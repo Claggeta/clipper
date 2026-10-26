@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "AI-assisted tool that finds clip-worthy moments in long-form video."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.1",
+]
 
 [project.scripts]
 clipper = "clipper:main"
