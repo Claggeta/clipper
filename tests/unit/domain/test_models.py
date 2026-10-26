@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from clipper.domain.models import Segment
+from clipper.domain.models import Segment, Transcript
 
 
 def test_segment_duration() -> None:
@@ -23,3 +23,31 @@ def test_segment_is_immutable() -> None:
     segment = Segment(start_seconds=0.0, end_seconds=1.0, text="hello")
     with pytest.raises(ValidationError):
         segment.text = "changed"  # type: ignore[misc]
+
+
+def _seg(start: float, end: float, text: str) -> Segment:
+    return Segment(start_seconds=start, end_seconds=end, text=text)
+
+
+def test_transcript_full_text_joins_segments() -> None:
+    transcript = Transcript(segments=[_seg(0, 1, "hello"), _seg(1, 2, "world")])
+    assert transcript.full_text == "hello world"
+
+
+def test_transcript_allows_empty() -> None:
+    assert Transcript(segments=[]).full_text == ""
+
+
+def test_transcript_rejects_out_of_order_segments() -> None:
+    with pytest.raises(ValidationError):
+        Transcript(segments=[_seg(5, 6, "b"), _seg(0, 1, "a")])
+
+
+def test_transcript_rejects_overlapping_segments() -> None:
+    with pytest.raises(ValidationError):
+        Transcript(segments=[_seg(0, 3, "a"), _seg(2, 4, "b")])
+
+
+def test_transcript_duration_is_last_segment_end() -> None:
+    transcript = Transcript(segments=[_seg(0, 1, "a"), _seg(2, 7.5, "b")])
+    assert transcript.duration_seconds == 7.5
