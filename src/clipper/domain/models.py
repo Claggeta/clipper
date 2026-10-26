@@ -42,3 +42,24 @@ class Transcript(BaseModel):
     @property
     def duration_seconds(self) -> float:
         return self.segments[-1].end_seconds if self.segments else 0.0
+
+
+class ClipCandidate(BaseModel):
+    """A time range the detector considers clip-worthy, with its score."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    score: float = Field(ge=0, le=1)
+    reasons: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> "ClipCandidate":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("end_seconds must be greater than start_seconds")
+        return self
+
+    @property
+    def duration_seconds(self) -> float:
+        return self.end_seconds - self.start_seconds

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from clipper.domain.models import Segment, Transcript
+from clipper.domain.models import ClipCandidate, Segment, Transcript
 
 
 def test_segment_duration() -> None:
@@ -51,3 +51,39 @@ def test_transcript_rejects_overlapping_segments() -> None:
 def test_transcript_duration_is_last_segment_end() -> None:
     transcript = Transcript(segments=[_seg(0, 1, "a"), _seg(2, 7.5, "b")])
     assert transcript.duration_seconds == 7.5
+
+
+def _candidate(**overrides: object) -> ClipCandidate:
+    fields: dict[str, object] = {
+        "start_seconds": 10.0,
+        "end_seconds": 40.0,
+        "score": 0.8,
+        "reasons": ["asks a question"],
+    }
+    fields.update(overrides)
+    return ClipCandidate(**fields)
+
+
+def test_candidate_duration() -> None:
+    assert _candidate().duration_seconds == 30.0
+
+
+def test_candidate_rejects_end_before_start() -> None:
+    with pytest.raises(ValidationError):
+        _candidate(start_seconds=40.0, end_seconds=10.0)
+
+
+@pytest.mark.parametrize("score", [-0.1, 1.1])
+def test_candidate_rejects_score_out_of_range(score: float) -> None:
+    with pytest.raises(ValidationError):
+        _candidate(score=score)
+
+
+def test_candidate_requires_reasons() -> None:
+    with pytest.raises(ValidationError):
+        _candidate(reasons=[])
+
+
+def test_candidate_is_immutable() -> None:
+    with pytest.raises(ValidationError):
+        _candidate().score = 0.1  # type: ignore[misc]
