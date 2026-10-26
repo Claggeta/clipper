@@ -22,4 +22,4 @@ def test_segment_rejects_negative_start() -> None:
 def test_segment_is_immutable() -> None:
     segment = Segment(start_seconds=0.0, end_seconds=1.0, text="hello")
     with pytest.raises(ValidationError):
-        segment.text = "changed"
+        segment.text = "changed"  # type: ignore[misc]
