@@ -37,6 +37,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 strict = true
 mypy_path = "src"
 files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
