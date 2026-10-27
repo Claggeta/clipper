@@ -63,3 +63,13 @@ class ClipCandidate(BaseModel):
     @property
     def duration_seconds(self) -> float:
         return self.end_seconds - self.start_seconds
+
+
+class AnalysisResult(BaseModel):
+    """The output of analyzing one video."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    transcript: Transcript
+    candidates: tuple[ClipCandidate, ...]
