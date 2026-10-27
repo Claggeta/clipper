@@ -5,6 +5,7 @@ description = "AI-assisted tool that finds clip-worthy moments in long-form vide
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "faster-whisper>=1.2.1",
     "pydantic>=2.14.1",
 ]
 
@@ -43,3 +44,6 @@ plugins = ["pydantic.mypy"]
 testpaths = ["tests"]
 addopts = "--cov=clipper --cov-report=term-missing"
 
+[[tool.mypy.overrides]]
+module = ["faster_whisper", "faster_whisper.*"]
+ignore_missing_imports = true
