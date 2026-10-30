@@ -130,7 +130,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 5. ~~Update the README with real usage and sample output from the actual run~~
    (done)
 6. Set the timing in `docs/vision.md`. (Done.)
-7. Tag `v0.1.0` with release notes.
+7. ~~Tag `v0.1.0` with release notes~~ (done; notes in
+   `docs/releases/v0.1.0.md`)
 8. ~~A manual test checklist for Whisper and ffmpeg, since CI cannot run
    them~~ (done)
 
