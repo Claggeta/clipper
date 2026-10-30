@@ -120,6 +120,9 @@ surfaced ffmpeg's stderr only to have the console mangle it.
 - A future change introduces a second place that formats ffmpeg output, at which
   point the line-capping logic should be a shared function rather than a second
   copy.
+  **Triggered by V2 (0007, 0009):** the clip renderer and the probe are further
+  places that format ffmpeg output, so V2 item 2 extracts the shared function
+  before either is written.
 
 ## Related
 

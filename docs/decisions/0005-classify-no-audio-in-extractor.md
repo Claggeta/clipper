@@ -44,7 +44,10 @@ case to its own design discussion.
 
 - A second failure mode needs classifying. Build the `ffprobe` probe then,
   instead of adding more string matches.
+  **Done in 0009** for render-time checks (duration, video stream). The no-audio
+  string match in the extractor is unchanged.
 
 ## Related
 
 - 0004: Report ffmpeg's actual error instead of the stderr tail
+- 0009: `render` reads the saved JSON and probes the media
