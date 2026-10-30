@@ -1,8 +1,13 @@
+import logging
 import shutil
 import subprocess
 from pathlib import Path
 
 from clipper.domain.errors import AudioExtractionError
+
+logger = logging.getLogger(__name__)
+
+_MAX_ERROR_LINES = 10
 
 
 class FfmpegAudioExtractor:
@@ -22,6 +27,9 @@ class FfmpegAudioExtractor:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         command = [
             self._executable,
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-y",
             "-i",
             str(video_path),
@@ -34,7 +42,10 @@ class FfmpegAudioExtractor:
         ]
         result = subprocess.run(command, capture_output=True, text=True, check=False)
         if result.returncode != 0:
+            logger.info("ffmpeg stderr:\n%s", result.stderr)
+            lines = [ln for ln in result.stderr.splitlines() if ln.strip()]
+            detail = "\n".join(lines[-_MAX_ERROR_LINES:])
             raise AudioExtractionError(
-                f"ffmpeg failed (exit {result.returncode}): {result.stderr[-500:]}"
+                f"ffmpeg failed (exit {result.returncode}): {detail}"
             )
         return output_path
