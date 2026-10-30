@@ -5,7 +5,9 @@ description = "AI-assisted tool that finds clip-worthy moments in long-form vide
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "av==17.0.0",
     "faster-whisper>=1.2.1",
+    "huggingface-hub<1.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
     "rich>=15.0.0",
