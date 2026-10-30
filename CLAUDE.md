@@ -125,7 +125,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 2. ~~Fix the truncated ffmpeg error~~ (done)
 3. ~~A clear error for a media file with no audio stream~~ (done)
 4. ~~CLI success-path test with an injectable transcriber~~ (done)
-5. Update the README with real usage and sample output from the actual run.
+5. ~~Update the README with real usage and sample output from the actual run~~
+   (done)
 6. Set the timing in `docs/vision.md`. (Done.)
 7. Tag `v0.1.0` with release notes.
 8. A manual test checklist for Whisper and ffmpeg, since CI cannot run them.
