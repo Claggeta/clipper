@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
@@ -70,7 +71,7 @@ def analyze(
     try:
         result = pipeline.run(video)
     except ClipperError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
     settings.output_dir.mkdir(parents=True, exist_ok=True)
