@@ -33,6 +33,21 @@ src layout. Dependencies point inward:
 Tests mirror the module under test: `tests/unit/<layer>/test_<module>.py`, plus
 `tests/integration/` for tests that use real third-party libraries.
 
+## Decision records
+
+Design decisions live in `docs/decisions/`, one ADR per decision, numbered.
+Read the ADRs that touch a file before changing it. The two that constrain
+current code:
+
+- `0003` — transcription dependency pins. Do not unpin `av` or
+  `huggingface-hub` without checking both conditions in the ADR.
+- `0004` — ffmpeg error reporting. `-hide_banner -loglevel error` is
+  load-bearing for the error message being readable. Removing it silently
+  degrades the message back toward ffmpeg's banner and metadata noise.
+
+A design decision that isn't in an ADR is a decision that will be undone by
+accident.
+
 ## Stack
 
 Python 3.12, uv, pydantic v2, pydantic-settings, ruff, mypy (strict, with the
@@ -93,6 +108,9 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    fire. Scores cluster low and `pace_signal` carries most of the weight.
    This is signal quality, not a bug, and it is the baseline future
    approaches are measured against.
+4. The tests for the ffmpeg adapter mock `subprocess.run`, so nothing in CI
+   confirms that `-loglevel error` leaves the cause line on stderr for a
+   given ffmpeg build. Item 8 closes this.
 
 ## M5 list
 
@@ -109,8 +127,11 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 ## Parked
 
 - ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
-  `exit 3199971767` for invalid data. Accurate but unreadable.
-- `chore(tests)`: the test-move plus weak-test fix are done.
+  `exit 3199971767` for invalid data. Fix: normalise negative `AVERROR`
+  values to signed form before display, and map the few codes this tool
+  actually produces (invalid data, no stream, permission denied) to a short
+  name, falling back to the bare signed number. `-1094995529` alone is no
+  friendlier than `3199971767`.
 - Docs drift in `docs/architecture.md`: omits `AudioExtractor` from core
   interfaces; says the CLI depends on core, but it imports adapters; promises
   CLI config flags that don't exist; says ffmpeg is checked at startup, when
