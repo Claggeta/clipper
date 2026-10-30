@@ -118,6 +118,8 @@ A cold run (no cached transcript, model already downloaded) took 14.3 s.
 - [Roadmap](docs/roadmap.md)
 - [Architecture](docs/architecture.md)
 - [Decision records](docs/decisions/)
+- [Manual test checklist](docs/manual-testing.md) (the ffmpeg and Whisper
+  checks CI cannot run)
 
 ## Development
 
