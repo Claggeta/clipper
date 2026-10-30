@@ -30,9 +30,10 @@ V1 user: the developer, running locally. No other users are assumed.
 - ML training
 
 ## Success Criteria
-1. `clipper analyze talk.mp4` runs end to end on a 30-minute video on a
-   local machine, completes in under N minutes (TBD, set in M2), and
-   outputs exactly 5 candidates.
+1. `clipper analyze talk.mp4` runs end to end on a local machine and outputs
+   at most 5 candidates. Measured on a 5:14 speech video on CPU with the
+   Whisper `base` model: 14.3 s cold, 0.4 s warm. A 30-minute video is not
+   yet measured, and will scale roughly with audio length.
 2. Detection is deterministic: the same transcript always produces the
    same top 5. Transcription itself may vary slightly between runs and
    model versions. Results are saved to disk.
