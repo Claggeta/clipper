@@ -29,6 +29,16 @@ V1 user: the developer, running locally. No other users are assumed.
 - User accounts
 - ML training
 
+## V2 Scope
+Input: the saved `AnalysisResult` JSON and the original video. Output: one
+rendered video file per clip-worthy candidate, optionally with captions
+burned in. Interface: a `clipper render` command.
+
+Non-goals for V2: vertical reframing or cropping, caption styling beyond one
+default, word-level captions, hardware encoders, concatenating clips, uploads,
+analytics, web UI, database, user accounts, ML training, and any change to
+the detector.
+
 ## Success Criteria
 1. `clipper analyze talk.mp4` runs end to end on a local machine and outputs
    at most 5 candidates. Measured on a 5:14 speech video on CPU with the
@@ -54,3 +64,5 @@ V1 user: the developer, running locally. No other users are assumed.
   V1 is a baseline to measure future approaches against.
 - CPU transcription of long videos may be slow. Transcripts are cached
   to mitigate this.
+- Re-encoding uses libx264, which is GPL. Clipper does not ship ffmpeg, and the
+  project's own license is still to be decided.
