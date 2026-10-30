@@ -58,6 +58,8 @@ skips transcription.
 ## Configuration
 
 Settings are read from environment variables. A `.env` file is not read.
+Relative paths resolve against the current directory, so run Clipper from the
+repo root or set absolute paths.
 
 | Variable               | Default       | Meaning                                |
 |------------------------|---------------|----------------------------------------|
