@@ -87,10 +87,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 1. CI stayed green while transcription was completely broken. Import-level
    checks and the fake transcriber never reach the real decode path. A smoke
    test now covers `decode_audio` (see `tests/integration/`).
-2. Truncated ffmpeg errors: `stderr[-500:]` shows the tail of ffmpeg's output,
-   which is the least useful part.
-3. Confusing message for a media file with no audio track.
-4. Detector signals are weak on real Whisper output. The `base` model omits
+2. Confusing message for a media file with no audio track.
+3. Detector signals are weak on real Whisper output. The `base` model omits
    much punctuation, so `question_signal` and `exclamation_signal` rarely
    fire. Scores cluster low and `pace_signal` carries most of the weight.
    This is signal quality, not a bug, and it is the baseline future
@@ -99,8 +97,7 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 ## M5 list
 
 1. ~~Smoke test for the real decode path~~ (done)
-2. Fix the truncated ffmpeg error, with a test asserting the message contains
-   ffmpeg's stderr.
+2. ~~Fix the truncated ffmpeg error~~ (done)
 3. A clear error for a media file with no audio stream.
 4. CLI success-path test with an injectable transcriber, which needs a small
    seam in the CLI. State the design first.
@@ -111,6 +108,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 
 ## Parked
 
+- ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
+  `exit 3199971767` for invalid data. Accurate but unreadable.
 - `chore(tests)`: the test-move plus weak-test fix are done.
 - Docs drift in `docs/architecture.md`: omits `AudioExtractor` from core
   interfaces; says the CLI depends on core, but it imports adapters; promises
