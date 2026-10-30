@@ -38,3 +38,5 @@ layer allowed to pick concrete adapter classes, so the seam had to live there.
 
 - A second command needs injected dependencies. Move to the context-object
   approach then.
+  **Triggered by `render` (0011):** the private-factory pattern is kept for the
+  second command, and the move to a context object now waits for a third.
