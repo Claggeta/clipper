@@ -6,6 +6,6 @@
 | M3: Clip detection  | Transcript → top 5 candidates via heuristics                | Strategy pattern, testing pure logic          | Done        |
 | M4: Pipeline + CLI  | End-to-end command with display and JSON output             | Orchestration, config, logging                | Done        |
 | M5: Hardening       | Error handling, docs, test coverage, v0.1.0 release         | Quality, semantic versioning                  | Done        |
-| V2 (later)          | Clip rendering with ffmpeg, captions                        | Subprocess handling, media                    | To do       |
+| V2 (later)          | Clip rendering with ffmpeg, captions                        | Subprocess handling, media                    | In progress |
 | V3 (later)          | Local LLM scoring, plus evaluation against labeled examples | ML evaluation                                 | To do       |
 | V4+ (later)         | Uploads, analytics, learning loop, database, API            | Persistence, integrations                     | To do       |

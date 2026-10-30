@@ -62,7 +62,7 @@ Python 3.12, uv, pydantic v2, pydantic-settings, ruff, mypy (strict, with the
 pydantic plugin), pytest + pytest-cov, pre-commit, GitHub Actions, Typer +
 rich, faster-whisper, ffmpeg.
 
-## V1 scope
+## V1 scope (shipped as `v0.1.0`)
 
 Input a local video file, generate a transcript, identify the top 5
 clip-worthy timestamps, and display the results. The interface is a CLI that
@@ -70,6 +70,17 @@ prints a table and saves JSON.
 
 Non-goals for V1: clip rendering, captions, uploads, analytics, web UI,
 database, user accounts, ML training.
+
+## V2 scope
+
+Input: the saved `AnalysisResult` JSON and the original video. Output: one
+rendered video file per clip-worthy candidate, optionally with captions
+burned in. Interface: a `clipper render` command.
+
+Non-goals for V2: vertical reframing or cropping, caption styling beyond one
+default, word-level captions, hardware encoders, concatenating clips, uploads,
+analytics, web UI, database, user accounts, ML training, and any change to
+the detector.
 
 ## Current state
 
@@ -85,6 +96,10 @@ All merged to `main` with green CI:
   CLI, with table output and JSON written to `data/output/`
 - M5: hardening, released as `v0.1.0` (pre-release). Notes are in
   `docs/releases/v0.1.0.md`.
+
+In progress:
+
+- V2: clip rendering and captions. See the V2 list below.
 
 ## Pinned dependencies
 
@@ -136,6 +151,25 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    `docs/releases/v0.1.0.md`)
 8. ~~A manual test checklist for Whisper and ffmpeg, since CI cannot run
    them~~ (done)
+
+## V2 list
+
+1. ADRs 0007 to 0011 for the rendering decisions (one docs PR)
+2. Extract a shared ffmpeg helper from `FfmpegAudioExtractor` (stderr line
+   cap, `which` check). Behaviour-neutral; this is the ADR 0004 trigger.
+3. `ffprobe` adapter behind a `MediaProbe` Protocol (duration, has video)
+4. Load a saved `AnalysisResult` from JSON, with the source-name check
+5. `ClipRenderer` Protocol, `ClipRenderError`, `RenderedClip`, fake renderer,
+   output naming
+6. `FfmpegClipRenderer`, no captions
+7. `clipper render` command with the `_build_renderer` seam
+8. Manual-test checklist: rendering, and a first real run
+9. Pure caption builder (transcript slice to SRT)
+10. Burn-in captions and a CLI flag
+11. Manual-test checklist: captions, README usage and sample output, release
+    notes, tag `v0.2.0`
+
+Before changing ffmpeg code, also read the V2 ADRs once they land.
 
 ## Parked
 
