@@ -5,7 +5,7 @@ import pytest
 
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.core.interfaces import AudioExtractor
-from clipper.domain.errors import AudioExtractionError
+from clipper.domain.errors import AudioExtractionError, NoAudioStreamError
 
 
 def test_satisfies_protocol() -> None:
@@ -121,3 +121,53 @@ def test_command_suppresses_banner_and_info_output(
 
     assert "-hide_banner" in captured[0]
     assert captured[0][captured[0].index("-loglevel") + 1] == "error"
+
+
+def test_no_audio_stream_raises_distinct_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    video = tmp_path / "silent.mp4"
+    video.write_bytes(b"x")
+    stderr = (
+        "[out#0/wav @ 000001b997ce11c0] Output file does not contain any stream\n"
+        "Error opening output file audio.wav.\n"
+        "Error opening output files: Invalid argument\n"
+    )
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", _failing_run(stderr))
+
+    with pytest.raises(NoAudioStreamError) as excinfo:
+        FfmpegAudioExtractor().extract(video, tmp_path / "a.wav")
+
+    assert isinstance(excinfo.value, AudioExtractionError)
+    assert str(video) in str(excinfo.value)
+    assert "audio track" in str(excinfo.value)
+
+
+def test_unrecognised_failure_stays_generic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", _failing_run("Invalid data found"))
+
+    with pytest.raises(AudioExtractionError) as excinfo:
+        FfmpegAudioExtractor().extract(video, tmp_path / "a.wav")
+
+    assert not isinstance(excinfo.value, NoAudioStreamError)
+
+
+def test_command_maps_first_audio_stream_optionally(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    captured: list[list[str]] = []
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", _failing_run("boom", captured))
+
+    with pytest.raises(AudioExtractionError):
+        FfmpegAudioExtractor().extract(video, tmp_path / "a.wav")
+
+    assert captured[0][captured[0].index("-map") + 1] == "0:a:0?"

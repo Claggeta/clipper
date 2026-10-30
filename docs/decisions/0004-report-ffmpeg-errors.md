@@ -1,6 +1,6 @@
 # 0004: Report ffmpeg's actual error instead of the stderr tail
 
-- Status: Accepted
+- Status: Accepted (the "adapter stays agnostic" clause is amended by 0005)
 - Date: 2026-10-30
 
 ## Context
@@ -75,6 +75,7 @@ surfaced ffmpeg's stderr only to have the console mangle it.
   the no-audio case has a different user message and deserves its own design
   discussion. Deferred to the no-audio work, where the tradeoff between string
   matching and an `ffprobe` pre-check will be decided. See "Revisit when".
+  **Decided in 0005: string match in the extractor.**
 
 ## Consequences
 

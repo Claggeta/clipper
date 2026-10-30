@@ -6,5 +6,9 @@ class AudioExtractionError(ClipperError):
     """Raised when audio cannot be extracted from a media file."""
 
 
+class NoAudioStreamError(AudioExtractionError):
+    """Raised when a media file contains no audio stream to extract."""
+
+
 class TranscriptionError(ClipperError):
     """Raised when a transcript cannot be produced."""
