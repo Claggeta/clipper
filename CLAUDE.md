@@ -36,7 +36,7 @@ Tests mirror the module under test: `tests/unit/<layer>/test_<module>.py`, plus
 ## Decision records
 
 Design decisions live in `docs/decisions/`, one ADR per decision, numbered.
-Read the ADRs that touch a file before changing it. The three that constrain
+Read the ADRs that touch a file before changing it. The four that constrain
 current code:
 
 - `0003` — transcription dependency pins. Do not unpin `av` or
@@ -49,6 +49,9 @@ current code:
   `does not contain any stream` and raises `NoAudioStreamError`; anything else
   stays a generic `AudioExtractionError`. The command uses `-map 0:a:0?`, not
   `-map 0:a?`, which breaks the WAV muxer on multi-audio files.
+- `0006` — CLI transcriber seam. `cli/main.py` builds the transcriber in
+  `_build_transcriber(settings)`, which tests monkeypatch. Do not add an
+  env/Settings switch for test doubles.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -121,8 +124,7 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 1. ~~Smoke test for the real decode path~~ (done)
 2. ~~Fix the truncated ffmpeg error~~ (done)
 3. ~~A clear error for a media file with no audio stream~~ (done)
-4. CLI success-path test with an injectable transcriber, which needs a small
-   seam in the CLI. State the design first.
+4. ~~CLI success-path test with an injectable transcriber~~ (done)
 5. Update the README with real usage and sample output from the actual run.
 6. Set the timing in `docs/vision.md`. (Done.)
 7. Tag `v0.1.0` with release notes.
