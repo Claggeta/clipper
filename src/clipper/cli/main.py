@@ -13,6 +13,7 @@ from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
 from clipper.adapters.transcription.video import VideoTranscriber
 from clipper.core.config import Settings
+from clipper.core.interfaces import Transcriber
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.domain.errors import ClipperError
 from clipper.domain.models import AnalysisResult
@@ -42,6 +43,16 @@ def _render(result: AnalysisResult) -> None:
     console.print(table)
 
 
+def _build_transcriber(settings: Settings) -> Transcriber:
+    """Compose the real transcriber. Tests replace this to avoid Whisper/ffmpeg."""
+    whisper = FasterWhisperTranscriber(model_size=settings.whisper_model)
+    return CachingTranscriber(
+        VideoTranscriber(FfmpegAudioExtractor(), whisper),
+        settings.cache_dir,
+        namespace=whisper.name,
+    )
+
+
 @app.callback()
 def _root() -> None:
     """Clipper command line interface."""
@@ -58,14 +69,8 @@ def analyze(
         format="%(levelname)s %(name)s: %(message)s",
     )
     settings = Settings()
-    whisper = FasterWhisperTranscriber(model_size=settings.whisper_model)
-    transcriber = CachingTranscriber(
-        VideoTranscriber(FfmpegAudioExtractor(), whisper),
-        settings.cache_dir,
-        namespace=whisper.name,
-    )
     pipeline = AnalysisPipeline(
-        transcriber, HeuristicClipDetector(top_n=settings.top_n)
+        _build_transcriber(settings), HeuristicClipDetector(top_n=settings.top_n)
     )
 
     try:
