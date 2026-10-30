@@ -2,9 +2,8 @@
 
 AI-assisted tool that finds clip-worthy moments in long-form video.
 
-**Status:** V1 works locally as a command-line tool. The first release
-(v0.1.0) is in preparation. Clip rendering, captions, uploads and analytics
-are not built yet.
+**Status:** V1 works locally as a command-line tool (v0.1.0). Clip rendering,
+captions, uploads and analytics are not built yet.
 
 ## What it does
 
