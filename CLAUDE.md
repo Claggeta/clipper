@@ -36,14 +36,19 @@ Tests mirror the module under test: `tests/unit/<layer>/test_<module>.py`, plus
 ## Decision records
 
 Design decisions live in `docs/decisions/`, one ADR per decision, numbered.
-Read the ADRs that touch a file before changing it. The two that constrain
+Read the ADRs that touch a file before changing it. The three that constrain
 current code:
 
 - `0003` — transcription dependency pins. Do not unpin `av` or
   `huggingface-hub` without checking both conditions in the ADR.
 - `0004` — ffmpeg error reporting. `-hide_banner -loglevel error` is
   load-bearing for the error message being readable. Removing it silently
-  degrades the message back toward ffmpeg's banner and metadata noise.
+  degrades the message back toward ffmpeg's banner and metadata noise. Its
+  "adapter stays agnostic" clause is amended by 0005.
+- `0005` — no-audio classification. The ffmpeg extractor matches
+  `does not contain any stream` and raises `NoAudioStreamError`; anything else
+  stays a generic `AudioExtractionError`. The command uses `-map 0:a:0?`, not
+  `-map 0:a?`, which breaks the WAV muxer on multi-audio files.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -102,13 +107,12 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 1. CI stayed green while transcription was completely broken. Import-level
    checks and the fake transcriber never reach the real decode path. A smoke
    test now covers `decode_audio` (see `tests/integration/`).
-2. Confusing message for a media file with no audio track.
-3. Detector signals are weak on real Whisper output. The `base` model omits
+2. Detector signals are weak on real Whisper output. The `base` model omits
    much punctuation, so `question_signal` and `exclamation_signal` rarely
    fire. Scores cluster low and `pace_signal` carries most of the weight.
    This is signal quality, not a bug, and it is the baseline future
    approaches are measured against.
-4. The tests for the ffmpeg adapter mock `subprocess.run`, so nothing in CI
+3. The tests for the ffmpeg adapter mock `subprocess.run`, so nothing in CI
    confirms that `-loglevel error` leaves the cause line on stderr for a
    given ffmpeg build. Item 8 closes this.
 
@@ -116,7 +120,7 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 
 1. ~~Smoke test for the real decode path~~ (done)
 2. ~~Fix the truncated ffmpeg error~~ (done)
-3. A clear error for a media file with no audio stream.
+3. ~~A clear error for a media file with no audio stream~~ (done)
 4. CLI success-path test with an injectable transcriber, which needs a small
    seam in the CLI. State the design first.
 5. Update the README with real usage and sample output from the actual run.
