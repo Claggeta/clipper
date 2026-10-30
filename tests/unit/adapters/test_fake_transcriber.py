@@ -2,6 +2,7 @@ from pathlib import Path
 
 from clipper.adapters.transcription.fake import FakeTranscriber
 from clipper.core.interfaces import Transcriber
+from clipper.domain.models import Segment, Transcript
 
 
 def test_fake_transcriber_satisfies_protocol() -> None:
@@ -16,11 +17,14 @@ def test_fake_transcriber_returns_transcript() -> None:
 
 
 def test_fake_transcriber_can_accept_custom_transcript() -> None:
-    custom = FakeTranscriber(transcript=None)
-    assert custom.transcribe(Path("x.mp4")).segments
+    custom = Transcript(
+        segments=(Segment(start_seconds=0.0, end_seconds=2.0, text="custom"),)
+    )
+    transcriber = FakeTranscriber(transcript=custom)
+    assert transcriber.transcribe(Path("x.mp4")).full_text == "custom"
 
 
-def test_fake_transcriber_reflects_media_path_independence() -> None:
+def test_fake_transcriber_ignores_media_path() -> None:
     transcriber = FakeTranscriber()
     assert transcriber.transcribe(Path("a.mp4")) == transcriber.transcribe(
         Path("b.mp4")
