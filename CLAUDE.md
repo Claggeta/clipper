@@ -117,7 +117,9 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    approaches are measured against.
 3. The tests for the ffmpeg adapter mock `subprocess.run`, so nothing in CI
    confirms that `-loglevel error` leaves the cause line on stderr for a
-   given ffmpeg build. Item 8 closes this.
+   given ffmpeg build. `docs/manual-testing.md` (step F1) checks this by hand.
+   Run it when ffmpeg, faster-whisper, av or huggingface-hub change, and before
+   a release.
 
 ## M5 list
 
@@ -129,7 +131,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    (done)
 6. Set the timing in `docs/vision.md`. (Done.)
 7. Tag `v0.1.0` with release notes.
-8. A manual test checklist for Whisper and ffmpeg, since CI cannot run them.
+8. ~~A manual test checklist for Whisper and ffmpeg, since CI cannot run
+   them~~ (done)
 
 ## Parked
 
