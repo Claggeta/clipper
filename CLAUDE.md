@@ -83,6 +83,8 @@ All merged to `main` with green CI:
   emphasis words, pace) over sliding windows, with overlap deduplication
 - M4: `AnalysisPipeline`, `Settings`, and the `clipper analyze <video> [-v]`
   CLI, with table output and JSON written to `data/output/`
+- M5: hardening, released as `v0.1.0` (pre-release). Notes are in
+  `docs/releases/v0.1.0.md`.
 
 ## Pinned dependencies
 
