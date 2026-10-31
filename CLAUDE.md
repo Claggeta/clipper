@@ -179,7 +179,7 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    (done)
 5. ~~`ClipRenderer` Protocol, `ClipRenderError`, `RenderedClip`, fake renderer,
    output naming~~ (done)
-6. `FfmpegClipRenderer`, no captions
+6. ~~`FfmpegClipRenderer`, no captions~~ (done)
 7. `clipper render` command with the `_build_renderer` seam
 8. Manual-test checklist: rendering, and a first real run
 9. Pure caption builder (transcript slice to SRT)
