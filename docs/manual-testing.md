@@ -1105,9 +1105,10 @@ copies), `over-1.png` and `over-3.png` show no caption, and `over-2.png` shows
 
 ### C7. Awkward text (constructed)
 
-Uses `cap-awkward.json`. `build_srt` removes `{ } < >` (ADR 0010), so the
+Uses `cap-awkward.json`. `build_srt` removes `{ } < > \` (ADR 0010), so the
 expected text on screen is below. The emoji is outside the Basic Multilingual
-Plane, and the last line has backslashes. Neither was checked before this step.
+Plane, and the last line has backslashes, which libass reads as a line break
+(`\n`) when they are left in.
 
 ```powershell
 Reset-CapClips
@@ -1124,15 +1125,15 @@ for ($k = 0; $k -lt 6; $k++) { Save-Frame $f $mid[$k] "$S\awk$($k + 1).png"; Inv
 | `awk3.png` | the word `café` and the word `naïve`, with their accents |
 | `awk4.png` | `before` and `after`. Observe and record the emoji |
 | `awk5.png` | `it's 100% "fine" & ok` |
-| `awk6.png` | observe and record: `path C:\new\table` as written, or a line break at `\n` |
+| `awk6.png` | `path C:newtable`, on one line, with no gap and no letter missing |
 
 Pass: exit 0 and all six frames show their text. The words around the emoji in
 `awk4.png` must be present. The emoji itself may be missing or a box, because
 the font that rendered in ADR 0010 looks like Arial. Record what you saw.
 
-Observe and record `awk6.png`. If `\new` turned into a line break, libass read
-`\n` as markup. That is a new finding and needs an ADR 0010 amendment and a
-code change. Do not fold it into a release.
+Fail `awk6.png` if it shows `C: ew` or any `\`. That is the finding the
+backslash amendment in ADR 0010 fixed: the removal of `\` in `_MARKUP` has been
+lost.
 
 ### C8. How it looks (observe and record)
 
@@ -1302,10 +1303,13 @@ maintainer.
 - C2, C3, C6, C7 and C8 also have frames to look at. The maintainer reported
   that the frames looked good. Notes for individual frames, such as the emoji
   in `awk4.png` and the backslash line `awk6.png` in C7, were not given.
+- This run was on the code before the backslash fix (#54), when `awk6.png`
+  was still "observe and record".
 - Before this run, the same C7 commands were run on generated media by the
   assistant that wrote the checklist, with `Invoke-Item` stubbed. `awk6.png` showed
   `path C: ew\table` for `path C:\new\table`: libass swallowed the `\n`. The
-  emoji drew as a glyph. This was not a run of the full checklist.
+  emoji drew as a glyph. This was not a run of the full checklist. After the
+  fix, the same cue showed `path C:newtable` on the same build.
 - Not covered by this run: a build without libass, other ffmpeg builds, and a
   second drive.
 
