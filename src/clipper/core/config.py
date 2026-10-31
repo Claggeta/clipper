@@ -12,3 +12,4 @@ class Settings(BaseSettings):
     top_n: int = 5
     cache_dir: Path = Path("data/cache")
     output_dir: Path = Path("data/output")
+    clips_dir: Path = Path("data/clips")

@@ -44,6 +44,27 @@ one can fail while others succeed.
 - (−) `--rank` refers to positions in the JSON, which is score order at the time
   `analyze` ran. A hand-edited JSON changes what a rank means.
 
+## Amended by the `render` command PR (V2 item 7)
+
+- Check order, all exit 1 with nothing written: load the JSON, source name,
+  rank selection, probe and video stream, duration, `plan_clip_paths`. Cheap
+  checks run before the `ffprobe` subprocess.
+- `--rank` values are validated by `render` and raise `ClipRenderError`, not
+  Typer's usage error, so `0` and `99` both exit 1. Duplicates are dropped and
+  clips render in ascending rank order, whatever order the flags were given.
+- The duration check (0009) and the collision check (0008) cover the selected
+  candidates only. A bad or colliding candidate that was not asked for does not
+  block a `--rank` run.
+- A result with no candidates exits 1 ("no candidates to render").
+- The duration check is strict: a candidate ending even slightly past the
+  probed duration fails. If real runs show Whisper segment ends overshooting
+  the container duration, add a small tolerance and amend 0009.
+- Output is plain lines, not a table: one `Rendered #N <span> <path>` per
+  success as it completes, then each failure, then
+  `Rendered X of Y clips to <dir>`. Messages are escaped for rich markup.
+- `render` has no `-v`, so the full ffmpeg stderr INFO log (0004) is not
+  reachable from the CLI yet.
+
 ## Revisit when
 
 - A third command or a third injected dependency appears. Move to the context
