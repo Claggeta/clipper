@@ -13,6 +13,10 @@ The [Rendering](#rendering) section covers `clipper render` the same way. The
 render tests patch `_build_renderer` and `_build_probe` (ADR 0011), so nothing
 in CI runs the real `ffprobe` JSON parsing or the real clip encode.
 
+The [Captions](#captions) section covers `clipper render --captions`. The
+renderer tests mock `subprocess.run`, so nothing in CI runs the real `subtitles`
+filter.
+
 ## When to run it
 
 - Before tagging a release.
@@ -23,6 +27,9 @@ in CI runs the real `ffprobe` JSON parsing or the real clip encode.
 - After any change to `src/clipper/adapters/rendering/`,
   `src/clipper/adapters/media/ffprobe.py`, `src/clipper/adapters/results/`,
   or the `render` command. Run the [Rendering](#rendering) section.
+- After any change to `src/clipper/core/captions.py`, the `subtitles` filter or
+  its style in `adapters/rendering/ffmpeg.py`, or after changing to an ffmpeg
+  build. Run the [Captions](#captions) section.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -769,6 +776,391 @@ The exit number may show as an unsigned 32-bit value on Windows. That is the
 parked issue in `CLAUDE.md`. Do not fail the step on it. If ffmpeg unexpectedly
 succeeds here, record that and the contents of the folder.
 
+## Captions
+
+Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),
+[0011](decisions/0011-render-command-shape-and-failure-policy.md)). Run the
+Rendering section's R0 first, in the same PowerShell window. These steps use
+`$S`, `$Src`, `$Json`, `$r` and `testsrc.mp4` from R0.
+
+Fixtures marked **constructed** are made by the commands in C0 and are not real
+analysis output.
+
+`CLIPPER_CLIPS_DIR` is set on the render command only and put back afterwards,
+by `Invoke-RenderC` below. R0 sets it for the whole session. Before running
+`uv run pytest` in this window, remove it:
+
+```powershell
+Remove-Item Env:CLIPPER_CLIPS_DIR -ErrorAction SilentlyContinue
+```
+
+`tests/unit/core/test_config.py::test_clips_dir_default` fails if it is set.
+
+### C0. Setup
+
+```powershell
+$CapClips = "$S\clips-captions"
+
+# Helper: like Invoke-Render, with --captions as a switch, and a clips folder
+# passed in. CLIPPER_CLIPS_DIR is set for this one command and restored.
+function Invoke-RenderC {
+  param([string]$Video, [string]$ResultJson, [string]$Clips,
+        [int[]]$Rank = @(), [switch]$Captions)
+  $parts = @()
+  foreach ($n in $Rank) { $parts += "--rank $n" }
+  if ($Captions) { $parts += "--captions" }
+  $old = $env:CLIPPER_CLIPS_DIR
+  $env:CLIPPER_CLIPS_DIR = $Clips
+  try {
+    cmd /c "uv run clipper render `"$Video`" `"$ResultJson`" $($parts -join ' ') > `"$S\last.txt`" 2>&1"
+    $script:Code = $LASTEXITCODE
+  } finally {
+    if ($null -eq $old) { Remove-Item Env:CLIPPER_CLIPS_DIR -ErrorAction SilentlyContinue }
+    else { $env:CLIPPER_CLIPS_DIR = $old }
+  }
+  $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  "exit $Code"
+  $Text
+}
+function Reset-CapClips { Remove-Item -Recurse -Force $CapClips -ErrorAction SilentlyContinue }
+function Show-CapClips {
+  if (Test-Path $CapClips) { Get-ChildItem $CapClips | Select-Object Name, Length | Format-Table -AutoSize }
+  else { "(clips folder does not exist)" }
+}
+function Get-CaptionTempCount {
+  @(Get-ChildItem $env:TEMP -Directory -Filter "clipper-captions-*" -ErrorAction SilentlyContinue).Count
+}
+
+# Helper: one frame of a clip at T seconds (clip time).
+function Save-Frame($Clip, [double]$T, $Png) {
+  $ts = $T.ToString("F3", [Globalization.CultureInfo]::InvariantCulture)
+  ffmpeg -hide_banner -loglevel error -y -ss $ts -i $Clip -frames:v 1 $Png
+}
+
+# Helper: the transcript segments that overlap a candidate, with clip-relative
+# times. This is what the SRT should contain.
+function Get-Cues($Res, [int]$Rank) {
+  $c = $Res.candidates[$Rank - 1]
+  foreach ($s in $Res.transcript.segments) {
+    # [double] casts: JSON whole numbers are integers, and [Math]::Max(10, 12.5)
+    # would pick the integer overload and return 12.
+    $a = [Math]::Max([double]$s.start_seconds, [double]$c.start_seconds)
+    $b = [Math]::Min([double]$s.end_seconds, [double]$c.end_seconds)
+    if ($b -gt $a) {
+      [pscustomobject]@{ Start = $a - $c.start_seconds; End = $b - $c.start_seconds; Text = $s.text.Trim() }
+    }
+  }
+}
+
+# Helper (constructed fixtures): a result JSON with a transcript.
+# Spans are "start-end"; Segments are "start|end|text". Written as UTF-8
+# without a BOM, which is what the JSON loader expects.
+function New-CapResult {
+  param([string]$Path, [string]$Source, [string[]]$Spans, [string[]]$Segments)
+  $cands = @(foreach ($sp in $Spans) {
+    $a, $b = $sp -split "-"
+    @{ start_seconds = [double]$a; end_seconds = [double]$b; score = 0.5; reasons = @("constructed") }
+  })
+  $segs = @(foreach ($sg in $Segments) {
+    $a, $b, $t = $sg -split "\|", 3
+    @{ start_seconds = [double]$a; end_seconds = [double]$b; text = $t }
+  })
+  $doc = @{ source = $Source; transcript = @{ segments = $segs }; candidates = $cands }
+  [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $doc -Depth 6),
+    (New-Object Text.UTF8Encoding $false))
+}
+
+# Constructed: testsrc.mp4 (from R0), two candidates (12.5-20 and 25-35).
+# Segment 10-12.5 only touches the first clip's start, 21-24 is between the
+# clips, so the first clip has no speech. The second clip has one segment.
+New-CapResult "$S\cap-nospeech.json" "testsrc.mp4" @("12.5-20", "25-35") @(
+  "0|5|far before both clips",
+  "10|12.5|touches the start edge of clip one",
+  "21|24|between the clips",
+  "26|33|words inside the second clip")
+
+# Constructed: one candidate, six segments of awkward text (C7).
+$e  = [string][char]0x00E9           # e with acute
+$i  = [string][char]0x00EF           # i with diaeresis
+$em = [char]::ConvertFromUtf32(0x1F600)   # outside the Basic Multilingual Plane
+New-CapResult "$S\cap-awkward.json" "testsrc.mp4" @("12.5-20") @(
+  "12.5|13.75|braces {a} and <b>bold</b> end",
+  "13.75|15|arrow --> and 5 > 3",
+  "15|16.25|caf$e na${i}ve",
+  "16.25|17.5|before $em after",
+  "17.5|18.75|it's 100% `"fine`" & ok",
+  "18.75|20|path C:\new\table")
+
+# Constructed: a 1280x720 source with the same name as testsrc.mp4 (C8).
+New-Item -ItemType Directory -Force "$S\hd" | Out-Null
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc=size=1280x720:rate=25:duration=40" `
+  -f lavfi -i "sine=frequency=440:duration=40" -shortest `
+  -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\hd\testsrc.mp4"
+
+# Constructed: a result for testsrc.mp4 with speech in both clips, for C4 to C6.
+New-CapResult "$S\cap-testsrc.json" "testsrc.mp4" @("12.5-20", "25-35") @(
+  "13|19|first clip speech",
+  "26|34|second clip speech")
+
+"captions temp folders before any run: " + (Get-CaptionTempCount)
+```
+
+Pass: the `ffmpeg` command prints nothing, and the last line prints a number.
+Record it. It should be `0`. If it is not, a folder was left by an earlier run,
+and C4 must be read against that number and not against zero.
+
+### C1. Render every candidate with captions (the first real run)
+
+```powershell
+Reset-CapClips
+$t = Measure-Command { Invoke-RenderC $Src $Json $CapClips -Captions | Out-Null }
+$Code; $Text
+"seconds: $($t.TotalSeconds)"
+Show-CapClips
+Invoke-RenderC $Src $Json $CapClips | Out-Null   # same clips, no flag
+$Text
+```
+
+Pass:
+
+- Exit 0 for both runs.
+- With `--captions`, each `Rendered #N ...` line ends with ` (captions)`. A
+  `Note: #N ... has no speech in range` line is also valid for a candidate
+  that has no speech in range. Record any.
+- Without the flag the same lines have no suffix, and the file names are the
+  same (ADR 0008).
+- The last line is `Rendered X of X clips to <clips folder>` in both runs.
+
+Record the seconds. R1 gave the plain render time for the same candidates, so
+the difference is the cost of the `subtitles` filter.
+
+### C2. Caption text and timing match the transcript
+
+Compares the burned-in text with the saved transcript, on the real clip with
+the highest rank. The source video may have text of its own in the picture. If
+it does, compare against the transcript and not against that text.
+
+```powershell
+Reset-CapClips
+Invoke-RenderC $Src $Json $CapClips -Rank 1 -Captions
+$Clip = (Get-ChildItem $CapClips -Filter "*.mp4" | Select-Object -First 1).FullName
+$cues = @(Get-Cues $r 1)
+$cues | Format-Table @{n="Start";e={"{0:N2}" -f $_.Start}}, @{n="End";e={"{0:N2}" -f $_.End}}, `
+  @{n="Len";e={"{0:N2}" -f ($_.End - $_.Start)}}, Text -AutoSize -Wrap
+$pick = @($cues[0], $cues[[int](($cues.Count - 1) / 2)], $cues[-1])
+$n = 0
+foreach ($c in $pick) {
+  $n++
+  Save-Frame $Clip (($c.Start + $c.End) / 2) "$S\cue$n.png"
+  "cue$n.png : middle of '" + $c.Text + "'"
+}
+Remove-Item "$S\before.png" -ErrorAction SilentlyContinue
+if ($cues[0].Start -gt 0.5) { Save-Frame $Clip ($cues[0].Start / 2) "$S\before.png"; "before.png : before the first cue" }
+1..3 | ForEach-Object { Invoke-Item "$S\cue$_.png" }
+if (Test-Path "$S\before.png") { Invoke-Item "$S\before.png" }
+```
+
+Pass:
+
+- Each `cueN.png` shows the text printed on its line, perhaps wrapped over
+  several lines, inside the frame, near the bottom.
+- `before.png`, if made, shows no caption.
+- The text has none of `{ } < >` in it.
+
+Then list the short cues in all candidates. A segment that crosses the edge of a
+clip keeps its full text for the part inside the clip, so a short overlap
+flashes a whole sentence (ADR 0010):
+
+```powershell
+1..$r.candidates.Count | ForEach-Object {
+  $k = $_
+  Get-Cues $r $k | Where-Object { ($_.End - $_.Start) -lt 0.5 } | ForEach-Object {
+    "rank {0}: {1:N2}-{2:N2} ({3:N2} s) {4}" -f $k, $_.Start, $_.End, ($_.End - $_.Start), $_.Text
+  }
+}
+```
+
+Observe and record: how many cues are shorter than 0.5 s, and whether you
+would want a minimum overlap. ADR 0010 left that decision to this step. Do not
+fail the step on it.
+
+### C3. A clip with no speech renders plain, with a note (constructed)
+
+Uses `cap-nospeech.json`. Clip 1 (12.5 to 20 s) has no speech in range.
+A segment that ends exactly at 12.5 s must not count. Clip 2 (25 to 35 s) has
+one segment.
+
+```powershell
+Reset-CapClips
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-nospeech.json" $CapClips -Captions
+Show-CapClips
+Save-Frame "$CapClips\testsrc_000012-000020.mp4" 3 "$S\nospeech-1.png"
+Save-Frame "$CapClips\testsrc_000025-000035.mp4" 4.5 "$S\nospeech-2.png"
+Invoke-Item "$S\nospeech-1.png"; Invoke-Item "$S\nospeech-2.png"
+```
+
+Pass:
+
+- Exit 0.
+- A line `Note: #1 0:00:12-0:00:20 has no speech in range; rendered without
+  captions`, before the `Rendered #1` line, and the `Rendered #1` line has no
+  ` (captions)`.
+- `Rendered #2 0:00:25-0:00:35 <path> (captions)`.
+- The last line is `Rendered 2 of 2 clips to <clips folder>`.
+- `nospeech-1.png` shows no caption. `nospeech-2.png` shows `words inside the
+  second clip`.
+
+### C4. The temporary folder does not leak
+
+`TemporaryDirectory(ignore_cleanup_errors=True)` hides a failed cleanup on
+purpose, so only a count shows it. Compare with the number from C0.
+
+```powershell
+$base = Get-CaptionTempCount
+Reset-CapClips
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Captions | Out-Null
+"after success: exit $Code, folders " + (Get-CaptionTempCount) + " (before: $base)"
+
+# Constructed failure, as in R14: a folder where the second clip's file goes.
+Reset-CapClips
+New-Item -ItemType Directory -Force "$CapClips\testsrc_000025-000035.mp4" | Out-Null
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Captions
+"after failure: folders " + (Get-CaptionTempCount) + " (before: $base)"
+Show-CapClips
+```
+
+Pass:
+
+- After the success run: exit 0, and the count equals `$base`.
+- After the failure run: `Rendered #1 ... (captions)`, a `Failed: #2
+  0:00:25-0:00:35: ffmpeg failed (exit ...): ...` line, `Rendered 1 of 2 clips`,
+  exit 1, no traceback, and the count equals `$base`. Record ffmpeg's cause
+  line. On R14 it was `Permission denied`; with a caption filter it may differ.
+- The blocking folder is still there, and `testsrc_000012-000020.mp4` exists.
+
+Fail: the count went up. The folder was not removed.
+
+### C5. Paths with spaces, a relative path and a drive letter
+
+ffmpeg runs with the temporary folder as its working directory, so the input
+and output paths are made absolute first (ADR 0010). These runs try to break
+that. Every path here is on the `C:` drive already, which covers the drive
+letter in the paths ffmpeg sees. Run from the repo root.
+
+```powershell
+# a) a video path with spaces, and a clips folder with spaces
+New-Item -ItemType Directory -Force "$S\with space" | Out-Null
+Copy-Item "$S\testsrc.mp4" "$S\with space\testsrc.mp4"
+Invoke-RenderC "$S\with space\testsrc.mp4" "$S\cap-testsrc.json" "$S\clips with space" -Rank 1 -Captions
+Get-ChildItem "$S\clips with space" | Select-Object Name, Length
+
+# b) a relative video path and a relative clips folder
+$RelVideo = Resolve-Path -Relative "$S\testsrc.mp4"
+$RelClips = ".\data\clips-captions-manual"
+Remove-Item -Recurse -Force $RelClips -ErrorAction SilentlyContinue
+"relative video: $RelVideo"
+Invoke-RenderC $RelVideo "$S\cap-testsrc.json" $RelClips -Rank 1 -Captions
+Get-ChildItem $RelClips | Select-Object Name, Length
+Remove-Item -Recurse -Force $RelClips
+
+"folders left: " + (Get-CaptionTempCount)
+```
+
+Pass: for both a) and b), exit 0, a `Rendered #1 ... (captions)` line, and a
+non-empty `testsrc_000012-000020.mp4`. In b) the clip is in the repo's
+`data\clips-captions-manual` and not in the temporary folder. The step removes
+that folder at the end. The last line equals `$base` from C4.
+
+Optional: if you have a second drive, repeat a) with a clips folder on it
+(`D:\clipper-test`, say) and record the result. Write "no second drive" if you
+do not.
+
+### C6. Plain and captioned clips overwrite each other
+
+A captioned clip has the same file name as a plain one (ADR 0008), so
+`--captions` overwrites an earlier plain clip of the same span, and the other
+way round.
+
+```powershell
+Reset-CapClips
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Rank 2 | Out-Null
+$f = "$CapClips\testsrc_000025-000035.mp4"
+$h1 = (Get-FileHash $f).Hash; $s1 = (Get-Item $f).Length
+Save-Frame $f 4.5 "$S\over-1.png"
+
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Rank 2 -Captions | Out-Null
+"captioned: exit $Code, hash changed: " + ((Get-FileHash $f).Hash -ne $h1) + ", size $s1 -> " + (Get-Item $f).Length
+Save-Frame $f 4.5 "$S\over-2.png"
+
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Rank 2 | Out-Null
+"plain again: exit $Code"
+Save-Frame $f 4.5 "$S\over-3.png"
+"files: " + @(Get-ChildItem $CapClips).Count
+1..3 | ForEach-Object { Invoke-Item "$S\over-$_.png" }
+```
+
+Pass: `hash changed: True`, one file in the folder (no numbered or suffixed
+copies), `over-1.png` and `over-3.png` show no caption, and `over-2.png` shows
+`second clip speech`.
+
+### C7. Awkward text (constructed)
+
+Uses `cap-awkward.json`. `build_srt` removes `{ } < >` (ADR 0010), so the
+expected text on screen is below. The emoji is outside the Basic Multilingual
+Plane, and the last line has backslashes. Neither was checked before this step.
+
+```powershell
+Reset-CapClips
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions
+$f = "$CapClips\testsrc_000012-000020.mp4"
+$mid = 0.625, 1.875, 3.125, 4.375, 5.625, 6.875
+for ($k = 0; $k -lt 6; $k++) { Save-Frame $f $mid[$k] "$S\awk$($k + 1).png"; Invoke-Item "$S\awk$($k + 1).png" }
+```
+
+| Frame | Expected on screen |
+|-------|--------------------|
+| `awk1.png` | `braces a and bbold/b end` |
+| `awk2.png` | `arrow -- and 5 3` |
+| `awk3.png` | the word `café` and the word `naïve`, with their accents |
+| `awk4.png` | `before` and `after`. Observe and record the emoji |
+| `awk5.png` | `it's 100% "fine" & ok` |
+| `awk6.png` | observe and record: `path C:\new\table` as written, or a line break at `\n` |
+
+Pass: exit 0 and all six frames show their text. The words around the emoji in
+`awk4.png` must be present. The emoji itself may be missing or a box, because
+the font that rendered in ADR 0010 looks like Arial. Record what you saw.
+
+Observe and record `awk6.png`. If `\new` turned into a line break, libass read
+`\n` as markup. That is a new finding and needs an ADR 0010 amendment and a
+code change. Do not fold it into a release.
+
+### C8. How it looks (observe and record)
+
+The style is `FontSize=18,Outline=2,Shadow=0,MarginV=30`, looked at on two
+frames in ADR 0010 and not tuned. This step records what it looks like at two
+sizes. It has no pass line. Use the constructed 640x360 `testsrc.mp4` and the
+1280x720 copy from C0.
+
+```powershell
+Reset-CapClips
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions | Out-Null
+$sd = "$CapClips\testsrc_000012-000020.mp4"
+Copy-Item $sd "$S\style-640.mp4"
+Invoke-RenderC "$S\hd\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions | Out-Null
+Copy-Item $sd "$S\style-1280.mp4"
+foreach ($w in 640, 1280) {
+  Save-Frame "$S\style-$w.mp4" 0.625 "$S\style-$w-a.png"
+  Save-Frame "$S\style-$w.mp4" 3.125 "$S\style-$w-b.png"
+  Invoke-Item "$S\style-$w-a.png"; Invoke-Item "$S\style-$w-b.png"
+}
+```
+
+Record: is the text readable on the test picture, how big it is next to the
+frame at both sizes, and whether any line touches the frame edge. Fail the
+step only if text is cut off by the frame. Size and placement are a judgement
+for the maintainer, and a change to them is a code change, not part of a
+release.
+
 ## Record your run
 
 | Field | Value |
@@ -813,6 +1205,15 @@ succeeds here, record that and the contents of the folder.
 | R12 | | |
 | R13 | | |
 | R14 | | ffmpeg's cause line: |
+| C0 | | temp folders before: |
+| C1 | | seconds: |
+| C2 | | cues under 0.5 s: |
+| C3 | | |
+| C4 | | ffmpeg's cause line: |
+| C5 | | second drive: |
+| C6 | | |
+| C7 | | awk4 emoji: ; awk6 backslash: |
+| C8 | | |
 
 ### Reference run
 
@@ -865,7 +1266,7 @@ had been pasted onto the wrong line).
   is `-13` (`EACCES`) as an unsigned 32-bit value: the parked issue in
   `CLAUDE.md`.
 - Not covered by this run: the `-v` log (`render` has no `-v`), a missing
-  libx264, and captions.
+  libx264, and captions (see the [Captions](#captions) section).
 
 ## If a step fails
 
@@ -880,6 +1281,11 @@ had been pasted onto the wrong line).
 | Missing-binary message (R13) | `run_tool` in `adapters/media/_process.py`; ADR 0004 |
 | One failed clip stops the rest, or the exit code is 0 (R14) | The loop in `render`; ADR 0011 |
 | Something was written although the run failed before cutting (R6 to R13) | Check order in `render`; ADR 0011 |
+| Caption text or timing wrong (C2) | `build_srt` in `core/captions.py`; `-ss` and `-vf` order in `adapters/rendering/ffmpeg.py`; ADR 0010 |
+| No note, or a note for a clip with speech (C3) | The `srt` check in `render` in `cli/main.py`; ADR 0011 |
+| Folder left in `%TEMP%` (C4) | `TemporaryDirectory` in `adapters/rendering/ffmpeg.py`; ADR 0010 |
+| Caption run fails on a path (C5) | Absolute paths and `cwd` in `adapters/rendering/ffmpeg.py`; `run_tool` in `adapters/media/_process.py`; ADR 0010 |
+| Markup, accents or backslashes mangled (C7) | `_MARKUP` in `core/captions.py`; ADR 0010 |
 
 | Symptom | Look at |
 |---------|---------|
@@ -898,5 +1304,15 @@ Also out of scope for the Rendering section:
 - A missing libx264 (ADR 0007). It needs a different ffmpeg build.
 - The full ffmpeg stderr INFO log for `render`. The command has no `-v`
   (ADR 0011), so only the 10-line message is reachable.
-- Captions (`--captions`). They arrive with V2 items 9 to 11, with their own
-  checklist steps.
+
+Also out of scope for the Captions section:
+
+- An ffmpeg build without libass (ADR 0010). It needs a different build. Until
+  someone runs it, what such a build reports is unknown.
+- ffmpeg builds other than the one recorded in your run.
+- A BOM or CRLF in the SRT file. The renderer writes the bytes itself, so the
+  CLI cannot produce them. A unit test
+  (`test_captions_file_is_utf8_without_bom_or_crlf`) checks the bytes handed to
+  ffmpeg, but with `subprocess.run` mocked, so it does not show how ffmpeg reads
+  a BOM or CRLF.
+- Word-level captions and caption styling (ADR 0010, non-goals for V2).
