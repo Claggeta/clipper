@@ -16,3 +16,7 @@ class TranscriptionError(ClipperError):
 
 class MediaProbeError(ClipperError):
     """Raised when a media file cannot be probed."""
+
+
+class AnalysisResultError(ClipperError):
+    """Raised when a saved analysis result cannot be loaded or does not match."""
