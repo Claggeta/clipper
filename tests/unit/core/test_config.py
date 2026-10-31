@@ -5,7 +5,8 @@ import pytest
 from clipper.core.config import Settings
 
 
-def test_clips_dir_default() -> None:
+def test_clips_dir_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CLIPPER_CLIPS_DIR", raising=False)
     assert Settings().clips_dir == Path("data/clips")
 
 
