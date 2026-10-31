@@ -398,6 +398,17 @@ installed build.
 Fixtures marked **constructed** are made by the commands in R0 and are not
 real analysis output. They exist so a failure path can be reached on purpose.
 
+Two things to know when you paste commands and record the run:
+
+- Paste one block at a time. A block whose last line has no trailing newline
+  can merge with the first line of the next paste and run as one broken
+  command (a `Test-Path` on a path that never exists prints `False` for the
+  wrong reason).
+- If you use `Start-Transcript`, it does not capture native command output
+  printed straight to the console, such as the `analyze` table or a bare
+  `ffprobe` line. Pipe it (`... | ForEach-Object { $_ }`) or assign it to a
+  variable and print that, as R3 does.
+
 ### R0. Setup
 
 You need a **long speech video** with an audio track. The reference run used a
@@ -506,6 +517,10 @@ Pass:
   name the start is the candidate's start rounded **down** and the end is its
   end rounded **up** to whole seconds (ADR 0008).
 
+The console line prints both ends rounded **down**, while the file name rounds
+the end **up**. A candidate ending at 73.8 s prints `0:01:13` but is named
+`...-000114.mp4`, so the two can differ by one second. That is not a failure.
+
 Record the seconds, which is the first render time measured for this tool
 (ADR 0007 notes none exists), and the file sizes.
 
@@ -553,7 +568,8 @@ Invoke-Render "$S\testsrc.mp4" "$S\testsrc.json"
 $Clip = "$env:CLIPPER_CLIPS_DIR\testsrc_000012-000020.mp4"
 ffmpeg -hide_banner -loglevel error -y -i $Clip -frames:v 1 "$S\first.png"
 ffmpeg -hide_banner -loglevel error -y -sseof -0.1 -i $Clip -frames:v 1 "$S\last.png"
-ffprobe -v error -show_entries format=duration -of csv=p=0 $Clip
+$d = ffprobe -v error -show_entries format=duration -of csv=p=0 $Clip
+"duration: $d"
 Invoke-Item "$S\first.png"; Invoke-Item "$S\last.png"
 ```
 
@@ -812,7 +828,9 @@ One observed run, for scale. It is not a pass threshold.
 
 ### Rendering reference run
 
-Earlier by-hand runs, copied from the maintainer's notes. They were **not**
+Two runs, for scale. Neither is a pass threshold.
+
+**Earlier by-hand runs**, copied from the maintainer's notes. They were **not**
 produced by running R0 to R14 as written, and no render time or file size was
 recorded. Windows, PowerShell, `data\test_input.mp4`, a 5:14 speech video.
 
@@ -823,7 +841,31 @@ recorded. Windows, PowerShell, `data\test_input.mp4`, a 5:14 speech video.
 - `FfmpegClipRenderer` run by hand on one clip: `h264` video and `aac` audio,
   duration 10.01 s for a requested 10.0 s.
 
-The failure paths (R6 to R14) have no reference run yet.
+**R0 to R14 run as written**, 2026-10-31, Windows 11, PowerShell 5.1, ffmpeg
+and ffprobe `9.0.2-full_build-www.gyan.dev`, the same 5:14 video, `base` model
+on CPU. Two steps were re-run on their own afterwards because the first
+transcript did not capture them (the R3 duration, and the R6 `Test-Path`, which
+had been pasted onto the wrong line).
+
+- R0: 5 candidates, from 32.4 to 273.8 s.
+- R1: 5 of 5 clips rendered in 12.0 s, 4.7 to 7.3 MB each.
+- R2: every clip `h264`, `yuv420p`, `aac`, `video,audio`. Actual duration was
+  0.006 to 0.028 s longer than requested, largest 0.028 s.
+- R3: first frame shows 12, last frame shows 19, duration 7.52 s for a
+  requested 7.5 s.
+- R4 to R5: ranks selected, sorted and de-duplicated. Re-run kept the same
+  names, and a later rank added a third file.
+- R6 to R13: exit 1 with the messages described in each step, and no clips
+  folder created. R8 exited 0 and rendered a clip from the wrong video, as
+  documented.
+- R14: clip 1 rendered. Clip 2 failed with ffmpeg's cause
+  `Error opening output <path>: Permission denied`. The summary was
+  `Rendered 1 of 2 clips`, the exit code was 1, there was no traceback, and
+  the blocking folder remained. The exit number showed as `4294967283`, which
+  is `-13` (`EACCES`) as an unsigned 32-bit value: the parked issue in
+  `CLAUDE.md`.
+- Not covered by this run: the `-v` log (`render` has no `-v`), a missing
+  libx264, and captions.
 
 ## If a step fails
 
