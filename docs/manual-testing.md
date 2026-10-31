@@ -1268,6 +1268,47 @@ had been pasted onto the wrong line).
 - Not covered by this run: the `-v` log (`render` has no `-v`), a missing
   libx264, and captions (see the [Captions](#captions) section).
 
+### Captions reference run
+
+One run of C0 to C8 as written, for scale. It is not a pass threshold.
+2026-10-31, Windows 11, PowerShell, ffmpeg `9.0.2-full_build-www.gyan.dev`, the
+same 5:14 video (`data\test_input.mp4`) and its R0 analysis (5 candidates).
+The commands and their output were pasted back by the
+maintainer.
+
+- C0: 0 `clipper-captions-*` folders before any run.
+- C1: `render --captions` exited 0 and rendered 5 of 5 clips in 12.05 s, 4.79
+  to 7.45 MB each, every line ending ` (captions)`. R1 rendered the same
+  candidates without captions in 12.0 s, on a different day, so the cost of the
+  `subtitles` filter was small. The same render without the flag gave the same
+  five file names and no suffix.
+- C2: rank 1 had 16 cues, each 2.00 to 3.35 s long. No rank had a cue shorter
+  than 0.5 s, so on this video a minimum overlap is not needed. The first cue
+  starts at 0.00 s, so there was no `before.png`.
+- C3: exit 0. `Note: #1 0:00:12-0:00:20 has no speech in range; rendered
+  without captions`, then `Rendered #1` without a suffix and `Rendered #2` with
+  ` (captions)`, and `Rendered 2 of 2 clips`.
+- C4: 0 folders left after a success and after a failure. The failure gave
+  `Rendered 1 of 2 clips`, exit 1, no traceback, and the blocking folder
+  remained. ffmpeg's cause was `Error opening output <path>: Permission denied`
+  (the exit number showed as `4294967283`, the parked issue in `CLAUDE.md`). The
+  `Failed:` message ran to three lines.
+- C5: a video path with spaces with a clips folder with spaces, and a relative
+  video path with a relative clips folder (`data\clips-captions-manual`), both
+  exited 0 with a captioned clip. No folders were left. A second drive was not
+  reported, so that part was not run.
+- C6: the captioned render changed the file (hash changed, 247061 to 260515
+  bytes) and the folder held one file.
+- C2, C3, C6, C7 and C8 also have frames to look at. The maintainer reported
+  that the frames looked good. Notes for individual frames, such as the emoji
+  in `awk4.png` and the backslash line `awk6.png` in C7, were not given.
+- Before this run, the same C7 commands were run on generated media by the
+  assistant that wrote the checklist, with `Invoke-Item` stubbed. `awk6.png` showed
+  `path C: ew\table` for `path C:\new\table`: libass swallowed the `\n`. The
+  emoji drew as a glyph. This was not a run of the full checklist.
+- Not covered by this run: a build without libass, other ffmpeg builds, and a
+  second drive.
+
 ## If a step fails
 
 | Symptom | Look at |
