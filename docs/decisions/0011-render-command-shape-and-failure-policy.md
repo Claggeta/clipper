@@ -65,6 +65,23 @@ one can fail while others succeed.
 - `render` has no `-v`, so the full ffmpeg stderr INFO log (0004) is not
   reachable from the CLI yet.
 
+## Amended by the burn-in captions PR (V2 item 10)
+
+- `--captions` is a plain on/off flag, off by default, independent of
+  `--rank`. For each selected clip, `render` builds the SRT from the saved
+  transcript with `build_srt` and passes it to the renderer (0010).
+- A clip with no speech in its window is rendered without captions, and
+  `render` prints `Note: #N <span> has no speech in range; rendered without
+  captions`. This is not a failure: the exit code and the
+  `Rendered X of Y clips` line are unchanged.
+- A successful captioned line ends with ` (captions)`. Plain output is
+  unchanged.
+- A caption failure is a render failure like any other: the clip is listed,
+  the rest still render, and the command exits 1. There is no early check for
+  libass, so a build without it fails every selected clip with the same ffmpeg
+  message.
+- The file name does not change with `--captions` (0008).
+
 ## Revisit when
 
 - A third command or a third injected dependency appears. Move to the context

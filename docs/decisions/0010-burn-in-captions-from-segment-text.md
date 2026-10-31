@@ -63,6 +63,54 @@ ignore soft subtitle tracks.
   error. The caller decides; the intent is to render that clip without
   captions.
 
+## Amended by the burn-in captions PR (V2 item 10)
+
+Checked by hand on 2026-10-31 with ffmpeg 9.0.2 (gyan.dev full build,
+`--enable-libass --enable-fontconfig --enable-libfreetype`), Windows 11, on a
+constructed 1280x720 test video and on `data/test_input.mp4`. One build only.
+
+- `ClipRenderer.render` takes an optional `captions: str | None` of SRT text.
+  `None` or `""` renders without captions. The renderer does not know about
+  transcripts; the CLI calls `build_srt` and passes the text.
+- The path-escaping function in the Consequences above is not needed. The
+  renderer writes `clip.srt` into a temporary folder and runs ffmpeg with that
+  folder as its working directory, so the filter is `subtitles=clip.srt:...`
+  and no path reaches the filter's escaping rules. The input and output paths
+  are made absolute first, because they no longer resolve against the caller's
+  directory. `run_tool` gained an optional `cwd` for this. A spaced output path
+  worked.
+- The file is UTF-8 with no BOM and LF line endings, and the filter passes
+  `charenc=UTF-8`. Not tested: a BOM, CRLF, or text outside the Basic
+  Multilingual Plane.
+- The folder is removed on success and on failure, with
+  `ignore_cleanup_errors=True` so a cleanup error cannot mask the real one.
+- One fixed style: `force_style='FontSize=18,Outline=2,Shadow=0,MarginV=30'`.
+  `FontSize` is relative to libass's 288-pixel SRT canvas, not pixels. These
+  values were looked at on two frames and are not tuned.
+- Observed on this build:
+  - libass wraps a long cue (a 200-character cue took 4 lines and stayed
+    inside the frame). `build_srt` does not need to wrap.
+  - Timing is correct under input seeking (`-ss` before `-i`) with the filter
+    on the output: cues appeared at their clip-relative times.
+  - No fontconfig warning and no stall on a first run with no font config.
+    The font that rendered looks like Arial; it was not asked for by name.
+  - `{...}` is dropped from the text and `<b>...</b>` is rendered as markup.
+    In one test, text after a `<` was lost and a following word turned bold; the
+    exact rule was not worked out. A lone `<`, a lone `>` and `-->` rendered
+    as written.
+- So `build_srt` now removes `{`, `}`, `<` and `>` from cue text. There is no
+  SRT escape for them. It also costs `-->` its `>` and turns `5 > 3` into
+  `5 3`. Whisper rarely produces these characters, and a lost symbol is
+  better than lost or restyled words.
+- Not verified: what a build without libass reports. This build has it. The
+  intent is unchanged: ffmpeg's own stderr surfaces through the usual
+  failure message, once per clip.
+- Empty captions: when `build_srt` returns `""`, the CLI renders the clip
+  without captions and prints a note (see 0011). The renderer treats `""` as
+  no captions.
+- A captioned clip has the same file name as a plain one (0008), so rendering
+  with `--captions` overwrites an earlier plain clip of the same span.
+
 ## Revisit when
 
 - Segment-level captions look bad on real clips. That is the case for

@@ -93,3 +93,12 @@ def test_timestamp_past_one_hour() -> None:
 def test_timestamp_hours_widen_past_99() -> None:
     srt = build_srt(_t((360000.0, 360001.0, "x")), _c(0.0, 400000.0))
     assert srt.splitlines()[1] == "100:00:00,000 --> 100:00:01,000"
+
+
+def test_markup_characters_are_removed() -> None:
+    srt = build_srt(_t((0.0, 1.0, "a {\\an8}b <i>c</i> d --> e")), _c(0.0, 5.0))
+    assert srt == "1\n00:00:00,000 --> 00:00:01,000\na \\an8b ic/i d -- e\n"
+
+
+def test_cue_that_is_only_markup_characters_is_dropped() -> None:
+    assert build_srt(_t((0.0, 1.0, "<>{}")), _c(0.0, 5.0)) == ""
