@@ -48,6 +48,24 @@ the implementing PR and recorded in the code, not here.
   rendering section of `docs/manual-testing.md` measures actual start and end
   with `ffprobe`.
 
+## Amended by the `FfmpegClipRenderer` PR (V2 item 6)
+
+- Streams: `-map 0:v:0` (required) and `-map 0:a:0?` (first audio stream,
+  optional). The first audio stream is the one the transcriber heard. A source
+  with no audio renders a video-only clip instead of failing; analysis already
+  requires audio (0005), so this only arises with a mismatched source. Explicit
+  maps also keep subtitle and data streams out of the MP4.
+- `-t` is an output option (after `-i`); `-ss` stays before `-i`. Times are
+  passed as fixed-point milliseconds.
+- Quality settings live in `adapters/rendering/ffmpeg.py`: `libx264`
+  `-preset medium -crf 20`, `aac` at 128k, `+faststart`, `-nostdin`. They are
+  not measured against real footage.
+- On a non-zero exit the renderer deletes the output path, so a broken file is
+  never left under a clip name. This also removes a previous good clip of the
+  same name, which `-y` had already truncated.
+- The renderer refuses an output path equal to the input, because `-y` would
+  destroy the source.
+
 ## Revisit when
 
 - Render time on long clips becomes a problem. Stream copy becomes an opt-in
