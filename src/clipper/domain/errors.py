@@ -12,3 +12,7 @@ class NoAudioStreamError(AudioExtractionError):
 
 class TranscriptionError(ClipperError):
     """Raised when a transcript cannot be produced."""
+
+
+class MediaProbeError(ClipperError):
+    """Raised when a media file cannot be probed."""

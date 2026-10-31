@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from clipper.domain.models import ClipCandidate, Transcript
+from clipper.domain.models import ClipCandidate, MediaInfo, Transcript
 
 
 @runtime_checkable
@@ -23,3 +23,10 @@ class ClipDetector(Protocol):
     """Finds clip-worthy time ranges in a transcript."""
 
     def detect(self, transcript: Transcript) -> list[ClipCandidate]: ...
+
+
+@runtime_checkable
+class MediaProbe(Protocol):
+    """Reports structural facts about a media file."""
+
+    def probe(self, media_path: Path) -> MediaInfo: ...
