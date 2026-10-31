@@ -183,7 +183,7 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 7. ~~`clipper render` command with the `_build_renderer` seam~~ (done)
 8. ~~Manual-test checklist: rendering, and a first real run~~ (done)
 9. ~~Pure caption builder (transcript slice to SRT)~~ (done)
-10. Burn-in captions and a CLI flag
+10. ~~Burn-in captions and a CLI flag~~ (done)
 11. Manual-test checklist: captions, README usage and sample output, release
     notes, tag `v0.2.0`
 
