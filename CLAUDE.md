@@ -86,7 +86,7 @@ prints a table and saves JSON.
 Non-goals for V1: clip rendering, captions, uploads, analytics, web UI,
 database, user accounts, ML training.
 
-## V2 scope
+## V2 scope (shipped as `v0.2.0`)
 
 Input: the saved `AnalysisResult` JSON and the original video. Output: one
 rendered video file per clip-worthy candidate, optionally with captions
@@ -111,10 +111,12 @@ All merged to `main` with green CI:
   CLI, with table output and JSON written to `data/output/`
 - M5: hardening, released as `v0.1.0` (pre-release). Notes are in
   `docs/releases/v0.1.0.md`.
+- V2: clip rendering and captions, released as `v0.2.0`. Notes are in
+  `docs/releases/v0.2.0.md`.
 
 In progress:
 
-- V2: clip rendering and captions. See the V2 list below.
+- Nothing.
 
 ## Pinned dependencies
 
@@ -184,8 +186,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 8. ~~Manual-test checklist: rendering, and a first real run~~ (done)
 9. ~~Pure caption builder (transcript slice to SRT)~~ (done)
 10. ~~Burn-in captions and a CLI flag~~ (done)
-11. Manual-test checklist: captions, README usage and sample output, release
-    notes, tag `v0.2.0`
+11. ~~Manual-test checklist: captions, README usage and sample output, release
+    notes, tag `v0.2.0`~~ (done; notes in `docs/releases/v0.2.0.md`)
 
 ## Parked
 
