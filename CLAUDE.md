@@ -177,8 +177,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    (done)
 4. ~~Load a saved `AnalysisResult` from JSON, with the source-name check~~
    (done)
-5. `ClipRenderer` Protocol, `ClipRenderError`, `RenderedClip`, fake renderer,
-   output naming
+5. ~~`ClipRenderer` Protocol, `ClipRenderError`, `RenderedClip`, fake renderer,
+   output naming~~ (done)
 6. `FfmpegClipRenderer`, no captions
 7. `clipper render` command with the `_build_renderer` seam
 8. Manual-test checklist: rendering, and a first real run
