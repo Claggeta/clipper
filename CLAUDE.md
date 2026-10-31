@@ -210,3 +210,15 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 - `.gitignore` duplicate entries (`.venv`, `dist/`, `__pycache__/`).
 - Opt-in model-load test: needs a marker, `--strict-markers`, and
   deselecting by default.
+- Captions on a build without libass: every selected clip fails with the same
+  ffmpeg message (ADR 0011), and no such build has been tried. Fix: check once,
+  before cutting, that ffmpeg has the `subtitles` filter, and exit 1 with
+  nothing written. How to ask ffmpeg is unverified. Amends ADR 0011's check
+  order and ADR 0010.
+- `render` has no `-v`, so the full ffmpeg stderr INFO log (ADR 0004) is not
+  reachable, only the 10-line failure message. Fix: a `--verbose` flag like
+  `analyze`'s, and an amendment to ADR 0011.
+- Minimum overlap for caption cues: a segment that crosses a clip's edge shows
+  its whole sentence for the part inside the clip (ADR 0010). On the one 5:14
+  video tried, no cue in any rank was under 0.5 s, so it was not needed. Revisit
+  if a real clip flashes a sentence, and set the threshold from that clip.
