@@ -1,4 +1,4 @@
-# Manual test checklist: ffmpeg and Whisper
+# Manual test checklist: ffmpeg, Whisper and rendering
 
 CI cannot run the real ffmpeg binary or a real Whisper model. Its tests mock
 `subprocess.run` for ffmpeg, use `FakeTranscriber` for the CLI, and the one
@@ -9,6 +9,10 @@ covers what is left. It closes the gap recorded in
 confirms that `-hide_banner -loglevel error` leaves the cause line on stderr,
 or that `does not contain any stream` is still ffmpeg's wording.
 
+The [Rendering](#rendering) section covers `clipper render` the same way. The
+render tests patch `_build_renderer` and `_build_probe` (ADR 0011), so nothing
+in CI runs the real `ffprobe` JSON parsing or the real clip encode.
+
 ## When to run it
 
 - Before tagging a release.
@@ -16,6 +20,9 @@ or that `does not contain any stream` is still ffmpeg's wording.
   (see [ADR 0003](decisions/0003-pin-transcription-dependencies.md)).
 - After any change to `src/clipper/adapters/media/ffmpeg.py`,
   `src/clipper/adapters/transcription/`, or the ffmpeg command line.
+- After any change to `src/clipper/adapters/rendering/`,
+  `src/clipper/adapters/media/ffprobe.py`, `src/clipper/adapters/results/`,
+  or the `render` command. Run the [Rendering](#rendering) section.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -373,6 +380,395 @@ empty table and saved a JSON file with no candidates. That is current
 behaviour, not necessarily the intended behaviour. Do not fail the release on
 this step. Note any change.
 
+## Rendering
+
+Covers `clipper render` ([ADR 0007](decisions/0007-cut-clips-by-re-encoding.md),
+[0008](decisions/0008-clip-output-location-and-naming.md),
+[0009](decisions/0009-render-reads-saved-json-and-probes-media.md),
+[0011](decisions/0011-render-command-shape-and-failure-policy.md)). It is
+independent of the ffmpeg and Whisper steps above, with its own setup, scratch
+folder and helpers. Run R0 first in a fresh PowerShell window, and keep that
+window for the rest of the section. Every later step uses the variables and
+helpers R0 defines.
+
+Where a step says "record", write down what you saw. The expected result is
+described, not quoted, because ffmpeg and ffprobe wording belongs to the
+installed build.
+
+Fixtures marked **constructed** are made by the commands in R0 and are not
+real analysis output. They exist so a failure path can be reached on purpose.
+
+Two things to know when you paste commands and record the run:
+
+- Paste one block at a time. A block whose last line has no trailing newline
+  can merge with the first line of the next paste and run as one broken
+  command (a `Test-Path` on a path that never exists prints `False` for the
+  wrong reason).
+- If you use `Start-Transcript`, it does not capture native command output
+  printed straight to the console, such as the `analyze` table or a bare
+  `ffprobe` line. Pipe it (`... | ForEach-Object { $_ }`) or assign it to a
+  variable and print that, as R3 does.
+
+### R0. Setup
+
+You need a **long speech video** with an audio track. The reference run used a
+5:14 clip, which gave 5 candidates. Steps R4 and R5 need at least 3 candidates
+and R1 to R2 are most useful with 5.
+
+```powershell
+$Src  = "path\to\speech.mp4"                               # your long speech video
+$Name = Split-Path $Src -Leaf
+$Stem = [IO.Path]::GetFileNameWithoutExtension($Src)
+$S    = Join-Path $env:TEMP "manual-test-clipper-render"
+New-Item -ItemType Directory -Force $S, "$S\short", "$S\other" | Out-Null
+
+$env:COLUMNS            = "500"
+$env:CLIPPER_CACHE_DIR  = "$S\cache"
+$env:CLIPPER_OUTPUT_DIR = "$S\out"
+$env:CLIPPER_CLIPS_DIR  = "$S\clips"
+$Json = "$S\out\$Stem.json"
+
+# Helper: runs `clipper render`, keeps the exit code and text, prints both.
+function Invoke-Render {
+  param([string]$Video, [string]$ResultJson, [int[]]$Rank = @())
+  $flags = ($Rank | ForEach-Object { "--rank $_" }) -join " "
+  cmd /c "uv run clipper render `"$Video`" `"$ResultJson`" $flags > `"$S\last.txt`" 2>&1"
+  $script:Code = $LASTEXITCODE
+  $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  "exit $Code"
+  $Text
+}
+
+# Helpers: empty the clips folder, and list it.
+function Reset-Clips { Remove-Item -Recurse -Force $env:CLIPPER_CLIPS_DIR -ErrorAction SilentlyContinue }
+function Show-Clips {
+  if (Test-Path $env:CLIPPER_CLIPS_DIR) {
+    Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object Name, Length | Format-Table -AutoSize
+  } else { "(clips folder does not exist)" }
+}
+
+# Helper (constructed fixtures): writes an analysis result JSON with one
+# candidate per "start-end" span, an empty transcript and a fixed score.
+function New-Result {
+  param([string]$Path, [string]$Source, [string[]]$Spans = @())
+  $items = foreach ($sp in $Spans) {
+    $a, $b = $sp -split "-"
+    '{"start_seconds": ' + $a + ', "end_seconds": ' + $b + ', "score": 0.5, "reasons": ["constructed"]}'
+  }
+  $json = '{"source": "' + $Source + '", "transcript": {"segments": []}, "candidates": [' + ($items -join ",") + ']}'
+  Set-Content -Path $Path -Value $json -Encoding ascii
+}
+
+# Real analysis of the source. Produces $Json.
+uv run clipper analyze "$Src"
+"exit $LASTEXITCODE"
+
+# Constructed fixtures.
+# testsrc.mp4: 40 s of lavfi test video. A large number drawn on the picture is
+# the source time in whole seconds. x264's default keyframe interval is 250
+# frames, which is 10 s at 25 fps.
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc=size=640x360:rate=25:duration=40" `
+  -f lavfi -i "sine=frequency=440:duration=40" -shortest `
+  -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\testsrc.mp4"
+New-Result "$S\testsrc.json"     "testsrc.mp4" "12.5-20"
+New-Result "$S\testsrc-two.json" "testsrc.mp4" "12.5-20", "25-35"
+# other\testsrc.mp4: a different 40 s video with the same file name (R8).
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "smptebars=size=640x360:rate=25:duration=40" `
+  -f lavfi -i "sine=frequency=880:duration=40" -shortest `
+  -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\other\testsrc.mp4"
+# short\<same name as the source>: 1 s of the source, so candidates overrun it (R9).
+ffmpeg -hide_banner -loglevel error -y -t 1 -i "$Src" `
+  -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\short\$Name"
+# audio-only.m4a and its JSON (R10).
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "sine=frequency=440:duration=10" `
+  -c:a aac "$S\audio-only.m4a"
+New-Result "$S\audio-only.json"  "audio-only.m4a" "1-5"
+# A result with no candidates (R11).
+New-Result "$S\empty.json"       $Name
+
+# What the real analysis found. These are the candidates R1 to R6 work from.
+$r = Get-Content $Json -Raw -Encoding UTF8 | ConvertFrom-Json
+"candidates: " + $r.candidates.Count
+$r.candidates | ForEach-Object { "{0,8:N1} - {1,8:N1}  score {2}" -f $_.start_seconds, $_.end_seconds, $_.score }
+```
+
+Pass: `analyze` exits 0 and prints `Saved:` with `$Stem.json`. Every `ffmpeg`
+command above prints nothing. The candidate list prints. Record the count
+and the spans.
+
+### R1. Render every candidate (the first real run)
+
+```powershell
+Reset-Clips
+$t = Measure-Command { Invoke-Render $Src $Json | Out-Null }
+$Code; $Text
+"seconds: $($t.TotalSeconds)"
+Show-Clips
+```
+
+Pass:
+
+- Exit 0.
+- One `Rendered #N H:MM:SS-H:MM:SS <path>` line per candidate, in rank order,
+  where `H:MM:SS-H:MM:SS` matches the candidate's span from R0.
+- A last line `Rendered X of X clips to <clips folder>`, with `X` equal to the
+  candidate count.
+- The clips folder holds `X` files named `<stem>_HHMMSS-HHMMSS.mp4`. In each
+  name the start is the candidate's start rounded **down** and the end is its
+  end rounded **up** to whole seconds (ADR 0008).
+
+The console line prints both ends rounded **down**, while the file name rounds
+the end **up**. A candidate ending at 73.8 s prints `0:01:13` but is named
+`...-000114.mp4`, so the two can differ by one second. That is not a failure.
+
+Record the seconds, which is the first render time measured for this tool
+(ADR 0007 notes none exists), and the file sizes.
+
+### R2. Rendered clips are H.264, AAC, yuv420p, and the right length
+
+Run after R1, without resetting the clips folder.
+
+```powershell
+$cands = $r.candidates | Sort-Object start_seconds
+$files = Get-ChildItem $env:CLIPPER_CLIPS_DIR -Filter "*.mp4" | Sort-Object Name
+for ($i = 0; $i -lt $files.Count; $i++) {
+  $f = $files[$i].FullName
+  $want = $cands[$i].end_seconds - $cands[$i].start_seconds
+  $got  = [double](ffprobe -v error -show_entries format=duration -of csv=p=0 $f)
+  $v = ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,pix_fmt -of csv=p=0 $f
+  $a = ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 $f
+  $kinds = (ffprobe -v error -show_entries stream=codec_type -of csv=p=0 $f) -join ","
+  "{0}`n  video: {1}  audio: {2}  streams: {3}`n  requested {4:N3} s, actual {5:N3} s, diff {6:N3} s" -f `
+    $files[$i].Name, $v, $a, $kinds, $want, $got, ($got - $want)
+}
+```
+
+Pass:
+
+- The video line contains `h264` and `yuv420p`, the audio line is `aac`, and
+  the streams are `video,audio`.
+- Every file's actual duration is close to the requested one. Record the
+  largest difference. The one earlier by-hand measurement was 10.01 s for a
+  requested 10.0 s. A difference of a second or more points at keyframe
+  snapping, which the re-encode in ADR 0007 is meant to avoid.
+
+If the source has more than one audio stream, `streams` will show only one
+audio stream anyway: `-map 0:a:0?` keeps the first (ADR 0007).
+
+### R3. A clip starts and ends where it was asked to
+
+The only check of the intent in ADR 0007 that cuts are frame-accurate and not
+snapped to keyframes. It uses the constructed `testsrc.mp4`, whose picture shows
+the source time in whole seconds, and the constructed `testsrc.json`, with one
+candidate from 12.5 s to 20 s.
+
+```powershell
+Reset-Clips
+Invoke-Render "$S\testsrc.mp4" "$S\testsrc.json"
+$Clip = "$env:CLIPPER_CLIPS_DIR\testsrc_000012-000020.mp4"
+ffmpeg -hide_banner -loglevel error -y -i $Clip -frames:v 1 "$S\first.png"
+ffmpeg -hide_banner -loglevel error -y -sseof -0.1 -i $Clip -frames:v 1 "$S\last.png"
+$d = ffprobe -v error -show_entries format=duration -of csv=p=0 $Clip
+"duration: $d"
+Invoke-Item "$S\first.png"; Invoke-Item "$S\last.png"
+```
+
+Pass:
+
+- Exit 0 and the clip is named `testsrc_000012-000020.mp4`.
+- The duration is close to 7.5. Record it.
+- `first.png` shows **12**: the source second the cut started in.
+- `last.png` shows **19**: the last frames are just before 20 s.
+
+Fail: `first.png` shows **10**. The cut snapped back to the keyframe at 10 s,
+which means the cut stopped being a re-encode or `-ss` moved (ADR 0007). The
+picture only resolves whole seconds, so a cut off by less than a second will
+not show here. R2's duration check covers the length.
+
+### R4. `--rank` selects, sorts and de-duplicates
+
+Needs at least 3 candidates.
+
+```powershell
+Reset-Clips
+Invoke-Render $Src $Json -Rank 3,1,1
+Show-Clips
+```
+
+Pass: exit 0. Exactly two `Rendered` lines, `#1` first and then `#3`, however
+the flags were given. The last line is `Rendered 2 of 2 clips`. The clips folder
+holds two files, the ones for candidates 1 and 3 from R0.
+
+### R5. Re-running is idempotent, and old clips are left alone
+
+Run after R4, without resetting the clips folder.
+
+```powershell
+$before = Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -ExpandProperty Name
+Invoke-Render $Src $Json -Rank 1,3 | Out-Null
+$Code
+$after = Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -ExpandProperty Name
+"same names: " + (-not (Compare-Object $before $after))
+Invoke-Render $Src $Json -Rank 2 | Out-Null
+$Code
+@(Get-ChildItem $env:CLIPPER_CLIPS_DIR).Count
+```
+
+Pass: exit 0 both times. `same names: True`, with no numbered or suffixed
+copies. After rendering rank 2 the folder holds 3 files, so the files from R4
+were not deleted (ADR 0008: "nothing deletes old files").
+
+### R6. Out-of-range ranks fail before cutting
+
+```powershell
+Reset-Clips
+Invoke-Render $Src $Json -Rank 99
+Invoke-Render $Src $Json -Rank 0
+Invoke-Render $Src $Json -Rank 1,99
+Test-Path $env:CLIPPER_CLIPS_DIR
+```
+
+Pass: all three exit 1. The text starts with `Error: Rank 99 out of range: the
+result has N candidates` (`Rank 0 ...` for the second run), where `N` is the
+count from R0. The third run renders nothing, even though rank 1 is valid, and
+`Test-Path` prints `False`: nothing was written and the clips folder was not
+even created. It is a rendering error and not a Typer usage error (ADR 0011).
+
+### R7. Result saved for a differently named video
+
+```powershell
+Reset-Clips
+Invoke-Render "$S\testsrc.mp4" $Json
+Test-Path $env:CLIPPER_CLIPS_DIR
+```
+
+Pass: exit 1 with `Analysis result is for '<your source name>' but the video is
+'testsrc.mp4'`, and `Test-Path` prints `False`.
+
+### R8. Same file name, different video (observe and record)
+
+This is the known weak spot of the name check (ADR 0009): `other\testsrc.mp4`
+is a different video with the same name as the one `testsrc.json` was saved
+for.
+
+```powershell
+Reset-Clips
+Invoke-Render "$S\other\testsrc.mp4" "$S\testsrc.json"
+Show-Clips
+```
+
+Pass: exit 0 and one clip, with no error. That is current, documented
+behaviour: the wrong picture is cut without a warning. Record any change. If
+this step starts failing, a fingerprint was added and ADR 0009 needs its
+"Revisit when" updated.
+
+### R9. A candidate past the end of the video
+
+```powershell
+Reset-Clips
+Invoke-Render "$S\short\$Name" $Json
+Test-Path $env:CLIPPER_CLIPS_DIR
+```
+
+Pass: exit 1 with `Candidate H:MM:SS-H:MM:SS ends after the end of the video
+(` followed by a duration near 1 s. The span named is one of the candidates
+from R0. `Test-Path` prints `False`. This is also the first check of the real
+`ffprobe` duration against `MediaInfo`.
+
+### R10. File with no video stream
+
+Constructed: an audio-only file, and a result whose `source` matches it.
+
+```powershell
+Reset-Clips
+Invoke-Render "$S\audio-only.m4a" "$S\audio-only.json"
+Test-Path $env:CLIPPER_CLIPS_DIR
+```
+
+Pass: exit 1 with `The video file has no video stream`, and `Test-Path`
+prints `False`. This is the first check of the real `ffprobe` stream and
+`attached_pic` JSON against the code in `ffprobe.py`.
+
+### R11. Bad, missing and empty result files
+
+```powershell
+Reset-Clips
+Set-Content "$S\bad.json" "this is not json" -Encoding ascii
+Set-Content "$S\wrong-shape.json" '{"a": 1}' -Encoding ascii
+Invoke-Render $Src "$S\bad.json"
+Invoke-Render $Src "$S\wrong-shape.json"
+Invoke-Render $Src "$S\does-not-exist.json"
+Invoke-Render $Src "$S\empty.json"
+Test-Path $env:CLIPPER_CLIPS_DIR
+```
+
+Pass: all four exit 1, with no traceback. In order, the messages are:
+`Invalid JSON in analysis result <path>: ...`, `<path> is not a valid analysis
+result: source: ...`, `Analysis result not found: <path>`, and `The analysis
+result has no candidates to render`. `Test-Path` prints `False`.
+
+### R12. Video file missing
+
+```powershell
+Invoke-Render "$S\gone\$Name" $Json
+```
+
+Pass: exit 1 with `Input file not found: <path>`. The name check passes first,
+so this message comes from the probe.
+
+### R13. `ffprobe` missing from `PATH`
+
+Modelled on F7. `ffprobe` normally lives in the same folder as `ffmpeg`, so
+removing that folder removes both. Call `uv` by absolute path.
+
+```powershell
+Reset-Clips
+$SavedPath = $env:PATH
+$uv = (Get-Command uv).Source
+$ffDir = Split-Path (Get-Command ffprobe).Source
+$env:PATH = ($env:PATH -split ';' |
+  Where-Object { $_ -and ($_.TrimEnd('\') -ne $ffDir.TrimEnd('\')) }) -join ';'
+[bool](Get-Command ffprobe -ErrorAction SilentlyContinue)   # must print False
+cmd /c "`"$uv`" run clipper render `"$Src`" `"$Json`" > `"$S\last.txt`" 2>&1"
+"exit $LASTEXITCODE"; Get-Content "$S\last.txt"
+Test-Path $env:CLIPPER_CLIPS_DIR
+$env:PATH = $SavedPath
+```
+
+Pass: `False` from the check, exit 1, the message
+`Error: 'ffprobe' not found on PATH. Install ffmpeg first.`, and `Test-Path`
+prints `False`. `PATH` is restored by the last line.
+
+### R14. One clip fails, the rest still render (observe and record)
+
+Constructed failure: before rendering, put a **folder** where the second clip's
+file should go, so ffmpeg cannot write it. `testsrc-two.json` has candidates
+12.5 to 20 s and 25 to 35 s.
+
+```powershell
+Reset-Clips
+New-Item -ItemType Directory -Force "$env:CLIPPER_CLIPS_DIR\testsrc_000025-000035.mp4" | Out-Null
+Invoke-Render "$S\testsrc.mp4" "$S\testsrc-two.json"
+Show-Clips
+Test-Path "$env:CLIPPER_CLIPS_DIR\testsrc_000025-000035.mp4" -PathType Container
+```
+
+Pass:
+
+- A `Rendered #1 ...` line for `testsrc_000012-000020.mp4`, and that file exists
+  and is not empty.
+- A `Failed: #2 0:00:25-0:00:35: ffmpeg failed (exit ...): ...` line. Record the
+  cause ffmpeg gave. I have not seen it.
+- The last line is `Rendered 1 of 2 clips to <clips folder>`, and the exit
+  code is 1 (ADR 0011).
+- No traceback. The renderer tries to delete the failed output and cannot
+  delete a folder, which must be logged and not raised, so the last command
+  prints `True`.
+
+The exit number may show as an unsigned 32-bit value on Windows. That is the
+parked issue in `CLAUDE.md`. Do not fail the step on it. If ffmpeg unexpectedly
+succeeds here, record that and the contents of the folder.
+
 ## Record your run
 
 | Field | Value |
@@ -402,6 +798,21 @@ this step. Note any change.
 | W6 | | |
 | W7 | | |
 | W8 | | |
+| R0 | | candidates: |
+| R1 | | seconds: ; sizes: |
+| R2 | | largest duration diff: |
+| R3 | | first.png shows: ; last.png shows: |
+| R4 | | |
+| R5 | | |
+| R6 | | |
+| R7 | | |
+| R8 | | |
+| R9 | | |
+| R10 | | |
+| R11 | | |
+| R12 | | |
+| R13 | | |
+| R14 | | ffmpeg's cause line: |
 
 ### Reference run
 
@@ -415,7 +826,60 @@ One observed run, for scale. It is not a pass threshold.
 - A 30 s clip produced one candidate, so do not expect five rows from a short
   clip.
 
+### Rendering reference run
+
+Two runs, for scale. Neither is a pass threshold.
+
+**Earlier by-hand runs**, copied from the maintainer's notes. They were **not**
+produced by running R0 to R14 as written, and no render time or file size was
+recorded. Windows, PowerShell, `data\test_input.mp4`, a 5:14 speech video.
+
+- `clipper analyze` then `clipper render <video> <json> --rank 1`, and `render`
+  with no flag, both succeeded: 5 clips in `data\clips`, named like
+  `test_input_000032-000114.mp4`. Every candidate passed the strict duration
+  check against real `ffprobe` output.
+- `FfmpegClipRenderer` run by hand on one clip: `h264` video and `aac` audio,
+  duration 10.01 s for a requested 10.0 s.
+
+**R0 to R14 run as written**, 2026-10-31, Windows 11, PowerShell 5.1, ffmpeg
+and ffprobe `9.0.2-full_build-www.gyan.dev`, the same 5:14 video, `base` model
+on CPU. Two steps were re-run on their own afterwards because the first
+transcript did not capture them (the R3 duration, and the R6 `Test-Path`, which
+had been pasted onto the wrong line).
+
+- R0: 5 candidates, from 32.4 to 273.8 s.
+- R1: 5 of 5 clips rendered in 12.0 s, 4.7 to 7.3 MB each.
+- R2: every clip `h264`, `yuv420p`, `aac`, `video,audio`. Actual duration was
+  0.006 to 0.028 s longer than requested, largest 0.028 s.
+- R3: first frame shows 12, last frame shows 19, duration 7.52 s for a
+  requested 7.5 s.
+- R4 to R5: ranks selected, sorted and de-duplicated. Re-run kept the same
+  names, and a later rank added a third file.
+- R6 to R13: exit 1 with the messages described in each step, and no clips
+  folder created. R8 exited 0 and rendered a clip from the wrong video, as
+  documented.
+- R14: clip 1 rendered. Clip 2 failed with ffmpeg's cause
+  `Error opening output <path>: Permission denied`. The summary was
+  `Rendered 1 of 2 clips`, the exit code was 1, there was no traceback, and
+  the blocking folder remained. The exit number showed as `4294967283`, which
+  is `-13` (`EACCES`) as an unsigned 32-bit value: the parked issue in
+  `CLAUDE.md`.
+- Not covered by this run: the `-v` log (`render` has no `-v`), a missing
+  libx264, and captions.
+
 ## If a step fails
+
+| Symptom | Look at |
+|---------|---------|
+| Duration off by a second or more, or R3 shows 10 (R2, R3) | `-ss` and `-c:v libx264` in `adapters/rendering/ffmpeg.py`; ADR 0007 |
+| Wrong streams in a clip (R2) | `-map 0:v:0` and `-map 0:a:0?` in `adapters/rendering/ffmpeg.py`; ADR 0007 |
+| Wrong clip name or folder (R1, R5) | `core/naming.py`; `Settings.clips_dir`; ADR 0008 |
+| `--rank` message, order or exit code (R4, R6) | `_select_ranks` in `cli/main.py`; ADR 0011 |
+| Bad, missing or empty result file (R7, R11) | `adapters/results/analysis_json.py`; ADR 0009 |
+| Overrun or no-video check wrong against real ffprobe (R9, R10) | `_check_media` in `cli/main.py`; `_parse` and `_is_video` in `adapters/media/ffprobe.py`; ADR 0009 |
+| Missing-binary message (R13) | `run_tool` in `adapters/media/_process.py`; ADR 0004 |
+| One failed clip stops the rest, or the exit code is 0 (R14) | The loop in `render`; ADR 0011 |
+| Something was written although the run failed before cutting (R6 to R13) | Check order in `render`; ADR 0011 |
 
 | Symptom | Look at |
 |---------|---------|
@@ -428,3 +892,11 @@ One observed run, for scale. It is not a pass threshold.
 
 Out of scope here: automated versions of these checks (an opt-in model-load
 test is on the parked list in `CLAUDE.md`), and the Windows exit-code display.
+
+Also out of scope for the Rendering section:
+
+- A missing libx264 (ADR 0007). It needs a different ffmpeg build.
+- The full ffmpeg stderr INFO log for `render`. The command has no `-v`
+  (ADR 0011), so only the 10-line message is reachable.
+- Captions (`--captions`). They arrive with V2 items 9 to 11, with their own
+  checklist steps.
