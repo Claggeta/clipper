@@ -175,7 +175,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
    (done)
 3. ~~`ffprobe` adapter behind a `MediaProbe` Protocol (duration, has video)~~
    (done)
-4. Load a saved `AnalysisResult` from JSON, with the source-name check
+4. ~~Load a saved `AnalysisResult` from JSON, with the source-name check~~
+   (done)
 5. `ClipRenderer` Protocol, `ClipRenderError`, `RenderedClip`, fake renderer,
    output naming
 6. `FfmpegClipRenderer`, no captions
