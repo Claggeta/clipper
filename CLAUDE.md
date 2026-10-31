@@ -182,7 +182,7 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 6. ~~`FfmpegClipRenderer`, no captions~~ (done)
 7. ~~`clipper render` command with the `_build_renderer` seam~~ (done)
 8. ~~Manual-test checklist: rendering, and a first real run~~ (done)
-9. Pure caption builder (transcript slice to SRT)
+9. ~~Pure caption builder (transcript slice to SRT)~~ (done)
 10. Burn-in captions and a CLI flag
 11. Manual-test checklist: captions, README usage and sample output, release
     notes, tag `v0.2.0`
@@ -194,7 +194,11 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
   values to signed form before display, and map the few codes this tool
   actually produces (invalid data, no stream, permission denied) to a short
   name, falling back to the bare signed number. `-1094995529` alone is no
-  friendlier than `3199971767`.
+  friendlier than `3199971767`. Seen again in manual step R14: exit
+  `4294967283` is -13 (`EACCES`), cause "Permission denied".
+- The `render` message for a malformed analysis JSON repeats the prefix:
+  `Invalid JSON in analysis result <path>: Invalid JSON: ...`. The second
+  part is pydantic's own message (manual step R11). Drop one of the two.
 - Docs drift in `docs/architecture.md`: omits `AudioExtractor` from core
   interfaces; says the CLI depends on core, but it imports adapters; promises
   CLI config flags that don't exist; says ffmpeg is checked at startup, when
