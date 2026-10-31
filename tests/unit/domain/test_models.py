@@ -1,7 +1,15 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
-from clipper.domain.models import ClipCandidate, MediaInfo, Segment, Transcript
+from clipper.domain.models import (
+    ClipCandidate,
+    MediaInfo,
+    RenderedClip,
+    Segment,
+    Transcript,
+)
 
 
 def test_segment_duration() -> None:
@@ -105,3 +113,15 @@ def test_media_info_is_immutable() -> None:
     info = MediaInfo(duration_seconds=1.0, has_video=True)
     with pytest.raises(ValidationError):
         info.has_video = False  # type: ignore[misc]
+
+
+def test_rendered_clip_holds_values() -> None:
+    clip = RenderedClip(candidate=_candidate(), path=Path("out/a.mp4"))
+    assert clip.path == Path("out/a.mp4")
+    assert clip.candidate == _candidate()
+
+
+def test_rendered_clip_is_immutable() -> None:
+    clip = RenderedClip(candidate=_candidate(), path=Path("a.mp4"))
+    with pytest.raises(ValidationError):
+        clip.path = Path("b.mp4")  # type: ignore[misc]

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -82,3 +84,12 @@ class MediaInfo(BaseModel):
 
     duration_seconds: float = Field(gt=0, allow_inf_nan=False)
     has_video: bool
+
+
+class RenderedClip(BaseModel):
+    """A clip candidate and the video file it was rendered to."""
+
+    model_config = ConfigDict(frozen=True)
+
+    candidate: ClipCandidate
+    path: Path
