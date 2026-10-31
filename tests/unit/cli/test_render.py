@@ -7,7 +7,13 @@ from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.cli import main as cli_main
 from clipper.cli.main import app
 from clipper.domain.errors import ClipRenderError, MediaProbeError
-from clipper.domain.models import AnalysisResult, ClipCandidate, MediaInfo, Transcript
+from clipper.domain.models import (
+    AnalysisResult,
+    ClipCandidate,
+    MediaInfo,
+    Segment,
+    Transcript,
+)
 
 # All fixtures here are constructed, not produced by a real analyze run.
 
@@ -33,7 +39,13 @@ class FakeProbe:
 
 
 class RaisingRenderer:
-    def render(self, video_path: Path, candidate: ClipCandidate, output_path: Path):  # type: ignore[no-untyped-def]
+    def render(  # type: ignore[no-untyped-def]
+        self,
+        video_path: Path,
+        candidate: ClipCandidate,
+        output_path: Path,
+        captions: str | None = None,
+    ):
         raise ClipRenderError("[aist#0:0/pcm_s16le] [/bogus] bad")
 
 
@@ -54,9 +66,12 @@ class Env:
         self,
         candidates: tuple[ClipCandidate, ...] = CANDIDATES,
         source: str = "talk.mp4",
+        transcript: Transcript | None = None,
     ) -> None:
         result = AnalysisResult(
-            source=source, transcript=Transcript(segments=()), candidates=candidates
+            source=source,
+            transcript=transcript or Transcript(segments=()),
+            candidates=candidates,
         )
         self.json.write_text(result.model_dump_json(), encoding="utf-8")
 
@@ -183,3 +198,52 @@ def test_failure_message_with_brackets_is_not_parsed_as_markup(env: Env) -> None
     result = env.run("--rank", "1")
     assert result.exit_code == 1
     assert "[aist#0:0/pcm_s16le] [/bogus] bad" in result.output
+
+
+# Constructed transcript: speech only inside the first and second candidates.
+_SPEECH = Transcript(
+    segments=(
+        Segment(start_seconds=12.0, end_seconds=14.0, text="hello there"),
+        Segment(start_seconds=31.0, end_seconds=33.0, text="second <i>one</i>"),
+    )
+)
+
+
+def test_captions_are_off_by_default(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert env.renderer.captions == [None, None, None]
+    assert "(captions)" not in result.output
+
+
+def test_captions_pass_srt_for_each_clip_window(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    result = env.run("--captions", "--rank", "1", "--rank", "2")
+    assert result.exit_code == 0, result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert env.renderer.captions == [
+        "1\n00:00:02,000 --> 00:00:04,000\nhello there\n",
+        "1\n00:00:01,000 --> 00:00:03,000\nsecond ione/i\n",
+    ]
+    assert result.output.count("(captions)") == 2
+
+
+def test_captions_with_no_speech_in_range_renders_plain_with_a_note(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    result = env.run("--captions")
+    assert result.exit_code == 0, result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert env.renderer.captions[2] is None
+    assert "#3 0:01:00-0:01:10 has no speech in range" in result.output
+    assert "Rendered 3 of 3 clips" in result.output
+    assert len(env.written()) == 3
+
+
+def test_captions_failure_renders_the_rest_and_exits_1(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.use_renderer(FakeClipRenderer(fail_on=[CANDIDATES[0]]))
+    result = env.run("--captions")
+    assert result.exit_code == 1
+    assert "Rendered 2 of 3 clips" in result.output

@@ -1,5 +1,6 @@
 import logging
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -80,3 +81,23 @@ def test_format_failure_keeps_last_ten_nonempty_lines() -> None:
 
 def test_format_failure_with_empty_stderr() -> None:
     assert format_failure("tool", _completed(1, "  \n")) == "tool failed (exit 1): "
+
+
+def test_cwd_is_passed_to_the_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[object] = []
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        seen.append(kwargs.get("cwd"))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/tool")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    run_tool("tool", [], error_type=AudioExtractionError, log=_log)
+    run_tool("tool", [], error_type=AudioExtractionError, log=_log, cwd=tmp_path)
+
+    assert seen == [None, tmp_path]

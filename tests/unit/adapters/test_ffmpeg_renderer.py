@@ -173,3 +173,126 @@ def test_failure_removes_partial_output(
         FfmpegClipRenderer().render(video, _CANDIDATE, out)
 
     assert not out.exists()
+
+
+class _Run:
+    """Records each ffmpeg call and what was on disk in its working directory."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, *, code: int = 0) -> None:
+        self.commands: list[list[str]] = []
+        self.cwds: list[Path] = []
+        self.srt: list[bytes] = []
+
+        def fake_run(
+            command: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            cwd = kwargs["cwd"]
+            assert isinstance(cwd, Path)
+            self.commands.append(command)
+            self.cwds.append(cwd)
+            self.srt.append((cwd / "clip.srt").read_bytes())
+            return subprocess.CompletedProcess(command, code, "", "boom")
+
+        monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+
+_SRT = "1\n00:00:00,000 --> 00:00:01,000\ncafé “quoted”\n"
+
+
+def test_no_captions_means_no_filter_and_no_cwd(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cwds: list[object] = []
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        cwds.append(kwargs.get("cwd"))
+        assert "-vf" not in command
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "a.mp4")
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "b.mp4", captions="")
+
+    assert cwds == [None, None]
+
+
+def test_captions_add_subtitles_filter_before_video_codec(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _Run(monkeypatch)
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", captions=_SRT)
+
+    command = run.commands[0]
+    vf = command[command.index("-vf") + 1]
+    assert vf.startswith("subtitles=clip.srt:charenc=UTF-8:force_style='")
+    assert command.index("-vf") < command.index("-c:v")
+    assert command[command.index("-loglevel") + 1] == "error"
+    assert "-hide_banner" in command
+
+
+def test_captions_file_is_utf8_without_bom_or_crlf(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _Run(monkeypatch)
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", captions=_SRT)
+
+    assert run.srt == [_SRT.encode("utf-8")]
+    assert not run.srt[0].startswith(b"\xef\xbb\xbf")
+    assert b"\r" not in run.srt[0]
+
+
+def test_captions_run_in_temp_dir_with_absolute_paths(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _Run(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+
+    FfmpegClipRenderer().render(
+        Path(video.name), _CANDIDATE, Path("rel") / "c.mp4", captions=_SRT
+    )
+
+    command = run.commands[0]
+    assert run.cwds[0] != tmp_path
+    assert Path(command[command.index("-i") + 1]).is_absolute()
+    assert Path(command[-1]) == (tmp_path / "rel" / "c.mp4").resolve()
+
+
+def test_captions_returns_the_callers_output_path(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _Run(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+
+    clip = FfmpegClipRenderer().render(video, _CANDIDATE, Path("c.mp4"), captions=_SRT)
+
+    assert clip.path == Path("c.mp4")
+
+
+def test_captions_temp_dir_is_removed_after_success(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _Run(monkeypatch)
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", captions=_SRT)
+
+    assert not run.cwds[0].exists()
+
+
+def test_captions_temp_dir_is_removed_after_failure(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _Run(monkeypatch, code=1)
+
+    with pytest.raises(ClipRenderError, match="boom"):
+        FfmpegClipRenderer().render(
+            video, _CANDIDATE, tmp_path / "c.mp4", captions=_SRT
+        )
+
+    assert not run.cwds[0].exists()

@@ -45,8 +45,16 @@ class ClipRenderer(Protocol):
     creates its parent directory, overwrites an existing file, returns a
     `RenderedClip` whose `path` is `output_path`, and raises `ClipRenderError`
     on failure.
+
+    `captions` is SRT text with times relative to the clip start (see
+    `clipper.core.captions`), burned into the video. `None` or "" renders
+    without captions.
     """
 
     def render(
-        self, video_path: Path, candidate: ClipCandidate, output_path: Path
+        self,
+        video_path: Path,
+        candidate: ClipCandidate,
+        output_path: Path,
+        captions: str | None = None,
     ) -> RenderedClip: ...

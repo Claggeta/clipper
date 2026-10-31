@@ -1,4 +1,5 @@
 import logging
+import tempfile
 from pathlib import Path
 
 from clipper.adapters.media._process import format_failure, run_tool
@@ -14,6 +15,16 @@ _CRF = "20"
 _PRESET = "medium"
 _AUDIO_BITRATE = "128k"
 
+# ADR 0010. The filter reads a bare filename from ffmpeg's working directory, so
+# no path ever reaches the filter's escaping rules (`:` and `\` on Windows).
+# The style is one fixed default; FontSize is relative to libass's 288-pixel
+# canvas for SRT, not pixels. Values are a first guess, checked by eye only.
+_SRT_NAME = "clip.srt"
+_SUBTITLES_FILTER = (
+    f"subtitles={_SRT_NAME}:charenc=UTF-8:"
+    "force_style='FontSize=18,Outline=2,Shadow=0,MarginV=30'"
+)
+
 
 def _seconds(value: float) -> str:
     """Fixed-point milliseconds, never scientific notation."""
@@ -27,7 +38,11 @@ class FfmpegClipRenderer:
         self._executable = executable
 
     def render(
-        self, video_path: Path, candidate: ClipCandidate, output_path: Path
+        self,
+        video_path: Path,
+        candidate: ClipCandidate,
+        output_path: Path,
+        captions: str | None = None,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -37,6 +52,34 @@ class FfmpegClipRenderer:
             )
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        if not captions:
+            self._cut(video_path, candidate, output_path)
+        else:
+            with tempfile.TemporaryDirectory(
+                prefix="clipper-captions-", ignore_cleanup_errors=True
+            ) as folder:
+                # UTF-8 with no BOM and LF line endings, whatever the platform.
+                (Path(folder) / _SRT_NAME).write_bytes(captions.encode("utf-8"))
+                # ffmpeg runs in `folder`, so the other paths must not depend on
+                # the caller's working directory.
+                self._cut(
+                    video_path.resolve(),
+                    candidate,
+                    output_path.resolve(),
+                    cwd=Path(folder),
+                    video_filter=_SUBTITLES_FILTER,
+                )
+        return RenderedClip(candidate=candidate, path=output_path)
+
+    def _cut(
+        self,
+        video_path: Path,
+        candidate: ClipCandidate,
+        output_path: Path,
+        *,
+        cwd: Path | None = None,
+        video_filter: str | None = None,
+    ) -> None:
         args = [
             "-hide_banner",
             "-loglevel",
@@ -55,6 +98,7 @@ class FfmpegClipRenderer:
             "0:v:0",
             "-map",
             "0:a:0?",
+            *(["-vf", video_filter] if video_filter else []),
             "-c:v",
             "libx264",
             "-preset",
@@ -72,7 +116,7 @@ class FfmpegClipRenderer:
             str(output_path),
         ]
         result = run_tool(
-            self._executable, args, error_type=ClipRenderError, log=logger
+            self._executable, args, error_type=ClipRenderError, log=logger, cwd=cwd
         )
         if result.returncode != 0:
             try:
@@ -80,4 +124,3 @@ class FfmpegClipRenderer:
             except OSError:
                 logger.info("Could not remove partial output %s", output_path)
             raise ClipRenderError(format_failure(self._executable, result))
-        return RenderedClip(candidate=candidate, path=output_path)

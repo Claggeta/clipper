@@ -50,3 +50,10 @@ def test_fake_renderer_fails_on_chosen_candidates(tmp_path: Path) -> None:
     assert not out.exists()
     assert renderer.calls == [(Path("v.mp4"), bad, out)]
     assert renderer.render(Path("v.mp4"), _c(), tmp_path / "ok.mp4")
+
+
+def test_fake_renderer_records_captions(tmp_path: Path) -> None:
+    renderer = FakeClipRenderer()
+    renderer.render(Path("v.mp4"), _c(), tmp_path / "a.mp4")
+    renderer.render(Path("v.mp4"), _c(), tmp_path / "b.mp4", captions="1\nx\n")
+    assert renderer.captions == [None, "1\nx\n"]

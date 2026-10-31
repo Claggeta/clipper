@@ -18,6 +18,7 @@ from clipper.adapters.results.analysis_json import (
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
 from clipper.adapters.transcription.video import VideoTranscriber
+from clipper.core.captions import build_srt
 from clipper.core.config import Settings
 from clipper.core.interfaces import ClipRenderer, MediaProbe, Transcriber
 from clipper.core.naming import plan_clip_paths
@@ -144,6 +145,9 @@ def render(
             "--rank", help="Render only this 1-based rank. Repeat for several."
         ),
     ] = None,
+    captions: Annotated[
+        bool, typer.Option("--captions", help="Burn captions into each clip.")
+    ] = False,
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""
     settings = Settings()
@@ -163,14 +167,23 @@ def render(
     rendered = 0
     for number, candidate, path in zip(ranks, selected, paths, strict=True):
         span = f"{_fmt(candidate.start_seconds)}-{_fmt(candidate.end_seconds)}"
+        srt = build_srt(result.transcript, candidate) if captions else ""
+        if captions and not srt:
+            console.print(
+                f"[yellow]Note:[/yellow] #{number} {span} has no speech in range; "
+                "rendered without captions",
+                soft_wrap=True,
+            )
         try:
-            clip = renderer.render(video, candidate, path)
+            clip = renderer.render(video, candidate, path, captions=srt or None)
         except ClipperError as exc:
             failures.append(f"#{number} {span}: {escape(str(exc))}")
             continue
         rendered += 1
         console.print(
-            f"Rendered #{number} {span} {escape(str(clip.path))}", soft_wrap=True
+            f"Rendered #{number} {span} {escape(str(clip.path))}"
+            f"{' (captions)' if srt else ''}",
+            soft_wrap=True,
         )
 
     for failure in failures:
