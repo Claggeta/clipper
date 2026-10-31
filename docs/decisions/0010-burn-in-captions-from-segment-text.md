@@ -45,6 +45,24 @@ ignore soft subtitle tracks.
 - (−) Segment boundaries cut mid-sentence at the clip edges, since text is
   clamped by time and not by words.
 
+## Amended by the caption builder PR (V2 item 9)
+
+- The function is `build_srt(transcript, candidate)` in `core/captions.py`. It
+  takes the `ClipCandidate` and reads only its start and end. This refines
+  "a clip window and nothing else" above.
+- Times are converted to whole milliseconds before clamping and shifting, so
+  float noise cannot move a cue. A segment that only touches the clip edge, or
+  has no length after rounding, is dropped.
+- A segment that straddles an edge keeps its full text and is shown only for
+  its in-window part. A short overlap therefore flashes a whole sentence; the
+  real-clip check in item 11 decides whether a minimum overlap is needed.
+- Whitespace in segment text, newlines included, collapses to single spaces.
+  There is no wrapping and no escaping of `{...}`, `<...>` or `-->`. Whether
+  ffmpeg needs any is checked with a real build in item 10.
+- No overlapping speech returns `""`, a valid SRT with zero cues. It is not an
+  error. The caller decides; the intent is to render that clip without
+  captions.
+
 ## Revisit when
 
 - Segment-level captions look bad on real clips. That is the case for
