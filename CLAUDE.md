@@ -173,7 +173,8 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 2. ~~Extract a shared ffmpeg helper from `FfmpegAudioExtractor` (stderr line
    cap, `which` check). Behaviour-neutral; this is the ADR 0004 trigger.~~
    (done)
-3. `ffprobe` adapter behind a `MediaProbe` Protocol (duration, has video)
+3. ~~`ffprobe` adapter behind a `MediaProbe` Protocol (duration, has video)~~
+   (done)
 4. Load a saved `AnalysisResult` from JSON, with the source-name check
 5. `ClipRenderer` Protocol, `ClipRenderError`, `RenderedClip`, fake renderer,
    output naming
