@@ -73,3 +73,12 @@ class AnalysisResult(BaseModel):
     source: str
     transcript: Transcript
     candidates: tuple[ClipCandidate, ...]
+
+
+class MediaInfo(BaseModel):
+    """Facts about a media file, as reported by a probe."""
+
+    model_config = ConfigDict(frozen=True)
+
+    duration_seconds: float = Field(gt=0, allow_inf_nan=False)
+    has_video: bool

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from clipper.domain.models import ClipCandidate, Segment, Transcript
+from clipper.domain.models import ClipCandidate, MediaInfo, Segment, Transcript
 
 
 def test_segment_duration() -> None:
@@ -87,3 +87,21 @@ def test_candidate_requires_reasons() -> None:
 def test_candidate_is_immutable() -> None:
     with pytest.raises(ValidationError):
         _candidate().score = 0.1  # type: ignore[misc]
+
+
+def test_media_info_holds_values() -> None:
+    info = MediaInfo(duration_seconds=97.04, has_video=True)
+    assert info.duration_seconds == 97.04
+    assert info.has_video is True
+
+
+@pytest.mark.parametrize("duration", [0.0, -1.0, float("nan"), float("inf")])
+def test_media_info_rejects_unusable_duration(duration: float) -> None:
+    with pytest.raises(ValidationError):
+        MediaInfo(duration_seconds=duration, has_video=True)
+
+
+def test_media_info_is_immutable() -> None:
+    info = MediaInfo(duration_seconds=1.0, has_video=True)
+    with pytest.raises(ValidationError):
+        info.has_video = False  # type: ignore[misc]
