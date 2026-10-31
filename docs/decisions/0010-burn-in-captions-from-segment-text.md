@@ -111,6 +111,24 @@ constructed 1280x720 test video and on `data/test_input.mp4`. One build only.
 - A captioned clip has the same file name as a plain one (0008), so rendering
   with `--captions` overwrites an earlier plain clip of the same span.
 
+## Amended by the backslash fix (after V2 item 10)
+
+Found on 2026-10-31 by rendering a constructed cue, `path C:\new\table`, with
+`--captions` on ffmpeg 9.0.2 (gyan.dev full build), Windows 11. The clip showed
+`path C: ew\table`: libass read `\n` as a line break and swallowed it. `\t`
+passed through as written. `\N` and `\h` are the other two ASS escapes of this
+kind; they were not rendered by hand, since removing the backslash covers all
+three.
+
+- `build_srt` now also removes `\` from cue text. Like `{ } < >`, it has no
+  escape in SRT. The cost is that `C:\new\table` shows as `C:newtable`. Whisper
+  rarely produces a backslash, and a lost symbol is better than a lost word.
+- Checked by hand after the change on the same build: the same cue rendered as
+  `path C:newtable`. Not checked: any other build.
+- Considered and not done: a zero-width space after each backslash, which would
+  keep the glyph but depends on the font not drawing a box for it, and
+  replacing `\` with a lookalike, which changes the text.
+
 ## Revisit when
 
 - Segment-level captions look bad on real clips. That is the case for

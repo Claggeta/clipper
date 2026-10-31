@@ -1,9 +1,10 @@
 from clipper.domain.models import ClipCandidate, Transcript
 
-# libass reads `{...}` as override tags and ffmpeg reads `<...>` as markup, so a
-# real build can drop or restyle spoken text that contains them (ADR 0010).
-# There is no escape for either in SRT, so the characters are removed.
-_MARKUP = str.maketrans("", "", "{}<>")
+# libass reads `{...}` as override tags and ffmpeg reads `<...>` as markup, and
+# libass reads `\n`, `\N` and `\h` as a line break or a space, so a real build
+# can drop or restyle spoken text that contains them (ADR 0010). There is no
+# escape for any of them in SRT, so the characters are removed.
+_MARKUP = str.maketrans("", "", "{}<>\\")
 
 
 def _to_ms(seconds: float) -> int:
@@ -26,8 +27,8 @@ def build_srt(transcript: Transcript, candidate: ClipCandidate) -> str:
     to cut it by. Times are converted to whole milliseconds before clamping
     so float noise cannot move a cue. Whitespace in the text, newlines
     included, collapses to single spaces, because a blank line would end the
-    cue. `{`, `}`, `<` and `>` are removed, since a renderer would read them as
-    markup. Cues that are empty or have no length after rounding are dropped.
+    cue. `{`, `}`, `<`, `>` and `\` are removed, since a renderer would read them
+    as markup. Cues that are empty or have no length after rounding are dropped.
 
     Returns "" when no cue remains. The caller decides what that means.
     """
