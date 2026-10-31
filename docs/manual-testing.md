@@ -1310,6 +1310,9 @@ maintainer.
   `path C: ew\table` for `path C:\new\table`: libass swallowed the `\n`. The
   emoji drew as a glyph. This was not a run of the full checklist. After the
   fix, the same cue showed `path C:newtable` on the same build.
+- C7 re-run by the maintainer on the merged code (after #54): the `awk6.png`
+  frame showed `path C:newtable`. The other frames of that re-run were not
+  reported.
 - Not covered by this run: a build without libass, other ffmpeg builds, and a
   second drive.
 
