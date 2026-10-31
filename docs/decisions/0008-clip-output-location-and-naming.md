@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Clarified: where the within-run collision check lives (see Consequences)
 
 ## Context
 
@@ -42,6 +43,11 @@ JSON is already named after the video stem and overwrites on collision.
 - (−) Two candidates that round to the same name would collide. The detector
   deduplicates overlapping windows, so this should not occur, but the renderer
   should fail loudly rather than silently overwrite within one run.
+  Clarification: the check is `plan_clip_paths` in `core/naming.py`, which the
+  `render` command calls once before cutting anything. Renderers are stateless
+  and take the output path from the caller, so the run fails with nothing
+  written. Times are rounded to milliseconds before flooring and ceiling, so
+  float noise cannot change a name.
 
 ## Revisit when
 

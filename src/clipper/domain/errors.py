@@ -20,3 +20,7 @@ class MediaProbeError(ClipperError):
 
 class AnalysisResultError(ClipperError):
     """Raised when a saved analysis result cannot be loaded or does not match."""
+
+
+class ClipRenderError(ClipperError):
+    """Raised when a clip cannot be rendered or its output path is unusable."""
