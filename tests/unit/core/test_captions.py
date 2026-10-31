@@ -97,8 +97,17 @@ def test_timestamp_hours_widen_past_99() -> None:
 
 def test_markup_characters_are_removed() -> None:
     srt = build_srt(_t((0.0, 1.0, "a {\\an8}b <i>c</i> d --> e")), _c(0.0, 5.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:01,000\na \\an8b ic/i d -- e\n"
+    assert srt == "1\n00:00:00,000 --> 00:00:01,000\na an8b ic/i d -- e\n"
 
 
 def test_cue_that_is_only_markup_characters_is_dropped() -> None:
     assert build_srt(_t((0.0, 1.0, "<>{}")), _c(0.0, 5.0)) == ""
+
+
+def test_backslash_is_removed_so_libass_cannot_read_a_line_break() -> None:
+    srt = build_srt(_t((0.0, 1.0, "C:\\new\\table \\N \\h x")), _c(0.0, 5.0))
+    assert srt == "1\n00:00:00,000 --> 00:00:01,000\nC:newtable N h x\n"
+
+
+def test_cue_that_is_only_backslashes_is_dropped() -> None:
+    assert build_srt(_t((0.0, 1.0, "\\ \\\\")), _c(0.0, 5.0)) == ""
