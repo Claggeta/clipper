@@ -1,0 +1,9 @@
+{
+  "source": "test_input.mp4",
+  "labels": [
+    { "start": "0:00", "end": "0:50", "note": "Make your bed: the opener" },
+    { "start": "0:50", "end": "2:29", "note": "SEAL bed inspection, struggles apply to all" },
+    { "start": "2:30", "end": "3:47", "note": "Darkest moment, power of hope, the list" },
+    { "start": "3:48", "end": "4:35", "note": "Ring the bell" }
+  ]
+}
