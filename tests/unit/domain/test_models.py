@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from clipper.domain.models import (
     ClipCandidate,
+    Label,
+    LabeledVideo,
     MediaInfo,
     RenderedClip,
     Segment,
@@ -125,3 +127,112 @@ def test_rendered_clip_is_immutable() -> None:
     clip = RenderedClip(candidate=_candidate(), path=Path("a.mp4"))
     with pytest.raises(ValidationError):
         clip.path = Path("b.mp4")  # type: ignore[misc]
+
+
+# Labels are hand-written, so the times below are constructed input.
+
+
+def _label(start: object, end: object, note: str | None = None) -> Label:
+    return Label(start=start, end=end, note=note)
+
+
+@pytest.mark.parametrize(
+    ("text", "seconds"),
+    [
+        ("0:00", 0.0),
+        ("0:50", 50.0),
+        ("2:29", 149.0),
+        ("0:49.78", 49.78),
+        ("75:10", 4510.0),
+        ("1:02:03", 3723.0),
+        ("1:02:03.5", 3723.5),
+    ],
+)
+def test_label_parses_timestamps(text: str, seconds: float) -> None:
+    assert _label(text, "9:00:00").start_seconds == pytest.approx(seconds)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        0.5,
+        50,
+        True,
+        None,
+        "50",
+        "0.50",
+        "0:5",
+        "0:60",
+        "1:60:00",
+        "1:2:03",
+        " 0:50",
+        "0:50 ",
+        "-0:50",
+        "0:50.",
+        "",
+        "١:٢٣",
+    ],
+)
+def test_label_rejects_other_time_forms(value: object) -> None:
+    with pytest.raises(ValidationError, match="M:SS"):
+        _label(value, "9:00:00")
+
+
+def test_label_duration_and_note() -> None:
+    label = _label("3:48", "4:35", "Ring the bell")
+    assert label.duration_seconds == 47.0
+    assert label.note == "Ring the bell"
+
+
+def test_label_note_is_optional() -> None:
+    assert _label("0:00", "0:50").note is None
+
+
+@pytest.mark.parametrize("end", ["0:50", "0:49"])
+def test_label_rejects_end_not_after_start(end: str) -> None:
+    with pytest.raises(ValidationError, match="end must be after start"):
+        _label("0:50", end)
+
+
+def test_label_rejects_unknown_keys() -> None:
+    with pytest.raises(ValidationError, match="end_second"):
+        Label.model_validate({"start": "0:00", "end_second": "0:50"})
+
+
+def test_label_rejects_seconds_field_names() -> None:
+    with pytest.raises(ValidationError):
+        Label.model_validate({"start_seconds": "0:00", "end_seconds": "0:50"})
+
+
+def test_label_is_immutable() -> None:
+    label = _label("0:00", "0:50")
+    with pytest.raises(ValidationError):
+        label.note = "changed"  # type: ignore[misc]
+
+
+def _video(*labels: Label) -> LabeledVideo:
+    return LabeledVideo(source="talk.mp4", labels=labels)
+
+
+def test_labeled_video_allows_touching_labels() -> None:
+    video = _video(_label("0:00", "0:50"), _label("0:50", "2:29"))
+    assert [label.end_seconds for label in video.labels] == [50.0, 149.0]
+
+
+def test_labeled_video_allows_no_labels() -> None:
+    assert _video().labels == ()
+
+
+def test_labeled_video_rejects_out_of_order_labels() -> None:
+    with pytest.raises(ValidationError, match="labels.1 starts before labels.0 ends"):
+        _video(_label("2:30", "3:47"), _label("0:00", "0:50"))
+
+
+def test_labeled_video_rejects_overlapping_labels() -> None:
+    with pytest.raises(ValidationError, match="labels.2 starts before labels.1 ends"):
+        _video(_label("0:00", "0:50"), _label("0:50", "2:29"), _label("2:00", "3:00"))
+
+
+def test_labeled_video_rejects_unknown_keys() -> None:
+    with pytest.raises(ValidationError, match="video"):
+        LabeledVideo.model_validate({"source": "a.mp4", "labels": [], "video": "x"})

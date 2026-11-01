@@ -13,3 +13,4 @@ class Settings(BaseSettings):
     cache_dir: Path = Path("data/cache")
     output_dir: Path = Path("data/output")
     clips_dir: Path = Path("data/clips")
+    labels_dir: Path = Path("data/labels")
