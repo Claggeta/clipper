@@ -144,7 +144,8 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V3, item 1 (scope and ADRs 0012 to 0015, a docs PR).
+- V3 (scope and ADRs 0012 to 0015 are merged). Next: item 2, the label
+  model. Item 0 (videos and labels) is the maintainer's and is not started.
 
 ## Pinned dependencies
 
@@ -226,7 +227,7 @@ confirmation first (see "How to work in this repo").
    podcasts, a mix of campaign and non-campaign), runs `analyze` on them, and
    writes label files. `eval` cannot say anything about real media until this
    exists. No videos or labels exist yet.
-1. ADRs 0012 to 0015 and the V3 scope (one docs PR)
+1. ~~ADRs 0012 to 0015 and the V3 scope (one docs PR)~~ (done)
 2. Label domain model, loader and `CLIPPER_LABELS_DIR`
 3. Pure comparison function and `clipper eval`, with the first label file
    format documented
