@@ -39,14 +39,29 @@ default, word-level captions, hardware encoders, concatenating clips, uploads,
 analytics, web UI, database, user accounts, ML training, and any change to
 the detector.
 
+## V3 Scope
+Input: saved `AnalysisResult` JSON and a hand-written labels file per video.
+Output: a measured comparison of detectors, and a second detector that scores
+the heuristic's windows with a local LLM. Interface: `clipper eval`, and
+`--detector` on `analyze` and `eval`.
+
+Non-goals for V3: downloading or URL ingestion, posting, analytics or platform
+metrics, a vector database or retrieval, a trained neural network, audio or
+visual features, a labeling UI, a rename of the project, and any change to
+`render`. Campaign briefs as a detector input are planned after the LLM
+detector works and need their own ADR.
+
 ## Success Criteria
 1. `clipper analyze talk.mp4` runs end to end on a local machine and outputs
    at most 5 candidates. Measured on a 5:14 speech video on CPU with the
    Whisper `base` model: 14.3 s cold, 0.4 s warm. A 30-minute video is not
    yet measured, and will scale roughly with audio length.
-2. Detection is deterministic: the same transcript always produces the
-   same top 5. Transcription itself may vary slightly between runs and
-   model versions. Results are saved to disk.
+2. Heuristic detection is deterministic: the same transcript always produces
+   the same top 5. An LLM detector is aimed at being repeatable on one setup
+   and is not guaranteed to be
+   ([ADR 0015](decisions/0015-determinism-is-per-detector.md)). Transcription
+   itself may vary slightly between runs and model versions. Results are saved
+   to disk.
 3. A new transcriber or detector can be added by writing one new class,
    with no changes to the pipeline or domain code.
 4. Core logic has automated tests that run without a real video or
@@ -62,6 +77,9 @@ the detector.
 ## Known Risks
 - Heuristic scoring may not match what audiences actually find engaging.
   V1 is a baseline to measure future approaches against.
+- V3 labels are one person's judgment on a few videos. They can show that a
+  detector change is a sanity-check improvement, not that audiences agree
+  ([ADR 0012](decisions/0012-evaluate-detectors-against-hand-labels.md)).
 - CPU transcription of long videos may be slow. Transcripts are cached
   to mitigate this.
 - Re-encoding uses libx264, which is GPL. Clipper does not ship ffmpeg, and the

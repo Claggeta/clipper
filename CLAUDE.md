@@ -67,6 +67,16 @@ and planned code:
   builder. Word-level captions are out of scope.
 - `0011` — `render` is a separate command (`--rank`, `--captions`). If one clip
   fails, the rest still render, then it exits 1.
+- `0012` — detectors are evaluated against hand-written label files (one JSON
+  per video, `CLIPPER_LABELS_DIR`). `clipper eval` reruns a detector on the
+  saved transcript. Results are indicative, not statistical.
+- `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed in
+  `_build_detector`. No test double is selectable by name. Amends 0006.
+- `0014` — the LLM detector re-ranks the heuristic's windows, via Ollama, and
+  never falls back silently. Windowing and dedup are extracted first, as a
+  behaviour-neutral change.
+- `0015` — determinism is a property of the heuristic detector. Amends vision
+  criterion 2.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -97,6 +107,24 @@ default, word-level captions, hardware encoders, concatenating clips, uploads,
 analytics, web UI, database, user accounts, ML training, and any change to
 the detector.
 
+## V3 scope (in progress)
+
+Input: saved `AnalysisResult` JSON and a hand-written labels file per video.
+Output: a measured comparison of detectors, and a local-LLM detector that
+re-ranks the heuristic's windows. Interface: `clipper eval`, and `--detector`
+on `analyze` and `eval`.
+
+Non-goals for V3: downloading or URL ingestion, posting, analytics or platform
+metrics, a vector database or retrieval, a trained neural network, audio or
+visual features, a labeling UI, a rename of the project, and any change to
+`render`. Campaign briefs as a detector input come after the LLM detector
+works and need their own ADR.
+
+The maintainer's goal for the project, as stated: a personal tool, used daily
+and eventually mostly unattended, that turns long-form videos into clips for
+niche short-form accounts, with the ML side growing over time and costs kept
+near zero. V3 serves that by making "better" measurable first.
+
 ## Current state
 
 All merged to `main` with green CI:
@@ -116,7 +144,7 @@ All merged to `main` with green CI:
 
 In progress:
 
-- Nothing.
+- V3, item 1 (scope and ADRs 0012 to 0015, a docs PR).
 
 ## Pinned dependencies
 
@@ -189,6 +217,31 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
 11. ~~Manual-test checklist: captions, README usage and sample output, release
     notes, tag `v0.2.0`~~ (done; notes in `docs/releases/v0.2.0.md`)
 
+## V3 list
+
+Each item is one PR, and each code item states its design and waits for
+confirmation first (see "How to work in this repo").
+
+0. Not a PR: the maintainer collects long videos (Twitch/YouTube VODs,
+   podcasts, a mix of campaign and non-campaign), runs `analyze` on them, and
+   writes label files. `eval` cannot say anything about real media until this
+   exists. No videos or labels exist yet.
+1. ADRs 0012 to 0015 and the V3 scope (one docs PR)
+2. Label domain model, loader and `CLIPPER_LABELS_DIR`
+3. Pure comparison function and `clipper eval`, with the first label file
+   format documented
+4. `--detector` option and the `_build_detector` seam, with the open question
+   on recording the detector name in `AnalysisResult` (ADR 0013)
+5. Whisper experiment: a larger model and/or the GPU, measured with `eval`.
+   Needs a manual-test step. May end in a settings change or in nothing.
+6. Extract windowing and overlap dedup from `HeuristicClipDetector`.
+   Behaviour-neutral; the heuristic's tests stay unchanged (ADR 0014).
+7. Local LLM detector via Ollama, a manual-test step, a repeatability check
+   (ADRs 0014, 0015), and a model choice recorded from `eval` results
+8. Release notes and tag `v0.3.0`, if the items above land
+
+Later, not scheduled: campaign briefs as a detector input (needs an ADR).
+
 ## Parked
 
 - ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
@@ -222,3 +275,10 @@ SUCCESS on a 5:14 speech video, Whisper `base` model, CPU:
   its whole sentence for the part inside the clip (ADR 0010). On the one 5:14
   video tried, no cue in any rank was under 0.5 s, so it was not needed. Revisit
   if a real clip flashes a sentence, and set the threshold from that clip.
+- YouTube's "Most replayed" graph as a second label source (ADR 0012). It is
+  public on many long videos and may be extractable with yt-dlp. Both are
+  unverified, and YouTube's terms have not been checked. A short spike would
+  settle whether it is usable.
+- Performance data from posted clips as a reference (ADR 0012). Needs posting
+  and analytics, which are not planned yet. Clips have no stable ID today (they
+  are named by time span), so joining metrics to clips needs one.

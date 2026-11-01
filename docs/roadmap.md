@@ -7,5 +7,5 @@
 | M4: Pipeline + CLI  | End-to-end command with display and JSON output             | Orchestration, config, logging                | Done        |
 | M5: Hardening       | Error handling, docs, test coverage, v0.1.0 release         | Quality, semantic versioning                  | Done        |
 | V2                  | Clip rendering with ffmpeg, captions (v0.2.0)               | Subprocess handling, media                    | Done        |
-| V3 (later)          | Local LLM scoring, plus evaluation against labeled examples | ML evaluation                                 | To do       |
+| V3                  | Evaluation against hand labels, then local LLM scoring      | ML evaluation                                 | In progress |
 | V4+ (later)         | Uploads, analytics, learning loop, database, API            | Persistence, integrations                     | To do       |
