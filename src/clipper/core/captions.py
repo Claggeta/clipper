@@ -27,8 +27,9 @@ def build_srt(transcript: Transcript, candidate: ClipCandidate) -> str:
     to cut it by. Times are converted to whole milliseconds before clamping
     so float noise cannot move a cue. Whitespace in the text, newlines
     included, collapses to single spaces, because a blank line would end the
-    cue. `{`, `}`, `<`, `>` and `\` are removed, since a renderer would read them
-    as markup. Cues that are empty or have no length after rounding are dropped.
+    cue. The characters `{`, `}`, `<`, `>` and backslash are removed, since a
+    renderer would read them as markup. Cues that are empty or have no length
+    after rounding are dropped.
 
     Returns "" when no cue remains. The caller decides what that means.
     """
