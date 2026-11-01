@@ -24,3 +24,7 @@ class AnalysisResultError(ClipperError):
 
 class ClipRenderError(ClipperError):
     """Raised when a clip cannot be rendered or its output path is unusable."""
+
+
+class LabelsError(ClipperError):
+    """Raised when a labels file cannot be loaded."""

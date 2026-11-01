@@ -16,7 +16,9 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .coverage
-data/
+# Hand-written labels are committed (docs/decisions/0012).
+data/*
+!data/labels/
 dist/
 
 clipper-reference.md

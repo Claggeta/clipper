@@ -71,6 +71,35 @@ maintainer's own judgment of which moments in a video are worth cutting.
 - The metric disagrees with what the maintainer sees when comparing two
   detectors by eye.
 
+## Amended by the label model PR (V3 item 2)
+
+- A label file is `<CLIPPER_LABELS_DIR>/<video stem>.json` by convention. It
+  holds `source` (the video's file name, as in `AnalysisResult.source`) and
+  `labels`, a list of `{"start", "end", "note"}`, `note` optional. The
+  `source` field ties the file to a video, not the file name.
+- Times are written as `"M:SS"` or `"H:MM:SS"` strings, with optional
+  fractional seconds (`"0:49.78"`), and held as seconds in the model. Plain
+  numbers are rejected. This refines "a time range in seconds" in decision 1:
+  the first labels were written as `0.50` meaning 0:50, which as a number of
+  seconds loads silently as half a second.
+- `end` must be after `start`. Labels must be in order and must not overlap;
+  touching is allowed, as for transcript segments. Unknown keys are rejected,
+  so a typo fails instead of being ignored. An empty `labels` list is valid: it
+  records that nothing in the video is worth cutting.
+- The model does not check labels against the video's length. It cannot know
+  it. `eval` can, once it has the transcript (item 3).
+- The models are `Label` and `LabeledVideo` in `domain/models.py`, loaded by
+  `load_labels` in `adapters/results/labels_json.py`, which raises
+  `LabelsError`.
+- Label files are committed to git: `.gitignore` ignores `data/*` except
+  `data/labels/`. They are the only hand-made data in the project, while
+  videos, transcripts and analyses can be fetched or regenerated.
+- First labels: on `data/test_input.mp4` the maintainer labeled four moments
+  that together cover the whole speech. Labels like that cannot count anything
+  against a detector, since every candidate lands inside one. A video with
+  stretches the maintainer would not post is needed before `eval` can tell
+  detectors apart.
+
 ## Related
 
 - 0013: detector choice on the CLI
