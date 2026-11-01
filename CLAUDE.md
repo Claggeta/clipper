@@ -144,8 +144,10 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V3 (scope and ADRs 0012 to 0015 are merged). Next: item 2, the label
-  model. Item 0 (videos and labels) is the maintainer's and is not started.
+- V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model, is
+  merged). Next: item 3, the comparison function and `clipper eval`. Item 0 is
+  started: one label file, `data/labels/test_input.json`, whose four labels
+  cover the whole speech (ADR 0012, item 2 amendment).
 
 ## Pinned dependencies
 
@@ -226,9 +228,9 @@ confirmation first (see "How to work in this repo").
 0. Not a PR: the maintainer collects long videos (Twitch/YouTube VODs,
    podcasts, a mix of campaign and non-campaign), runs `analyze` on them, and
    writes label files. `eval` cannot say anything about real media until this
-   exists. No videos or labels exist yet.
+   exists. Started: labels for `test_input.mp4` only. No long videos yet.
 1. ~~ADRs 0012 to 0015 and the V3 scope (one docs PR)~~ (done)
-2. Label domain model, loader and `CLIPPER_LABELS_DIR`
+2. ~~Label domain model, loader and `CLIPPER_LABELS_DIR`~~ (done)
 3. Pure comparison function and `clipper eval`, with the first label file
    format documented
 4. `--detector` option and the `_build_detector` seam, with the open question
