@@ -57,7 +57,7 @@ def _fmt(seconds: float) -> str:
 
 
 def _render(result: AnalysisResult) -> None:
-    table = Table(title=f"Top clips: {result.source}")
+    table = Table(title=f"Top clips: {escape(result.source)}")
     for column in ("#", "Start", "End", "Score", "Why"):
         table.add_column(column)
     for rank, c in enumerate(result.candidates, start=1):
@@ -66,7 +66,7 @@ def _render(result: AnalysisResult) -> None:
             _fmt(c.start_seconds),
             _fmt(c.end_seconds),
             f"{c.score:.2f}",
-            "; ".join(c.reasons),
+            escape("; ".join(c.reasons)),
         )
     console.print(table)
 
@@ -157,7 +157,7 @@ def _report_evaluation(
             f"{number} (repeat of #{matched_by[number - 1] + 1})" for number in numbers
         )
 
-    labels = Table(title=f"Labels: {evaluation.source}")
+    labels = Table(title=f"Labels: {escape(evaluation.source)}")
     for column in ("#", "Start", "End", "Hit by", "Note"):
         labels.add_column(column)
     for index, label in enumerate(evaluation.labels):
@@ -263,7 +263,7 @@ def analyze(
     out_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     _render(result)
     console.print(f"Detector: {detector.value}", soft_wrap=True)
-    console.print(f"Saved: {out_file}")
+    console.print(f"Saved: {escape(str(out_file))}")
 
 
 @app.command()

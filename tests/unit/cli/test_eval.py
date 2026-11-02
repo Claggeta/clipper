@@ -200,6 +200,23 @@ def test_default_labels_path_uses_the_source_stem(env: Env) -> None:
     assert "Labels: lecture.mkv" in result.output
 
 
+def test_bracketed_source_is_not_parsed_as_markup(env: Env) -> None:
+    source = "Title [oFbD0Ot7nQ8].mp4"
+    env.labels.unlink()
+    env.save(source=source)
+    env.write_labels(
+        [{"start": "0:00", "end": "5:00"}],
+        source=source,
+        path=env.labels_dir / "Title [oFbD0Ot7nQ8].json",
+    )
+
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    # rich may wrap the title at the space, so check the bracketed part.
+    assert "[oFbD0Ot7nQ8].mp4" in result.output
+
+
 def test_missing_default_labels_file(env: Env) -> None:
     env.labels.unlink()
 
