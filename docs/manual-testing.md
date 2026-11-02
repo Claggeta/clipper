@@ -784,6 +784,89 @@ The exit number may show as an unsigned 32-bit value on Windows. That is the
 parked issue in `CLAUDE.md`. Do not fail the step on it. If ffmpeg unexpectedly
 succeeds here, record that and the contents of the folder.
 
+### R15. `--vertical` crops to 9:16 at 1080x1920
+
+Covers [ADR 0016](decisions/0016-vertical-centre-crop.md). `Invoke-Render` in R0
+takes ranks only, so this step defines a helper that passes any flags.
+
+```powershell
+# Helper: like Invoke-Render, with the flags passed as one string.
+function Invoke-RenderWith {
+  param([string]$Video, [string]$ResultJson, [string]$Flags)
+  cmd /c "uv run clipper render `"$Video`" `"$ResultJson`" $Flags > `"$S\last.txt`" 2>&1"
+  $script:Code = $LASTEXITCODE
+  $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  "exit $Code"
+  $Text
+}
+# Helper: what ffprobe says about a clip's streams and length.
+function Show-Streams([string]$Clip) {
+  ffprobe -v error -show_entries "stream=codec_type,codec_name,width,height,sample_aspect_ratio,pix_fmt:format=duration" -of compact=p=0 "$Clip"
+}
+
+Reset-Clips
+"source: " + (ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$Src")
+Invoke-RenderWith $Src $Json "--vertical --rank 1"
+$clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -First 1).FullName
+Show-Streams $clip
+ffmpeg -hide_banner -loglevel error -y -ss 5 -i $clip -frames:v 1 "$S\vertical.png"
+Invoke-Item "$S\vertical.png"
+```
+
+Pass:
+
+- Exit 0, and the `Rendered #1 ...` line ends with ` (vertical)`. The file name
+  is the same as R1's for rank 1.
+- The video stream is `h264`, `width=1080`, `height=1920`,
+  `sample_aspect_ratio=1:1`, `yuv420p`; the audio stream is `aac`; the duration
+  is within R2's tolerance of the requested length.
+- In `vertical.png`, the picture is the middle of the source frame, not
+  squashed or stretched. Record what is cut off at the sides.
+
+A source with black bars built into its frame keeps them: the crop takes the
+full height, bars included.
+
+### R16. `--vertical --captions`: captions drawn on the vertical frame
+
+```powershell
+Reset-Clips
+Invoke-RenderWith $Src $Json "--vertical --captions --rank 1"
+$clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -First 1).FullName
+Show-Streams $clip
+ffmpeg -hide_banner -loglevel error -y -ss 5 -i $clip -frames:v 1 "$S\vertical-captions.png"
+Invoke-Item "$S\vertical-captions.png"
+```
+
+Pass: exit 0, the line ends with ` (vertical, captions)`, the streams are as in
+R15, and the frame shows a caption inside the 1080-wide picture. The caption
+style is still the one fixed segment-level style (ADR 0010) until V4 item 4.
+Record how large it is and how many lines it wraps to.
+
+### R17. Portrait and narrow sources (constructed)
+
+Two constructed sources: 720x1280, which is already 9:16, so the crop changes
+nothing, and 600x1280, which is narrower than 9:16, so the crop takes height
+instead of width. Each has one candidate, 2 to 8 s.
+
+```powershell
+foreach ($p in @(@{ n = "portrait"; s = "720x1280" }, @{ n = "narrow"; s = "600x1280" })) {
+  ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc=size=$($p.s):rate=25:duration=10" `
+    -f lavfi -i "sine=frequency=440:duration=10" -shortest `
+    -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\$($p.n).mp4"
+  New-Result "$S\$($p.n).json" "$($p.n).mp4" "2-8"
+  Reset-Clips
+  Invoke-RenderWith "$S\$($p.n).mp4" "$S\$($p.n).json" "--vertical"
+  $clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -First 1).FullName
+  Show-Streams $clip
+  ffmpeg -hide_banner -loglevel error -y -ss 3 -i $clip -frames:v 1 "$S\$($p.n).png"
+}
+Invoke-Item "$S\narrow.png"
+```
+
+Pass: both exit 0 with streams as in R15 and a duration of 6 s. `narrow.png`
+shows the number `5` (2 s into the source, plus 3 s into the clip), and the
+test picture is not visibly stretched.
+
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),
@@ -1520,6 +1603,9 @@ item if the timings in L5 call for it.
 | R12 | | |
 | R13 | | |
 | R14 | | ffmpeg's cause line: |
+| R15 | | source size: ; cut off at the sides: |
+| R16 | | caption size and lines: |
+| R17 | | |
 | C0 | | temp folders before: |
 | C1 | | seconds: |
 | C2 | | cues under 0.5 s: |
@@ -1589,6 +1675,26 @@ had been pasted onto the wrong line).
   `CLAUDE.md`.
 - Not covered by this run: the `-v` log (`render` has no `-v`), a missing
   libx264, and captions (see the [Captions](#captions) section).
+
+**R15 to R17**, 2026-11-02, run by the assistant from a script that followed
+the steps (its own helpers, a scratch clips folder set for the child process
+only), output pasted back. Windows 11, ffmpeg and ffprobe
+`9.0.2-full_build-www.gyan.dev`, `data\test_input.mp4` (1280x720) and its saved
+analysis.
+
+- R15: ranks 1 and 5 with `--vertical` exited 0 in 8.53 s, each line ending
+  ` (vertical)`. Both clips were `h264` 1080x1920, SAR `1:1`, DAR `9:16`,
+  `yuv420p`, with `aac` audio, 10.73 and 10.47 MB. Durations 41.375 s and
+  30.898 s for requested 41.35 s and 30.87 s (0.025 and 0.028 s over). The
+  frame was the middle of the picture, not distorted. The source has black
+  bars built into its frame, and they stayed at the top and bottom. The
+  source's own burned-in subtitle was cut at both sides.
+- R16: exit 0 in 4.96 s, ` (vertical, captions)`, same streams. The caption
+  drew inside the vertical frame, large, wrapped to three lines, over the
+  lower part of the picture and the bottom bar.
+- R17 (constructed): 720x1280 and 600x1280 sources both exited 0 with 1080x1920,
+  SAR `1:1` clips of 6.000 s. The 600x1280 frame showed `5` and no visible
+  stretching.
 
 ### Captions reference run
 
@@ -1678,6 +1784,7 @@ script that followed the steps, with the output pasted back.
 | Missing-binary message (R13) | `run_tool` in `adapters/media/_process.py`; ADR 0004 |
 | One failed clip stops the rest, or the exit code is 0 (R14) | The loop in `render`; ADR 0011 |
 | Something was written although the run failed before cutting (R6 to R13) | Check order in `render`; ADR 0011 |
+| Vertical clip not 1080x1920, stretched, or off-centre (R15 to R17) | `_VERTICAL_FILTER` in `adapters/rendering/ffmpeg.py`; ADR 0016 |
 | Caption text or timing wrong (C2) | `build_srt` in `core/captions.py`; `-ss` and `-vf` order in `adapters/rendering/ffmpeg.py`; ADR 0010 |
 | No note, or a note for a clip with speech (C3) | The `srt` check in `render` in `cli/main.py`; ADR 0011 |
 | Folder left in `%TEMP%` (C4) | `TemporaryDirectory` in `adapters/rendering/ffmpeg.py`; ADR 0010 |

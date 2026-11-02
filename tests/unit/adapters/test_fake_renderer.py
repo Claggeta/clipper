@@ -57,3 +57,10 @@ def test_fake_renderer_records_captions(tmp_path: Path) -> None:
     renderer.render(Path("v.mp4"), _c(), tmp_path / "a.mp4")
     renderer.render(Path("v.mp4"), _c(), tmp_path / "b.mp4", captions="1\nx\n")
     assert renderer.captions == [None, "1\nx\n"]
+
+
+def test_fake_renderer_records_vertical(tmp_path: Path) -> None:
+    renderer = FakeClipRenderer()
+    renderer.render(Path("v.mp4"), _c(), tmp_path / "a.mp4")
+    renderer.render(Path("v.mp4"), _c(), tmp_path / "b.mp4", vertical=True)
+    assert renderer.vertical == [False, True]

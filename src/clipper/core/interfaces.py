@@ -49,6 +49,9 @@ class ClipRenderer(Protocol):
     `captions` is SRT text with times relative to the clip start (see
     `clipper.core.captions`), burned into the video. `None` or "" renders
     without captions.
+
+    `vertical` crops the centre of the frame to 9:16 at 1080x1920, before any
+    captions are drawn (see docs/decisions/0016).
     """
 
     def render(
@@ -57,4 +60,6 @@ class ClipRenderer(Protocol):
         candidate: ClipCandidate,
         output_path: Path,
         captions: str | None = None,
+        *,
+        vertical: bool = False,
     ) -> RenderedClip: ...

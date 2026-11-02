@@ -25,6 +25,16 @@ _SUBTITLES_FILTER = (
     "force_style='FontSize=18,Outline=2,Shadow=0,MarginV=30'"
 )
 
+# ADR 0016. A centred 9:16 crop, the widest the frame allows, rounded down to
+# even sizes for yuv420p; a source already 9:16 or narrower is cropped in
+# height instead. The quotes keep the commas inside min() away from the
+# filtergraph parser. Scaled with ffmpeg's default scaler; setsar=1 stops
+# players stretching the result.
+_VERTICAL_FILTER = (
+    "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',"
+    "scale=1080:1920,setsar=1"
+)
+
 
 def _seconds(value: float) -> str:
     """Fixed-point milliseconds, never scientific notation."""
@@ -43,6 +53,8 @@ class FfmpegClipRenderer:
         candidate: ClipCandidate,
         output_path: Path,
         captions: str | None = None,
+        *,
+        vertical: bool = False,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -52,8 +64,15 @@ class FfmpegClipRenderer:
             )
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Crop and scale first, so captions are laid out on the final frame.
+        filters = [_VERTICAL_FILTER] if vertical else []
         if not captions:
-            self._cut(video_path, candidate, output_path)
+            self._cut(
+                video_path,
+                candidate,
+                output_path,
+                video_filter=",".join(filters) or None,
+            )
         else:
             with tempfile.TemporaryDirectory(
                 prefix="clipper-captions-", ignore_cleanup_errors=True
@@ -67,7 +86,7 @@ class FfmpegClipRenderer:
                     candidate,
                     output_path.resolve(),
                     cwd=Path(folder),
-                    video_filter=_SUBTITLES_FILTER,
+                    video_filter=",".join([*filters, _SUBTITLES_FILTER]),
                 )
         return RenderedClip(candidate=candidate, path=output_path)
 

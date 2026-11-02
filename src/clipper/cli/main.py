@@ -299,6 +299,10 @@ def render(
     captions: Annotated[
         bool, typer.Option("--captions", help="Burn captions into each clip.")
     ] = False,
+    vertical: Annotated[
+        bool,
+        typer.Option("--vertical", help="Crop the centre to 9:16 at 1080x1920."),
+    ] = False,
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""
     settings = Settings()
@@ -326,14 +330,17 @@ def render(
                 soft_wrap=True,
             )
         try:
-            clip = renderer.render(video, candidate, path, captions=srt or None)
+            clip = renderer.render(
+                video, candidate, path, captions=srt or None, vertical=vertical
+            )
         except ClipperError as exc:
             failures.append(f"#{number} {span}: {escape(str(exc))}")
             continue
         rendered += 1
+        tags = [t for t, on in (("vertical", vertical), ("captions", srt)) if on]
+        suffix = f" ({', '.join(tags)})" if tags else ""
         console.print(
-            f"Rendered #{number} {span} {escape(str(clip.path))}"
-            f"{' (captions)' if srt else ''}",
+            f"Rendered #{number} {span} {escape(str(clip.path))}{suffix}",
             soft_wrap=True,
         )
 
