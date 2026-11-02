@@ -19,6 +19,7 @@ from clipper.adapters.results.analysis_json import (
     load_analysis_result,
 )
 from clipper.adapters.results.labels_json import check_labels_match, load_labels
+from clipper.adapters.results.manifest_json import save_manifest
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
 from clipper.adapters.transcription.video import VideoTranscriber
@@ -26,14 +27,16 @@ from clipper.core.captions import build_ass
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
 from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
-from clipper.core.naming import plan_clip_paths
+from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.domain.errors import ClipperError, ClipRenderError, DetectionError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
     Evaluation,
+    ManifestClip,
     MediaInfo,
+    RenderManifest,
     Transcript,
 )
 
@@ -315,15 +318,24 @@ def render(
         ranks = _select_ranks(result, rank)
         selected = [result.candidates[r - 1] for r in ranks]
         _check_media(selected, _build_probe().probe(video))
-        paths = plan_clip_paths(video, selected, settings.clips_dir)
+        folder = clip_folder(video, settings.clips_dir)
+        paths = plan_clip_paths(video, selected, folder)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
     renderer = _build_renderer(settings)
     failures: list[str] = []
+    entries: list[ManifestClip] = []
     rendered = 0
     for number, candidate, path in zip(ranks, selected, paths, strict=True):
+        entry = {
+            "rank": number,
+            "start_seconds": candidate.start_seconds,
+            "end_seconds": candidate.end_seconds,
+            "score": candidate.score,
+            "reasons": candidate.reasons,
+        }
         span = f"{_fmt(candidate.start_seconds)}-{_fmt(candidate.end_seconds)}"
         built = (
             build_ass(result.transcript, candidate, vertical=vertical)
@@ -349,8 +361,13 @@ def render(
             )
         except ClipperError as exc:
             failures.append(f"#{number} {span}: {escape(str(exc))}")
+            entries.append(ManifestClip(**entry, error=str(exc)))
             continue
         rendered += 1
+        burned = None
+        if ass and built:
+            burned = "segments" if built.from_segments else "words"
+        entries.append(ManifestClip(**entry, file=path.name, captions=burned))
         tags = [t for t, on in (("vertical", vertical), ("captions", ass)) if on]
         suffix = f" ({', '.join(tags)})" if tags else ""
         console.print(
@@ -361,10 +378,23 @@ def render(
     for failure in failures:
         console.print(f"[red]Failed:[/red] {failure}", soft_wrap=True)
     console.print(
-        f"Rendered {rendered} of {len(selected)} clips to "
-        f"{escape(str(settings.clips_dir))}",
+        f"Rendered {rendered} of {len(selected)} clips to {escape(str(folder))}",
         soft_wrap=True,
     )
+    manifest = RenderManifest(
+        source=video.name,
+        analysis=str(result_json),
+        detector=result.detector,
+        vertical=vertical,
+        captions=captions,
+        clips=tuple(entries),
+    )
+    try:
+        written = save_manifest(manifest, folder)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+    console.print(f"Manifest: {escape(str(written))}", soft_wrap=True)
     if failures:
         raise typer.Exit(code=1)
 

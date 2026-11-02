@@ -24,6 +24,11 @@ def clip_file_name(video: Path, candidate: ClipCandidate) -> str:
     return f"{video.stem}_{_hhmmss(start)}-{_hhmmss(end)}.mp4"
 
 
+def clip_folder(video: Path, clips_dir: Path) -> Path:
+    """The folder for one video's clips, `<clips dir>/<stem>`. See ADR 0019."""
+    return clips_dir / video.stem
+
+
 def plan_clip_paths(
     video: Path, candidates: Sequence[ClipCandidate], clips_dir: Path
 ) -> list[Path]:

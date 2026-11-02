@@ -10,7 +10,9 @@ from clipper.domain.errors import ClipRenderError, MediaProbeError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
+    ManifestClip,
     MediaInfo,
+    RenderManifest,
     Segment,
     Transcript,
     Word,
@@ -89,15 +91,22 @@ class Env:
         args = ["render", str(self.video), str(self.json), *extra]
         return CliRunner().invoke(app, args)
 
+    @property
+    def folder(self) -> Path:
+        return self.clips / "talk"
+
     def written(self) -> list[str]:
-        if not self.clips.exists():
-            return []
-        return sorted(p.name for p in self.clips.glob("*"))
+        """The clips in the video's folder (ADR 0019), without the manifest."""
+        return sorted(p.name for p in self.folder.glob("*.mp4"))
+
+    def manifest(self) -> RenderManifest:
+        raw = (self.folder / "manifest.json").read_bytes()
+        return RenderManifest.model_validate_json(raw)
 
     def assert_failed_before_cutting(self, result: Result, text: str) -> None:
         assert result.exit_code == 1, result.output
         assert text in result.output
-        assert self.written() == []
+        assert list(self.clips.rglob("*")) == []
         assert not isinstance(self.renderer, FakeClipRenderer) or (
             self.renderer.calls == []
         )
@@ -311,3 +320,125 @@ def test_vertical_with_captions_shows_both(env: Env) -> None:
     captions = env.renderer.captions[0]
     assert captions is not None
     assert "PlayResX: 1080\nPlayResY: 1920\n" in captions
+
+
+def test_clips_go_to_a_folder_per_video_with_a_manifest(env: Env) -> None:
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    assert sorted(p.name for p in env.clips.iterdir()) == ["talk"]
+    assert f"Rendered 3 of 3 clips to {env.folder}" in result.output
+    assert f"Manifest: {env.folder / 'manifest.json'}" in result.output
+    assert env.manifest() == RenderManifest(
+        source="talk.mp4",
+        analysis=str(env.json),
+        detector=None,
+        vertical=False,
+        captions=False,
+        clips=(
+            ManifestClip(
+                rank=1,
+                start_seconds=10,
+                end_seconds=20,
+                score=0.9,
+                reasons=("test",),
+                file="talk_000010-000020.mp4",
+            ),
+            ManifestClip(
+                rank=2,
+                start_seconds=30,
+                end_seconds=45,
+                score=0.7,
+                reasons=("test",),
+                file="talk_000030-000045.mp4",
+            ),
+            ManifestClip(
+                rank=3,
+                start_seconds=60,
+                end_seconds=70,
+                score=0.5,
+                reasons=("test",),
+                file="talk_000100-000110.mp4",
+            ),
+        ),
+    )
+
+
+def test_manifest_is_utf8_with_lf_line_endings(env: Env) -> None:
+    env.run()
+    raw = (env.folder / "manifest.json").read_bytes()
+    assert b"\r" not in raw
+    assert not raw.startswith(b"\xef\xbb\xbf")
+    assert raw.endswith(b"}\n")
+
+
+def test_manifest_records_flags_detector_and_what_captions_were_burned(
+    env: Env,
+) -> None:
+    word = Word(start_seconds=12.0, end_seconds=12.5, text="hello")
+    transcript = Transcript(
+        segments=(
+            Segment(start_seconds=12.0, end_seconds=12.5, text="hello", words=(word,)),
+            Segment(start_seconds=31.0, end_seconds=33.0, text="no words here"),
+        )
+    )
+    result = AnalysisResult(
+        source="talk.mp4",
+        transcript=transcript,
+        candidates=CANDIDATES,
+        detector="llm:qwen3.5:9b",
+    )
+    env.json.write_text(result.model_dump_json(), encoding="utf-8")
+    assert env.run("--captions", "--vertical").exit_code == 0
+    manifest = env.manifest()
+    assert (manifest.vertical, manifest.captions) == (True, True)
+    assert manifest.detector == "llm:qwen3.5:9b"
+    assert [c.captions for c in manifest.clips] == ["words", "segments", None]
+
+
+def test_a_rank_run_replaces_the_manifest(env: Env) -> None:
+    env.run()
+    result = env.run("--rank", "2")
+    assert result.exit_code == 0, result.output
+    assert [c.rank for c in env.manifest().clips] == [2]
+    # Clips from the earlier run stay in the folder (ADR 0019, decision 3).
+    assert len(env.written()) == 3
+
+
+def test_failed_clips_are_in_the_manifest_with_their_error(env: Env) -> None:
+    env.use_renderer(FakeClipRenderer(fail_on=[CANDIDATES[1]]))
+    result = env.run()
+    assert result.exit_code == 1
+    clips = env.manifest().clips
+    assert [c.file for c in clips] == [
+        "talk_000010-000020.mp4",
+        None,
+        "talk_000100-000110.mp4",
+    ]
+    assert clips[1].error == "Fake render failed for talk_000030-000045.mp4"
+
+
+def test_manifest_keeps_the_raw_error_text(env: Env) -> None:
+    env.use_renderer(RaisingRenderer())
+    result = env.run("--rank", "1")
+    assert result.exit_code == 1
+    assert env.manifest().clips[0].error == "[aist#0:0/pcm_s16le] [/bogus] bad"
+    assert "Manifest: " in result.output
+
+
+def test_a_failure_before_cutting_leaves_the_old_manifest(env: Env) -> None:
+    env.run()
+    before = (env.folder / "manifest.json").read_bytes()
+    result = env.run("--rank", "9")
+    assert result.exit_code == 1
+    assert "Manifest:" not in result.output
+    assert (env.folder / "manifest.json").read_bytes() == before
+
+
+def test_manifest_write_failure_is_an_error(env: Env) -> None:
+    # Constructed: a folder where the manifest file goes.
+    (env.folder / "manifest.json").mkdir(parents=True)
+    result = env.run("--rank", "1")
+    assert result.exit_code == 1
+    assert "Error: Cannot write manifest" in result.output
+    assert "Rendered 1 of 1 clips" in result.output
+    assert env.written() == ["talk_000010-000020.mp4"]

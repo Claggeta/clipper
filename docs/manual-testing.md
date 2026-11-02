@@ -436,7 +436,9 @@ transcripts cached without word timestamps are under a different cache key.
 Covers `clipper render` ([ADR 0007](decisions/0007-cut-clips-by-re-encoding.md),
 [0008](decisions/0008-clip-output-location-and-naming.md),
 [0009](decisions/0009-render-reads-saved-json-and-probes-media.md),
-[0011](decisions/0011-render-command-shape-and-failure-policy.md)). It is
+[0011](decisions/0011-render-command-shape-and-failure-policy.md),
+[0019](decisions/0019-a-folder-per-video.md)). Clips go to a folder per video,
+`<clips folder>\<stem>`, with a `manifest.json`. It is
 independent of the ffmpeg and Whisper steps above, with its own setup, scratch
 folder and helpers. Run R0 first in a fresh PowerShell window, and keep that
 window for the rest of the section. Every later step uses the variables and
@@ -494,7 +496,8 @@ function Invoke-Render {
 function Reset-Clips { Remove-Item -Recurse -Force $env:CLIPPER_CLIPS_DIR -ErrorAction SilentlyContinue }
 function Show-Clips {
   if (Test-Path $env:CLIPPER_CLIPS_DIR) {
-    Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object Name, Length | Format-Table -AutoSize
+    Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -File |
+      Select-Object @{n="Folder";e={$_.Directory.Name}}, Name, Length | Format-Table -AutoSize
   } else { "(clips folder does not exist)" }
 }
 
@@ -562,11 +565,12 @@ Pass:
 - Exit 0.
 - One `Rendered #N H:MM:SS-H:MM:SS <path>` line per candidate, in rank order,
   where `H:MM:SS-H:MM:SS` matches the candidate's span from R0.
-- A last line `Rendered X of X clips to <clips folder>`, with `X` equal to the
-  candidate count.
-- The clips folder holds `X` files named `<stem>_HHMMSS-HHMMSS.mp4`. In each
-  name the start is the candidate's start rounded **down** and the end is its
-  end rounded **up** to whole seconds (ADR 0008).
+- A line `Rendered X of X clips to <clips folder>\<stem>`, with `X` equal to
+  the candidate count, then `Manifest: <clips folder>\<stem>\manifest.json`.
+- The clips folder holds one folder, `<stem>` (ADR 0019), with `X` files named
+  `<stem>_HHMMSS-HHMMSS.mp4` and `manifest.json`. In each name the start is the
+  candidate's start rounded **down** and the end is its end rounded **up** to
+  whole seconds (ADR 0008). R18 checks the manifest.
 
 The console line prints both ends rounded **down**, while the file name rounds
 the end **up**. A candidate ending at 73.8 s prints `0:01:13` but is named
@@ -581,7 +585,7 @@ Run after R1, without resetting the clips folder.
 
 ```powershell
 $cands = $r.candidates | Sort-Object start_seconds
-$files = Get-ChildItem $env:CLIPPER_CLIPS_DIR -Filter "*.mp4" | Sort-Object Name
+$files = Get-ChildItem "$env:CLIPPER_CLIPS_DIR\$Stem" -Filter "*.mp4" | Sort-Object Name
 for ($i = 0; $i -lt $files.Count; $i++) {
   $f = $files[$i].FullName
   $want = $cands[$i].end_seconds - $cands[$i].start_seconds
@@ -616,7 +620,7 @@ candidate from 12.5 s to 20 s.
 ```powershell
 Reset-Clips
 Invoke-Render "$S\testsrc.mp4" "$S\testsrc.json"
-$Clip = "$env:CLIPPER_CLIPS_DIR\testsrc_000012-000020.mp4"
+$Clip = "$env:CLIPPER_CLIPS_DIR\testsrc\testsrc_000012-000020.mp4"
 ffmpeg -hide_banner -loglevel error -y -i $Clip -frames:v 1 "$S\first.png"
 ffmpeg -hide_banner -loglevel error -y -sseof -0.1 -i $Clip -frames:v 1 "$S\last.png"
 $d = ffprobe -v error -show_entries format=duration -of csv=p=0 $Clip
@@ -647,26 +651,27 @@ Show-Clips
 ```
 
 Pass: exit 0. Exactly two `Rendered` lines, `#1` first and then `#3`, however
-the flags were given. The last line is `Rendered 2 of 2 clips`. The clips folder
-holds two files, the ones for candidates 1 and 3 from R0.
+the flags were given. Then `Rendered 2 of 2 clips` and a `Manifest:` line. The
+video's folder holds two clips, the ones for candidates 1 and 3 from R0, and
+`manifest.json`.
 
 ### R5. Re-running is idempotent, and old clips are left alone
 
 Run after R4, without resetting the clips folder.
 
 ```powershell
-$before = Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -ExpandProperty Name
+$before = Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -Filter "*.mp4" | Select-Object -ExpandProperty Name
 Invoke-Render $Src $Json -Rank 1,3 | Out-Null
 $Code
-$after = Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -ExpandProperty Name
+$after = Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -Filter "*.mp4" | Select-Object -ExpandProperty Name
 "same names: " + (-not (Compare-Object $before $after))
 Invoke-Render $Src $Json -Rank 2 | Out-Null
 $Code
-@(Get-ChildItem $env:CLIPPER_CLIPS_DIR).Count
+@(Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -Filter "*.mp4").Count
 ```
 
 Pass: exit 0 both times. `same names: True`, with no numbered or suffixed
-copies. After rendering rank 2 the folder holds 3 files, so the files from R4
+copies. After rendering rank 2 the folder holds 3 clips, so the clips from R4
 were not deleted (ADR 0008: "nothing deletes old files").
 
 ### R6. Out-of-range ranks fail before cutting
@@ -798,10 +803,10 @@ file should go, so ffmpeg cannot write it. `testsrc-two.json` has candidates
 
 ```powershell
 Reset-Clips
-New-Item -ItemType Directory -Force "$env:CLIPPER_CLIPS_DIR\testsrc_000025-000035.mp4" | Out-Null
+New-Item -ItemType Directory -Force "$env:CLIPPER_CLIPS_DIR\testsrc\testsrc_000025-000035.mp4" | Out-Null
 Invoke-Render "$S\testsrc.mp4" "$S\testsrc-two.json"
 Show-Clips
-Test-Path "$env:CLIPPER_CLIPS_DIR\testsrc_000025-000035.mp4" -PathType Container
+Test-Path "$env:CLIPPER_CLIPS_DIR\testsrc\testsrc_000025-000035.mp4" -PathType Container
 ```
 
 Pass:
@@ -810,8 +815,8 @@ Pass:
   and is not empty.
 - A `Failed: #2 0:00:25-0:00:35: ffmpeg failed (exit ...): ...` line. Record the
   cause ffmpeg gave. I have not seen it.
-- The last line is `Rendered 1 of 2 clips to <clips folder>`, and the exit
-  code is 1 (ADR 0011).
+- `Rendered 1 of 2 clips to <clips folder>\testsrc`, then a `Manifest:` line,
+  and the exit code is 1 (ADR 0011).
 - No traceback. The renderer tries to delete the failed output and cannot
   delete a folder, which must be logged and not raised, so the last command
   prints `True`.
@@ -843,7 +848,7 @@ function Show-Streams([string]$Clip) {
 Reset-Clips
 "source: " + (ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$Src")
 Invoke-RenderWith $Src $Json "--vertical --rank 1"
-$clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -First 1).FullName
+$clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -Filter "*.mp4" | Select-Object -First 1).FullName
 Show-Streams $clip
 ffmpeg -hide_banner -loglevel error -y -ss 5 -i $clip -frames:v 1 "$S\vertical.png"
 Invoke-Item "$S\vertical.png"
@@ -868,7 +873,7 @@ picture and blurred in the fill.
 ```powershell
 Reset-Clips
 Invoke-RenderWith $Src $Json "--vertical --captions --rank 1"
-$clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -First 1).FullName
+$clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -Filter "*.mp4" | Select-Object -First 1).FullName
 Show-Streams $clip
 ffmpeg -hide_banner -loglevel error -y -ss 5 -i $clip -frames:v 1 "$S\vertical-captions.png"
 Invoke-Item "$S\vertical-captions.png"
@@ -895,7 +900,7 @@ foreach ($p in @(@{ n = "portrait"; s = "720x1280" }, @{ n = "narrow"; s = "600x
   New-Result "$S\$($p.n).json" "$($p.n).mp4" "2-8"
   Reset-Clips
   Invoke-RenderWith "$S\$($p.n).mp4" "$S\$($p.n).json" "--vertical"
-  $clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR | Select-Object -First 1).FullName
+  $clip = (Get-ChildItem $env:CLIPPER_CLIPS_DIR -Recurse -Filter "*.mp4" | Select-Object -First 1).FullName
   Show-Streams $clip
   ffmpeg -hide_banner -loglevel error -y -ss 3 -i $clip -frames:v 1 "$S\$($p.n).png"
 }
@@ -906,6 +911,60 @@ Pass: both exit 0 with streams as in R15 and a duration of 6 s. `narrow.png`
 shows the number `5` (2 s into the source, plus 3 s into the clip), the test
 picture at full height and not visibly stretched, and blurred strips at the
 sides.
+
+### R18. The folder per video and its manifest
+
+Covers [ADR 0019](decisions/0019-a-folder-per-video.md). Uses `Invoke-RenderWith`
+from R15.
+
+```powershell
+# a) Every candidate, vertical with captions.
+Reset-Clips
+Invoke-RenderWith $Src $Json "--vertical --captions"
+$Dir = "$env:CLIPPER_CLIPS_DIR\$Stem"
+$m = Get-Content "$Dir\manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$m | Select-Object source, analysis, detector, vertical, captions | Format-List
+$m.clips | Format-Table rank, start_seconds, end_seconds, score, file, captions, error -AutoSize
+$listed = @($m.clips | ForEach-Object { $_.file })
+$onDisk = @(Get-ChildItem $Dir -Filter "*.mp4" | ForEach-Object { $_.Name })
+"listed files match the folder: " + (-not (Compare-Object $listed $onDisk))
+
+# b) A --rank run replaces the manifest.
+Invoke-RenderWith $Src $Json "--rank 2" | Out-Null
+"b) exit $Code"
+$m = Get-Content "$Dir\manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+# ForEach-Object, not $m.clips.rank: an array has its own Rank property, 1.
+"ranks: " + (($m.clips | ForEach-Object { $_.rank }) -join ",")
+"vertical: $($m.vertical), captions: $($m.captions)"
+"clips in the folder: " + @(Get-ChildItem $Dir -Filter "*.mp4").Count
+
+# c) A failed clip is listed with its error (the constructed failure from R14).
+Reset-Clips
+New-Item -ItemType Directory -Force "$env:CLIPPER_CLIPS_DIR\testsrc\testsrc_000025-000035.mp4" | Out-Null
+Invoke-Render "$S\testsrc.mp4" "$S\testsrc-two.json"
+$tm = "$env:CLIPPER_CLIPS_DIR\testsrc\manifest.json"
+(Get-Content $tm -Raw -Encoding UTF8 | ConvertFrom-Json).clips | Format-List rank, file, error
+
+# d) A failure before cutting leaves the manifest as it was.
+$h = (Get-FileHash $tm).Hash
+Invoke-Render "$S\testsrc.mp4" "$S\testsrc-two.json" -Rank 9 | Out-Null
+"d) exit $Code, manifest unchanged: " + ((Get-FileHash $tm).Hash -eq $h)
+```
+
+Pass:
+
+- a) Exit 0 and a last line `Manifest: <clips folder>\<stem>\manifest.json`.
+  `source` is the video's file name, `analysis` is `$Json` as passed,
+  `detector` is `heuristic`, and `vertical` and `captions` are `True`. One row
+  per candidate in rank order, with the spans and scores from R0, a `file`, no
+  `error`, and `captions` `words` (empty for a clip that printed a `has no
+  speech in range` note). `listed files match the folder: True`.
+- b) Exit 0, `ranks: 2`, `vertical: False, captions: False`, and
+  `clips in the folder:` still counts every clip from a).
+- c) Exit 1. Rank 1 has a `file` and no `error`. Rank 2 has no `file`, and its
+  `error` starts `ffmpeg failed (exit` and holds the same cause as the
+  `Failed: #2` line.
+- d) `exit 1, manifest unchanged: True`.
 
 ## Captions
 
@@ -957,7 +1016,10 @@ function Invoke-RenderC {
 }
 function Reset-CapClips { Remove-Item -Recurse -Force $CapClips -ErrorAction SilentlyContinue }
 function Show-CapClips {
-  if (Test-Path $CapClips) { Get-ChildItem $CapClips | Select-Object Name, Length | Format-Table -AutoSize }
+  if (Test-Path $CapClips) {
+    Get-ChildItem $CapClips -Recurse -File |
+      Select-Object @{n="Folder";e={$_.Directory.Name}}, Name, Length | Format-Table -AutoSize
+  }
   else { "(clips folder does not exist)" }
 }
 function Get-CaptionTempCount {
@@ -1097,7 +1159,8 @@ Pass:
   note: R0's analysis has word times.
 - Without the flag the same lines have no suffix, and the file names are the
   same (ADR 0008).
-- The last line is `Rendered X of X clips to <clips folder>` in both runs.
+- `Rendered X of X clips to <clips folder>\<stem>`, then a `Manifest:` line,
+  in both runs.
 
 Record the seconds. R1 gave the plain render time for the same candidates, so
 the difference is the cost of the `subtitles` filter.
@@ -1122,7 +1185,7 @@ foreach ($frame in @(@{ n = "src"; f = "" }, @{ n = "vert"; f = "--vertical" }))
   $old = $env:CLIPPER_CLIPS_DIR; $env:CLIPPER_CLIPS_DIR = $CapClips
   try { Invoke-RenderWith $Src $Json "--rank 1 --captions $($frame.f)" | Out-Null } finally { $env:CLIPPER_CLIPS_DIR = $old }
   "$($frame.n): exit $Code"
-  $Clip = (Get-ChildItem $CapClips -Filter "*.mp4" | Select-Object -First 1).FullName
+  $Clip = (Get-ChildItem $CapClips -Recurse -Filter "*.mp4" | Select-Object -First 1).FullName
   $n = 0
   foreach ($w in $pick) {
     $n++
@@ -1167,8 +1230,8 @@ not count. Clip 2 (25 to 35 s) has one segment of five words, 1.4 s each.
 Reset-CapClips
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-nospeech.json" $CapClips -Captions
 Show-CapClips
-Save-Frame "$CapClips\testsrc_000012-000020.mp4" 3 "$S\nospeech-1.png"
-Save-Frame "$CapClips\testsrc_000025-000035.mp4" 4.5 "$S\nospeech-2.png"
+Save-Frame "$CapClips\testsrc\testsrc_000012-000020.mp4" 3 "$S\nospeech-1.png"
+Save-Frame "$CapClips\testsrc\testsrc_000025-000035.mp4" 4.5 "$S\nospeech-2.png"
 Invoke-Item "$S\nospeech-1.png"; Invoke-Item "$S\nospeech-2.png"
 ```
 
@@ -1179,7 +1242,7 @@ Pass:
   captions`, before the `Rendered #1` line, and the `Rendered #1` line has no
   ` (captions)`.
 - `Rendered #2 0:00:25-0:00:35 <path> (captions)`.
-- The last line is `Rendered 2 of 2 clips to <clips folder>`.
+- `Rendered 2 of 2 clips to <clips folder>\testsrc`, then a `Manifest:` line.
 - No `has no word timings` note.
 - `nospeech-1.png` shows no caption. `nospeech-2.png` shows `words inside the`
   with `the` in yellow.
@@ -1190,7 +1253,7 @@ analysis saved by v0.3 does not:
 ```powershell
 Reset-CapClips
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-segments.json" $CapClips -Captions
-Save-Frame "$CapClips\testsrc_000012-000020.mp4" 3 "$S\segments-1.png"
+Save-Frame "$CapClips\testsrc\testsrc_000012-000020.mp4" 3 "$S\segments-1.png"
 Invoke-Item "$S\segments-1.png"
 ```
 
@@ -1212,7 +1275,7 @@ Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Captions | Out-
 
 # Constructed failure, as in R14: a folder where the second clip's file goes.
 Reset-CapClips
-New-Item -ItemType Directory -Force "$CapClips\testsrc_000025-000035.mp4" | Out-Null
+New-Item -ItemType Directory -Force "$CapClips\testsrc\testsrc_000025-000035.mp4" | Out-Null
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Captions
 "after failure: folders " + (Get-CaptionTempCount) + " (before: $base)"
 Show-CapClips
@@ -1241,7 +1304,7 @@ letter in the paths ffmpeg sees. Run from the repo root.
 New-Item -ItemType Directory -Force "$S\with space" | Out-Null
 Copy-Item "$S\testsrc.mp4" "$S\with space\testsrc.mp4"
 Invoke-RenderC "$S\with space\testsrc.mp4" "$S\cap-testsrc.json" "$S\clips with space" -Rank 1 -Captions
-Get-ChildItem "$S\clips with space" | Select-Object Name, Length
+Get-ChildItem "$S\clips with space" -Recurse -File | Select-Object Name, Length
 
 # b) a relative video path and a relative clips folder
 $RelVideo = Resolve-Path -Relative "$S\testsrc.mp4"
@@ -1249,15 +1312,16 @@ $RelClips = ".\data\clips-captions-manual"
 Remove-Item -Recurse -Force $RelClips -ErrorAction SilentlyContinue
 "relative video: $RelVideo"
 Invoke-RenderC $RelVideo "$S\cap-testsrc.json" $RelClips -Rank 1 -Captions
-Get-ChildItem $RelClips | Select-Object Name, Length
+Get-ChildItem $RelClips -Recurse -File | Select-Object Name, Length
 Remove-Item -Recurse -Force $RelClips
 
 "folders left: " + (Get-CaptionTempCount)
 ```
 
 Pass: for both a) and b), exit 0, a `Rendered #1 ... (captions)` line, and a
-non-empty `testsrc_000012-000020.mp4`. In b) the clip is in the repo's
-`data\clips-captions-manual` and not in the temporary folder. The step removes
+non-empty `testsrc_000012-000020.mp4` in a `testsrc` folder. In b) the clip is
+in the repo's `data\clips-captions-manual\testsrc` and not in the temporary
+folder. The step removes
 that folder at the end. The last line equals `$base` from C4.
 
 Optional: if you have a second drive, repeat a) with a clips folder on it
@@ -1273,7 +1337,7 @@ way round.
 ```powershell
 Reset-CapClips
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Rank 2 | Out-Null
-$f = "$CapClips\testsrc_000025-000035.mp4"
+$f = "$CapClips\testsrc\testsrc_000025-000035.mp4"
 $h1 = (Get-FileHash $f).Hash; $s1 = (Get-Item $f).Length
 Save-Frame $f 4.5 "$S\over-1.png"
 
@@ -1284,12 +1348,12 @@ Save-Frame $f 4.5 "$S\over-2.png"
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-testsrc.json" $CapClips -Rank 2 | Out-Null
 "plain again: exit $Code"
 Save-Frame $f 4.5 "$S\over-3.png"
-"files: " + @(Get-ChildItem $CapClips).Count
+"files: " + @(Get-ChildItem $CapClips -Recurse -File).Count
 1..3 | ForEach-Object { Invoke-Item "$S\over-$_.png" }
 ```
 
-Pass: `hash changed: True`, one file in the folder (no numbered or suffixed
-copies), `over-1.png` and `over-3.png` show no caption, and `over-2.png` shows
+Pass: `hash changed: True`, `files: 2`, the clip and `manifest.json` (no
+numbered or suffixed copies), `over-1.png` and `over-3.png` show no caption, and `over-2.png` shows
 `second clip speech` with `clip` in yellow.
 
 ### C7. Awkward text (constructed)
@@ -1306,7 +1370,7 @@ has no words, so it is one whole cue.
 ```powershell
 Reset-CapClips
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions
-$f = "$CapClips\testsrc_000012-000020.mp4"
+$f = "$CapClips\testsrc\testsrc_000012-000020.mp4"
 $mid = 0.5, 1.5, 2.75, 3.5, 4.5, 5.75, 6.75
 for ($k = 0; $k -lt 7; $k++) { Save-Frame $f $mid[$k] "$S\awk$($k + 1).png"; Invoke-Item "$S\awk$($k + 1).png" }
 ```
@@ -1343,7 +1407,7 @@ the text. This step records what it looks like on the constructed 640x360
 frame. It has one fail condition.
 
 ```powershell
-$sd = "$CapClips\testsrc_000012-000020.mp4"
+$sd = "$CapClips\testsrc\testsrc_000012-000020.mp4"
 foreach ($v in @(@{ n = "640"; p = "$S\testsrc.mp4" }, @{ n = "1280"; p = "$S\hd\testsrc.mp4" },
                  @{ n = "narrow"; p = "$S\narrow\testsrc.mp4" })) {
   Reset-CapClips
@@ -1906,7 +1970,8 @@ script that followed the steps, with the output pasted back.
 |---------|---------|
 | Duration off by a second or more, or R3 shows 10 (R2, R3) | `-ss` and `-c:v libx264` in `adapters/rendering/ffmpeg.py`; ADR 0007 |
 | Wrong streams in a clip (R2) | `-map 0:v:0` and `-map 0:a:0?` in `adapters/rendering/ffmpeg.py`; ADR 0007 |
-| Wrong clip name or folder (R1, R5) | `core/naming.py`; `Settings.clips_dir`; ADR 0008 |
+| Wrong clip name or folder (R1, R5) | `clip_file_name` and `clip_folder` in `core/naming.py`; `Settings.clips_dir`; ADRs 0008 and 0019 |
+| Manifest missing, wrong or not replaced (R18) | The manifest block at the end of `render` in `cli/main.py`; `adapters/results/manifest_json.py`; `RenderManifest` in `domain/models.py`; ADR 0019 |
 | `--rank` message, order or exit code (R4, R6) | `_select_ranks` in `cli/main.py`; ADR 0011 |
 | Bad, missing or empty result file (R7, R11) | `adapters/results/analysis_json.py`; ADR 0009 |
 | Overrun or no-video check wrong against real ffprobe (R9, R10) | `_check_media` in `cli/main.py`; `_parse` and `_is_video` in `adapters/media/ffprobe.py`; ADR 0009 |
