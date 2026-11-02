@@ -125,8 +125,10 @@ example):
 A candidate hits a label when they overlap by at least half of the shorter of
 the two. `eval` prints each label with the candidates that hit it, each
 candidate with the labels it hits, then recall (labels hit by at least one
-candidate) and precision (candidates that hit at least one label), as counts
-and percentages. Recall is `n/a` with no labels, and precision is `n/a` with no
+candidate) and precision, as counts and percentages. Precision is one-to-one:
+going down the ranking, each candidate claims the first label it hits that a
+higher-ranked candidate has not, and a candidate that hits only claimed labels
+is a repeat (`16 (repeat of #3)`) and does not count. Recall is `n/a` with no labels, and precision is `n/a` with no
 candidates. A label that ends after the transcript does is noted and still
 counted. The numbers come from one person's labels on a few videos, so treat a
 difference between detectors as a sanity check, not a measurement.

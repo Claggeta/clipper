@@ -164,7 +164,24 @@ def test_explicit_labels_path_overrides_the_default(env: Env, tmp_path: Path) ->
     assert result.exit_code == 0, result.output
     assert "1 video, 1 label, 3 candidates" in result.output
     assert "Recall: 1 of 1 label (100%)" in result.output
-    assert "Precision: 3 of 3 candidates (100%)" in result.output
+    assert (
+        "Precision: 1 of 3 candidates (33%); 2 more repeat a matched label"
+    ) in result.output
+
+
+def test_a_second_candidate_on_a_matched_label_is_a_repeat(env: Env) -> None:
+    env.write_labels([{"start": "0:00", "end": "2:00"}])
+    env.detect([_c(10, 55, 0.9), _c(60, 105, 0.7)])
+
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    assert "1 (repeat of #1)" in result.output
+    assert "Hit by" in result.output
+    assert "#1, #2" in result.output
+    assert (
+        "Precision: 1 of 2 candidates (50%); 1 more repeats a matched label"
+    ) in result.output
 
 
 def test_default_labels_path_uses_the_source_stem(env: Env) -> None:

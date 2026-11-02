@@ -146,6 +146,16 @@ def _report_evaluation(
     for label_index, candidate_index in evaluation.hits:
         hit_by.setdefault(label_index, []).append(candidate_index + 1)
         hits.setdefault(candidate_index, []).append(label_index + 1)
+    matched_by = {label: candidate for label, candidate in evaluation.matches}
+    matched = set(matched_by.values())
+
+    def hits_cell(index: int) -> str:
+        numbers = hits.get(index, [])
+        if index in matched or not numbers:
+            return ", ".join(str(number) for number in numbers) or "-"
+        return ", ".join(
+            f"{number} (repeat of #{matched_by[number - 1] + 1})" for number in numbers
+        )
 
     labels = Table(title=f"Labels: {evaluation.source}")
     for column in ("#", "Start", "End", "Hit by", "Note"):
@@ -169,7 +179,7 @@ def _report_evaluation(
             _fmt(candidate.start_seconds),
             _fmt(candidate.end_seconds),
             f"{candidate.score:.2f}",
-            ", ".join(str(number) for number in hits.get(index, [])) or "-",
+            hits_cell(index),
         )
     console.print(candidates)
 
@@ -195,13 +205,20 @@ def _report_evaluation(
         + _ratio(evaluation.labels_hit, n_labels, "label", evaluation.recall),
         soft_wrap=True,
     )
+    repeats = evaluation.repeats
     console.print(
         "Precision: "
         + _ratio(
-            evaluation.candidates_hit,
+            evaluation.candidates_matched,
             n_candidates,
             "candidate",
             evaluation.precision,
+        )
+        + (
+            f"; {repeats} more {'repeats' if repeats == 1 else 'repeat'} "
+            "a matched label"
+            if repeats
+            else ""
         ),
         soft_wrap=True,
     )

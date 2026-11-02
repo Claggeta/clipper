@@ -143,6 +143,41 @@ maintainer's own judgment of which moments in a video are worth cutting.
 - Whether a label file is complete is not recorded in the file. Add a field
   for it if complete and incomplete files ever need to be told apart.
 
+## Amended by the hit-rule review (V3 item 6a)
+
+- On `oFbD0Ot7nQ8.json` at top 30, three of the seven candidates that hit a
+  label were 45 s candidates inside the one 9.5-minute label (label 16), so
+  precision counted one moment three times.
+- The pair rule (decision 4) and `HIT_FRACTION = 0.5` are kept. Measured on
+  both saved analyses with the heuristic: on the long video, 0.3 and 0.5 gave
+  the same recall and precision at top 5 and top 30, and 0.7 lowered recall
+  from 5 to 3 at top 30. Every hit outside label 16 overlapped by at least 66%
+  of the shorter range, and the nearest miss by 29%. Nothing here supports a
+  different threshold.
+- Rules measured against the label's length (IoU, or overlap as a fraction of
+  the label) are rejected for now. Candidates are fixed 45 s windows and 7 of
+  the 30 long-video labels are longer than 90 s (up to 574 s), so those rules
+  measure label length against window length. At 0.5 they cut top-30 recall
+  from 5 to 2 (IoU) or 3 (fraction of the label).
+- Precision is now one-to-one. `evaluate` walks the candidates in rank order,
+  and each claims the earliest label it hits that no higher-ranked candidate
+  has claimed. Those pairs are `Evaluation.matches`, and precision is matched
+  candidates over all candidates. A candidate that hits only claimed labels is
+  a **repeat**, not a hit: the maintainer would not post a second clip of a
+  moment already matched. Recall still counts labels with any hit.
+- Matching is greedy, not a maximum matching. They can differ only when one
+  candidate hits two short neighbouring labels and a later candidate could
+  only have taken the first. This has not happened in either label file.
+- `eval` marks a repeat in the candidates table as `16 (repeat of #3)` and
+  ends the precision line with `; N more repeat a matched label`. The labels
+  table still lists every candidate that hit each label.
+- Effect on the saved analyses (the maintainer's labels, heuristic, recall
+  unchanged throughout): `test_input.json` precision went from 5 of 5 to 3 of 5
+  (2 repeats); `oFbD0Ot7nQ8.json` from 3 of 5 to 2 of 5 at top 5 (1 repeat),
+  and from 7 of 30 to 5 of 30 at top 30 (2 repeats).
+- Labels longer than two windows stay unreachable as whole moments. Proposing
+  longer clips is a detector question (item 7 or later), not a metric one.
+
 ## Related
 
 - 0013: detector choice on the CLI
