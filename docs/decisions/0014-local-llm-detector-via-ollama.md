@@ -147,6 +147,34 @@ V3 item 7 is three PRs: the adapter (this one, not reachable from the CLI),
   only through PRs, so git history records it. 7c may revise it while
   choosing a model.
 
+## Amended by the thinking fix (V3 item 7c)
+
+The first real run (manual step L1, Ollama 0.40.13, `qwen3.5:9b`, RTX 4070 Ti)
+failed on window 15 of 18 of `test_input.json`, 0:03:32-0:04:14:
+`Model reply for window 0:03:32-0:04:14 is not a valid score: <root>: Invalid
+JSON: EOF while parsing a value at line 1 column 0 (got '')`.
+
+- **Cause.** `qwen3.5` is a thinking model (its `/api/show` capabilities
+  include `thinking`), and Ollama lets it think when the request does not say
+  otherwise. Sent on its own, that window's request had a 293-token prompt
+  and generated 3,803 tokens, about 15,000 characters of thinking, then
+  stopped with `done_reason: length` and an empty `response`. The context was
+  4,096 tokens. The 14 windows before it took 18.75 s to 1 m 10 s each, the
+  first including the model load.
+- **Decision.** `OllamaClient` sends `think: false` with every request. A score
+  per window is a short judgement, not a reasoning task, and at those times the
+  1,215 windows of `oFbD0Ot7nQ8.json` would take hours. With `think: false`
+  the same window took 0.8 s and generated 48 tokens, a valid `WindowScore`.
+- **Models without thinking.** `llama3.1:8b` (capabilities `completion`,
+  `tools`) accepts `think: false` and gave the same reply as without it, so
+  the flag is sent unconditionally and the client does not ask `/api/show`
+  first.
+- **Tradeoff.** Whatever thinking might add to a score is given up. If it is
+  wanted later, it is a setting and a further amendment, measured with `eval`.
+- **Not changed here.** The client does not read `done_reason`, so a reply cut
+  off at the length limit still surfaces as a validation error on an empty or
+  partial reply.
+
 ## Related
 
 - 0012: evaluation

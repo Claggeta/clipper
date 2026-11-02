@@ -33,6 +33,9 @@ class OllamaClient:
             "prompt": prompt,
             "format": schema,
             "stream": False,
+            # A thinking model otherwise reasons before the JSON, and can run out
+            # of context before writing it (ADR 0014, 7c amendment).
+            "think": False,
             "options": {"temperature": 0, "seed": SEED},
         }
         request = urllib.request.Request(
