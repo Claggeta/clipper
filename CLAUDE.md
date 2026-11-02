@@ -51,10 +51,9 @@ and planned code:
   `does not contain any stream` and raises `NoAudioStreamError`; anything else
   stays a generic `AudioExtractionError`. The command uses `-map 0:a:0?`, not
   `-map 0:a?`, which breaks the WAV muxer on multi-audio files.
-- `0006` — CLI transcriber seam. `cli/main.py` builds the transcriber in
-  `_build_transcriber(settings)`, which tests monkeypatch. Do not add an
-  env/Settings switch for test doubles. Amended by 0011: `render` adds
-  `_build_renderer` and `_build_probe` the same way.
+- `0006` — CLI test seam. Do not add an env/Settings switch for test
+  doubles. Its private factories were replaced by the context object in 0013's
+  item 4b amendment.
 - `0007` — clips are re-encoded (`libx264`, `aac`, `yuv420p`), one code path.
   No stream copy.
 - `0008` — clips go to `data/clips/` (`CLIPPER_CLIPS_DIR`) as
@@ -74,14 +73,16 @@ and planned code:
   Precision is one-to-one: in rank order each candidate claims the earliest
   unclaimed label it hits, and one on a claimed label is a repeat. Recall
   counts labels with any hit.
-- `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed in
-  `_build_detector(settings, name)`. No test double is selectable by name.
+- `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
+  `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
   `None` in older JSON; `render` and `eval` don't check it.
   `CLIPPER_LLM_MODEL` defaults to `qwen3.5:9b` (0014); an empty value is an
-  `Error:`, exit 1. Private factories stay until
-  more than four exist or a third real detector appears; that replaces the
-  0006 and 0011 triggers. Amends 0006.
+  `Error:`, exit 1. Amends 0006. Item 4b amendment: `AppContext` in
+  `cli/context.py`, a frozen dataclass of builders (`transcriber`,
+  `detector`, `renderer`, `probe`), set as `ctx.obj` by the root callback.
+  Tests pass `obj=AppContext(...)` to `CliRunner().invoke`; a new adapter is
+  a new field.
 - `0014` — the LLM detector re-ranks the heuristic's windows, via Ollama, and
   never falls back silently. Windowing and dedup were extracted first, as a
   behaviour-neutral change, into `adapters/detection/windows.py`
@@ -217,8 +218,9 @@ All merged to `main` with green CI:
 In progress:
 
 - V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92), 3
-  (word timestamps, #93), 4 (styled captions, #95) and 4a (a folder per video
-  and the manifest, #97) are merged. Next: item 4b, the CLI context object.
+  (word timestamps, #93), 4 (styled captions, #95), 4a (a folder per video
+  and the manifest, #97) and 4b (the CLI context object, #99) are merged.
+  Next: item 5, `render --titles`.
 
 V3 results, for reference:
 
@@ -370,9 +372,9 @@ picked.
    step.~~ (done; #95, manual steps C2 and C7 rewritten; ADR 0017 amendment)
 4a. ~~A folder per video and the manifest (0019).~~ (done; #97, manual step
    R18; ADR 0019 amendment)
-4b. Replace the CLI's private factories with a context object.
+4b. ~~Replace the CLI's private factories with a context object.
    Behaviour-neutral; ADR 0013's trigger, since titles would be the fifth
-   factory. A 0013 amendment.
+   factory. A 0013 amendment.~~ (done; #99, `AppContext` in `cli/context.py`)
 5. A title and hook per clip, `render --titles` (0018), with a manual-test
    step.
 6. `clipper fetch <url>`: first an ADR (0020) on YouTube's and Twitch's terms
