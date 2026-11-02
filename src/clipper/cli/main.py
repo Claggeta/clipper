@@ -301,7 +301,10 @@ def render(
     ] = False,
     vertical: Annotated[
         bool,
-        typer.Option("--vertical", help="Crop the centre to 9:16 at 1080x1920."),
+        typer.Option(
+            "--vertical",
+            help="Fit the whole frame into 9:16 at 1080x1920, on a blurred fill.",
+        ),
     ] = False,
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""

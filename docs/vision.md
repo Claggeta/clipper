@@ -59,7 +59,7 @@ transcription, for speed.
 
 ## V4 Scope
 Input: a video URL (YouTube or Twitch) or a local file. Output: a folder per
-video of post-ready drafts: 9:16 vertical (a centre crop), styled
+video of post-ready drafts: 9:16 vertical (whole frame, blurred fill), styled
 word-by-word captions burned in, and a suggested hook/title per clip. The
 developer picks which to post, by hand. Interface: `clipper fetch`, changes to
 `render`, and one command from a URL to that folder.
@@ -112,7 +112,9 @@ training.
   detector so far reads only the transcript.
 - Whether YouTube's and Twitch's terms allow downloading is unverified. It is
   checked in the `clipper fetch` ADR before that code is written.
-- A centre crop can cut off a subject who is not in the middle of the frame.
+- Fitting a 16:9 frame into 9:16 makes the picture small: about a third of
+  the vertical frame. Following the subject instead needs tracking, a V4
+  non-goal.
 - CPU transcription of long videos may be slow. Transcripts are cached
   to mitigate this.
 - Re-encoding uses libx264, which is GPL. Clipper does not ship ffmpeg, and the

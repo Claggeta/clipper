@@ -286,12 +286,16 @@ def test_captions_temp_dir_is_removed_after_success(
 
 
 _VERTICAL = (
-    "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',"
-    "scale=1080:1920,setsar=1"
+    "split[bg][fg];"
+    "[bg]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,"
+    "boxblur=10:2,scale=1080:1920[blurred];"
+    "[fg]scale=1080:1920:force_original_aspect_ratio=decrease:"
+    "force_divisible_by=2[fitted];"
+    "[blurred][fitted]overlay=(W-w)/2:(H-h)/2,setsar=1"
 )
 
 
-def test_vertical_adds_crop_and_scale_filter(
+def test_vertical_adds_fit_and_blur_filter(
     video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captured: list[list[str]] = []
@@ -305,7 +309,7 @@ def test_vertical_adds_crop_and_scale_filter(
     assert command[command.index("-pix_fmt") + 1] == "yuv420p"
 
 
-def test_vertical_with_captions_crops_before_subtitles(
+def test_vertical_with_captions_fits_before_subtitles(
     video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     run = _Run(monkeypatch)
