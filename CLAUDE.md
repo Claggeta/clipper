@@ -248,6 +248,10 @@ confirmation first (see "How to work in this repo").
    Needs a manual-test step. May end in a settings change or in nothing.
 6. Extract windowing and overlap dedup from `HeuristicClipDetector`.
    Behaviour-neutral; the heuristic's tests stay unchanged (ADR 0014).
+6a. Revisit the hit rule on the long-video labels. Half of the shorter range
+   counts any 45 s candidate inside a long label as a hit (three of seven
+   top-30 hits on `oFbD0Ot7nQ8.json`). A change is an ADR 0012 amendment,
+   lands before item 7, and states its design and waits for confirmation.
 7. Local LLM detector via Ollama, a manual-test step, a repeatability check
    (ADRs 0014, 0015), and a model choice recorded from `eval` results
 8. Release notes and tag `v0.3.0`, if the items above land
