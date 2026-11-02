@@ -173,7 +173,10 @@ class Evaluation(BaseModel):
     """A detector's candidates compared with one video's labels. See ADR 0012.
 
     `hits` holds `(label index, candidate index)` pairs, one per hitting pair.
-    Recall and precision are None when there is nothing to divide by.
+    `matches` is the subset in which each label and each candidate appears at
+    most once: precision counts matched candidates, so a second candidate on
+    an already matched label is a repeat, not a hit. Recall counts labels with
+    any hit. Recall and precision are None when there is nothing to divide by.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -182,6 +185,7 @@ class Evaluation(BaseModel):
     labels: tuple[Label, ...]
     candidates: tuple[ClipCandidate, ...]
     hits: tuple[tuple[int, int], ...]
+    matches: tuple[tuple[int, int], ...]
 
     @model_validator(mode="after")
     def _hits_in_range(self) -> "Evaluation":
@@ -194,6 +198,19 @@ class Evaluation(BaseModel):
                 )
         return self
 
+    @model_validator(mode="after")
+    def _matches_are_one_to_one_hits(self) -> "Evaluation":
+        for match in self.matches:
+            if match not in self.hits:
+                raise ValueError(f"match {match} is not a hit")
+        labels = [label_index for label_index, _ in self.matches]
+        candidates = [candidate_index for _, candidate_index in self.matches]
+        if len(set(labels)) != len(labels):
+            raise ValueError("a label is matched more than once")
+        if len(set(candidates)) != len(candidates):
+            raise ValueError("a candidate is matched more than once")
+        return self
+
     @property
     def labels_hit(self) -> int:
         return len({label_index for label_index, _ in self.hits})
@@ -203,9 +220,20 @@ class Evaluation(BaseModel):
         return len({candidate_index for _, candidate_index in self.hits})
 
     @property
+    def candidates_matched(self) -> int:
+        return len(self.matches)
+
+    @property
+    def repeats(self) -> int:
+        """Candidates that hit only labels another candidate matched."""
+        return self.candidates_hit - self.candidates_matched
+
+    @property
     def recall(self) -> float | None:
         return self.labels_hit / len(self.labels) if self.labels else None
 
     @property
     def precision(self) -> float | None:
-        return self.candidates_hit / len(self.candidates) if self.candidates else None
+        if not self.candidates:
+            return None
+        return self.candidates_matched / len(self.candidates)

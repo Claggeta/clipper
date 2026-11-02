@@ -25,16 +25,28 @@ def is_hit(candidate: ClipCandidate, label: Label) -> bool:
 
 
 def evaluate(labeled: LabeledVideo, candidates: Sequence[ClipCandidate]) -> Evaluation:
-    """Compare a detector's candidates with a video's labels. See ADR 0012."""
+    """Compare a detector's candidates with a video's labels. See ADR 0012.
+
+    Candidates are matched in rank order: each claims the earliest label it
+    hits that no higher-ranked candidate has claimed.
+    """
     hits = tuple(
         (label_index, candidate_index)
         for label_index, label in enumerate(labeled.labels)
         for candidate_index, candidate in enumerate(candidates)
         if is_hit(candidate, label)
     )
+    claimed: set[int] = set()
+    matches: list[tuple[int, int]] = []
+    for candidate_index in range(len(candidates)):
+        free = [i for i, c in hits if c == candidate_index and i not in claimed]
+        if free:
+            claimed.add(free[0])
+            matches.append((free[0], candidate_index))
     return Evaluation(
         source=labeled.source,
         labels=labeled.labels,
         candidates=tuple(candidates),
         hits=hits,
+        matches=tuple(matches),
     )

@@ -72,6 +72,9 @@ def test_evaluate_records_every_hitting_pair() -> None:
     # Candidate 0 overlaps label 0 by 20 s and label 1 by 20 s; both are at
     # least half of the 30 s labels.
     assert result.hits == ((0, 0), (1, 0))
+    # Candidate 0 matches only the earlier label; label 1 still counts for
+    # recall, because recall asks whether any candidate hit it.
+    assert result.matches == ((0, 0),)
     assert result.labels_hit == 2
     assert result.candidates_hit == 1
     assert result.recall == pytest.approx(2 / 3)
@@ -84,10 +87,33 @@ def test_two_candidates_on_one_label_count_the_label_once() -> None:
     result = evaluate(_video(_l("0:00", "2:00")), [_c(0.0, 45.0), _c(60.0, 105.0)])
 
     assert result.hits == ((0, 0), (0, 1))
+    assert result.matches == ((0, 0),)
     assert result.labels_hit == 1
     assert result.candidates_hit == 2
+    assert result.repeats == 1
     assert result.recall == 1.0
-    assert result.precision == 1.0
+    assert result.precision == 0.5
+
+
+def test_rank_order_decides_which_candidate_matches() -> None:
+    # The list is in rank order, so the later-starting candidate ranked first
+    # is the match and the other is the repeat.
+    result = evaluate(_video(_l("0:00", "2:00")), [_c(60.0, 105.0), _c(0.0, 45.0)])
+    assert result.matches == ((0, 0),)
+
+
+def test_candidate_hitting_two_labels_claims_the_earlier() -> None:
+    labels = _video(_l("0:00", "0:30"), _l("0:30", "1:00"))
+
+    # Candidate 1 (30-60) hits only label 1, which candidate 0 left free.
+    freed = evaluate(labels, [_c(10.0, 50.0), _c(30.0, 60.0)])
+    # Candidate 1 (0-30) hits only label 0, which candidate 0 claimed.
+    taken = evaluate(labels, [_c(10.0, 50.0), _c(0.0, 30.0)])
+
+    assert freed.matches == ((0, 0), (1, 1))
+    assert freed.precision == 1.0
+    assert taken.matches == ((0, 0),)
+    assert taken.repeats == 1
 
 
 def test_no_labels_leaves_recall_undefined() -> None:

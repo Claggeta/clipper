@@ -242,7 +242,9 @@ def test_labeled_video_rejects_unknown_keys() -> None:
 # Evaluations below are constructed, not produced by `clipper eval`.
 
 
-def _evaluation(hits: tuple[tuple[int, int], ...]) -> Evaluation:
+def _evaluation(
+    hits: tuple[tuple[int, int], ...], matches: tuple[tuple[int, int], ...] = ()
+) -> Evaluation:
     return Evaluation(
         source="talk.mp4",
         labels=(_label("0:00", "0:50"), _label("0:50", "2:29")),
@@ -252,15 +254,26 @@ def _evaluation(hits: tuple[tuple[int, int], ...]) -> Evaluation:
             _candidate(start_seconds=200, end_seconds=245),
         ),
         hits=hits,
+        matches=matches,
     )
 
 
 def test_evaluation_counts_distinct_labels_and_candidates() -> None:
-    evaluation = _evaluation(((0, 0), (1, 0), (1, 1)))
+    evaluation = _evaluation(((0, 0), (1, 0), (1, 1)), ((0, 0), (1, 1)))
     assert evaluation.labels_hit == 2
     assert evaluation.candidates_hit == 2
+    assert evaluation.candidates_matched == 2
+    assert evaluation.repeats == 0
     assert evaluation.recall == 1.0
     assert evaluation.precision == pytest.approx(2 / 3)
+
+
+def test_evaluation_precision_counts_matches_not_hits() -> None:
+    evaluation = _evaluation(((1, 0), (1, 1)), ((1, 0),))
+    assert evaluation.candidates_hit == 2
+    assert evaluation.candidates_matched == 1
+    assert evaluation.repeats == 1
+    assert evaluation.precision == pytest.approx(1 / 3)
 
 
 def test_evaluation_with_no_hits() -> None:
@@ -268,6 +281,23 @@ def test_evaluation_with_no_hits() -> None:
     assert (evaluation.labels_hit, evaluation.candidates_hit) == (0, 0)
     assert evaluation.recall == 0.0
     assert evaluation.precision == 0.0
+
+
+@pytest.mark.parametrize(
+    ("hits", "matches", "message"),
+    [
+        (((0, 0),), ((1, 0),), "is not a hit"),
+        (((1, 0), (1, 1)), ((1, 0), (1, 1)), "label is matched more than once"),
+        (((0, 0), (1, 0)), ((0, 0), (1, 0)), "candidate is matched more than once"),
+    ],
+)
+def test_evaluation_rejects_matches_that_are_not_one_to_one_hits(
+    hits: tuple[tuple[int, int], ...],
+    matches: tuple[tuple[int, int], ...],
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        _evaluation(hits, matches)
 
 
 @pytest.mark.parametrize(
