@@ -77,14 +77,20 @@ and planned code:
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed in
   `_build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
-  `None` in older JSON; `render` and `eval` don't check it. An unset
-  `CLIPPER_LLM_MODEL` is an `Error:`, exit 1. Private factories stay until
+  `None` in older JSON; `render` and `eval` don't check it.
+  `CLIPPER_LLM_MODEL` defaults to `qwen3.5:9b` (0014); an empty value is an
+  `Error:`, exit 1. Private factories stay until
   more than four exist or a third real detector appears; that replaces the
   0006 and 0011 triggers. Amends 0006.
 - `0014` — the LLM detector re-ranks the heuristic's windows, via Ollama, and
   never falls back silently. Windowing and dedup were extracted first, as a
   behaviour-neutral change, into `adapters/detection/windows.py`
   (`sliding_windows`, `select_top`, `WINDOW_SECONDS`, `STEP_SECONDS`).
+  Requests send `think: false`: with thinking, `qwen3.5:9b` took tens of
+  seconds per window and ran out of context. The default model is
+  `qwen3.5:9b`, chosen from manual steps L1 to L5; `heuristic` stays the
+  default detector. Breaking score ties by the heuristic was measured and not
+  adopted.
 - `0015` — determinism is a property of the heuristic detector. Amends vision
   criterion 2.
 
@@ -154,11 +160,14 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model,
-  item 3, `clipper eval`, item 4, `--detector` and the `_build_detector`
-  seam, item 6, the windowing extraction, and item 6a, one-to-one precision,
-  are merged). Next: the parked unescaped-markup fix as a small `fix(cli)` PR,
-  then item 7. Item 0 has two label files. With one-to-one precision (ADR 0012,
+- V3 (scope and ADRs 0012 to 0015 are merged; items 2, 3, 4, 6, 6a and 7
+  are merged). Item 7, the LLM detector: `--detector llm` via Ollama, with
+  thinking off and `qwen3.5:9b` as the default model (ADR 0014 amendments).
+  Its results on the two label files: `test_input.json` top 5, recall 4 of 4
+  and precision 4 of 5 (1 repeat); `oFbD0Ot7nQ8.json` top 30, recall 6 of 30
+  and precision 6 of 30 in 953 s, but 0 of 30 in its top 5. Both models tried
+  cluster their scores on round values. Remaining: item 5 (Whisper
+  experiment) and item 8 (release). Item 0 has two label files. With one-to-one precision (ADR 0012,
   item 6a amendment), the heuristic gives: on `test_input.json` (labels cover
   the whole speech) recall 3 of 4 and precision 3 of 5, with 2 repeats; on
   `oFbD0Ot7nQ8.json` recall 2 of 30 and precision 2 of 5 at top 5 (1 repeat),
@@ -266,8 +275,10 @@ confirmation first (see "How to work in this repo").
    top-30 hits on `oFbD0Ot7nQ8.json`). A change is an ADR 0012 amendment,
    lands before item 7, and states its design and waits for confirmation.~~
    (done; the threshold stays at 0.5, precision is one-to-one in rank order)
-7. Local LLM detector via Ollama, a manual-test step, a repeatability check
-   (ADRs 0014, 0015), and a model choice recorded from `eval` results
+7. ~~Local LLM detector via Ollama, a manual-test step, a repeatability check
+   (ADRs 0014, 0015), and a model choice recorded from `eval` results~~
+   (done; #79, #80, #81, #82 and the default-model PR; model `qwen3.5:9b`,
+   ADR 0014 amendments)
 8. Release notes and tag `v0.3.0`, if the items above land
 
 Later, not scheduled: campaign briefs as a detector input (needs an ADR).
@@ -316,3 +327,17 @@ terms, and a manual-test step.
 - Performance data from posted clips as a reference (ADR 0012). Needs posting
   and analytics, which are not planned yet. Clips have no stable ID today (they
   are named by time span), so joining metrics to clips needs one.
+- A finer LLM score. Both models tried score on a few round values (on the
+  long video, `llama3.1:8b` gave 0.8 to 403 of 1,215 windows), and neither
+  put a label in its top 5 there. Options: token probabilities (whether
+  Ollama returns them is unverified) or a scoring rubric in the prompt. Needs
+  an ADR 0014 amendment and `eval` results.
+- Labels may hinge on what is seen, not said. Several `oFbD0Ot7nQ8.json`
+  labels name visual moments ("Biz Hits a Long Putt"), which a
+  transcript-only detector cannot see. Unverified as the cause of the LLM's
+  top-5 misses. Audio and visual features are a V3 non-goal.
+- `OllamaClient` ignores `done_reason`. A reply cut off at the length limit
+  shows as `not a valid score ... (got '')` instead of saying it was cut off.
+  Not hit since `think: false` (ADR 0014).
+- `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
+  temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.
