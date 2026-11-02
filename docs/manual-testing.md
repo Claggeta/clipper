@@ -1233,7 +1233,8 @@ transcript in `data/cache/`. It does not need the Setup section above.
    $env:COLUMNS = "500"
 
    # Helper: runs `clipper <Arguments>` with CLIPPER_LLM_MODEL set to $Model
-   # (unset if $Model is ""), plus any extra CLIPPER_ variables, for this one
+   # (unset if $Model is "", so the default applies), plus any extra CLIPPER_
+   # variables, for this one
    # command, and puts every variable back afterwards. Keeps the exit code,
    # the seconds taken and the text, and prints them.
    function Invoke-Llm {
@@ -1261,6 +1262,14 @@ transcript in `data/cache/`. It does not need the Setup section above.
      $Text
    }
    ```
+
+Check that each model variable names a pulled model. A placeholder left in
+place, such as `<first model tag>`, fails every later step with
+`HTTP 400 ... invalid model name`. Each line should end in `True`:
+
+```powershell
+foreach ($m in $M1, $M2, $M3) { ollama show $m | Out-Null; "$m resolves: $($LASTEXITCODE -eq 0)" }
+```
 
 Check that no `CLIPPER_` variable is set before you start. This should print
 nothing:
@@ -1310,9 +1319,13 @@ request or the schema does not match what this Ollama version expects.
 Each must exit 1 with one `Error: ...` line and no traceback. Record each
 message exactly.
 
+The empty-model error (ADR 0013) is not checked here. `CLIPPER_LLM_MODEL`
+defaults to `qwen3.5:9b`, so only an empty value reaches it, and Windows does
+not keep an empty environment variable. The CLI unit tests cover it.
+
 ```powershell
-# a. Model not set.
-Invoke-Llm "" "eval data\output\test_input.json --detector llm"
+# a. Malformed model name.
+Invoke-Llm "<not a model tag>" "eval data\output\test_input.json --detector llm"
 
 # b. Model not pulled. The tag is deliberately one that does not exist.
 Invoke-Llm "no-such-model-clipper:latest" "eval data\output\test_input.json --detector llm"
@@ -1335,11 +1348,13 @@ on.
 
 Pass:
 
-- a: `Error: Set CLIPPER_LLM_MODEL to an Ollama model name to use --detector llm`.
-- b: `Error: Ollama at http://127.0.0.1:11434 returned HTTP <status> for model
-  'no-such-model-clipper:latest': <Ollama's text>`. Record the status and the
-  text. The pull hint is added only on a 404, and whether this Ollama version
-  answers 404 for a missing model is what this step finds out.
+- a: `Error: Ollama at http://127.0.0.1:11434 returned HTTP 400 for model
+  '<not a model tag>': invalid model name`. Ollama 0.40.13 answered 400 with
+  that text for `<first model tag>`; no pull hint is added on a 400.
+- b: `Error: Ollama at http://127.0.0.1:11434 returned HTTP 404 for model
+  'no-such-model-clipper:latest': model 'no-such-model-clipper:latest' not
+  found. Is the model pulled? (`ollama pull no-such-model-clipper:latest`)`,
+  as Ollama 0.40.13 answered. Record it again after upgrading Ollama.
 - c and d: `Error: Cannot reach Ollama at <url>: <reason>. Is it running?`.
   Record the reason text, which comes from Windows.
 - c and d return within a few seconds. A long wait before the error means the
@@ -1622,6 +1637,34 @@ maintainer.
 - Not covered by this run: a build without libass, other ffmpeg builds, and a
   second drive.
 
+### LLM detector reference run
+
+One run, for scale. It is not a pass threshold. 2026-11-02, Windows 11,
+PowerShell 5.1, Ollama 0.40.13, RTX 4070 Ti 12 GB (driver 610.88),
+`qwen3.5:9b` (6.6 GB) and `llama3.1:8b` (4.9 GB), both `100% GPU`. L1 and L2 a
+to c were run by the maintainer; L2 d to L5 were run by the assistant from a
+script that followed the steps, with the output pasted back.
+
+- First L1 attempt, before thinking was turned off: `qwen3.5:9b` took 18.75 s
+  to 1 m 10 s per window and failed on window 15 of 18 with
+  `Model reply for window 0:03:32-0:04:14 is not a valid score: <root>: Invalid
+  JSON: EOF while parsing a value at line 1 column 0 (got '')`. Cause and fix
+  are in ADR 0014's thinking amendment (#82).
+- L1 with `think: false`: exit 0 in 19.5 s including the model load,
+  `Scored 18 of 18 windows`, five candidates with one-sentence reasons,
+  `Detector: llm:qwen3.5:9b` and the same string in the saved JSON. Scores 0.95,
+  0.95, 0.85, 0.85, 0.85.
+- L2: a (a placeholder tag) gave HTTP 400 `invalid model name`; b gave HTTP 404
+  with the pull hint; c gave `[WinError 10061] No connection could be made
+  because the target machine actively refused it` in 2.4 s; d gave the same
+  reason in 2.5 s.
+- L3: `qwen3.5:9b` saved identical JSON twice. `llama3.1:8b` gave the same
+  candidates and scores, but 2 of 6 reasons were worded differently.
+- L4 and L5: results and tie counts are in ADR 0014's model-choice amendment.
+  On `oFbD0Ot7nQ8.json` at top 30, `qwen3.5:9b` took 953.4 s (0.78 s per
+  window) and `llama3.1:8b` 685.2 s (0.56 s per window).
+- Not run: L5's second run of the chosen model on the long video.
+
 ## If a step fails
 
 | Symptom | Look at |
@@ -1644,6 +1687,8 @@ maintainer.
 | Error message wrong or a traceback (L2) | `generate` and `_http_failure` in `adapters/detection/ollama.py`; the `try` in `analyze` and `eval`; ADR 0013 |
 | `Detector:` line or saved `detector` wrong (L1) | `_detector_label` in `cli/main.py`; ADR 0013 |
 | Timeout on the first window (L1) | `TIMEOUT_SECONDS` in `adapters/detection/ollama.py`; model load time |
+| `HTTP 400 ... invalid model name` (L0 to L5) | A placeholder or typo in `$M1` to `$M3` or `CLIPPER_LLM_MODEL`; the L0 `ollama show` check |
+| Tens of seconds per window, or `not a valid score ... (got '')` (L1) | `think` in the payload in `adapters/detection/ollama.py`; ADR 0014, thinking amendment |
 
 | Symptom | Look at |
 |---------|---------|
