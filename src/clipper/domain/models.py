@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -139,6 +140,50 @@ class RenderedClip(BaseModel):
 
     candidate: ClipCandidate
     path: Path
+
+
+class ManifestClip(BaseModel):
+    """One selected clip in a render manifest. See docs/decisions/0019.
+
+    `file` is the clip's name inside the manifest's folder, set when it was
+    rendered; `error` is the failure message otherwise. `captions` is what was
+    burned in: word-by-word, whole segments (a transcript without word times),
+    or nothing.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    rank: int = Field(ge=1)
+    start_seconds: float
+    end_seconds: float
+    score: float
+    reasons: tuple[str, ...]
+    file: str | None = None
+    captions: Literal["words", "segments"] | None = None
+    error: str | None = None
+
+    @model_validator(mode="after")
+    def _file_or_error(self) -> "ManifestClip":
+        if (self.file is None) == (self.error is None):
+            raise ValueError("exactly one of file and error must be set")
+        return self
+
+
+class RenderManifest(BaseModel):
+    """What one `render` run wrote to a video's folder. See docs/decisions/0019.
+
+    `vertical` and `captions` are the flags the run was given. `analysis` is
+    the result JSON path as given on the command line.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    analysis: str
+    detector: str | None
+    vertical: bool
+    captions: bool
+    clips: tuple[ManifestClip, ...]
 
 
 def _parse_timestamp(value: object) -> float:

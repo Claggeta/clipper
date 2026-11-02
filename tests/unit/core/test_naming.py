@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from clipper.core.naming import clip_file_name, plan_clip_paths
+from clipper.core.naming import clip_file_name, clip_folder, plan_clip_paths
 from clipper.domain.errors import ClipperError, ClipRenderError
 from clipper.domain.models import ClipCandidate
 
@@ -65,3 +65,12 @@ def test_plan_rejects_duplicate_names() -> None:
 
 def test_clip_render_error_is_a_clipper_error() -> None:
     assert issubclass(ClipRenderError, ClipperError)
+
+
+def test_folder_is_the_video_stem_under_the_clips_dir() -> None:
+    folder = clip_folder(Path("videos/oFbD0Ot7nQ8.mp4"), Path("data/clips"))
+    assert folder == Path("data/clips/oFbD0Ot7nQ8")
+
+
+def test_folder_keeps_dots_before_the_extension() -> None:
+    assert clip_folder(Path("my.talk.mkv"), Path("c")) == Path("c/my.talk")

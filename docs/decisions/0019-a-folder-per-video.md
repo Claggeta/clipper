@@ -45,6 +45,47 @@ subfolder as the likely fix.
   other, as in 0008.
 - (-) Clips from older runs stay in the old flat folder. Nothing moves them.
 
+## Amended by the folder and manifest PR (V4 item 4a)
+
+- `clip_folder(video, clips_dir)` in `core/naming.py` gives
+  `<clips dir>/<stem>`. `render` passes it to `plan_clip_paths`, so the
+  within-run collision check (0008) is unchanged.
+- **Manifest model.** `RenderManifest` and `ManifestClip` in
+  `domain/models.py`, written by `save_manifest` in
+  `adapters/results/manifest_json.py` as indented UTF-8 with LF endings.
+  - Run level: `source` (the video's file name), `analysis` (the result JSON
+    path as given on the command line), `detector` (copied from the result,
+    `null` for older JSON), and the flags `vertical` and `captions`.
+  - Per clip: `rank`, `start_seconds`, `end_seconds`, `score`, `reasons`,
+    `file`, `captions` and `error`. Exactly one of `file` and `error` is set.
+- **Changes from decision 2:**
+  - `file` is the name inside the folder, not a path, so the folder can be
+    moved.
+  - The flags are recorded once per run, since they are per run. Per clip,
+    `captions` records what was burned in: `words`, `segments` (a transcript
+    without word times, 0017) or `null` (not asked for, or no speech in
+    range).
+  - There is no `titles` flag, title or hook yet. Item 5 (0018) adds them.
+  - No timestamp. The file's modified time gives one, and the output stays
+    the same for the same run.
+- **When it is written.** Once, after every selected clip has been tried,
+  including when some or all failed; the exit code is still 1 then (0011).
+  `error` holds the raw message, not the console's escaped one. A failure
+  before cutting writes nothing, so the previous manifest stays. If the
+  manifest cannot be written, `render` prints `Error:` and exits 1, and the
+  clips it rendered stay.
+- `render` prints `Rendered X of Y clips to <folder>` and then
+  `Manifest: <path>`.
+
+Checked on 2026-11-02 with ffmpeg 9.0.2 (gyan.dev full build), Windows 11, by
+the assistant in a separate process: the Rendering and Captions sections of
+`docs/manual-testing.md` run as written on `test_input.mp4`, including the new
+step R18. Rendering all 5 candidates took 11.6 s. The manifest listed the
+5 clips in rank order with `captions` `words`, a `--rank 2` run replaced it
+with one entry, the constructed failure from R14 was listed with ffmpeg's
+`Permission denied` message, and a rank error left it unchanged. The v0.3
+analysis of the same video gave `captions` `segments` and `detector` `null`.
+
 ## Revisit when
 
 - The maintainer wants a run's earlier clips kept in the manifest.

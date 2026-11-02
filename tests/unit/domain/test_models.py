@@ -8,6 +8,7 @@ from clipper.domain.models import (
     Evaluation,
     Label,
     LabeledVideo,
+    ManifestClip,
     MediaInfo,
     RenderedClip,
     Segment,
@@ -360,3 +361,42 @@ def test_evaluation_is_immutable() -> None:
     evaluation = _evaluation(())
     with pytest.raises(ValidationError):
         evaluation.source = "other.mp4"  # type: ignore[misc]
+
+
+def _entry(**fields: object) -> dict[str, object]:
+    # Constructed manifest entry.
+    base: dict[str, object] = {
+        "rank": 1,
+        "start_seconds": 1.0,
+        "end_seconds": 2.0,
+        "score": 0.5,
+        "reasons": ("test",),
+    }
+    return base | fields
+
+
+def test_manifest_clip_with_a_file() -> None:
+    clip = ManifestClip.model_validate(_entry(file="a.mp4", captions="words"))
+    assert (clip.file, clip.captions, clip.error) == ("a.mp4", "words", None)
+
+
+def test_manifest_clip_with_an_error() -> None:
+    clip = ManifestClip.model_validate(_entry(error="boom"))
+    assert (clip.file, clip.captions) == (None, None)
+
+
+@pytest.mark.parametrize(
+    "fields", [{}, {"file": "a.mp4", "error": "boom"}], ids=["neither", "both"]
+)
+def test_manifest_clip_needs_exactly_one_of_file_and_error(
+    fields: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError, match="exactly one of file and error"):
+        ManifestClip.model_validate(_entry(**fields))
+
+
+def test_manifest_clip_rejects_unknown_caption_kinds_and_rank_zero() -> None:
+    with pytest.raises(ValidationError):
+        ManifestClip.model_validate(_entry(file="a.mp4", captions="srt"))
+    with pytest.raises(ValidationError):
+        ManifestClip.model_validate(_entry(file="a.mp4", rank=0))

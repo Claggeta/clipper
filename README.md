@@ -94,17 +94,43 @@ This renders every candidate. Options:
   Nothing is cut off. Black bars built into the source stay in the picture.
   Captions are drawn on the vertical frame.
 
-Clips are written to `<clips dir>/<video name>_<HHMMSS>-<HHMMSS>.mp4` (by
-default `data/clips/`) and re-encoded as H.264 video and AAC audio. The name
-comes from the clip's span, not its rank, so rendering the same candidate again
+Clips are written to a folder per video,
+`<clips dir>/<video name>/<video name>_<HHMMSS>-<HHMMSS>.mp4` (by default
+`data/clips/`), and re-encoded as H.264 video and AAC audio. The name comes
+from the clip's span, not its rank, so rendering the same candidate again
 overwrites the same file. A captioned clip has the same name as a plain one, so
-`--captions` overwrites a plain clip of the same span.
+`--captions` overwrites a plain clip of the same span. Clips rendered before
+v0.4 stay in the flat `data/clips/` folder.
+
+Each run also writes `manifest.json` in the video's folder, replacing the one
+before. It records the video, the analysis JSON, the detector, the flags, and
+one entry per selected clip with its rank, span, score, reasons, file name,
+which captions were burned in (`words`, `segments` for an analysis without word
+times, or `null`), and the error if it failed. A `--rank` run lists only the
+ranks it rendered. One entry from a real run with `--vertical --captions`:
+
+```json
+{
+  "rank": 1,
+  "start_seconds": 32.21,
+  "end_seconds": 73.0,
+  "score": 0.26186565334640843,
+  "reasons": [
+    "strong words: never",
+    "fast pace (3.1 words/sec)"
+  ],
+  "file": "test_input_000032-000113.mp4",
+  "captions": "words",
+  "error": null
+}
+```
 
 The video's file name must match the one the JSON was saved for. Problems found
 before any cutting (a bad JSON, a name mismatch, a rank out of range, a
 candidate past the end of the video, no video stream) print `Error: ...`, write
 nothing and exit 1. If one clip fails while others succeed, the rest are still
-rendered, each failure is printed, and the command exits 1.
+rendered, each failure is printed and listed in the manifest, and the command
+exits 1.
 
 ### Evaluating detectors
 
@@ -210,6 +236,9 @@ Rendered #5 0:04:02-0:04:33 data\clips\test_input_000402-000434.mp4 (captions)
 Rendered 2 of 2 clips to data\clips
 ```
 
+That output is from v0.2. Since then the clips go to `data\clips\test_input\`,
+and a `Manifest:` line follows the last line.
+
 The console line shows both ends rounded down, while the file name rounds the
 end up, so a clip ending at 73.8 s prints `0:01:13` and is named `...-000114.mp4`.
 Rendering all 5 candidates took 12.0 s without captions and 12.05 s with them
@@ -270,8 +299,9 @@ maintainer would not post.
   transcript cached took 0.67 s. The GPU and larger models are untried.
 - **Output name collisions.** The JSON file is named after the video's file
   name without its extension, so two videos with the same name overwrite
-  each other's output. Rendered clips are named the same way, so two videos
-  with the same name and overlapping spans overwrite each other's clips.
+  each other's output. Rendered clips go to a folder named the same way, so
+  two videos with the same name share a folder and manifest, and overlapping
+  spans overwrite each other's clips.
 - **The video check is by name only.** `render` checks that the video's file
   name matches the one in the JSON. A different video with the same name is cut
   without a warning.
