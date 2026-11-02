@@ -127,6 +127,22 @@ maintainer's own judgment of which moments in a video are worth cutting.
 - With no labels, recall is reported as `n/a`, and precision is 0 of the
   candidates. With no candidates, precision is `n/a`. Both exit 0.
 
+## Amended by the first long-video labels
+
+- A label file may list only some of the moments worth cutting. The labels for
+  `oFbD0Ot7nQ8.mp4` (a long stream; the last label ends at 4:51:00) are the
+  maintainer's main clips, and the maintainer said they are not all the
+  clippable moments.
+- With incomplete labels, a candidate on a good but unlisted moment counts as
+  a miss, so precision is a lower bound. Recall is unaffected: it asks whether
+  the listed moments were found. When comparing detectors on such a file,
+  read recall first.
+- `top_n` caps recall: with 30 labels and the default of 5 candidates, at most
+  5 labels can be hit. Set `CLIPPER_TOP_N` on the `eval` command to compare at
+  a larger N.
+- Whether a label file is complete is not recorded in the file. Add a field
+  for it if complete and incomplete files ever need to be told apart.
+
 ## Related
 
 - 0013: detector choice on the CLI
