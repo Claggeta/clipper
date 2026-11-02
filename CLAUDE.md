@@ -102,7 +102,9 @@ and planned code:
   captions from one pure builder that replaces `build_srt`. The transcriber's
   name gains `+words`, so old cache entries are re-transcribed. Segments
   without words become whole-segment cues, with a note. Supersedes 0010's
-  segment-level decision; its burn-in mechanism stands.
+  segment-level decision; its burn-in mechanism stands. Item 4 amendment:
+  `build_ass`, chunks of up to 3 words, one event per word with the active
+  word yellow, 1080x1920 or 1920x1080 canvas, style chosen from frames.
 - `0018` — `render --titles`: a `TitleWriter` Protocol and an Ollama adapter
   reusing `OllamaClient` write a title and hook per clip to the manifest. A
   title failure is that clip's failure; no fallback. Built through the context
@@ -212,8 +214,9 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92) and 3
-  (word timestamps, #93) are merged. Next: item 4, styled captions.
+- V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92), 3
+  (word timestamps, #93) and 4 (styled captions, #95) are merged. Next:
+  item 4a, a folder per video and the manifest.
 
 V3 results, for reference:
 
@@ -361,7 +364,8 @@ picked.
    faster-whisper's word timestamps are usable here, and what they cost, is
    unverified.~~ (done; #93, manual step W9; no measurable time cost, segments
    re-split, ADR 0017 amendment)
-4. Styled, word-by-word burned-in captions (0017), with a manual-test step.
+4. ~~Styled, word-by-word burned-in captions (0017), with a manual-test
+   step.~~ (done; #95, manual steps C2 and C7 rewritten; ADR 0017 amendment)
 4a. A folder per video and the manifest (0019).
 4b. Replace the CLI's private factories with a context object.
    Behaviour-neutral; ADR 0013's trigger, since titles would be the fifth
@@ -422,9 +426,11 @@ Later, not scheduled:
   reachable, only the 10-line failure message. Fix: a `--verbose` flag like
   `analyze`'s, and an amendment to ADR 0011.
 - Minimum overlap for caption cues: a segment that crosses a clip's edge shows
-  its whole sentence for the part inside the clip (ADR 0010). On the one 5:14
-  video tried, no cue in any rank was under 0.5 s, so it was not needed. Revisit
-  if a real clip flashes a sentence, and set the threshold from that clip.
+  its whole sentence for the part inside the clip (ADR 0010). Since V4 item 4
+  this applies only to segments without words (v0.3 analyses); word captions
+  drop a word that starts before the clip. On the one 5:14 video tried, no cue
+  in any rank was under 0.5 s, so it was not needed. Revisit if a real clip
+  flashes a sentence, and set the threshold from that clip.
 - YouTube's "Most replayed" graph as a second label source (ADR 0012). It is
   public on many long videos and may be extractable with yt-dlp. Both are
   unverified, and YouTube's terms have not been checked. A short spike would
