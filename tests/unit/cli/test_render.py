@@ -1,10 +1,11 @@
+import dataclasses
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner, Result
 
 from clipper.adapters.rendering.fake import FakeClipRenderer
-from clipper.cli import main as cli_main
+from clipper.cli.context import AppContext
 from clipper.cli.main import app
 from clipper.domain.errors import ClipRenderError, MediaProbeError
 from clipper.domain.models import (
@@ -62,6 +63,7 @@ class Env:
         self.clips = tmp_path / "clips"
         self.renderer = FakeClipRenderer()
         self.monkeypatch = monkeypatch
+        self.context = AppContext()
         monkeypatch.setenv("CLIPPER_CLIPS_DIR", str(self.clips))
         self.save()
         self.use_probe(FakeProbe())
@@ -81,15 +83,18 @@ class Env:
         self.json.write_text(result.model_dump_json(), encoding="utf-8")
 
     def use_probe(self, probe: FakeProbe) -> None:
-        self.monkeypatch.setattr(cli_main, "_build_probe", lambda: probe)
+        self.context = dataclasses.replace(self.context, probe=lambda: probe)
 
     def use_renderer(self, renderer: object) -> None:
         self.renderer = renderer  # type: ignore[assignment]
-        self.monkeypatch.setattr(cli_main, "_build_renderer", lambda s: renderer)
+        self.context = dataclasses.replace(
+            self.context,
+            renderer=lambda s: renderer,  # type: ignore[arg-type,return-value]
+        )
 
     def run(self, *extra: str) -> Result:
         args = ["render", str(self.video), str(self.json), *extra]
-        return CliRunner().invoke(app, args)
+        return CliRunner().invoke(app, args, obj=self.context)
 
     @property
     def folder(self) -> Path:

@@ -1,0 +1,74 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
+
+from clipper.adapters.detection.heuristic import HeuristicClipDetector
+from clipper.adapters.detection.llm import LlmClipDetector
+from clipper.adapters.detection.ollama import OllamaClient
+from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
+from clipper.adapters.media.ffprobe import FfprobeMediaProbe
+from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.transcription.caching import CachingTranscriber
+from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
+from clipper.adapters.transcription.video import VideoTranscriber
+from clipper.core.config import Settings
+from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
+from clipper.domain.errors import DetectionError
+
+
+class DetectorName(StrEnum):
+    """Detectors selectable with --detector (ADR 0013)."""
+
+    HEURISTIC = "heuristic"
+    LLM = "llm"
+
+
+def build_transcriber(settings: Settings) -> Transcriber:
+    """Compose the real transcriber."""
+    whisper = FasterWhisperTranscriber(model_size=settings.whisper_model)
+    return CachingTranscriber(
+        VideoTranscriber(FfmpegAudioExtractor(), whisper),
+        settings.cache_dir,
+        namespace=whisper.name,
+    )
+
+
+def build_detector(settings: Settings, name: DetectorName) -> ClipDetector:
+    """Compose the chosen detector."""
+    match name:
+        case DetectorName.HEURISTIC:
+            return HeuristicClipDetector(top_n=settings.top_n)
+        case DetectorName.LLM:
+            if not settings.llm_model:
+                raise DetectionError(
+                    "Set CLIPPER_LLM_MODEL to an Ollama model name to use "
+                    "--detector llm"
+                )
+            client = OllamaClient(settings.llm_url, settings.llm_model)
+            return LlmClipDetector(client, top_n=settings.top_n)
+
+
+def build_renderer(settings: Settings) -> ClipRenderer:
+    """Compose the real clip renderer."""
+    return FfmpegClipRenderer()
+
+
+def build_probe() -> MediaProbe:
+    """Compose the real media probe."""
+    return FfprobeMediaProbe()
+
+
+@dataclass(frozen=True)
+class AppContext:
+    """How the commands build their adapters. See docs/decisions/0013.
+
+    `cli/` is the composition root. The fields are builders, not built
+    objects, so each command builds only what it uses, when it uses it.
+    Tests pass their own through `CliRunner().invoke(..., obj=AppContext(...))`;
+    nothing at runtime selects a test double (ADR 0006).
+    """
+
+    transcriber: Callable[[Settings], Transcriber] = build_transcriber
+    detector: Callable[[Settings, DetectorName], ClipDetector] = build_detector
+    renderer: Callable[[Settings], ClipRenderer] = build_renderer
+    probe: Callable[[], MediaProbe] = build_probe

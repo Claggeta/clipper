@@ -10,8 +10,9 @@ confirms that `-hide_banner -loglevel error` leaves the cause line on stderr,
 or that `does not contain any stream` is still ffmpeg's wording.
 
 The [Rendering](#rendering) section covers `clipper render` the same way. The
-render tests patch `_build_renderer` and `_build_probe` (ADR 0011), so nothing
-in CI runs the real `ffprobe` JSON parsing or the real clip encode.
+render tests pass a renderer and a probe of their own through `AppContext`
+(ADR 0013), so nothing in CI runs the real `ffprobe` JSON parsing or the real
+clip encode.
 
 The [Captions](#captions) section covers `clipper render --captions`. The
 renderer tests mock `subprocess.run`, so nothing in CI runs the real `subtitles`

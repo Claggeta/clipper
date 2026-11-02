@@ -1,5 +1,4 @@
 import logging
-from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -8,28 +7,19 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from clipper.adapters.detection.heuristic import HeuristicClipDetector
-from clipper.adapters.detection.llm import LlmClipDetector
-from clipper.adapters.detection.ollama import OllamaClient
-from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
-from clipper.adapters.media.ffprobe import FfprobeMediaProbe
-from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.adapters.results.analysis_json import (
     check_source_matches,
     load_analysis_result,
 )
 from clipper.adapters.results.labels_json import check_labels_match, load_labels
 from clipper.adapters.results.manifest_json import save_manifest
-from clipper.adapters.transcription.caching import CachingTranscriber
-from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
-from clipper.adapters.transcription.video import VideoTranscriber
+from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
-from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
-from clipper.domain.errors import ClipperError, ClipRenderError, DetectionError
+from clipper.domain.errors import ClipperError, ClipRenderError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
@@ -42,13 +32,6 @@ from clipper.domain.models import (
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
-
-
-class DetectorName(StrEnum):
-    """Detectors selectable with --detector (ADR 0013)."""
-
-    HEURISTIC = "heuristic"
-    LLM = "llm"
 
 
 DetectorOption = Annotated[
@@ -77,29 +60,11 @@ def _render(result: AnalysisResult) -> None:
     console.print(table)
 
 
-def _build_transcriber(settings: Settings) -> Transcriber:
-    """Compose the real transcriber. Tests replace this to avoid Whisper/ffmpeg."""
-    whisper = FasterWhisperTranscriber(model_size=settings.whisper_model)
-    return CachingTranscriber(
-        VideoTranscriber(FfmpegAudioExtractor(), whisper),
-        settings.cache_dir,
-        namespace=whisper.name,
-    )
-
-
-def _build_detector(settings: Settings, name: DetectorName) -> ClipDetector:
-    """Compose the chosen detector. Tests replace this (see ADR 0013)."""
-    match name:
-        case DetectorName.HEURISTIC:
-            return HeuristicClipDetector(top_n=settings.top_n)
-        case DetectorName.LLM:
-            if not settings.llm_model:
-                raise DetectionError(
-                    "Set CLIPPER_LLM_MODEL to an Ollama model name to use "
-                    "--detector llm"
-                )
-            client = OllamaClient(settings.llm_url, settings.llm_model)
-            return LlmClipDetector(client, top_n=settings.top_n)
+def _context(ctx: typer.Context) -> AppContext:
+    """The AppContext the root callback set, or the one a test passed in."""
+    if not isinstance(ctx.obj, AppContext):
+        raise TypeError(f"Expected an AppContext, got {type(ctx.obj).__name__}")
+    return ctx.obj
 
 
 def _detector_label(settings: Settings, name: DetectorName) -> str:
@@ -107,16 +72,6 @@ def _detector_label(settings: Settings, name: DetectorName) -> str:
     if name is DetectorName.LLM:
         return f"{name.value}:{settings.llm_model}"
     return name.value
-
-
-def _build_renderer(settings: Settings) -> ClipRenderer:
-    """Compose the real clip renderer. Tests replace this to avoid ffmpeg."""
-    return FfmpegClipRenderer()
-
-
-def _build_probe() -> MediaProbe:
-    """Compose the real media probe. Tests replace this to avoid ffprobe."""
-    return FfprobeMediaProbe()
 
 
 def _select_ranks(result: AnalysisResult, ranks: list[int] | None) -> list[int]:
@@ -251,12 +206,15 @@ def _report_evaluation(
 
 
 @app.callback()
-def _root() -> None:
+def _root(ctx: typer.Context) -> None:
     """Clipper command line interface."""
+    if ctx.obj is None:
+        ctx.obj = AppContext()
 
 
 @app.command()
 def analyze(
+    ctx: typer.Context,
     video: Annotated[Path, typer.Argument(help="Path to a video file.")],
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     detector: DetectorOption = DetectorName.HEURISTIC,
@@ -267,11 +225,12 @@ def analyze(
         format="%(levelname)s %(name)s: %(message)s",
     )
     settings = Settings()
+    build = _context(ctx)
     label = _detector_label(settings, detector)
     try:
         pipeline = AnalysisPipeline(
-            _build_transcriber(settings),
-            _build_detector(settings, detector),
+            build.transcriber(settings),
+            build.detector(settings, detector),
             detector_name=label,
         )
         result = pipeline.run(video)
@@ -289,6 +248,7 @@ def analyze(
 
 @app.command()
 def render(
+    ctx: typer.Context,
     video: Annotated[Path, typer.Argument(help="Path to the original video file.")],
     result_json: Annotated[
         Path, typer.Argument(help="JSON saved by `clipper analyze`.")
@@ -312,19 +272,20 @@ def render(
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""
     settings = Settings()
+    build = _context(ctx)
     try:
         result = load_analysis_result(result_json)
         check_source_matches(result, video)
         ranks = _select_ranks(result, rank)
         selected = [result.candidates[r - 1] for r in ranks]
-        _check_media(selected, _build_probe().probe(video))
+        _check_media(selected, build.probe().probe(video))
         folder = clip_folder(video, settings.clips_dir)
         paths = plan_clip_paths(video, selected, folder)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
-    renderer = _build_renderer(settings)
+    renderer = build.renderer(settings)
     failures: list[str] = []
     entries: list[ManifestClip] = []
     rendered = 0
@@ -401,6 +362,7 @@ def render(
 
 @app.command("eval")
 def eval_(
+    ctx: typer.Context,
     result_json: Annotated[
         Path, typer.Argument(help="JSON saved by `clipper analyze`.")
     ],
@@ -415,13 +377,14 @@ def eval_(
 ) -> None:
     """Rerun the detector on RESULT_JSON's transcript and compare with labels."""
     settings = Settings()
+    build = _context(ctx)
     try:
         result = load_analysis_result(result_json)
         if labels_json is None:
             labels_json = settings.labels_dir / f"{Path(result.source).stem}.json"
         labeled = load_labels(labels_json)
         check_labels_match(labeled, result)
-        candidates = _build_detector(settings, detector).detect(result.transcript)
+        candidates = build.detector(settings, detector).detect(result.transcript)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
