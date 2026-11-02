@@ -50,8 +50,8 @@ class ClipRenderer(Protocol):
     `clipper.core.captions`), burned into the video. `None` or "" renders
     without captions.
 
-    `vertical` crops the centre of the frame to 9:16 at 1080x1920, before any
-    captions are drawn (see docs/decisions/0016).
+    `vertical` fits the whole frame into 9:16 at 1080x1920 over a blurred copy
+    of itself, before any captions are drawn (see docs/decisions/0016).
     """
 
     def render(

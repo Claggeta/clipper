@@ -784,7 +784,7 @@ The exit number may show as an unsigned 32-bit value on Windows. That is the
 parked issue in `CLAUDE.md`. Do not fail the step on it. If ffmpeg unexpectedly
 succeeds here, record that and the contents of the folder.
 
-### R15. `--vertical` crops to 9:16 at 1080x1920
+### R15. `--vertical` fits the frame into 9:16 at 1080x1920
 
 Covers [ADR 0016](decisions/0016-vertical-centre-crop.md). `Invoke-Render` in R0
 takes ranks only, so this step defines a helper that passes any flags.
@@ -820,11 +820,12 @@ Pass:
 - The video stream is `h264`, `width=1080`, `height=1920`,
   `sample_aspect_ratio=1:1`, `yuv420p`; the audio stream is `aac`; the duration
   is within R2's tolerance of the requested length.
-- In `vertical.png`, the picture is the middle of the source frame, not
-  squashed or stretched. Record what is cut off at the sides.
+- In `vertical.png`, the whole source frame is visible, full width, centred,
+  and not squashed or stretched, on a blurred copy of itself that fills the
+  rest of the frame.
 
-A source with black bars built into its frame keeps them: the crop takes the
-full height, bars included.
+A source with black bars built into its frame keeps them, inside the fitted
+picture and blurred in the fill.
 
 ### R16. `--vertical --captions`: captions drawn on the vertical frame
 
@@ -844,9 +845,9 @@ Record how large it is and how many lines it wraps to.
 
 ### R17. Portrait and narrow sources (constructed)
 
-Two constructed sources: 720x1280, which is already 9:16, so the crop changes
-nothing, and 600x1280, which is narrower than 9:16, so the crop takes height
-instead of width. Each has one candidate, 2 to 8 s.
+Two constructed sources: 720x1280, which is already 9:16, so it fills the
+frame, and 600x1280, which is narrower than 9:16, so it fits by height with
+the blurred fill at the sides. Each has one candidate, 2 to 8 s.
 
 ```powershell
 foreach ($p in @(@{ n = "portrait"; s = "720x1280" }, @{ n = "narrow"; s = "600x1280" })) {
@@ -864,8 +865,9 @@ Invoke-Item "$S\narrow.png"
 ```
 
 Pass: both exit 0 with streams as in R15 and a duration of 6 s. `narrow.png`
-shows the number `5` (2 s into the source, plus 3 s into the clip), and the
-test picture is not visibly stretched.
+shows the number `5` (2 s into the source, plus 3 s into the clip), the test
+picture at full height and not visibly stretched, and blurred strips at the
+sides.
 
 ## Captions
 
@@ -1603,7 +1605,7 @@ item if the timings in L5 call for it.
 | R12 | | |
 | R13 | | |
 | R14 | | ffmpeg's cause line: |
-| R15 | | source size: ; cut off at the sides: |
+| R15 | | source size: ; seconds: |
 | R16 | | caption size and lines: |
 | R17 | | |
 | C0 | | temp folders before: |
@@ -1682,19 +1684,22 @@ only), output pasted back. Windows 11, ffmpeg and ffprobe
 `9.0.2-full_build-www.gyan.dev`, `data\test_input.mp4` (1280x720) and its saved
 analysis.
 
-- R15: ranks 1 and 5 with `--vertical` exited 0 in 8.53 s, each line ending
+- R15: ranks 1 and 5 with `--vertical` exited 0 in 8.2 s, each line ending
   ` (vertical)`. Both clips were `h264` 1080x1920, SAR `1:1`, DAR `9:16`,
-  `yuv420p`, with `aac` audio, 10.73 and 10.47 MB. Durations 41.375 s and
+  `yuv420p`, with `aac` audio, 8.41 and 9.32 MB. Durations 41.375 s and
   30.898 s for requested 41.35 s and 30.87 s (0.025 and 0.028 s over). The
-  frame was the middle of the picture, not distorted. The source has black
-  bars built into its frame, and they stayed at the top and bottom. The
-  source's own burned-in subtitle was cut at both sides.
-- R16: exit 0 in 4.96 s, ` (vertical, captions)`, same streams. The caption
-  drew inside the vertical frame, large, wrapped to three lines, over the
-  lower part of the picture and the bottom bar.
-- R17 (constructed): 720x1280 and 600x1280 sources both exited 0 with 1080x1920,
-  SAR `1:1` clips of 6.000 s. The 600x1280 frame showed `5` and no visible
-  stretching.
+  frame showed the whole source width, undistorted, across the middle, on the
+  blurred fill. The source has black bars built into its frame; they showed
+  above and below the picture.
+- R16: exit 0 in 5.4 s, ` (vertical, captions)`, same streams. The caption
+  drew in the blurred area below the picture, large, wrapped to three lines.
+- R17 (constructed): 720x1280 and 600x1280 sources both exited 0 with
+  1080x1920, SAR `1:1` clips of 6.000 s. The 600x1280 frame showed `5`, the
+  picture at full height without visible stretching, and blurred strips at the
+  sides.
+- An earlier run the same day used a centre crop, which cut off most of the
+  frame (the source's burned-in subtitle lost both ends). The maintainer
+  rejected it, and the fit replaced it before release (ADR 0016).
 
 ### Captions reference run
 
@@ -1784,7 +1789,7 @@ script that followed the steps, with the output pasted back.
 | Missing-binary message (R13) | `run_tool` in `adapters/media/_process.py`; ADR 0004 |
 | One failed clip stops the rest, or the exit code is 0 (R14) | The loop in `render`; ADR 0011 |
 | Something was written although the run failed before cutting (R6 to R13) | Check order in `render`; ADR 0011 |
-| Vertical clip not 1080x1920, stretched, or off-centre (R15 to R17) | `_VERTICAL_FILTER` in `adapters/rendering/ffmpeg.py`; ADR 0016 |
+| Vertical clip not 1080x1920, stretched, cut off, or off-centre (R15 to R17) | `_VERTICAL_FILTER` in `adapters/rendering/ffmpeg.py`; ADR 0016 |
 | Caption text or timing wrong (C2) | `build_srt` in `core/captions.py`; `-ss` and `-vf` order in `adapters/rendering/ffmpeg.py`; ADR 0010 |
 | No note, or a note for a clip with speech (C3) | The `srt` check in `render` in `cli/main.py`; ADR 0011 |
 | Folder left in `%TEMP%` (C4) | `TemporaryDirectory` in `adapters/rendering/ffmpeg.py`; ADR 0010 |

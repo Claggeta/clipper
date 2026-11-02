@@ -93,9 +93,11 @@ and planned code:
   adopted.
 - `0015` — determinism is a property of the heuristic detector. Amends vision
   criterion 2.
-- `0016` — `render --vertical`: a centre crop to 9:16, scaled to 1080x1920, in
-  the one re-encode path; crop, scale, then captions. Off by default. Amends
-  0007 and 0011.
+- `0016` — `render --vertical`: 1080x1920, the whole frame fitted to the
+  width and centred on a blurred copy of itself (amended: the original centre
+  crop cut off too much and was replaced before release). One re-encode path;
+  the vertical frame first, then captions. Off by default. Amends 0007 and
+  0011.
 - `0017` — word timestamps (`Segment.words`, default empty) and styled ASS
   captions from one pure builder that replaces `build_srt`. The transcriber's
   name gains `+words`, so old cache entries are re-transcribed. Segments
@@ -156,7 +158,7 @@ a Whisper change on real work.
 ## V4 scope (next)
 
 Input: a video URL (YouTube or Twitch) or a local file. Output: a folder per
-video of post-ready drafts: 9:16 vertical (a centre crop), styled
+video of post-ready drafts: 9:16 vertical (whole frame, blurred fill), styled
 word-by-word captions burned in, and a suggested hook/title per clip. The
 maintainer picks which to post, by hand. Interface: `clipper fetch`, changes
 to `render`, and one command from a URL to that folder.
@@ -348,7 +350,8 @@ picked.
    0017 word timestamps and captions, 0018 titles, 0019 folder per video).
    The fetch ADR moved to item 6, since it depends on platform terms.
 2. ~~9:16 centre crop in `render` (0016), with a manual-test step.~~ (done;
-   #90, manual steps R15 to R17)
+   #90, manual steps R15 to R17; the crop was then replaced by a fit over a
+   blurred fill, ADR 0016 amendment)
 3. Word timestamps in the transcript (0017). A domain-model change. Whether
    faster-whisper's word timestamps are usable here, and what they cost, is
    unverified.
@@ -436,8 +439,9 @@ Later, not scheduled:
   shows as `not a valid score ... (got '')` instead of saying it was cut off.
   Not hit since `think: false` (ADR 0014).
 - Letterboxed sources keep their bars under `--vertical` (ADR 0016, manual
-  step R15): `test_input.mp4` has black bars in its 1280x720 frame, and the
-  crop takes the full height. Fix: detect the picture area first (ffmpeg's
-  `cropdetect`, untried here) and crop inside it. An ADR 0016 amendment.
+  step R15): `test_input.mp4` has black bars in its 1280x720 frame, and they
+  show inside the fitted picture and blurred in the fill. Fix: detect the
+  picture area first (ffmpeg's `cropdetect`, untried here) and fit only that.
+  An ADR 0016 amendment.
 - `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
   temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.

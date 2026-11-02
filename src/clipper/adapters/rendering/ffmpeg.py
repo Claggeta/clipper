@@ -25,14 +25,18 @@ _SUBTITLES_FILTER = (
     "force_style='FontSize=18,Outline=2,Shadow=0,MarginV=30'"
 )
 
-# ADR 0016. A centred 9:16 crop, the widest the frame allows, rounded down to
-# even sizes for yuv420p; a source already 9:16 or narrower is cropped in
-# height instead. The quotes keep the commas inside min() away from the
-# filtergraph parser. Scaled with ffmpeg's default scaler; setsar=1 stops
-# players stretching the result.
+# ADR 0016. The whole frame, fitted inside 1080x1920 at even sizes, centred on
+# a blurred copy of itself scaled to fill the frame. The blur runs at quarter
+# size (270x480) and is scaled back up, which is far cheaper than blurring at
+# full size. Blur strength is a first guess, checked by eye only. setsar=1
+# stops players stretching the result.
 _VERTICAL_FILTER = (
-    "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',"
-    "scale=1080:1920,setsar=1"
+    "split[bg][fg];"
+    "[bg]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,"
+    "boxblur=10:2,scale=1080:1920[blurred];"
+    "[fg]scale=1080:1920:force_original_aspect_ratio=decrease:"
+    "force_divisible_by=2[fitted];"
+    "[blurred][fitted]overlay=(W-w)/2:(H-h)/2,setsar=1"
 )
 
 
@@ -64,7 +68,7 @@ class FfmpegClipRenderer:
             )
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        # Crop and scale first, so captions are laid out on the final frame.
+        # Make the vertical frame first, so captions are laid out on it.
         filters = [_VERTICAL_FILTER] if vertical else []
         if not captions:
             self._cut(

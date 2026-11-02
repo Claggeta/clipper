@@ -3,6 +3,9 @@
 - Status: Accepted
 - Date: 2026-11-02
 - Amends: 0007 (the filter chain), 0011 (a new `render` flag)
+- Amended: the centre crop was replaced by fitting the whole frame over a
+  blurred fill before release (see "Amended by the fit fix"). The title and
+  decision 2 describe the original crop.
 
 ## Context
 
@@ -72,6 +75,37 @@ ffmpeg.
   `cropdetect`) is parked, not part of this ADR.
 - The v0.2 caption style draws large on the vertical frame and wrapped to
   three lines in R16. Item 4 (0017) restyles captions.
+
+## Amended by the fit fix (after V4 item 2)
+
+The maintainer looked at the R15 frames and rejected the crop: on a 16:9
+source it keeps about a third of the width, and `test_input.mp4`'s own
+burned-in subtitle lost both ends. Nothing had been released with it.
+
+- **Decision 2 is replaced.** `--vertical` now fits the whole frame inside
+  1080x1920 (1080x608 for 16:9), at even sizes, centred on a copy of the same
+  video that is scaled to fill 1080x1920, cropped to it, and blurred. Nothing
+  of the source is cut off, and nothing is stretched.
+- Filter, `_VERTICAL_FILTER` in `adapters/rendering/ffmpeg.py`:
+  `split`; the background scaled to fill 270x480, cropped, `boxblur=10:2`,
+  scaled to 1080x1920; the foreground scaled to fit 1080x1920 with
+  `force_original_aspect_ratio=decrease:force_divisible_by=2`; `overlay`
+  centred; `setsar=1`. The blur runs at quarter size because that is far
+  cheaper than at full size. Its strength is a first guess, checked by eye.
+- Still one `-vf` value and one re-encode path (0007); captions come after
+  the overlay, so they draw over the whole 1080x1920 frame. With the v0.2
+  style they land in the fill below the picture.
+- The centre crop is not kept as an option. It may come back with subject
+  tracking, which is still a V4 non-goal.
+- Checked on 2026-11-02, same build and steps as above: every clip 1080x1920,
+  SAR 1:1, the same durations; ranks 1 and 5 took 8.2 s (8.53 s with the
+  crop). The 600x1280 source fitted by height with blurred strips at the
+  sides.
+- Letterbox bars built into a source now show inside the fitted picture, and
+  blurred in the fill. Removing them stays parked.
+- Alternatives considered here: black bars instead of the blur (simpler, but
+  dead space), and a partial zoom to about 1:1 (keeps more than the crop but
+  still cuts the edges). The maintainer chose the blurred fill.
 
 ## Revisit when
 
