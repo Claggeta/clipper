@@ -4,9 +4,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner, Result
 
-from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.transcription.fake import FakeTranscriber
+from clipper.cli import main as cli_main
 from clipper.cli.main import app
+from clipper.core.config import Settings
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
@@ -72,14 +73,19 @@ class Env:
 
     def detect(self, candidates: list[ClipCandidate]) -> None:
         self.seen: list[Transcript] = []
+        self.names: list[cli_main.DetectorName] = []
+        env = self
 
-        def fake(
-            detector: HeuristicClipDetector, transcript: Transcript
-        ) -> list[ClipCandidate]:
-            self.seen.append(transcript)
-            return candidates
+        class StubDetector:
+            def detect(self, transcript: Transcript) -> list[ClipCandidate]:
+                env.seen.append(transcript)
+                return candidates
 
-        self.monkeypatch.setattr(HeuristicClipDetector, "detect", fake)
+        def build(settings: Settings, name: cli_main.DetectorName) -> StubDetector:
+            self.names.append(name)
+            return StubDetector()
+
+        self.monkeypatch.setattr(cli_main, "_build_detector", build)
 
     def run(self, *extra: str) -> Result:
         return CliRunner().invoke(app, ["eval", str(self.json), *extra])
@@ -119,6 +125,28 @@ def test_tables_show_labels_and_notes(env: Env) -> None:
 def test_runs_the_detector_on_the_saved_transcript(env: Env) -> None:
     env.run()
     assert env.seen == [TRANSCRIPT]
+
+
+def test_uses_the_heuristic_by_default(env: Env) -> None:
+    env.run()
+    assert env.names == [cli_main.DetectorName.HEURISTIC]
+
+
+def test_detector_can_be_named(env: Env) -> None:
+    result = env.run("--detector", "heuristic")
+
+    assert result.exit_code == 0, result.output
+    assert env.names == [cli_main.DetectorName.HEURISTIC]
+    assert "Detector: heuristic (top 5)" in result.output
+
+
+@pytest.mark.parametrize("name", ["llm", "fake"])
+def test_rejects_an_unknown_detector(env: Env, name: str) -> None:
+    result = env.run("--detector", name)
+
+    assert result.exit_code == 2
+    assert "Invalid value" in result.output
+    assert env.names == []
 
 
 def test_top_n_comes_from_settings(env: Env) -> None:

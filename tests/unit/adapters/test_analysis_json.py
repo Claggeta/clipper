@@ -66,6 +66,8 @@ def test_loads_real_output(tmp_path: Path) -> None:
     assert len(result.transcript.segments) == 2
     assert result.candidates[0].score == 0.25951229343006854
     assert result.candidates[0].reasons[1] == "fast pace (3.1 words/sec)"
+    # Saved before the detector was recorded (ADR 0013), so it has no field.
+    assert result.detector is None
 
 
 def test_round_trips_model_dump(tmp_path: Path) -> None:
@@ -73,6 +75,11 @@ def test_round_trips_model_dump(tmp_path: Path) -> None:
     path = _write(tmp_path, original.model_dump_json(indent=2))
 
     assert load_analysis_result(path) == original
+
+
+def test_loads_the_detector_name(tmp_path: Path) -> None:
+    result = load_analysis_result(_write(tmp_path, _payload(detector="heuristic")))
+    assert result.detector == "heuristic"
 
 
 def test_errors_are_clipper_errors() -> None:

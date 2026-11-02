@@ -6,9 +6,10 @@ from typer.testing import CliRunner
 from clipper.adapters.transcription.fake import FakeTranscriber
 from clipper.cli import main as cli_main
 from clipper.cli.main import app
+from clipper.core.config import Settings
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.domain.errors import AudioExtractionError
-from clipper.domain.models import AnalysisResult
+from clipper.domain.models import AnalysisResult, ClipCandidate, Transcript
 
 
 def test_missing_file_shows_friendly_error(tmp_path: Path) -> None:
@@ -52,3 +53,51 @@ def test_analyze_success_prints_table_and_saves_json(
     )
     assert saved.source == "clip.mp4"
     assert len(saved.candidates) >= 1
+
+
+class StubDetector:
+    def detect(self, transcript: Transcript) -> list[ClipCandidate]:
+        return [
+            ClipCandidate(
+                start_seconds=1.0, end_seconds=2.0, score=0.5, reasons=("stub",)
+            )
+        ]
+
+
+def test_analyze_uses_the_heuristic_by_default_and_records_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"not a real video")
+    out_dir = tmp_path / "out"
+    monkeypatch.setenv("CLIPPER_OUTPUT_DIR", str(out_dir))
+    monkeypatch.setattr(
+        cli_main, "_build_transcriber", lambda settings: FakeTranscriber()
+    )
+    names: list[cli_main.DetectorName] = []
+
+    def build(settings: Settings, name: cli_main.DetectorName) -> StubDetector:
+        names.append(name)
+        return StubDetector()
+
+    monkeypatch.setattr(cli_main, "_build_detector", build)
+
+    result = CliRunner().invoke(app, ["analyze", str(video)])
+
+    assert result.exit_code == 0, result.output
+    assert names == [cli_main.DetectorName.HEURISTIC]
+    assert "stub" in result.output
+    assert "Detector: heuristic" in result.output
+    saved = AnalysisResult.model_validate_json(
+        (out_dir / "clip.json").read_text(encoding="utf-8")
+    )
+    assert saved.detector == "heuristic"
+
+
+@pytest.mark.parametrize("name", ["llm", "fake"])
+def test_analyze_rejects_an_unknown_detector(tmp_path: Path, name: str) -> None:
+    result = CliRunner().invoke(
+        app, ["analyze", str(tmp_path / "v.mp4"), "--detector", name]
+    )
+    assert result.exit_code == 2
+    assert "Invalid value" in result.output

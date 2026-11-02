@@ -72,13 +72,18 @@ class ClipCandidate(BaseModel):
 
 
 class AnalysisResult(BaseModel):
-    """The output of analyzing one video."""
+    """The output of analyzing one video.
+
+    `detector` names the detector that chose the candidates. It is None in
+    results saved before it was recorded (ADR 0013).
+    """
 
     model_config = ConfigDict(frozen=True)
 
     source: str
     transcript: Transcript
     candidates: tuple[ClipCandidate, ...]
+    detector: str | None = None
 
 
 class MediaInfo(BaseModel):

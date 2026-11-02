@@ -52,6 +52,43 @@ fixed sample output. A choice between two real detectors is a different thing.
 - A third real detector appears, or more than four factories exist. Move to the
   context object then.
 
+## Amended by the `--detector` PR (V3 item 4)
+
+- `AnalysisResult` records the detector in a new field, `detector: str | None`,
+  set to the `--detector` value. This replaces decision 4's "in the existing
+  `reasons` only": the heuristic's reasons describe its signals and never named
+  the detector, so nothing saved before this said which detector made a result.
+  Once two detectors write to the same `<output dir>/<stem>.json`, the file
+  must say which one it holds.
+- The field defaults to `None`, so JSON saved before it loads unchanged.
+  `None` means "not recorded", not "heuristic": `domain/` does not name
+  adapters, and old files cannot show which detector made them.
+- `AnalysisPipeline` takes the name as a keyword argument, `detector_name`, and
+  writes it into the result. The `ClipDetector` Protocol does not gain a `name`:
+  the choice the user made is what is recorded, and every detector and test
+  double would otherwise need the attribute.
+- `render` and `eval` neither show nor check the saved name. `render` only cuts
+  saved spans (0015), and `eval` reruns the detector it is given and ignores
+  the saved candidates.
+- `analyze` prints `Detector: <name>` after the table. `eval` prints
+  `Detector: <name> (top N)`, as before. The output file name stays
+  `<stem>.json` whichever detector runs, so a later run with another detector
+  overwrites it. The transcript is cached and `eval` reruns detectors from any
+  saved JSON, so little is lost.
+- `--detector` takes a `DetectorName` enum in `cli/main.py`. Until the LLM
+  detector lands (V3 item 7) its only value is `heuristic`, and any other
+  value, `llm` included, is Typer's usage error (exit 2). This is decision 5;
+  decision 1's `llm` arrives with item 7 rather than as an option that always
+  fails.
+- The factory is `_build_detector(settings, name)`. Both `analyze` and `eval`
+  call it. Tests patch it and return a stub detector defined in the test file.
+- The context object (0006, 0011) is decided here: not now. After this item
+  there are four factories, three commands and one real detector. 0011's
+  trigger (a third command) was passed by `eval`, and 0013 deferred the
+  decision to this item. The private factories stay, and this ADR's "revisit
+  when" (more than four factories, or a third real detector) replaces the
+  triggers in 0006 and 0011.
+
 ## Related
 
 - 0006, 0011: the private-factory seam

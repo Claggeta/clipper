@@ -1,4 +1,5 @@
 import logging
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -22,7 +23,7 @@ from clipper.adapters.transcription.video import VideoTranscriber
 from clipper.core.captions import build_srt
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
-from clipper.core.interfaces import ClipRenderer, MediaProbe, Transcriber
+from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
 from clipper.core.naming import plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.domain.errors import ClipperError, ClipRenderError
@@ -36,6 +37,17 @@ from clipper.domain.models import (
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
+
+
+class DetectorName(StrEnum):
+    """Detectors selectable with --detector. `llm` arrives with V3 item 7."""
+
+    HEURISTIC = "heuristic"
+
+
+DetectorOption = Annotated[
+    DetectorName, typer.Option("--detector", help="Detector that picks the clips.")
+]
 
 
 def _fmt(seconds: float) -> str:
@@ -67,6 +79,13 @@ def _build_transcriber(settings: Settings) -> Transcriber:
         settings.cache_dir,
         namespace=whisper.name,
     )
+
+
+def _build_detector(settings: Settings, name: DetectorName) -> ClipDetector:
+    """Compose the chosen detector. Tests replace this (see ADR 0013)."""
+    match name:
+        case DetectorName.HEURISTIC:
+            return HeuristicClipDetector(top_n=settings.top_n)
 
 
 def _build_renderer(settings: Settings) -> ClipRenderer:
@@ -202,6 +221,7 @@ def _root() -> None:
 def analyze(
     video: Annotated[Path, typer.Argument(help="Path to a video file.")],
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+    detector: DetectorOption = DetectorName.HEURISTIC,
 ) -> None:
     """Transcribe VIDEO and print the top clip candidates."""
     logging.basicConfig(
@@ -210,7 +230,9 @@ def analyze(
     )
     settings = Settings()
     pipeline = AnalysisPipeline(
-        _build_transcriber(settings), HeuristicClipDetector(top_n=settings.top_n)
+        _build_transcriber(settings),
+        _build_detector(settings, detector),
+        detector_name=detector.value,
     )
 
     try:
@@ -223,6 +245,7 @@ def analyze(
     out_file = settings.output_dir / f"{video.stem}.json"
     out_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     _render(result)
+    console.print(f"Detector: {detector.value}", soft_wrap=True)
     console.print(f"Saved: {out_file}")
 
 
@@ -302,6 +325,7 @@ def eval_(
             show_default=False,
         ),
     ] = None,
+    detector: DetectorOption = DetectorName.HEURISTIC,
 ) -> None:
     """Rerun the detector on RESULT_JSON's transcript and compare with labels."""
     settings = Settings()
@@ -315,8 +339,8 @@ def eval_(
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
-    detector = HeuristicClipDetector(top_n=settings.top_n)
-    evaluation = evaluate(labeled, detector.detect(result.transcript))
+    candidates = _build_detector(settings, detector).detect(result.transcript)
+    evaluation = evaluate(labeled, candidates)
     _report_evaluation(
-        evaluation, result.transcript, f"heuristic (top {settings.top_n})"
+        evaluation, result.transcript, f"{detector.value} (top {settings.top_n})"
     )
