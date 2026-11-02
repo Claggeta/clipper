@@ -284,8 +284,8 @@ maintainer would not post.
 - [Architecture](docs/architecture.md)
 - [Decision records](docs/decisions/)
 - [Manual test checklist](docs/manual-testing.md) (the ffmpeg, Whisper,
-  rendering and caption checks CI cannot run)
-- [Release notes](docs/releases/v0.2.0.md)
+  rendering, caption and LLM detector checks CI cannot run)
+- [Release notes](docs/releases/v0.3.0.md)
 
 ## Development
 
