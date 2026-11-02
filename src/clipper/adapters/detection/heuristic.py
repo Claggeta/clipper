@@ -1,4 +1,10 @@
 from clipper.adapters.detection.signals import DEFAULT_SIGNALS, WeightedSignal
+from clipper.adapters.detection.windows import (
+    STEP_SECONDS,
+    WINDOW_SECONDS,
+    select_top,
+    sliding_windows,
+)
 from clipper.domain.models import ClipCandidate, Segment, Transcript
 
 
@@ -8,8 +14,8 @@ class HeuristicClipDetector:
     def __init__(
         self,
         top_n: int = 5,
-        window_seconds: float = 45.0,
-        step_seconds: float = 15.0,
+        window_seconds: float = WINDOW_SECONDS,
+        step_seconds: float = STEP_SECONDS,
         min_score: float = 0.0,
         signals: tuple[WeightedSignal, ...] = DEFAULT_SIGNALS,
     ) -> None:
@@ -20,38 +26,10 @@ class HeuristicClipDetector:
         self._signals = signals
 
     def detect(self, transcript: Transcript) -> list[ClipCandidate]:
-        windows = self._windows(transcript)
+        windows = sliding_windows(transcript, self._window, self._step)
         scored = [c for w in windows if (c := self._score(w)) is not None]
         scored = [c for c in scored if c.score > self._min_score]
-        scored.sort(key=lambda c: (-c.score, c.start_seconds))
-
-        chosen: list[ClipCandidate] = []
-        for candidate in scored:
-            if all(not _overlaps(candidate, other) for other in chosen):
-                chosen.append(candidate)
-            if len(chosen) == self._top_n:
-                break
-        return chosen
-
-    def _windows(self, transcript: Transcript) -> list[tuple[Segment, ...]]:
-        segments = transcript.segments
-        if not segments:
-            return []
-        windows: list[tuple[Segment, ...]] = []
-        start = segments[0].start_seconds
-        last_end = segments[-1].end_seconds
-        while start < last_end:
-            inside = tuple(
-                s
-                for s in segments
-                if s.start_seconds >= start and s.end_seconds <= start + self._window
-            )
-            if inside:
-                windows.append(inside)
-            start += self._step
-        # Identical segment sets from adjacent steps are the same window.
-        unique = {(w[0].start_seconds, w[-1].end_seconds): w for w in windows}
-        return list(unique.values())
+        return select_top(scored, self._top_n)
 
     def _score(self, window: tuple[Segment, ...]) -> ClipCandidate | None:
         total = 0.0
@@ -72,7 +50,3 @@ class HeuristicClipDetector:
             score=min(total / weight_sum, 1.0),
             reasons=tuple(reasons),
         )
-
-
-def _overlaps(a: ClipCandidate, b: ClipCandidate) -> bool:
-    return a.start_seconds < b.end_seconds and b.start_seconds < a.end_seconds

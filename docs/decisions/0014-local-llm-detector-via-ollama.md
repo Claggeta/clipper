@@ -76,6 +76,28 @@ point, which the heuristic cannot. Everything must stay local and free
 - `eval` shows re-ranking caps what the LLM can do, because good moments are not
   among the heuristic's windows. Then try the boundary-proposing approach.
 
+## Amended by the extraction PR (V3 item 6)
+
+- Decision 6 is done. Windowing and overlap deduplication live in
+  `adapters/detection/windows.py`, next to `signals.py`, not in `core/`: only
+  detectors use them, and the window and step are detection choices.
+- `sliding_windows(transcript, window_seconds, step_seconds)` returns the
+  whole-segment windows, and `select_top(candidates, top_n)` ranks by score
+  (ties by earlier start) and skips any candidate that overlaps one already
+  chosen. Touching candidates do not overlap.
+- `WINDOW_SECONDS = 45.0` and `STEP_SECONDS = 15.0` are module constants and
+  the heuristic's defaults, so the LLM detector scores the same windows from
+  one definition.
+- `min_score` stays a `HeuristicClipDetector` parameter, applied before
+  `select_top`.
+- Behaviour kept as it was: windows step from the first segment's start, and a
+  segment longer than the window is in no window. Changing either is a
+  detector change, not part of the extraction.
+- Checked as behaviour-neutral: the heuristic's tests are unchanged, and on
+  the two saved analyses (`test_input.json`, `oFbD0Ot7nQ8.json`) the
+  heuristic's candidates at top 5, 30 and 1000, and `eval`'s output at top 5
+  and 30, were byte-identical before and after.
+
 ## Related
 
 - 0012: evaluation
