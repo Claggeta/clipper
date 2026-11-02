@@ -47,10 +47,12 @@ uv sync
 uv run clipper analyze path\to\video.mp4
 ```
 
-Add `-v` / `--verbose` to see progress logging.
+Add `-v` / `--verbose` to see progress logging. `--detector` chooses the
+detector; the only one so far, and the default, is `heuristic`.
 
-The command prints a table of the top candidates and writes the full result
-to `<output dir>/<video name>.json` (by default `data/output/`). Candidates
+The command prints a table of the top candidates and the detector's name, and
+writes the full result, including the detector's name, to
+`<output dir>/<video name>.json` (by default `data/output/`). Candidates
 are ranked by score, not by time. Times are `H:MM:SS`.
 
 If something fails, for example the file has no audio stream or ffmpeg
@@ -128,6 +130,9 @@ and percentages. Recall is `n/a` with no labels, and precision is `n/a` with no
 candidates. A label that ends after the transcript does is noted and still
 counted. The numbers come from one person's labels on a few videos, so treat a
 difference between detectors as a sanity check, not a measurement.
+
+`--detector` chooses the detector to rerun, as on `analyze`. The default is
+`heuristic`, the only one so far.
 
 A bad or missing file, or labels written for a different video, prints
 `Error: ...` and exits 1.

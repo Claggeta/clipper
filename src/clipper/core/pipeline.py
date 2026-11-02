@@ -11,9 +11,12 @@ logger = logging.getLogger(__name__)
 class AnalysisPipeline:
     """Video file -> transcript -> clip candidates."""
 
-    def __init__(self, transcriber: Transcriber, detector: ClipDetector) -> None:
+    def __init__(
+        self, transcriber: Transcriber, detector: ClipDetector, *, detector_name: str
+    ) -> None:
         self._transcriber = transcriber
         self._detector = detector
+        self._detector_name = detector_name
 
     def run(self, video_path: Path) -> AnalysisResult:
         if not video_path.is_file():
@@ -26,4 +29,5 @@ class AnalysisPipeline:
             source=video_path.name,
             transcript=transcript,
             candidates=tuple(candidates),
+            detector=self._detector_name,
         )

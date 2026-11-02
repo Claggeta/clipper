@@ -10,7 +10,9 @@ from clipper.domain.models import AnalysisResult
 
 
 def _pipeline() -> AnalysisPipeline:
-    return AnalysisPipeline(FakeTranscriber(), HeuristicClipDetector())
+    return AnalysisPipeline(
+        FakeTranscriber(), HeuristicClipDetector(), detector_name="heuristic"
+    )
 
 
 def _video(tmp_path: Path) -> Path:
@@ -24,6 +26,10 @@ def test_pipeline_runs_end_to_end_with_fake(tmp_path: Path) -> None:
     assert result.source == "talk.mp4"
     assert result.transcript.segments
     assert len(result.candidates) <= 5
+
+
+def test_result_records_the_detector_name(tmp_path: Path) -> None:
+    assert _pipeline().run(_video(tmp_path)).detector == "heuristic"
 
 
 def test_result_round_trips_through_json(tmp_path: Path) -> None:
