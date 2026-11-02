@@ -5,7 +5,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from clipper.adapters.transcription.fake import FakeTranscriber
-from clipper.cli import main as cli_main
+from clipper.cli.context import AppContext, DetectorName
 from clipper.cli.main import app
 from clipper.core.config import Settings
 from clipper.domain.errors import DetectionError
@@ -18,9 +18,6 @@ from clipper.domain.models import (
 
 # All fixtures here are constructed, not produced by a real analyze run or
 # written by the maintainer.
-
-# Kept before any test patches it, for the tests that need the real one.
-REAL_BUILD_DETECTOR = cli_main._build_detector
 
 
 def _c(start: float, end: float, score: float = 0.5) -> ClipCandidate:
@@ -77,7 +74,7 @@ class Env:
 
     def detect(self, candidates: list[ClipCandidate]) -> None:
         self.seen: list[Transcript] = []
-        self.names: list[cli_main.DetectorName] = []
+        self.names: list[DetectorName] = []
         env = self
 
         class StubDetector:
@@ -85,14 +82,16 @@ class Env:
                 env.seen.append(transcript)
                 return candidates
 
-        def build(settings: Settings, name: cli_main.DetectorName) -> StubDetector:
+        def build(settings: Settings, name: DetectorName) -> StubDetector:
             self.names.append(name)
             return StubDetector()
 
-        self.monkeypatch.setattr(cli_main, "_build_detector", build)
+        self.context = AppContext(detector=build)
 
     def run(self, *extra: str) -> Result:
-        return CliRunner().invoke(app, ["eval", str(self.json), *extra])
+        return CliRunner().invoke(
+            app, ["eval", str(self.json), *extra], obj=self.context
+        )
 
 
 @pytest.fixture
@@ -133,14 +132,14 @@ def test_runs_the_detector_on_the_saved_transcript(env: Env) -> None:
 
 def test_uses_the_heuristic_by_default(env: Env) -> None:
     env.run()
-    assert env.names == [cli_main.DetectorName.HEURISTIC]
+    assert env.names == [DetectorName.HEURISTIC]
 
 
 def test_detector_can_be_named(env: Env) -> None:
     result = env.run("--detector", "heuristic")
 
     assert result.exit_code == 0, result.output
-    assert env.names == [cli_main.DetectorName.HEURISTIC]
+    assert env.names == [DetectorName.HEURISTIC]
     assert "Detector: heuristic (top 5)" in result.output
 
 
@@ -159,13 +158,13 @@ def test_llm_detector_is_named_with_its_model(env: Env) -> None:
     result = env.run("--detector", "llm")
 
     assert result.exit_code == 0, result.output
-    assert env.names == [cli_main.DetectorName.LLM]
+    assert env.names == [DetectorName.LLM]
     assert "Detector: llm:some-model:tag (top 5)" in result.output
 
 
 def test_llm_with_an_empty_model_is_an_error(env: Env) -> None:
     env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
-    env.monkeypatch.setattr(cli_main, "_build_detector", REAL_BUILD_DETECTOR)
+    env.context = AppContext()
 
     result = env.run("--detector", "llm")
 
@@ -178,9 +177,7 @@ def test_detection_error_is_reported(env: Env) -> None:
         def detect(self, transcript: Transcript) -> list[ClipCandidate]:
             raise DetectionError("Model reply for window [0:00:00] is bad")
 
-    env.monkeypatch.setattr(
-        cli_main, "_build_detector", lambda settings, name: FailingDetector()
-    )
+    env.context = AppContext(detector=lambda settings, name: FailingDetector())
 
     result = env.run()
 

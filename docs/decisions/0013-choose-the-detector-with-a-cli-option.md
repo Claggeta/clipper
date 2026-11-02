@@ -118,6 +118,42 @@ fixed sample output. A choice between two real detectors is a different thing.
 - No fallback: if the LLM fails, nothing runs the heuristic in its place
   (0014, decision 5).
 
+## Amended by the context object PR (V4 item 4b)
+
+Titles (0018) would be a fifth factory, which is this ADR's trigger. The
+private factories are replaced by a context object before titles land.
+
+- **Replaces decision 2** and the first amendment's "the private factories
+  stay". `cli/context.py` holds `AppContext`, a frozen dataclass whose fields
+  are builders: `transcriber(settings)`, `detector(settings, name)`,
+  `renderer(settings)` and `probe()`. Their defaults are the former
+  `_build_*` functions, unchanged and renamed `build_*`. `DetectorName` moved
+  there with `build_detector`.
+- The fields are builders, not built objects, so each command still builds
+  only what it uses, when it uses it: `render` builds no transcriber, and an
+  empty `CLIPPER_LLM_MODEL` is still an `Error:` before anything is
+  transcribed (item 7b amendment).
+- The root callback sets `ctx.obj = AppContext()` unless one was passed in.
+  Each command takes `ctx: typer.Context` and reads it through `_context`,
+  which raises `TypeError` for anything else. Typer hides the parameter: the
+  `--help` text of the app and all three commands was byte-identical before
+  and after.
+- Tests pass doubles with `CliRunner().invoke(app, args,
+  obj=AppContext(...))` instead of monkeypatching module names. Fields they
+  leave out are the real builders. `mypy` now checks each double's signature
+  against the field, so this ADR's "a rename fails loudly" cost now fails at
+  type-check time rather than when the test runs.
+- 0006's rule stands: no test double is selectable at runtime. `obj` is only
+  reachable through `CliRunner`, and there is still no env or Settings
+  switch. Decision 3 is unchanged.
+- `Settings()` is still built by each command, not by the context, so when
+  settings are read is unchanged. Moving it is a separate decision.
+- The "revisit when" trigger is used up. A new adapter (titles, item 5) is a
+  new field.
+- Behaviour-neutral: every test assertion about output, exit codes and files
+  is unchanged; only how doubles are passed in changed. No manual step,
+  since no code that runs a real tool changed.
+
 ## Related
 
 - 0006, 0011: the private-factory seam
