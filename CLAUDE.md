@@ -69,7 +69,11 @@ and planned code:
   fails, the rest still render, then it exits 1.
 - `0012` — detectors are evaluated against hand-written label files (one JSON
   per video, `CLIPPER_LABELS_DIR`). `clipper eval` reruns a detector on the
-  saved transcript. Results are indicative, not statistical.
+  saved transcript. Results are indicative, not statistical. A candidate hits
+  a label at an overlap of half the shorter range (`HIT_FRACTION = 0.5`).
+  Precision is one-to-one: in rank order each candidate claims the earliest
+  unclaimed label it hits, and one on a claimed label is a repeat. Recall
+  counts labels with any hit.
 - `0013` — `--detector` on `analyze` and `eval` (`heuristic` only until the
   LLM detector lands; `llm` comes with V3 item 7), composed in
   `_build_detector(settings, name)`. No test double is selectable by name.
@@ -152,16 +156,17 @@ In progress:
 
 - V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model,
   item 3, `clipper eval`, item 4, `--detector` and the `_build_detector`
-  seam, and item 6, the windowing extraction, are merged). Next: item 6a,
-  the hit rule, before item 7. Item 0 has two label files. On `test_input.json`
-  (labels cover the whole speech), `eval` gave recall 3 of 4 and precision 5
-  of 5, which shows the plumbing works. On `oFbD0Ot7nQ8.json` the heuristic
-  gave recall 2 of 30 and precision 3 of 5 at top 5, and recall 5 of 30 and
-  precision 7 of 30 at top 30 (`CLIPPER_TOP_N=30`); precision is a lower
-  bound there. Three of the seven top-30 hits are 45 s candidates inside the
-  one 9.5-minute label, so the half-overlap rule is due a revisit. Videos are
-  downloaded by hand with `uv tool run yt-dlp` into `data/videos/`, named by
-  video ID.
+  seam, item 6, the windowing extraction, and item 6a, one-to-one precision,
+  are merged). Next: the parked unescaped-markup fix as a small `fix(cli)` PR,
+  then item 7. Item 0 has two label files. With one-to-one precision (ADR 0012,
+  item 6a amendment), the heuristic gives: on `test_input.json` (labels cover
+  the whole speech) recall 3 of 4 and precision 3 of 5, with 2 repeats; on
+  `oFbD0Ot7nQ8.json` recall 2 of 30 and precision 2 of 5 at top 5 (1 repeat),
+  and recall 5 of 30 and precision 5 of 30 at top 30 (`CLIPPER_TOP_N=30`,
+  2 repeats, both inside the 9.5-minute label 16). Precision is a lower bound
+  on the long video. Before 6a, precision there was 3 of 5 and 7 of 30. Seven
+  of its 30 labels are longer than two 45 s windows. Videos are downloaded by
+  hand with `uv tool run yt-dlp` into `data/videos/`, named by video ID.
 
 ## Pinned dependencies
 
@@ -256,10 +261,11 @@ confirmation first (see "How to work in this repo").
 6. ~~Extract windowing and overlap dedup from `HeuristicClipDetector`.
    Behaviour-neutral; the heuristic's tests stay unchanged (ADR 0014).~~
    (done; `adapters/detection/windows.py`)
-6a. Revisit the hit rule on the long-video labels. Half of the shorter range
+6a. ~~Revisit the hit rule on the long-video labels. Half of the shorter range
    counts any 45 s candidate inside a long label as a hit (three of seven
    top-30 hits on `oFbD0Ot7nQ8.json`). A change is an ADR 0012 amendment,
-   lands before item 7, and states its design and waits for confirmation.
+   lands before item 7, and states its design and waits for confirmation.~~
+   (done; the threshold stays at 0.5, precision is one-to-one in rank order)
 7. Local LLM detector via Ollama, a manual-test step, a repeatability check
    (ADRs 0014, 0015), and a model choice recorded from `eval` results
 8. Release notes and tag `v0.3.0`, if the items above land
