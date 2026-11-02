@@ -395,6 +395,42 @@ empty table and saved a JSON file with no candidates. That is current
 behaviour, not necessarily the intended behaviour. Do not fail the release on
 this step. Note any change.
 
+### W9. Word timestamps
+
+Covers [ADR 0017](decisions/0017-word-timestamps-and-styled-captions.md).
+W1's saved JSON holds every segment's words. This checks them against the
+segment they belong to.
+
+```powershell
+$check = @'
+import json, re, sys
+segs = json.load(open(sys.argv[1], encoding="utf-8"))["transcript"]["segments"]
+norm = lambda t: re.sub(r"\s+", " ", t).strip()
+words = [w for s in segs for w in s["words"]]
+print("segments:", len(segs), "words:", len(words))
+print("segments without words:", sum(not s["words"] for s in segs))
+print("zero-length words:", sum(w["end_seconds"] == w["start_seconds"] for w in words))
+outside = sum(w["start_seconds"] < s["start_seconds"] or w["end_seconds"] > s["end_seconds"]
+              for s in segs for w in s["words"])
+print("words outside their segment:", outside)
+for s in segs:
+    joined = norm(" ".join(w["text"] for w in s["words"]))
+    if joined != norm(s["text"]):
+        print("differs:", repr(norm(s["text"])), "vs", repr(joined))
+'@
+Set-Content "$S\check_words.py" $check -Encoding utf8
+uv run python "$S\check_words.py" "$S\normal-run1.json"
+```
+
+Pass: no segment without words, no word outside its segment (the model
+rejects that, so a load failure is also a fail), and no `differs:` lines.
+Record the counts. A `differs:` line means a word was split or lost: look at
+how faster-whisper spaced the raw words (`_clean_words` in
+`adapters/transcription/faster_whisper.py`).
+
+The first `analyze` of a video after upgrading from v0.3 re-transcribes it:
+transcripts cached without word timestamps are under a different cache key.
+
 ## Rendering
 
 Covers `clipper render` ([ADR 0007](decisions/0007-cut-clips-by-re-encoding.md),
@@ -1590,6 +1626,7 @@ item if the timings in L5 call for it.
 | W6 | | |
 | W7 | | |
 | W8 | | |
+| W9 | | words: ; zero-length: ; differs: |
 | R0 | | candidates: |
 | R1 | | seconds: ; sizes: |
 | R2 | | largest duration diff: |
@@ -1636,6 +1673,12 @@ One observed run, for scale. It is not a pass threshold.
   earlier run on the same machine, and depends on the network.
 - A 30 s clip produced one candidate, so do not expect five rows from a short
   clip.
+- W9, 2026-11-02, by the assistant, with W9's check script on a cold
+  `analyze` of the full 5:14 `data\test_input.mp4` (not the 30 s clip): 96
+  segments, 721 words, 1 zero-length, none outside its segment, no `differs:`
+  lines; 14.7 s cold. The same check on the 5:04:01 stream: 9,343 segments,
+  43,058 words, 917 zero-length, none outside, no `differs:` lines; 1,236.1 s
+  cold. Measurements are in ADR 0017's word timestamps amendment.
 
 ### Rendering reference run
 

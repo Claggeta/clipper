@@ -7,8 +7,12 @@ _TIMESTAMP = re.compile(r"(?:([0-9]+):)?([0-9]+):([0-9]{2}(?:\.[0-9]+)?)")
 _TIMESTAMP_HINT = 'must be a "M:SS" or "H:MM:SS" string, e.g. "0:50" or "1:02:03"'
 
 
-class Segment(BaseModel):
-    """A span of transcribed speech with start and end times in seconds."""
+class Word(BaseModel):
+    """One transcribed word with its start and end in seconds.
+
+    A word may have zero length: Whisper can time a word as an instant, and
+    its text is still worth showing in captions.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -17,9 +21,42 @@ class Segment(BaseModel):
     text: str
 
     @model_validator(mode="after")
+    def _end_not_before_start(self) -> "Word":
+        if self.end_seconds < self.start_seconds:
+            raise ValueError("end_seconds must not be before start_seconds")
+        return self
+
+
+class Segment(BaseModel):
+    """A span of transcribed speech with start and end times in seconds.
+
+    `words` is empty for transcripts made without word timestamps, including
+    older saved JSON (see docs/decisions/0017).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    text: str
+    words: tuple[Word, ...] = ()
+
+    @model_validator(mode="after")
     def _end_after_start(self) -> "Segment":
         if self.end_seconds <= self.start_seconds:
             raise ValueError("end_seconds must be greater than start_seconds")
+        return self
+
+    @model_validator(mode="after")
+    def _words_inside_and_ordered(self) -> "Segment":
+        message = "words must be in order, not overlap, and lie inside the segment"
+        previous_end = self.start_seconds
+        for word in self.words:
+            if word.start_seconds < previous_end:
+                raise ValueError(message)
+            previous_end = word.end_seconds
+        if previous_end > self.end_seconds:
+            raise ValueError(message)
         return self
 
     @property

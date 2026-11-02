@@ -66,7 +66,9 @@ If something fails, for example the file has no audio stream or ffmpeg
 cannot read it, the command prints `Error: ...` and exits with code 1.
 
 Transcripts are cached in `data/cache/`, so analysing the same video again
-skips transcription.
+skips transcription. Transcripts include the time of each word. Transcripts
+cached by v0.3 and earlier have no word times, so the first `analyze` of a
+video after upgrading transcribes it again.
 
 ### Rendering clips
 
