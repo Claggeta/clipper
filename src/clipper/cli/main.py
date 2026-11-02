@@ -9,6 +9,8 @@ from rich.markup import escape
 from rich.table import Table
 
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
+from clipper.adapters.detection.llm import LlmClipDetector
+from clipper.adapters.detection.ollama import OllamaClient
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
@@ -26,7 +28,7 @@ from clipper.core.evaluation import evaluate
 from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
 from clipper.core.naming import plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
-from clipper.domain.errors import ClipperError, ClipRenderError
+from clipper.domain.errors import ClipperError, ClipRenderError, DetectionError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
@@ -40,9 +42,10 @@ console = Console()
 
 
 class DetectorName(StrEnum):
-    """Detectors selectable with --detector. `llm` arrives with V3 item 7."""
+    """Detectors selectable with --detector (ADR 0013)."""
 
     HEURISTIC = "heuristic"
+    LLM = "llm"
 
 
 DetectorOption = Annotated[
@@ -86,6 +89,21 @@ def _build_detector(settings: Settings, name: DetectorName) -> ClipDetector:
     match name:
         case DetectorName.HEURISTIC:
             return HeuristicClipDetector(top_n=settings.top_n)
+        case DetectorName.LLM:
+            if not settings.llm_model:
+                raise DetectionError(
+                    "Set CLIPPER_LLM_MODEL to an Ollama model name to use "
+                    "--detector llm"
+                )
+            client = OllamaClient(settings.llm_url, settings.llm_model)
+            return LlmClipDetector(client, top_n=settings.top_n)
+
+
+def _detector_label(settings: Settings, name: DetectorName) -> str:
+    """The name recorded in results and printed: the LLM's includes its model."""
+    if name is DetectorName.LLM:
+        return f"{name.value}:{settings.llm_model}"
+    return name.value
 
 
 def _build_renderer(settings: Settings) -> ClipRenderer:
@@ -195,7 +213,7 @@ def _report_evaluation(
             )
 
     n_labels, n_candidates = len(evaluation.labels), len(evaluation.candidates)
-    console.print(f"Detector: {detector}", soft_wrap=True)
+    console.print(f"Detector: {escape(detector)}", soft_wrap=True)
     console.print(
         f"1 video, {_count(n_labels, 'label')}, {_count(n_candidates, 'candidate')}",
         soft_wrap=True,
@@ -246,13 +264,13 @@ def analyze(
         format="%(levelname)s %(name)s: %(message)s",
     )
     settings = Settings()
-    pipeline = AnalysisPipeline(
-        _build_transcriber(settings),
-        _build_detector(settings, detector),
-        detector_name=detector.value,
-    )
-
+    label = _detector_label(settings, detector)
     try:
+        pipeline = AnalysisPipeline(
+            _build_transcriber(settings),
+            _build_detector(settings, detector),
+            detector_name=label,
+        )
         result = pipeline.run(video)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
@@ -262,7 +280,7 @@ def analyze(
     out_file = settings.output_dir / f"{video.stem}.json"
     out_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     _render(result)
-    console.print(f"Detector: {detector.value}", soft_wrap=True)
+    console.print(f"Detector: {escape(label)}", soft_wrap=True)
     console.print(f"Saved: {escape(str(out_file))}")
 
 
@@ -352,12 +370,11 @@ def eval_(
             labels_json = settings.labels_dir / f"{Path(result.source).stem}.json"
         labeled = load_labels(labels_json)
         check_labels_match(labeled, result)
+        candidates = _build_detector(settings, detector).detect(result.transcript)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
-    candidates = _build_detector(settings, detector).detect(result.transcript)
     evaluation = evaluate(labeled, candidates)
-    _report_evaluation(
-        evaluation, result.transcript, f"{detector.value} (top {settings.top_n})"
-    )
+    label = _detector_label(settings, detector)
+    _report_evaluation(evaluation, result.transcript, f"{label} (top {settings.top_n})")

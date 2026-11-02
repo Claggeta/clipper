@@ -74,13 +74,13 @@ and planned code:
   Precision is one-to-one: in rank order each candidate claims the earliest
   unclaimed label it hits, and one on a claimed label is a repeat. Recall
   counts labels with any hit.
-- `0013` — `--detector` on `analyze` and `eval` (`heuristic` only until the
-  LLM detector lands; `llm` comes with V3 item 7), composed in
+- `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed in
   `_build_detector(settings, name)`. No test double is selectable by name.
-  `AnalysisResult.detector` records the name, `None` in older JSON; `render`
-  and `eval` don't check it. Private factories stay until more than four exist
-  or a third real detector appears; that replaces the 0006 and 0011 triggers.
-  Amends 0006.
+  `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
+  `None` in older JSON; `render` and `eval` don't check it. An unset
+  `CLIPPER_LLM_MODEL` is an `Error:`, exit 1. Private factories stay until
+  more than four exist or a third real detector appears; that replaces the
+  0006 and 0011 triggers. Amends 0006.
 - `0014` — the LLM detector re-ranks the heuristic's windows, via Ollama, and
   never falls back silently. Windowing and dedup were extracted first, as a
   behaviour-neutral change, into `adapters/detection/windows.py`

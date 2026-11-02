@@ -8,6 +8,7 @@ from clipper.adapters.transcription.fake import FakeTranscriber
 from clipper.cli import main as cli_main
 from clipper.cli.main import app
 from clipper.core.config import Settings
+from clipper.domain.errors import DetectionError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
@@ -17,6 +18,9 @@ from clipper.domain.models import (
 
 # All fixtures here are constructed, not produced by a real analyze run or
 # written by the maintainer.
+
+# Kept before any test patches it, for the tests that need the real one.
+REAL_BUILD_DETECTOR = cli_main._build_detector
 
 
 def _c(start: float, end: float, score: float = 0.5) -> ClipCandidate:
@@ -140,13 +144,48 @@ def test_detector_can_be_named(env: Env) -> None:
     assert "Detector: heuristic (top 5)" in result.output
 
 
-@pytest.mark.parametrize("name", ["llm", "fake"])
+@pytest.mark.parametrize("name", ["fake", "ollama"])
 def test_rejects_an_unknown_detector(env: Env, name: str) -> None:
     result = env.run("--detector", name)
 
     assert result.exit_code == 2
     assert "Invalid value" in result.output
     assert env.names == []
+
+
+def test_llm_detector_is_named_with_its_model(env: Env) -> None:
+    env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "some-model:tag")
+
+    result = env.run("--detector", "llm")
+
+    assert result.exit_code == 0, result.output
+    assert env.names == [cli_main.DetectorName.LLM]
+    assert "Detector: llm:some-model:tag (top 5)" in result.output
+
+
+def test_llm_without_a_model_is_an_error(env: Env) -> None:
+    env.monkeypatch.delenv("CLIPPER_LLM_MODEL", raising=False)
+    env.monkeypatch.setattr(cli_main, "_build_detector", REAL_BUILD_DETECTOR)
+
+    result = env.run("--detector", "llm")
+
+    assert result.exit_code == 1
+    assert "Error: Set CLIPPER_LLM_MODEL" in result.output
+
+
+def test_detection_error_is_reported(env: Env) -> None:
+    class FailingDetector:
+        def detect(self, transcript: Transcript) -> list[ClipCandidate]:
+            raise DetectionError("Model reply for window [0:00:00] is bad")
+
+    env.monkeypatch.setattr(
+        cli_main, "_build_detector", lambda settings, name: FailingDetector()
+    )
+
+    result = env.run()
+
+    assert result.exit_code == 1
+    assert "Error: Model reply for window [0:00:00] is bad" in result.output
 
 
 def test_top_n_comes_from_settings(env: Env) -> None:

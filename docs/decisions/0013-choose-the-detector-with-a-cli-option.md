@@ -89,6 +89,33 @@ fixed sample output. A choice between two real detectors is a different thing.
   when" (more than four factories, or a third real detector) replaces the
   triggers in 0006 and 0011.
 
+## Amended by the `--detector llm` PR (V3 item 7b)
+
+- `DetectorName` gains `llm`, and `_build_detector` composes
+  `LlmClipDetector(OllamaClient(CLIPPER_LLM_URL, CLIPPER_LLM_MODEL))` with
+  `CLIPPER_TOP_N` (0014). `llm` is no longer a usage error.
+- **The recorded name includes the model**: `llm:` followed by the value of
+  `CLIPPER_LLM_MODEL`. This changes the first amendment's "set to
+  the `--detector` value" for the LLM only; the heuristic is still recorded as
+  `heuristic`. Plain `llm` would make results from two models
+  indistinguishable in the saved JSON and in `eval`'s `Detector:` line, and
+  choosing a model is exactly that comparison. The field stays a free-form
+  string, so `domain/` does not change, and nothing parses it. The prompt is
+  not recorded (0014, item 7a amendment).
+- A `CLIPPER_LLM_MODEL` that is unset or empty with `--detector llm` is an
+  error from `_build_detector` (`DetectionError`), printed as `Error: ...`
+  with exit 1 before anything is transcribed or written. It is not a usage
+  error (exit 2): the option value is valid and the setting is missing.
+- `analyze` now builds the pipeline, and `eval` builds and runs the detector,
+  inside the `try` that reports a `ClipperError`. Before, `eval` called the
+  detector outside it, which did not matter while the only detector could not
+  fail. A `DetectionError` during scoring now prints `Error: ...` and exits 1;
+  `analyze` writes no JSON.
+- The `Detector:` lines are escaped for rich markup, since a model name is
+  user-supplied text.
+- No fallback: if the LLM fails, nothing runs the heuristic in its place
+  (0014, decision 5).
+
 ## Related
 
 - 0006, 0011: the private-factory seam
