@@ -98,6 +98,55 @@ point, which the heuristic cannot. Everything must stay local and free
   heuristic's candidates at top 5, 30 and 1000, and `eval`'s output at top 5
   and 30, were byte-identical before and after.
 
+## Amended by the LLM detector PR (V3 item 7a)
+
+V3 item 7 is three PRs: the adapter (this one, not reachable from the CLI),
+`--detector llm` (7b), and the manual steps, first real runs and model choice
+(7c). Nothing in this PR has run against a real Ollama server or model.
+
+- **HTTP client.** Python's standard library (`urllib.request`, `json`). No
+  dependency is added, so the check against 0003 does not arise. `requests` is
+  in the lock only through the pinned `huggingface-hub`, and `httpx` and the
+  `ollama` package would be new dependencies, `httpx` from the family Hub 2.x
+  churned.
+- **Two classes.** `OllamaClient` (`adapters/detection/ollama.py`) is the
+  transport. It POSTs one request per prompt to `<CLIPPER_LLM_URL>/api/generate`
+  with `stream: false`, `format` set to a JSON schema, and
+  `options: {temperature: 0, seed: 0}`, and returns the reply text. The timeout
+  is 120 s per request, because the first request also loads the model.
+  `LlmClipDetector` (`adapters/detection/llm.py`) owns the prompt, validation
+  and ranking, and takes any object with the same `generate` method (a
+  Protocol in that module), so its tests need no server.
+- **Every window is scored**, one request per window from `sliding_windows`,
+  in order, and not only the windows where a heuristic signal fires. The point
+  is to judge meaning the heuristic misses. On the two saved analyses that is
+  18 requests (`test_input.json`, 274 s) and 1,215 (`oFbD0Ot7nQ8.json`,
+  18,234 s). Filtering by the heuristic first stays the "too slow" lever under
+  "Revisit when".
+- **Score scale.** Decision 4 stands: the model is asked for a score from 0
+  to 1. At temperature 0 a model may favour round values, and `select_top`
+  breaks ties by the earlier start, which would favour the start of a video.
+  7c records how many windows tie at the top-N cut. If ties decide the result,
+  the scale changes in a further amendment.
+- **Validation.** The reply must parse as `WindowScore`: `score` from 0 to 1,
+  and a non-empty `reason` after stripping whitespace. Its JSON schema is the
+  `format` sent to Ollama. The reason becomes the candidate's only `reasons`
+  entry.
+- **Errors.** `DetectionError`, a new `ClipperError`, for: the server cannot be
+  reached; an HTTP error, carrying Ollama's own `error` text rather than
+  matching it, plus a pull hint on 404; a timeout; a response body without a
+  string `response`; and a reply that fails validation, naming the window and
+  quoting the start of the reply. There is no retry. At temperature 0 with a
+  fixed seed a retry would repeat the reply, so one bad window ends the run.
+- **Settings.** `CLIPPER_LLM_URL` defaults to `http://127.0.0.1:11434`,
+  Ollama's documented default address, not yet tried here.
+  `CLIPPER_LLM_MODEL` has no default. 7b makes an unset model a clear error,
+  and 7c sets the default to the model chosen from `eval` results.
+- **Progress** is logged at INFO every 50 windows and after the last one.
+- **The prompt** is a module constant, not recorded in results. It changes
+  only through PRs, so git history records it. 7c may revise it while
+  choosing a model.
+
 ## Related
 
 - 0012: evaluation

@@ -28,3 +28,7 @@ class ClipRenderError(ClipperError):
 
 class LabelsError(ClipperError):
     """Raised when a labels file cannot be loaded."""
+
+
+class DetectionError(ClipperError):
+    """Raised when a detector cannot score a transcript."""

@@ -14,3 +14,7 @@ class Settings(BaseSettings):
     output_dir: Path = Path("data/output")
     clips_dir: Path = Path("data/clips")
     labels_dir: Path = Path("data/labels")
+    # Ollama's default address. The model is unset until one is chosen from
+    # eval results (ADR 0014).
+    llm_url: str = "http://127.0.0.1:11434"
+    llm_model: str | None = None
