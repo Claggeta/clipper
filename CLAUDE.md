@@ -110,7 +110,9 @@ and planned code:
   title failure is that clip's failure; no fallback. Built through the context
   object that replaces the factories first.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
-  each run. File names inside are unchanged. Amends 0008.
+  each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
+  run-level flags, per-clip `file` or `error` and burned-in `captions`; no
+  titles fields until item 5; a failure before cutting leaves the manifest.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -215,8 +217,8 @@ All merged to `main` with green CI:
 In progress:
 
 - V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92), 3
-  (word timestamps, #93) and 4 (styled captions, #95) are merged. Next:
-  item 4a, a folder per video and the manifest.
+  (word timestamps, #93), 4 (styled captions, #95) and 4a (a folder per video
+  and the manifest, #97) are merged. Next: item 4b, the CLI context object.
 
 V3 results, for reference:
 
@@ -366,7 +368,8 @@ picked.
    re-split, ADR 0017 amendment)
 4. ~~Styled, word-by-word burned-in captions (0017), with a manual-test
    step.~~ (done; #95, manual steps C2 and C7 rewritten; ADR 0017 amendment)
-4a. A folder per video and the manifest (0019).
+4a. ~~A folder per video and the manifest (0019).~~ (done; #97, manual step
+   R18; ADR 0019 amendment)
 4b. Replace the CLI's private factories with a context object.
    Behaviour-neutral; ADR 0013's trigger, since titles would be the fifth
    factory. A 0013 amendment.
