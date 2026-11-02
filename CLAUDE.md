@@ -210,7 +210,8 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V4. Item 1 (ADRs 0016 to 0019) is merged. Next: item 2, the vertical crop.
+- V4. Items 1 (ADRs 0016 to 0019) and 2 (`render --vertical`, #90) are
+  merged. Next: item 3, word timestamps.
 
 V3 results, for reference:
 
@@ -346,7 +347,8 @@ picked.
 1. ~~ADRs for the V4 decisions (one docs PR)~~ (done; 0016 vertical crop,
    0017 word timestamps and captions, 0018 titles, 0019 folder per video).
    The fetch ADR moved to item 6, since it depends on platform terms.
-2. 9:16 centre crop in `render` (0016), with a manual-test step.
+2. ~~9:16 centre crop in `render` (0016), with a manual-test step.~~ (done;
+   #90, manual steps R15 to R17)
 3. Word timestamps in the transcript (0017). A domain-model change. Whether
    faster-whisper's word timestamps are usable here, and what they cost, is
    unverified.
