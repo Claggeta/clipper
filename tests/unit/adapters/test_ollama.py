@@ -70,6 +70,7 @@ def test_posts_one_non_streaming_request(monkeypatch: pytest.MonkeyPatch) -> Non
         "prompt": "words",
         "format": SCHEMA,
         "stream": False,
+        "think": False,
         "options": {"temperature": 0, "seed": SEED},
     }
 
