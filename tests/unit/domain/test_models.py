@@ -12,6 +12,7 @@ from clipper.domain.models import (
     RenderedClip,
     Segment,
     Transcript,
+    Word,
 )
 
 
@@ -34,6 +35,50 @@ def test_segment_is_immutable() -> None:
     segment = Segment(start_seconds=0.0, end_seconds=1.0, text="hello")
     with pytest.raises(ValidationError):
         segment.text = "changed"  # type: ignore[misc]
+
+
+def _w(start: float, end: float, text: str = "w") -> Word:
+    return Word(start_seconds=start, end_seconds=end, text=text)
+
+
+def test_word_allows_zero_length() -> None:
+    assert _w(1.0, 1.0).end_seconds == 1.0
+
+
+def test_word_rejects_end_before_start() -> None:
+    with pytest.raises(ValidationError):
+        _w(2.0, 1.0)
+
+
+def test_segment_words_default_to_empty() -> None:
+    assert Segment(start_seconds=0.0, end_seconds=1.0, text="hi").words == ()
+
+
+def test_segment_without_words_key_loads_from_older_json() -> None:
+    segment = Segment.model_validate_json(
+        '{"start_seconds": 0.0, "end_seconds": 1.0, "text": "hi"}'
+    )
+    assert segment.words == ()
+
+
+def test_segment_accepts_ordered_words_inside_it() -> None:
+    words = (_w(1.0, 1.5, "a"), _w(1.5, 1.5, "b"), _w(1.6, 2.0, "c"))
+    segment = Segment(start_seconds=1.0, end_seconds=2.0, text="a b c", words=words)
+    assert segment.words == words
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        (_w(0.5, 1.2),),  # starts before the segment
+        (_w(1.5, 2.5),),  # ends after the segment
+        (_w(1.0, 1.6), _w(1.5, 1.8)),  # overlap
+        (_w(1.6, 1.8), _w(1.0, 1.2)),  # out of order
+    ],
+)
+def test_segment_rejects_words_out_of_order_or_outside(words: tuple[Word, ...]) -> None:
+    with pytest.raises(ValidationError):
+        Segment(start_seconds=1.0, end_seconds=2.0, text="x", words=words)
 
 
 def _seg(start: float, end: float, text: str) -> Segment:

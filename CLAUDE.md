@@ -232,6 +232,11 @@ V3 results, for reference:
   on the long video. Before 6a, precision there was 3 of 5 and 7 of 30. Seven
   of its 30 labels are longer than two 45 s windows. Videos are downloaded by
   hand with `uv tool run yt-dlp` into `data/videos/`, named by video ID.
+- The numbers above are on transcripts made without word timestamps. With them
+  (V4 item 3, ADR 0017 amendment) segments are re-split, and the heuristic
+  gives: `test_input.json` unchanged; `oFbD0Ot7nQ8.json` recall 1 of 30 at
+  top 5 (precision 1 of 5) and 6 of 30 at top 30 (precision 6 of 30,
+  2 repeats). The LLM detector has not been re-run on them.
 
 ## Pinned dependencies
 

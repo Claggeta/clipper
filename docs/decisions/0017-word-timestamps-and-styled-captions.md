@@ -69,6 +69,58 @@ word timestamps.
   markup wrong than SRT. The manual steps cover awkward text again.
 - (-) The SRT manual steps (C2, C7) are rewritten for ASS.
 
+## Amended by the word timestamps PR (V4 item 3)
+
+Decisions 1 and 2 are done. Captions (decisions 3 to 5) are item 4.
+
+- `Word` is frozen, with `start_seconds` (at least 0), `end_seconds` (not
+  before the start; zero length is allowed) and `text`. `Segment` validates
+  that its words are in order, do not overlap and lie inside it. Word
+  probability is not stored.
+- `build_transcript` takes `(start, end, text, words)` and cleans words the way
+  it cleans segments: text stripped, empty words dropped, times clamped into
+  the segment (including a start the overlap rule pushed later) and kept in
+  order. A word left with no time keeps zero length.
+- **Split words are merged.** faster-whisper starts every real word with a
+  space. Its default prepend punctuation (which includes `-` and `'`) makes a
+  token without one: on `test_input.mp4` it returned `' battle', '-hardened'`
+  and `' o', "'clock."`. Stripping lost the only sign that these belong
+  together, so a token without a leading space is merged into the word before
+  it in the same segment, which then ends where the token ends. A first token
+  without a space stays a word.
+- **Segment boundaries change.** faster-whisper 1.2.1 sets each segment's start
+  and end to its first and last word's times when word timestamps are on
+  (`transcribe.py`, read in the installed package). The decode also changes
+  slightly, so text and splits differ from a transcript made without words.
+
+Measured on 2026-11-02, Windows 11, Whisper `base`, CPU, int8, cold runs into
+a scratch output folder:
+
+| | `test_input.mp4` (5:14) | `oFbD0Ot7nQ8.mp4` (5:04:01) |
+|---|---|---|
+| Cold `analyze`, without words (earlier runs) | 14.3 s | 1,260 s |
+| Cold `analyze`, with words | 14.7 s | 1,236.1 s |
+| Saved JSON | 14,911 to 110,243 bytes | 1,230,241 to 7,171,013 bytes |
+| Segments | 97 to 96 | 9,420 to 9,343 |
+| Text | 3,800 to 3,799 characters | 225,284 to 219,212 characters |
+| Words; zero-length | 721; 1 | 43,058; 917 |
+| Segments without words; words outside their segment; joined words differing from the text | 0; 0; 0 | 0; 0; 0 |
+| Heuristic `eval`, top 5 | recall 3/4, precision 3/5 (unchanged) | recall 1/30, precision 1/5 (was 2/30, 2/5) |
+| Heuristic `eval`, top 30 | - | recall 6/30, precision 6/30, 2 repeats (was 5/30, 5/30) |
+
+- Word timestamps cost no measurable time on this machine; each video was
+  timed once.
+- On the short video about a dozen segments were split differently, and some
+  words changed both ways: "the perfection" became "to perfection", and
+  "Iraq and Afghanistan" became "a rack in Afghanistan". Neither transcript is
+  consistently better.
+- The heuristic's candidates moved with the segments. The long video's `eval`
+  numbers changed by one label each way. That is the transcript, not the
+  detector, and with 30 labels it is within what these indicative numbers can
+  show (0012).
+- Not measured: how accurate the word times are against the audio. Item 4's
+  frames are the first check.
+
 ## Revisit when
 
 - Word times are visibly off on real clips. Then compare a larger Whisper
