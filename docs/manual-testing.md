@@ -1,4 +1,4 @@
-# Manual test checklist: ffmpeg, Whisper and rendering
+# Manual test checklist: ffmpeg, Whisper, rendering and the LLM detector
 
 CI cannot run the real ffmpeg binary or a real Whisper model. Its tests mock
 `subprocess.run` for ffmpeg, use `FakeTranscriber` for the CLI, and the one
@@ -17,6 +17,10 @@ The [Captions](#captions) section covers `clipper render --captions`. The
 renderer tests mock `subprocess.run`, so nothing in CI runs the real `subtitles`
 filter.
 
+The [LLM detector](#llm-detector) section covers `--detector llm`. Its tests
+use a fake generator and a mocked HTTP call, so nothing in CI talks to a real
+Ollama server or model.
+
 ## When to run it
 
 - Before tagging a release.
@@ -30,6 +34,10 @@ filter.
 - After any change to `src/clipper/core/captions.py`, the `subtitles` filter or
   its style in `adapters/rendering/ffmpeg.py`, or after changing to an ffmpeg
   build. Run the [Captions](#captions) section.
+- After any change to `src/clipper/adapters/detection/llm.py` or `ollama.py`
+  (the prompt included), after upgrading Ollama, or before changing
+  `CLIPPER_LLM_MODEL`'s default. Run the [LLM detector](#llm-detector)
+  section.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -1162,6 +1170,297 @@ step only if text is cut off by the frame. Size and placement are a judgement
 for the maintainer, and a change to them is a code change, not part of a
 release.
 
+## LLM detector
+
+Covers `--detector llm` ([ADR 0014](decisions/0014-local-llm-detector-via-ollama.md),
+[0013](decisions/0013-choose-the-detector-with-a-cli-option.md),
+[0015](decisions/0015-determinism-is-per-detector.md)). The detector and CLI
+tests use a fake generator and a mocked `urllib.request.urlopen`, so nothing in
+CI talks to a real Ollama server or model. This section checks that Ollama
+accepts the request `OllamaClient` sends, that the error messages read well
+against the real server, how long scoring takes, whether two runs agree, and
+which model to use.
+
+It reruns detectors on saved analyses with `eval`, so nothing is transcribed.
+L1 and L3 run `analyze` on the short video, which takes the transcript from
+the cache and writes to the scratch folder. It needs the two saved analyses
+and their labels files from V3 item 0: `data/output/test_input.json` with
+`data/labels/test_input.json`, and `data/output/oFbD0Ot7nQ8.json` with
+`data/labels/oFbD0Ot7nQ8.json`, plus `data/test_input.mp4` and its cached
+transcript in `data/cache/`. It does not need the Setup section above.
+
+`CLIPPER_*` variables are set for one command and put back afterwards by
+`Invoke-Llm` below. Nothing in this section leaves one set.
+
+### L0. Setup
+
+1. Install Ollama for Windows from <https://ollama.com>. It runs as a
+   background server with a tray icon.
+2. Pick two or three instruction-tuned models from Ollama's library that fit
+   in the GPU's 12 GB at their default quantisation: roughly 14 billion
+   parameters or fewer, ideally from different families. Pull each one:
+
+   ```powershell
+   ollama pull <model>
+   ```
+
+3. Record the versions and exact model tags:
+
+   ```powershell
+   ollama --version
+   ollama list
+   nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
+   ```
+
+4. Check that the server answers on the address `CLIPPER_LLM_URL` defaults to.
+   It should list the pulled models:
+
+   ```powershell
+   (Invoke-RestMethod http://127.0.0.1:11434/api/tags).models | Select-Object name, size
+   ```
+
+5. In a fresh PowerShell window at the repo root:
+
+   ```powershell
+   $S = Join-Path $env:TEMP "manual-test-clipper-llm"
+   New-Item -ItemType Directory -Force $S | Out-Null
+   $M1 = "<first model tag>"        # from ollama list
+   $M2 = "<second model tag>"
+   $M3 = "<third model tag>"        # or drop it from the loops below
+
+   # Keep rich from wrapping at 80 columns. Not a CLIPPER_ variable; L6
+   # removes it.
+   $env:COLUMNS = "500"
+
+   # Helper: runs `clipper <Arguments>` with CLIPPER_LLM_MODEL set to $Model
+   # (unset if $Model is ""), plus any extra CLIPPER_ variables, for this one
+   # command, and puts every variable back afterwards. Keeps the exit code,
+   # the seconds taken and the text, and prints them.
+   function Invoke-Llm {
+     param([string]$Model, [string]$Arguments, [hashtable]$Extra = @{})
+     $vars = @{ CLIPPER_LLM_MODEL = $Model } + $Extra
+     $old = @{}
+     foreach ($k in $vars.Keys) {
+       $old[$k] = [Environment]::GetEnvironmentVariable($k, "Process")
+       $v = if ($vars[$k] -eq "") { $null } else { $vars[$k] }
+       [Environment]::SetEnvironmentVariable($k, $v, "Process")
+     }
+     try {
+       $t = Measure-Command {
+         cmd /c "uv run clipper $Arguments > `"$S\last.txt`" 2>&1"
+       }
+       $script:Code = $LASTEXITCODE
+     } finally {
+       foreach ($k in $vars.Keys) {
+         [Environment]::SetEnvironmentVariable($k, $old[$k], "Process")
+       }
+     }
+     $script:Seconds = [Math]::Round($t.TotalSeconds, 1)
+     $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+     "exit $Code, $Seconds s"
+     $Text
+   }
+   ```
+
+Check that no `CLIPPER_` variable is set before you start. This should print
+nothing:
+
+```powershell
+Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue
+```
+
+### L1. First real run: `analyze --detector llm`
+
+Unload the model first, so the time includes loading it, then run on the 5:14
+speech video. The transcript comes from the cache. Output goes to the scratch
+folder, so `data/output/test_input.json` keeps the heuristic's result.
+
+```powershell
+ollama stop $M1
+Invoke-Llm $M1 "analyze data\test_input.mp4 --detector llm -v" @{ CLIPPER_OUTPUT_DIR = "$S\out" }
+ollama ps
+(Get-Content "$S\out\test_input.json" -Raw | ConvertFrom-Json).detector
+```
+
+Pass:
+
+- Exit 0.
+- The log shows `Scored 18 of 18 windows`. ADR 0014's 7a amendment counted 18
+  windows on this transcript.
+- A table of up to five candidates. Each Why cell is one sentence from the
+  model, not the heuristic's signal names.
+- `Detector: llm:<model tag>`, and the saved JSON's `detector` is the same
+  string.
+
+Record:
+
+- The seconds. This is the first time measured for the LLM detector, and it
+  includes loading the model.
+- The table, as printed.
+- What `ollama ps` shows for the model, in particular whether it runs on the
+  GPU, the CPU, or split between them. Anything but all-GPU means the model
+  did not fit in VRAM, and the timings below are not GPU timings.
+
+If this fails with `Model reply for window ... is not a valid score` or
+`Unexpected response from Ollama`, record the full message and stop: the
+request or the schema does not match what this Ollama version expects.
+
+### L2. Errors against the real server (observe and record)
+
+Each must exit 1 with one `Error: ...` line and no traceback. Record each
+message exactly.
+
+```powershell
+# a. Model not set.
+Invoke-Llm "" "eval data\output\test_input.json --detector llm"
+
+# b. Model not pulled. The tag is deliberately one that does not exist.
+Invoke-Llm "no-such-model-clipper:latest" "eval data\output\test_input.json --detector llm"
+
+# c. Nothing listening on the URL.
+Invoke-Llm $M1 "eval data\output\test_input.json --detector llm" @{ CLIPPER_LLM_URL = "http://127.0.0.1:1" }
+```
+
+Then quit Ollama from its tray icon, confirm the server is gone, and run d:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:11434/api/tags   # should fail now
+
+# d. Ollama not running.
+Invoke-Llm $M1 "eval data\output\test_input.json --detector llm"
+```
+
+Start Ollama again from the Start menu, and rerun step 4 of L0 before going
+on.
+
+Pass:
+
+- a: `Error: Set CLIPPER_LLM_MODEL to an Ollama model name to use --detector llm`.
+- b: `Error: Ollama at http://127.0.0.1:11434 returned HTTP <status> for model
+  'no-such-model-clipper:latest': <Ollama's text>`. Record the status and the
+  text. The pull hint is added only on a 404, and whether this Ollama version
+  answers 404 for a missing model is what this step finds out.
+- c and d: `Error: Cannot reach Ollama at <url>: <reason>. Is it running?`.
+  Record the reason text, which comes from Windows.
+- c and d return within a few seconds. A long wait before the error means the
+  connection timed out instead of being refused; record the seconds.
+
+### L3. Repeatability on the short video (ADR 0015)
+
+The same transcript and model, twice, for each model. This uses `analyze`, not
+`eval`, because `eval` prints only each candidate's span and a two-decimal
+score: two runs that differ in a reason or in the third decimal would print the
+same. The saved JSON holds every score in full and every reason, and the
+transcript comes from the cache, so the two files differ only if the
+candidates do. L5 repeats this for the chosen model on the long video.
+
+```powershell
+foreach ($m in $M1, $M2, $M3) {
+  foreach ($r in "a", "b") {
+    Invoke-Llm $m "analyze data\test_input.mp4 --detector llm" @{ CLIPPER_OUTPUT_DIR = "$S\rep-$r"; CLIPPER_TOP_N = "30" } | Out-Null
+  }
+  $a = Get-Content "$S\rep-a\test_input.json" -Raw -Encoding UTF8
+  $b = Get-Content "$S\rep-b\test_input.json" -Raw -Encoding UTF8
+  "$m identical: $($a -ceq $b)"
+  if ($a -cne $b) { Compare-Object ($a -split "`n") ($b -split "`n") }
+}
+```
+
+There is no pass or fail. ADR 0015 makes repeatability an aim for the LLM, not
+a guarantee. Record, per model, whether the two files were identical and, if
+not, the lines that differ. A difference triggers ADR 0015's "revisit when"
+(repeated runs in `eval`).
+
+### L4. Short video: compare the models with `eval`
+
+The labels on `test_input.json` cover the whole speech, so this is a smoke test
+of quality, not a measurement. The first command is the heuristic, as the
+baseline.
+
+```powershell
+Invoke-Llm "" "eval data\output\test_input.json"
+foreach ($m in $M1, $M2, $M3) {
+  Invoke-Llm $m "eval data\output\test_input.json --detector llm"
+}
+```
+
+Record, per model: the `Recall:` and `Precision:` lines, the seconds, and the
+candidates table. ADR 0014's 7a amendment asks how often scores tie at the
+top-N cut: count the rows whose Score equals the last row's. Scores print with
+two decimals, so a tie in print may not be a tie in the score itself.
+
+### L5. Long video: runtime, results and ties
+
+`oFbD0Ot7nQ8.json` is 5:04:01 and has 1,215 windows, one request each. `eval`
+prints nothing until scoring finishes, so judge progress from `ollama ps` or
+the GPU load in Task Manager.
+
+Run at top 30. `select_top` and the one-to-one matching are both greedy in
+rank order, so the first five rows of a top-30 run are exactly the top-5 run's
+candidates and matches. Read the top-5 numbers off those rows instead of
+running again.
+
+Run the first model alone. If it takes longer than you would wait for every
+video, stop it with Ctrl+C, record the time and how far it got (the GPU going
+idle marks the end), and skip the second block. That is ADR 0014's "too slow"
+trigger.
+
+```powershell
+function Save-Long([string]$Model) {
+  $Text | Set-Content "$S\long-$($Model -replace '[:/\\]', '_').txt" -Encoding utf8
+}
+Invoke-Llm $M1 "eval data\output\oFbD0Ot7nQ8.json --detector llm" @{ CLIPPER_TOP_N = "30" }
+Save-Long $M1
+```
+
+Then the other models, and the heuristic:
+
+```powershell
+foreach ($m in $M2, $M3) {
+  Invoke-Llm $m "eval data\output\oFbD0Ot7nQ8.json --detector llm" @{ CLIPPER_TOP_N = "30" }
+  Save-Long $m
+}
+Invoke-Llm "" "eval data\output\oFbD0Ot7nQ8.json" @{ CLIPPER_TOP_N = "30" }
+```
+
+Record, per model:
+
+- The seconds, and the seconds per window (seconds / 1,215).
+- At top 30: the `Recall:` and `Precision:` lines, with the repeats.
+- At top 5, from the first five rows of the candidates table: labels hit
+  (recall); rows whose Hits label shows a label number not marked
+  `(repeat of #k)` (precision); and rows marked as repeats.
+- Ties: rows whose Score equals row 5's, and rows whose Score equals row 30's.
+
+The last command reprints the heuristic's numbers for the same files, to set
+beside the ones in `CLAUDE.md` ("In progress").
+
+Then run the chosen model once more and compare with its first run, for the
+long-video repeatability check:
+
+```powershell
+$m = "<chosen model tag>"
+Invoke-Llm $m "eval data\output\oFbD0Ot7nQ8.json --detector llm" @{ CLIPPER_TOP_N = "30" } | Out-Null
+$first = Get-Content "$S\long-$($m -replace '[:/\\]', '_').txt" -Raw -Encoding utf8
+"identical: $($first.TrimEnd() -ceq $Text.TrimEnd())"
+```
+
+This compares spans and two-decimal scores only (see L3). Rerunning `analyze`
+on the long video would compare reasons too, but it needs the video and its
+cached transcript; it is not part of this check.
+
+### L6. Clean up
+
+```powershell
+Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothing
+Remove-Item Env:COLUMNS
+Remove-Item -Recurse -Force $S
+```
+
+Out of scope here: models that do not fit in VRAM, a remote Ollama server,
+parallel requests, and caching scores between `eval` runs. Each is a separate
+item if the timings in L5 call for it.
+
 ## Record your run
 
 | Field | Value |
@@ -1215,6 +1514,13 @@ release.
 | C6 | | |
 | C7 | | awk4 emoji: ; awk6 backslash: |
 | C8 | | |
+| L0 | | Ollama version: ; models: |
+| L1 | | seconds: ; ollama ps: |
+| L2 | | b status and text: ; c, d reason: |
+| L3 | | identical per model: |
+| L4 | | per model recall / precision / seconds: |
+| L5 | | per model seconds / per window: ; top 30: ; top 5: ; ties: |
+| L6 | | |
 
 ### Reference run
 
@@ -1334,6 +1640,10 @@ maintainer.
 | Folder left in `%TEMP%` (C4) | `TemporaryDirectory` in `adapters/rendering/ffmpeg.py`; ADR 0010 |
 | Caption run fails on a path (C5) | Absolute paths and `cwd` in `adapters/rendering/ffmpeg.py`; `run_tool` in `adapters/media/_process.py`; ADR 0010 |
 | Markup, accents or backslashes mangled (C7) | `_MARKUP` in `core/captions.py`; ADR 0010 |
+| `Unexpected response` or `not a valid score` on every run (L1) | The payload in `adapters/detection/ollama.py`; `WindowScore` and `_SCHEMA` in `adapters/detection/llm.py`; ADR 0014 |
+| Error message wrong or a traceback (L2) | `generate` and `_http_failure` in `adapters/detection/ollama.py`; the `try` in `analyze` and `eval`; ADR 0013 |
+| `Detector:` line or saved `detector` wrong (L1) | `_detector_label` in `cli/main.py`; ADR 0013 |
+| Timeout on the first window (L1) | `TIMEOUT_SECONDS` in `adapters/detection/ollama.py`; model load time |
 
 | Symptom | Look at |
 |---------|---------|
