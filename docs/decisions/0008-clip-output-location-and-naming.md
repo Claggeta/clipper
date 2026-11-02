@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-30
 - Clarified: where the within-run collision check lives (see Consequences)
+- Amended by: 0019 (a folder per video; decision 1)
 
 ## Context
 

@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended by: 0016 (the vertical crop filter)
 
 ## Context
 

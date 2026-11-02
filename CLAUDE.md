@@ -93,6 +93,20 @@ and planned code:
   adopted.
 - `0015` — determinism is a property of the heuristic detector. Amends vision
   criterion 2.
+- `0016` — `render --vertical`: a centre crop to 9:16, scaled to 1080x1920, in
+  the one re-encode path; crop, scale, then captions. Off by default. Amends
+  0007 and 0011.
+- `0017` — word timestamps (`Segment.words`, default empty) and styled ASS
+  captions from one pure builder that replaces `build_srt`. The transcriber's
+  name gains `+words`, so old cache entries are re-transcribed. Segments
+  without words become whole-segment cues, with a note. Supersedes 0010's
+  segment-level decision; its burn-in mechanism stands.
+- `0018` — `render --titles`: a `TitleWriter` Protocol and an Ollama adapter
+  reusing `OllamaClient` write a title and hook per clip to the manifest. A
+  title failure is that clip's failure; no fallback. Built through the context
+  object that replaces the factories first.
+- `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
+  each run. File names inside are unchanged. Amends 0008.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -196,7 +210,7 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V4. Nothing merged yet. Next: item 1, the ADRs for the V4 decisions.
+- V4. Item 1 (ADRs 0016 to 0019) is merged. Next: item 2, the vertical crop.
 
 V3 results, for reference:
 
@@ -329,26 +343,31 @@ Each item is one PR, and each code item states its design and waits for
 confirmation first. Output first: nothing here changes which moments are
 picked.
 
-1. ADRs for the V4 decisions (one docs PR): the 9:16 centre crop (amends 0007
-   and 0011), word timestamps and styled captions (supersede part of 0010),
-   hook/title generation via Ollama, `clipper fetch` (0016, with YouTube's and
-   Twitch's terms checked first; unverified so far), and the one-command flow
-   with a folder per video (amends 0008).
-2. 9:16 centre crop in `render`, one code path, with a manual-test step.
-3. Word timestamps in the transcript. A domain-model change; the transcript
-   cache must handle older entries. Whether faster-whisper's word timestamps
-   are usable here is unverified.
-4. Styled, word-by-word burned-in captions, with a manual-test step.
-5. A hook/title per clip from the existing Ollama client, with a manual-test
+1. ~~ADRs for the V4 decisions (one docs PR)~~ (done; 0016 vertical crop,
+   0017 word timestamps and captions, 0018 titles, 0019 folder per video).
+   The fetch ADR moved to item 6, since it depends on platform terms.
+2. 9:16 centre crop in `render` (0016), with a manual-test step.
+3. Word timestamps in the transcript (0017). A domain-model change. Whether
+   faster-whisper's word timestamps are usable here, and what they cost, is
+   unverified.
+4. Styled, word-by-word burned-in captions (0017), with a manual-test step.
+4a. A folder per video and the manifest (0019).
+4b. Replace the CLI's private factories with a context object.
+   Behaviour-neutral; ADR 0013's trigger, since titles would be the fifth
+   factory. A 0013 amendment.
+5. A title and hook per clip, `render --titles` (0018), with a manual-test
    step.
-6. `clipper fetch <url>`: runs the `yt-dlp` program as a subprocess behind a
-   `Downloader` Protocol, saves to `data/videos/<id>.mp4`, and leaves
-   `analyze` unchanged. Manual-test step.
+6. `clipper fetch <url>`: first an ADR (0020) on YouTube's and Twitch's terms
+   (unverified so far; it may limit `fetch` to sources with permission, or
+   drop it), then the `yt-dlp` program as a subprocess behind a `Downloader`
+   Protocol, saving to `data/videos/<id>.mp4`, with `analyze` unchanged.
+   Manual-test step.
 7. GPU transcription (was V3 item 5): time the long video on the GPU against
    the CPU's 20:59. May end in a settings change or in nothing. Manual-test
    step. No `eval` claim.
 8. One command from a URL or file to a folder of drafts: fetch, analyze,
-   render.
+   render with `--vertical --captions --titles`. Its command shape needs an
+   ADR or a 0011 amendment, decided in that item.
 9. Release notes and tag `v0.4.0`, if the items above land.
 
 Later, not scheduled:
