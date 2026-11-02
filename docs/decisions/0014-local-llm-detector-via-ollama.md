@@ -175,6 +175,46 @@ JSON: EOF while parsing a value at line 1 column 0 (got '')`.
   off at the length limit still surfaces as a validation error on an empty or
   partial reply.
 
+## Amended by the model choice (V3 item 7c)
+
+Manual steps L1 to L5 were run on 2026-11-02 with thinking off: Windows 11,
+Ollama 0.40.13, RTX 4070 Ti 12 GB, `qwen3.5:9b` and `llama3.1:8b`, both
+`100% GPU` in `ollama ps`. Numbers below are from those runs.
+
+| Step | Heuristic | `qwen3.5:9b` | `llama3.1:8b` |
+|---|---|---|---|
+| L3: two `analyze` runs, saved JSON | (deterministic, 0015) | identical | same candidates and scores; 2 of 6 reasons worded differently |
+| L4: `test_input.json`, top 5 | recall 3/4, precision 3/5, 2 repeats | 4/4, 4/5, 1 repeat, 19.2 s | 4/4, 4/5, 1 repeat, 13.7 s |
+| L5: `oFbD0Ot7nQ8.json`, top 30 | 5/30, 5/30, 2 repeats | 6/30, 6/30, 953.4 s (0.78 s per window) | 3/30, 3/30, 3 repeats, 685.2 s (0.56 s per window) |
+| L5: top 5 (first five rows) | 2/30, 2/5 | 0/30, 0/5 | 0/30, 0/5 |
+
+- **Ties (the 7a question).** Scores cluster on round values. On
+  `oFbD0Ot7nQ8.json`, `qwen3.5:9b` used 11 distinct scores over 1,215 windows
+  (0.9 for 6, 0.85 for 28, 0.2 for 646); `llama3.1:8b` used 7 (0.8 for 403,
+  0.6 for 421). In L5, `llama3.1:8b`'s rows 3 to 30 all scored 0.80, so the
+  earlier-start tie rule filled its top 30 from the first 34 minutes.
+- **Heuristic score as the tie-break, measured and not adopted.** A scratch
+  script (not committed) scored every window once per model and re-ranked by
+  `(-llm, -heuristic, start)`, with `select_top`'s overlap rule and
+  `evaluate`. Its earlier-start rows reproduced L4 and L5. For `qwen3.5:9b`
+  it changed nothing on `oFbD0Ot7nQ8.json` (top 5: 0/30; top 30: 6/30) and
+  lost a label on `test_input.json` (recall 3/4). For `llama3.1:8b` it raised
+  top 30 to 9/30 and top 5 to 1/30, but with 403 windows tied at the cut that
+  is the heuristic's ranking inside one LLM score band, not the LLM's. The tie
+  rule stays as it is. Ties are not what keeps the top five off the labels;
+  both models' highest-scored windows are not the labelled ones.
+- **Decision.** `CLIPPER_LLM_MODEL` defaults to `qwen3.5:9b`: repeatable in L3,
+  the widest spread of scores, and level with or slightly above the heuristic
+  at top 30 on the long video. `heuristic` stays the default detector, because
+  neither model beats it at top 5 there. An empty `CLIPPER_LLM_MODEL` is still
+  an error (0013).
+- **Score scale.** Decision 4 stands for now. A finer score (token
+  probabilities, or a rubric in the prompt) is the next lever, and needs its
+  own amendment with `eval` results.
+- **Repeatability (0015).** `llama3.1:8b`'s reasons varied between two runs at
+  temperature 0 and seed 0, though its scores did not. That meets 0015's
+  "revisit when" for that model; it is not the default.
+
 ## Related
 
 - 0012: evaluation

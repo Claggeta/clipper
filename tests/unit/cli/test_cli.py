@@ -183,18 +183,14 @@ def test_analyze_records_the_llm_detector_with_its_model(
     assert saved.detector == "llm:some-model:tag"
 
 
-@pytest.mark.parametrize("model", [None, ""])
-def test_analyze_llm_without_a_model_is_an_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model: str | None
+def test_analyze_llm_with_an_empty_model_is_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     video = tmp_path / "clip.mp4"
     video.write_bytes(b"not a real video")
     out_dir = tmp_path / "out"
     monkeypatch.setenv("CLIPPER_OUTPUT_DIR", str(out_dir))
-    if model is None:
-        monkeypatch.delenv("CLIPPER_LLM_MODEL", raising=False)
-    else:
-        monkeypatch.setenv("CLIPPER_LLM_MODEL", model)
+    monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
     transcribed: list[Path] = []
 
     class RecordingTranscriber(FakeTranscriber):

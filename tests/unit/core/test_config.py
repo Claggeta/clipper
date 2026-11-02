@@ -30,7 +30,7 @@ def test_llm_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLIPPER_LLM_MODEL", raising=False)
     settings = Settings()
     assert settings.llm_url == "http://127.0.0.1:11434"
-    assert settings.llm_model is None
+    assert settings.llm_model == "qwen3.5:9b"
 
 
 def test_llm_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:

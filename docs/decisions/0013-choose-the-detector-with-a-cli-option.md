@@ -104,7 +104,9 @@ fixed sample output. A choice between two real detectors is a different thing.
   not recorded (0014, item 7a amendment).
 - A `CLIPPER_LLM_MODEL` that is unset or empty with `--detector llm` is an
   error from `_build_detector` (`DetectionError`), printed as `Error: ...`
-  with exit 1 before anything is transcribed or written. It is not a usage
+  with exit 1 before anything is transcribed or written. (Since 0014's 7c
+  amendment the setting defaults to `qwen3.5:9b`, so only an empty value
+  reaches this error.) It is not a usage
   error (exit 2): the option value is valid and the setting is missing.
 - `analyze` now builds the pipeline, and `eval` builds and runs the detector,
   inside the `try` that reports a `ClipperError`. Before, `eval` called the

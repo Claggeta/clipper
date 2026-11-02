@@ -163,8 +163,8 @@ def test_llm_detector_is_named_with_its_model(env: Env) -> None:
     assert "Detector: llm:some-model:tag (top 5)" in result.output
 
 
-def test_llm_without_a_model_is_an_error(env: Env) -> None:
-    env.monkeypatch.delenv("CLIPPER_LLM_MODEL", raising=False)
+def test_llm_with_an_empty_model_is_an_error(env: Env) -> None:
+    env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
     env.monkeypatch.setattr(cli_main, "_build_detector", REAL_BUILD_DETECTOR)
 
     result = env.run("--detector", "llm")
