@@ -206,15 +206,15 @@ V3 results, for reference:
   4 of 5 (1 repeat); `oFbD0Ot7nQ8.json` top 30, recall 6 of 30 and precision
   6 of 30 in 953 s, but 0 of 30 in its top 5. Both models tried cluster their
   scores on round values.
-- Item 0 has two label files. With one-to-one precision (ADR 0012, item 6a amendment), the heuristic gives: on
-  `test_input.json` (labels cover the whole speech) recall 3 of 4 and
-  precision 3 of 5, with 2 repeats; on `oFbD0Ot7nQ8.json` recall 2 of 30 and
-  precision 2 of 5 at top 5 (1 repeat), and recall 5 of 30 and precision 5 of
-  30 at top 30 (`CLIPPER_TOP_N=30`, 2 repeats, both inside the 9.5-minute
-  label 16). Precision is a lower bound on the long video. Before 6a,
-  precision there was 3 of 5 and 7 of 30. Seven of its 30 labels are longer
-  than two 45 s windows. Videos are downloaded by hand with
-  `uv tool run yt-dlp` into `data/videos/`, named by video ID.
+- Item 0 has two label files. With one-to-one precision (ADR 0012, item 6a
+  amendment), the heuristic gives: on `test_input.json` (labels cover the
+  whole speech) recall 3 of 4 and precision 3 of 5, with 2 repeats; on
+  `oFbD0Ot7nQ8.json` recall 2 of 30 and precision 2 of 5 at top 5 (1 repeat),
+  and recall 5 of 30 and precision 5 of 30 at top 30 (`CLIPPER_TOP_N=30`,
+  2 repeats, both inside the 9.5-minute label 16). Precision is a lower bound
+  on the long video. Before 6a, precision there was 3 of 5 and 7 of 30. Seven
+  of its 30 labels are longer than two 45 s windows. Videos are downloaded by
+  hand with `uv tool run yt-dlp` into `data/videos/`, named by video ID.
 
 ## Pinned dependencies
 
