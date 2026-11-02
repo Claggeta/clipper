@@ -198,13 +198,15 @@ In progress:
 
 - V4. Nothing merged yet. Next: item 1, the ADRs for the V4 decisions.
 
-V3 results, for reference. Item 7, the LLM detector: `--detector llm` via Ollama, with
-  thinking off and `qwen3.5:9b` as the default model (ADR 0014 amendments).
-  Its results on the two label files: `test_input.json` top 5, recall 4 of 4
-  and precision 4 of 5 (1 repeat); `oFbD0Ot7nQ8.json` top 30, recall 6 of 30
-  and precision 6 of 30 in 953 s, but 0 of 30 in its top 5. Both models tried
-  cluster their scores on round values. Item 0 has two label files. With
-  one-to-one precision (ADR 0012, item 6a amendment), the heuristic gives: on
+V3 results, for reference:
+
+- Item 7, the LLM detector: `--detector llm` via Ollama, with thinking off
+  and `qwen3.5:9b` as the default model (ADR 0014 amendments). Its results on
+  the two label files: `test_input.json` top 5, recall 4 of 4 and precision
+  4 of 5 (1 repeat); `oFbD0Ot7nQ8.json` top 30, recall 6 of 30 and precision
+  6 of 30 in 953 s, but 0 of 30 in its top 5. Both models tried cluster their
+  scores on round values.
+- Item 0 has two label files. With one-to-one precision (ADR 0012, item 6a amendment), the heuristic gives: on
   `test_input.json` (labels cover the whole speech) recall 3 of 4 and
   precision 3 of 5, with 2 repeats; on `oFbD0Ot7nQ8.json` recall 2 of 30 and
   precision 2 of 5 at top 5 (1 repeat), and recall 5 of 30 and precision 5 of
