@@ -135,9 +135,9 @@ candidate with the labels it hits, then recall (labels hit by at least one
 candidate) and precision, as counts and percentages. Precision is one-to-one:
 going down the ranking, each candidate claims the first label it hits that a
 higher-ranked candidate has not, and a candidate that hits only claimed labels
-is a repeat (`16 (repeat of #3)`) and does not count. Recall is `n/a` with no labels, and precision is `n/a` with no
-candidates. A label that ends after the transcript does is noted and still
-counted. The numbers come from one person's labels on a few videos, so treat a
+is a repeat (`16 (repeat of #3)`) and does not count. Recall is `n/a` with no
+labels, and precision is `n/a` with no candidates. A label that ends after the
+transcript does is noted and still counted. The numbers come from one person's labels on a few videos, so treat a
 difference between detectors as a sanity check, not a measurement.
 
 `--detector` chooses the detector to rerun, as on `analyze`. The default is
@@ -220,27 +220,28 @@ Evaluating that result against the maintainer's four labels for the same video
 │ 3 │ 0:02:30 │ 0:03:47 │ #2, #3 │ Darkest moment, power of hope, the list    │
 │ 4 │ 0:03:48 │ 0:04:35 │ #5     │ Ring the bell                              │
 └───┴─────────┴─────────┴────────┴────────────────────────────────────────────┘
-                  Candidates
-┌───┬─────────┬─────────┬───────┬────────────┐
-│ # │ Start   │ End     │ Score │ Hits label │
-├───┼─────────┼─────────┼───────┼────────────┤
-│ 1 │ 0:00:32 │ 0:01:13 │ 0.26  │ 2          │
-│ 2 │ 0:03:17 │ 0:04:00 │ 0.23  │ 3          │
-│ 3 │ 0:02:33 │ 0:03:15 │ 0.17  │ 3          │
-│ 4 │ 0:01:47 │ 0:02:26 │ 0.09  │ 2          │
-│ 5 │ 0:04:02 │ 0:04:33 │ 0.03  │ 4          │
-└───┴─────────┴─────────┴───────┴────────────┘
+                     Candidates
+┌───┬─────────┬─────────┬───────┬──────────────────┐
+│ # │ Start   │ End     │ Score │ Hits label       │
+├───┼─────────┼─────────┼───────┼──────────────────┤
+│ 1 │ 0:00:32 │ 0:01:13 │ 0.26  │ 2                │
+│ 2 │ 0:03:17 │ 0:04:00 │ 0.23  │ 3                │
+│ 3 │ 0:02:33 │ 0:03:15 │ 0.17  │ 3 (repeat of #2) │
+│ 4 │ 0:01:47 │ 0:02:26 │ 0.09  │ 2 (repeat of #1) │
+│ 5 │ 0:04:02 │ 0:04:33 │ 0.03  │ 4                │
+└───┴─────────┴─────────┴───────┴──────────────────┘
 Note: label 4 (0:03:48-0:04:35) ends after the end of the transcript (273.8s); no detector can reach the part past it
 Detector: heuristic (top 5)
 1 video, 4 labels, 5 candidates
 Recall: 3 of 4 labels (75%)
-Precision: 5 of 5 candidates (100%)
+Precision: 3 of 5 candidates (60%); 2 more repeat a matched label
 Indicative only: one labeler, 1 video, 4 labels (ADR 0012).
 ```
 
-These four labels cover the whole speech, so every candidate lands inside one
-and precision cannot be anything but full. This run shows that `eval` works,
-not how good the detector is. That needs a long video with stretches the
+These four labels cover the whole speech, so every candidate lands inside one,
+and precision drops only through repeats: candidates 3 and 4 hit labels that a
+higher-ranked candidate already claimed. This run shows that `eval` works, not
+how good the detector is. That needs a long video with stretches the
 maintainer would not post.
 
 ## Known limitations
