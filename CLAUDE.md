@@ -78,8 +78,9 @@ and planned code:
   or a third real detector appears; that replaces the 0006 and 0011 triggers.
   Amends 0006.
 - `0014` — the LLM detector re-ranks the heuristic's windows, via Ollama, and
-  never falls back silently. Windowing and dedup are extracted first, as a
-  behaviour-neutral change.
+  never falls back silently. Windowing and dedup were extracted first, as a
+  behaviour-neutral change, into `adapters/detection/windows.py`
+  (`sliding_windows`, `select_top`, `WINDOW_SECONDS`, `STEP_SECONDS`).
 - `0015` — determinism is a property of the heuristic detector. Amends vision
   criterion 2.
 
@@ -149,9 +150,10 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model, and
-  item 3, `clipper eval`, and item 4, `--detector` and the `_build_detector`
-  seam, are merged). Item 0 has two label files. On `test_input.json`
+- V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model,
+  item 3, `clipper eval`, item 4, `--detector` and the `_build_detector`
+  seam, and item 6, the windowing extraction, are merged). Next: item 6a,
+  the hit rule, before item 7. Item 0 has two label files. On `test_input.json`
   (labels cover the whole speech), `eval` gave recall 3 of 4 and precision 5
   of 5, which shows the plumbing works. On `oFbD0Ot7nQ8.json` the heuristic
   gave recall 2 of 30 and precision 3 of 5 at top 5, and recall 5 of 30 and
@@ -251,8 +253,9 @@ confirmation first (see "How to work in this repo").
    on recording the detector name in `AnalysisResult` (ADR 0013)~~ (done)
 5. Whisper experiment: a larger model and/or the GPU, measured with `eval`.
    Needs a manual-test step. May end in a settings change or in nothing.
-6. Extract windowing and overlap dedup from `HeuristicClipDetector`.
-   Behaviour-neutral; the heuristic's tests stay unchanged (ADR 0014).
+6. ~~Extract windowing and overlap dedup from `HeuristicClipDetector`.
+   Behaviour-neutral; the heuristic's tests stay unchanged (ADR 0014).~~
+   (done; `adapters/detection/windows.py`)
 6a. Revisit the hit rule on the long-video labels. Half of the shorter range
    counts any 45 s candidate inside a long label as a hit (three of seven
    top-30 hits on `oFbD0Ot7nQ8.json`). A change is an ADR 0012 amendment,
