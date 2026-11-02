@@ -48,7 +48,11 @@ uv run clipper analyze path\to\video.mp4
 ```
 
 Add `-v` / `--verbose` to see progress logging. `--detector` chooses the
-detector; the only one so far, and the default, is `heuristic`.
+detector: `heuristic`, the default, or `llm`, which asks a local model served
+by [Ollama](https://ollama.com) to score each window. `llm` needs Ollama
+running and `CLIPPER_LLM_MODEL` set, and it is recorded with its model, e.g.
+`llm:<model>`. It has not yet been run on a real model; setup and results come
+with the manual-test steps.
 
 The command prints a table of the top candidates and the detector's name, and
 writes the full result, including the detector's name, to
@@ -134,7 +138,7 @@ counted. The numbers come from one person's labels on a few videos, so treat a
 difference between detectors as a sanity check, not a measurement.
 
 `--detector` chooses the detector to rerun, as on `analyze`. The default is
-`heuristic`, the only one so far.
+`heuristic`.
 
 A bad or missing file, or labels written for a different video, prints
 `Error: ...` and exits 1.
@@ -153,6 +157,8 @@ repo root or set absolute paths.
 | `CLIPPER_OUTPUT_DIR`   | `data/output` | Where result JSON is written           |
 | `CLIPPER_CLIPS_DIR`    | `data/clips`  | Where rendered clips are written       |
 | `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files    |
+| `CLIPPER_LLM_URL`      | `http://127.0.0.1:11434` | Ollama server for `--detector llm` |
+| `CLIPPER_LLM_MODEL`    | (unset)       | Ollama model for `--detector llm`      |
 
 For example, in PowerShell:
 
