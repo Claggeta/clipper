@@ -1,5 +1,10 @@
-from clipper.core.captions import build_srt
-from clipper.domain.models import ClipCandidate, Segment, Transcript
+from clipper.core.captions import Captions, build_ass
+from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
+
+# All transcripts here are constructed, not Whisper output.
+
+_ON = "{\\c&H0000FFFF&}"
+_OFF = "{\\r}"
 
 
 def _c(start: float, end: float) -> ClipCandidate:
@@ -9,105 +14,203 @@ def _c(start: float, end: float) -> ClipCandidate:
     )
 
 
-def _t(*spans: tuple[float, float, str]) -> Transcript:
-    # Constructed transcript, not Whisper output.
-    return Transcript(
-        segments=tuple(
-            Segment(start_seconds=s, end_seconds=e, text=text) for s, e, text in spans
-        )
+def _seg(start: float, end: float, text: str) -> Segment:
+    """A segment without word times, as in v0.3 JSON."""
+    return Segment(start_seconds=start, end_seconds=end, text=text)
+
+
+def _wseg(*words: tuple[float, float, str]) -> Segment:
+    """A segment spanning its words, with their text joined by spaces."""
+    return Segment(
+        start_seconds=words[0][0],
+        end_seconds=words[-1][1],
+        text=" ".join(t for _, _, t in words),
+        words=tuple(Word(start_seconds=s, end_seconds=e, text=t) for s, e, t in words),
     )
 
 
-def test_segment_inside_is_shifted_to_clip_start() -> None:
-    srt = build_srt(_t((12.0, 14.5, "hello there")), _c(10.0, 20.0))
-    assert srt == "1\n00:00:02,000 --> 00:00:04,500\nhello there\n"
+def _t(*segments: Segment) -> Transcript:
+    return Transcript(segments=segments)
 
 
-def test_segment_straddling_start_is_clamped_and_keeps_full_text() -> None:
-    srt = build_srt(_t((8.0, 12.0, "so this is it")), _c(10.0, 20.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:02,000\nso this is it\n"
+def _events(captions: Captions) -> list[str]:
+    """Each Dialogue line as 'start,end,text'."""
+    return [
+        ",".join(line.split(",", 9)[i] for i in (1, 2, 9))
+        for line in captions.text.splitlines()
+        if line.startswith("Dialogue: ")
+    ]
 
 
-def test_segment_straddling_end_is_clamped() -> None:
-    srt = build_srt(_t((18.0, 23.0, "and then")), _c(10.0, 20.0))
-    assert srt == "1\n00:00:08,000 --> 00:00:10,000\nand then\n"
-
-
-def test_segment_spanning_whole_clip_is_clamped_both_sides() -> None:
-    srt = build_srt(_t((5.0, 30.0, "long")), _c(10.0, 20.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:10,000\nlong\n"
-
-
-def test_segments_touching_the_edges_are_excluded() -> None:
-    transcript = _t((5.0, 10.0, "before"), (20.0, 25.0, "after"))
-    assert build_srt(transcript, _c(10.0, 20.0)) == ""
-
-
-def test_no_overlap_returns_empty_string() -> None:
-    assert build_srt(_t((0.0, 1.0, "early")), _c(10.0, 20.0)) == ""
-
-
-def test_empty_transcript_returns_empty_string() -> None:
-    assert build_srt(Transcript(segments=()), _c(0.0, 5.0)) == ""
-
-
-def test_cues_are_numbered_and_separated_by_a_blank_line() -> None:
-    transcript = _t((10.0, 11.0, "one"), (12.0, 13.0, "two"))
-    assert build_srt(transcript, _c(10.0, 20.0)) == (
-        "1\n00:00:00,000 --> 00:00:01,000\none\n"
-        "\n"
-        "2\n00:00:02,000 --> 00:00:03,000\ntwo\n"
+def _hl(words: list[str], active: int) -> str:
+    return " ".join(
+        f"{_ON}{w}{_OFF}" if i == active else w for i, w in enumerate(words)
     )
 
 
-def test_numbering_skips_dropped_segments() -> None:
-    transcript = _t((10.0, 11.0, "   "), (12.0, 13.0, "kept"))
-    assert build_srt(transcript, _c(10.0, 20.0)).startswith("1\n")
+def test_each_word_is_an_event_showing_its_chunk_highlighted() -> None:
+    seg = _wseg((10.0, 10.4, "one"), (10.5, 10.9, "two"), (11.0, 11.6, "three"))
+    captions = build_ass(_t(seg), _c(10.0, 20.0), vertical=True)
+    words = ["one", "two", "three"]
+    assert _events(captions) == [
+        f"0:00:00.00,0:00:00.50,{_hl(words, 0)}",
+        f"0:00:00.50,0:00:01.00,{_hl(words, 1)}",
+        f"0:00:01.00,0:00:01.60,{_hl(words, 2)}",
+    ]
+    assert captions.from_segments is False
 
 
-def test_times_round_to_milliseconds_without_float_noise() -> None:
-    # 32.43 - 32.43 is 0 and 33.1 - 32.43 is not exactly 0.67 in floats.
-    srt = build_srt(_t((32.43, 33.1, "x")), _c(32.43, 40.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:00,670\nx\n"
+def test_chunks_hold_at_most_three_words() -> None:
+    seg = _wseg(*((float(i), i + 0.5, f"w{i}") for i in range(5)))
+    events = _events(build_ass(_t(seg), _c(0.0, 10.0), vertical=True))
+    assert len(events) == 5
+    assert events[2].endswith(_hl(["w0", "w1", "w2"], 2))
+    assert events[3] == f"0:00:03.00,0:00:04.00,{_hl(['w3', 'w4'], 0)}"
+    # The last word of a chunk ends with the word, not at the next chunk.
+    assert events[2].startswith("0:00:02.00,0:00:02.50,")
 
 
-def test_cue_with_no_length_after_rounding_is_dropped() -> None:
-    # Overlaps the clip by 0.0004 s, which rounds to zero milliseconds.
-    assert build_srt(_t((9.0, 10.0004, "blip")), _c(10.0, 20.0)) == ""
+def test_a_chunk_ends_after_a_sentence() -> None:
+    seg = _wseg((0.0, 0.5, "Done."), (1.0, 1.5, "Next"), (2.0, 2.5, "one?"))
+    events = _events(build_ass(_t(seg), _c(0.0, 10.0), vertical=False))
+    assert events[0] == f"0:00:00.00,0:00:00.50,{_hl(['Done.'], 0)}"
+    assert events[1].endswith(_hl(["Next", "one?"], 0))
 
 
-def test_whitespace_and_newlines_collapse_to_single_spaces() -> None:
-    srt = build_srt(_t((0.0, 1.0, "  one\n\ntwo \t three  ")), _c(0.0, 5.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:01,000\none two three\n"
+def test_a_chunk_never_spans_two_segments() -> None:
+    first = _wseg((0.0, 0.5, "a"), (0.5, 1.0, "b"))
+    second = _wseg((1.0, 1.5, "c"), (1.5, 2.0, "d"))
+    events = _events(build_ass(_t(first, second), _c(0.0, 10.0), vertical=True))
+    assert events[1].endswith(_hl(["a", "b"], 1))
+    assert events[2].endswith(_hl(["c", "d"], 0))
 
 
-def test_empty_text_produces_no_cue() -> None:
-    assert build_srt(_t((0.0, 1.0, " \n ")), _c(0.0, 5.0)) == ""
+def test_words_starting_inside_the_clip_are_kept_and_clamped() -> None:
+    first = _wseg((9.5, 10.2, "before"), (10.2, 10.6, "in"))
+    second = _wseg((19.8, 20.5, "late"))
+    events = _events(build_ass(_t(first, second), _c(10.0, 20.0), vertical=True))
+    # "before" starts before the clip and is dropped; "late" ends at the edge.
+    assert events == [
+        f"0:00:00.20,0:00:00.60,{_hl(['in'], 0)}",
+        f"0:00:09.80,0:00:10.00,{_hl(['late'], 0)}",
+    ]
 
 
-def test_timestamp_past_one_hour() -> None:
-    srt = build_srt(_t((3700.0, 3701.5, "late")), _c(100.0, 4000.0))
-    assert srt == "1\n01:00:00,000 --> 01:00:01,500\nlate\n"
+def test_a_word_is_held_until_the_next_word_in_its_chunk() -> None:
+    seg = _wseg((1.0, 1.2, "wait"), (4.0, 4.5, "what"))
+    events = _events(build_ass(_t(seg), _c(0.0, 5.0), vertical=True))
+    assert events[0] == f"0:00:01.00,0:00:04.00,{_hl(['wait', 'what'], 0)}"
 
 
-def test_timestamp_hours_widen_past_99() -> None:
-    srt = build_srt(_t((360000.0, 360001.0, "x")), _c(0.0, 400000.0))
-    assert srt.splitlines()[1] == "100:00:00,000 --> 100:00:01,000"
+def test_a_word_starting_at_the_clip_end_is_dropped() -> None:
+    seg = _wseg((20.0, 20.5, "after"))
+    assert build_ass(_t(seg), _c(10.0, 20.0), vertical=True) == ("", False)
 
 
-def test_markup_characters_are_removed() -> None:
-    srt = build_srt(_t((0.0, 1.0, "a {\\an8}b <i>c</i> d --> e")), _c(0.0, 5.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:01,000\na an8b ic/i d -- e\n"
+def test_a_zero_length_word_shows_in_its_chunk_but_is_never_highlighted() -> None:
+    seg = _wseg((1.0, 1.0, "a"), (1.0, 1.5, "b"))
+    events = _events(build_ass(_t(seg), _c(0.0, 5.0), vertical=True))
+    assert events == [f"0:00:01.00,0:00:01.50,{_hl(['a', 'b'], 1)}"]
 
 
-def test_cue_that_is_only_markup_characters_is_dropped() -> None:
-    assert build_srt(_t((0.0, 1.0, "<>{}")), _c(0.0, 5.0)) == ""
+def test_times_round_to_centiseconds() -> None:
+    # 4 ms rounds down and 5 ms rounds up, so "x" has no length and is
+    # dropped. 33.1 - 32.43 is not exactly 0.67 in floats.
+    seg = _wseg((32.431, 32.434, "x"), (32.434, 32.435, "y"), (32.435, 33.1, "z"))
+    events = _events(build_ass(_t(seg), _c(32.43, 40.0), vertical=True))
+    words = ["x", "y", "z"]
+    assert events == [
+        f"0:00:00.00,0:00:00.01,{_hl(words, 1)}",
+        f"0:00:00.01,0:00:00.67,{_hl(words, 2)}",
+    ]
 
 
-def test_backslash_is_removed_so_libass_cannot_read_a_line_break() -> None:
-    srt = build_srt(_t((0.0, 1.0, "C:\\new\\table \\N \\h x")), _c(0.0, 5.0))
-    assert srt == "1\n00:00:00,000 --> 00:00:01,000\nC:newtable N h x\n"
+def test_timestamp_past_one_hour_and_ten_hours() -> None:
+    transcript = _t(_wseg((3700.0, 3701.5, "late")), _wseg((36000.0, 36001.0, "x")))
+    events = _events(build_ass(transcript, _c(0.0, 40000.0), vertical=True))
+    assert events[0].startswith("1:01:40.00,1:01:41.50,")
+    assert events[1].startswith("10:00:00.00,10:00:01.00,")
 
 
-def test_cue_that_is_only_backslashes_is_dropped() -> None:
-    assert build_srt(_t((0.0, 1.0, "\\ \\\\")), _c(0.0, 5.0)) == ""
+def test_markup_characters_are_removed_from_words() -> None:
+    seg = _wseg((0.0, 0.5, "{a}"), (0.5, 1.0, "<b>"), (1.0, 1.5, "C:\\new"))
+    events = _events(build_ass(_t(seg), _c(0.0, 5.0), vertical=True))
+    assert events[0].endswith(_hl(["a", "b", "C:new"], 0))
+
+
+def test_a_word_that_is_only_markup_is_dropped() -> None:
+    seg = _wseg((0.0, 0.5, "{}"), (0.5, 1.0, "kept"))
+    events = _events(build_ass(_t(seg), _c(0.0, 5.0), vertical=True))
+    assert events == [f"0:00:00.50,0:00:01.00,{_hl(['kept'], 0)}"]
+
+
+def test_a_segment_without_words_is_one_whole_cue() -> None:
+    captions = build_ass(
+        _t(_seg(8.0, 12.0, "so this is it")), _c(10.0, 20.0), vertical=True
+    )
+    assert _events(captions) == ["0:00:00.00,0:00:02.00,so this is it"]
+    assert captions.from_segments is True
+
+
+def test_segment_cues_keep_0010s_rules() -> None:
+    transcript = _t(
+        _seg(5.0, 10.0, "touches the start"),
+        _seg(11.0, 12.0, "  a {\\an8}b\n<i>c</i>  "),
+        _seg(13.0, 14.0, " \n "),
+    )
+    captions = build_ass(transcript, _c(10.0, 20.0), vertical=False)
+    assert _events(captions) == ["0:00:01.00,0:00:02.00,a an8b ic/i"]
+
+
+def test_mixed_segments_set_from_segments() -> None:
+    transcript = _t(_wseg((1.0, 1.5, "word")), _seg(2.0, 3.0, "no words"))
+    captions = build_ass(transcript, _c(0.0, 5.0), vertical=True)
+    assert _events(captions) == [
+        f"0:00:01.00,0:00:01.50,{_hl(['word'], 0)}",
+        "0:00:02.00,0:00:03.00,no words",
+    ]
+    assert captions.from_segments is True
+
+
+def test_from_segments_is_false_when_the_segment_cue_is_outside_the_clip() -> None:
+    transcript = _t(_wseg((1.0, 1.5, "word")), _seg(8.0, 9.0, "outside"))
+    assert build_ass(transcript, _c(0.0, 5.0), vertical=True).from_segments is False
+
+
+def test_no_speech_in_range_returns_empty_text() -> None:
+    assert build_ass(_t(_seg(0.0, 1.0, "early")), _c(10.0, 20.0), vertical=True) == (
+        "",
+        False,
+    )
+    assert build_ass(Transcript(segments=()), _c(0.0, 5.0), vertical=False) == (
+        "",
+        False,
+    )
+
+
+def test_vertical_layout_is_1080x1920() -> None:
+    text = build_ass(_t(_seg(0.0, 1.0, "x")), _c(0.0, 5.0), vertical=True).text
+    assert "PlayResX: 1080\nPlayResY: 1920\n" in text
+
+
+def test_source_layout_is_a_16_by_9_canvas() -> None:
+    text = build_ass(_t(_seg(0.0, 1.0, "x")), _c(0.0, 5.0), vertical=False).text
+    assert "PlayResX: 1920\nPlayResY: 1080\n" in text
+
+
+def test_header_has_one_bold_bottom_centre_style_and_events_follow_it() -> None:
+    text = build_ass(_t(_seg(0.0, 1.0, "x")), _c(0.0, 5.0), vertical=True).text
+    lines = text.splitlines()
+    assert lines[0] == "[Script Info]"
+    assert "ScaledBorderAndShadow: yes" in lines
+    styles = [line for line in lines if line.startswith("Style: ")]
+    assert len(styles) == 1
+    fields = styles[0].removeprefix("Style: ").split(",")
+    assert fields[0] == "Default"
+    assert fields[7] == "-1"  # bold
+    assert fields[18] == "2"  # bottom centre
+    assert lines.index("[Events]") < lines.index(
+        "Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,x"
+    )
+    assert text.endswith("\n")
+    assert "\r" not in text

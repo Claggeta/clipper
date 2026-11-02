@@ -46,9 +46,9 @@ class ClipRenderer(Protocol):
     `RenderedClip` whose `path` is `output_path`, and raises `ClipRenderError`
     on failure.
 
-    `captions` is SRT text with times relative to the clip start (see
-    `clipper.core.captions`), burned into the video. `None` or "" renders
-    without captions.
+    `captions` is ASS text with times relative to the clip start, laid out
+    for the frame being rendered (see `clipper.core.captions`), burned into
+    the video. `None` or "" renders without captions.
 
     `vertical` fits the whole frame into 9:16 at 1080x1920 over a blurred copy
     of itself, before any captions are drawn (see docs/decisions/0016).

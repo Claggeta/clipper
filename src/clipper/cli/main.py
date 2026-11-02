@@ -22,7 +22,7 @@ from clipper.adapters.results.labels_json import check_labels_match, load_labels
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
 from clipper.adapters.transcription.video import VideoTranscriber
-from clipper.core.captions import build_srt
+from clipper.core.captions import build_ass
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
 from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
@@ -325,22 +325,33 @@ def render(
     rendered = 0
     for number, candidate, path in zip(ranks, selected, paths, strict=True):
         span = f"{_fmt(candidate.start_seconds)}-{_fmt(candidate.end_seconds)}"
-        srt = build_srt(result.transcript, candidate) if captions else ""
-        if captions and not srt:
+        built = (
+            build_ass(result.transcript, candidate, vertical=vertical)
+            if captions
+            else None
+        )
+        ass = built.text if built else ""
+        if captions and not ass:
             console.print(
                 f"[yellow]Note:[/yellow] #{number} {span} has no speech in range; "
                 "rendered without captions",
                 soft_wrap=True,
             )
+        elif built and built.from_segments:
+            console.print(
+                f"[yellow]Note:[/yellow] #{number} {span} has no word timings; "
+                "captions show whole segments",
+                soft_wrap=True,
+            )
         try:
             clip = renderer.render(
-                video, candidate, path, captions=srt or None, vertical=vertical
+                video, candidate, path, captions=ass or None, vertical=vertical
             )
         except ClipperError as exc:
             failures.append(f"#{number} {span}: {escape(str(exc))}")
             continue
         rendered += 1
-        tags = [t for t, on in (("vertical", vertical), ("captions", srt)) if on]
+        tags = [t for t, on in (("vertical", vertical), ("captions", ass)) if on]
         suffix = f" ({', '.join(tags)})" if tags else ""
         console.print(
             f"Rendered #{number} {span} {escape(str(clip.path))}{suffix}",

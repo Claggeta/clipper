@@ -83,9 +83,12 @@ This renders every candidate. Options:
 - `--rank N` renders only that rank, the 1-based position in the JSON (the
   table's `#` column). Repeat it for several, for example `--rank 1 --rank 5`.
   Clips are rendered in ascending rank order whatever order you give.
-- `--captions` burns the transcript text into each clip, in one fixed style. A
-  clip with no speech in range is rendered without captions and a note is
-  printed.
+- `--captions` burns captions into each clip, a few words at a time, in bold
+  white with the word being spoken in yellow. A clip with no speech in range
+  is rendered without captions and a note is printed. An analysis saved by
+  v0.3 or earlier has no word times: its captions show whole segments, with a
+  note. Run `analyze` again for word-by-word captions; that re-transcribes the
+  video once and may move the candidates.
 - `--vertical` makes a 1080x1920 (9:16) clip for short-form platforms: the
   whole frame, scaled to fit the width, centred on a blurred copy of itself.
   Nothing is cut off. Black bars built into the source stay in the picture.
@@ -275,11 +278,10 @@ maintainer would not post.
 - **Captions need libass.** An ffmpeg build without it fails every clip with
   ffmpeg's own message. Only one build (gyan.dev 9.0.2, with libass) has been
   tried.
-- **Captions are segment-level and fixed in style.** A long Whisper segment
-  makes a large caption block, and a segment that crosses a clip's edge shows
-  its whole sentence for the part inside the clip. The characters
-  `{ } < > \` are removed from caption text because the renderer reads them as
-  markup, so `5 > 3` shows as `5 3`.
+- **Captions have one style.** It was chosen by eye on one video and is not
+  tuned. A word that starts before a clip's first frame is not shown. The
+  characters `{ } < > \` are removed from caption text because the renderer
+  reads them as markup, so `5 > 3` shows as `5 3`.
 - **`render` has no `-v`.** Only the 10-line ffmpeg failure message is
   available.
 

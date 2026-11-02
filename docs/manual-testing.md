@@ -875,9 +875,11 @@ Invoke-Item "$S\vertical-captions.png"
 ```
 
 Pass: exit 0, the line ends with ` (vertical, captions)`, the streams are as in
-R15, and the frame shows a caption inside the 1080-wide picture. The caption
-style is still the one fixed segment-level style (ADR 0010) until V4 item 4.
-Record how large it is and how many lines it wraps to.
+R15, and the frame shows a caption of one to three words in the blurred fill
+below the picture, bold white with at most one word in yellow, on one line
+(ADR 0017). A frame in a pause between chunks shows no caption; rerun the
+`ffmpeg` line at another time if 5 s falls in one. The Captions section checks
+the words and their timing.
 
 ### R17. Portrait and narrow sources (constructed)
 
@@ -908,7 +910,9 @@ sides.
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),
-[0011](decisions/0011-render-command-shape-and-failure-policy.md)). Run the
+[0011](decisions/0011-render-command-shape-and-failure-policy.md),
+[0017](decisions/0017-word-timestamps-and-styled-captions.md)). Captions show
+one to three words at a time, with the word being spoken in yellow. Run the
 Rendering section's R0 first, in the same PowerShell window. These steps use
 `$S`, `$Src`, `$Json`, `$r` and `testsrc.mp4` from R0.
 
@@ -966,59 +970,82 @@ function Save-Frame($Clip, [double]$T, $Png) {
   ffmpeg -hide_banner -loglevel error -y -ss $ts -i $Clip -frames:v 1 $Png
 }
 
-# Helper: the transcript segments that overlap a candidate, with clip-relative
-# times. This is what the SRT should contain.
-function Get-Cues($Res, [int]$Rank) {
+# Helper: the words that start inside a candidate, with clip-relative times.
+# These are what the captions show, a chunk of up to three at a time.
+function Get-Words($Res, [int]$Rank) {
   $c = $Res.candidates[$Rank - 1]
+  # [double] casts: JSON whole numbers are integers, and [Math]::Min(10, 12.5)
+  # would pick the integer overload and return 10.
+  $cs = [double]$c.start_seconds; $ce = [double]$c.end_seconds
   foreach ($s in $Res.transcript.segments) {
-    # [double] casts: JSON whole numbers are integers, and [Math]::Max(10, 12.5)
-    # would pick the integer overload and return 12.
-    $a = [Math]::Max([double]$s.start_seconds, [double]$c.start_seconds)
-    $b = [Math]::Min([double]$s.end_seconds, [double]$c.end_seconds)
-    if ($b -gt $a) {
-      [pscustomobject]@{ Start = $a - $c.start_seconds; End = $b - $c.start_seconds; Text = $s.text.Trim() }
+    foreach ($w in $s.words) {
+      $a = [double]$w.start_seconds
+      if ($a -ge $cs -and $a -lt $ce) {
+        $b = [Math]::Min([double]$w.end_seconds, $ce)
+        [pscustomobject]@{ Start = $a - $cs; End = $b - $cs; Text = $w.text }
+      }
     }
   }
 }
 
 # Helper (constructed fixtures): a result JSON with a transcript.
-# Spans are "start-end"; Segments are "start|end|text". Written as UTF-8
-# without a BOM, which is what the JSON loader expects.
+# Spans are "start-end"; Segments are "start|end|text". With -Words, each
+# segment gets constructed word times, its text split on spaces and spread
+# evenly over the segment, except the segments whose 0-based index is in
+# -Whole. Without -Words no segment has words, like a v0.3 analysis. Written as
+# UTF-8 without a BOM, which is what the JSON loader expects.
 function New-CapResult {
-  param([string]$Path, [string]$Source, [string[]]$Spans, [string[]]$Segments)
+  param([string]$Path, [string]$Source, [string[]]$Spans, [string[]]$Segments,
+        [switch]$Words, [int[]]$Whole = @())
   $cands = @(foreach ($sp in $Spans) {
     $a, $b = $sp -split "-"
     @{ start_seconds = [double]$a; end_seconds = [double]$b; score = 0.5; reasons = @("constructed") }
   })
+  $k = -1
   $segs = @(foreach ($sg in $Segments) {
+    $k++
     $a, $b, $t = $sg -split "\|", 3
-    @{ start_seconds = [double]$a; end_seconds = [double]$b; text = $t }
+    $a = [double]$a; $b = [double]$b
+    $ws = @()
+    if ($Words -and $Whole -notcontains $k) {
+      $parts = @($t.Trim() -split " +")
+      $step = ($b - $a) / $parts.Count
+      for ($n = 0; $n -lt $parts.Count; $n++) {
+        $end = if ($n -eq $parts.Count - 1) { $b } else { [Math]::Round($a + ($n + 1) * $step, 3) }
+        $ws += @{ start_seconds = [Math]::Round($a + $n * $step, 3); end_seconds = $end; text = $parts[$n] }
+      }
+    }
+    @{ start_seconds = $a; end_seconds = $b; text = $t; words = $ws }
   })
   $doc = @{ source = $Source; transcript = @{ segments = $segs }; candidates = $cands }
-  [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $doc -Depth 6),
+  [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $doc -Depth 8),
     (New-Object Text.UTF8Encoding $false))
 }
 
 # Constructed: testsrc.mp4 (from R0), two candidates (12.5-20 and 25-35).
 # Segment 10-12.5 only touches the first clip's start, 21-24 is between the
-# clips, so the first clip has no speech. The second clip has one segment.
+# clips, so the first clip has no speech: its last word starts before 12.5 s.
+# The second clip has one segment.
 New-CapResult "$S\cap-nospeech.json" "testsrc.mp4" @("12.5-20", "25-35") @(
   "0|5|far before both clips",
   "10|12.5|touches the start edge of clip one",
   "21|24|between the clips",
-  "26|33|words inside the second clip")
+  "26|33|words inside the second clip") -Words
 
-# Constructed: one candidate, six segments of awkward text (C7).
+# Constructed: one candidate, seven segments of awkward text (C7). Each of the
+# first six has up to three words, so it is one chunk. The seventh has no
+# words, so it is one whole cue.
 $e  = [string][char]0x00E9           # e with acute
 $i  = [string][char]0x00EF           # i with diaeresis
 $em = [char]::ConvertFromUtf32(0x1F600)   # outside the Basic Multilingual Plane
 New-CapResult "$S\cap-awkward.json" "testsrc.mp4" @("12.5-20") @(
-  "12.5|13.75|braces {a} and <b>bold</b> end",
-  "13.75|15|arrow --> and 5 > 3",
-  "15|16.25|caf$e na${i}ve",
-  "16.25|17.5|before $em after",
-  "17.5|18.75|it's 100% `"fine`" & ok",
-  "18.75|20|path C:\new\table")
+  "12.5|13.5|braces {a} <b>bold</b>",
+  "13.5|14.5|arrow --> 5>3",
+  "14.5|15.5|caf$e na${i}ve",
+  "15.5|16.5|before $em after",
+  "16.5|17.5|it's `"fine`" &",
+  "17.5|18.5|path C:\new\table",
+  "18.5|20|whole {cue} C:\new\table here") -Words -Whole 6
 
 # Constructed: a 1280x720 source with the same name as testsrc.mp4 (C8).
 New-Item -ItemType Directory -Force "$S\hd" | Out-Null
@@ -1026,15 +1053,26 @@ ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc=size=1280x720:rate=2
   -f lavfi -i "sine=frequency=440:duration=40" -shortest `
   -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\hd\testsrc.mp4"
 
+# Constructed: a 600x1280 source, narrower than 9:16, with the same name (C8).
+New-Item -ItemType Directory -Force "$S\narrow" | Out-Null
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc=size=600x1280:rate=25:duration=40" `
+  -f lavfi -i "sine=frequency=440:duration=40" -shortest `
+  -c:v libx264 -pix_fmt yuv420p -c:a aac "$S\narrow\testsrc.mp4"
+
 # Constructed: a result for testsrc.mp4 with speech in both clips, for C4 to C6.
 New-CapResult "$S\cap-testsrc.json" "testsrc.mp4" @("12.5-20", "25-35") @(
+  "13|19|first clip speech",
+  "26|34|second clip speech") -Words
+
+# Constructed: the same, with no word times, like a v0.3 analysis (C3).
+New-CapResult "$S\cap-segments.json" "testsrc.mp4" @("12.5-20", "25-35") @(
   "13|19|first clip speech",
   "26|34|second clip speech")
 
 "captions temp folders before any run: " + (Get-CaptionTempCount)
 ```
 
-Pass: the `ffmpeg` command prints nothing, and the last line prints a number.
+Pass: the `ffmpeg` commands print nothing, and the last line prints a number.
 Record it. It should be `0`. If it is not, a folder was left by an earlier run,
 and C4 must be read against that number and not against zero.
 
@@ -1055,7 +1093,8 @@ Pass:
 - Exit 0 for both runs.
 - With `--captions`, each `Rendered #N ...` line ends with ` (captions)`. A
   `Note: #N ... has no speech in range` line is also valid for a candidate
-  that has no speech in range. Record any.
+  that has no speech in range. Record any. There is no `has no word timings`
+  note: R0's analysis has word times.
 - Without the flag the same lines have no suffix, and the file names are the
   same (ADR 0008).
 - The last line is `Rendered X of X clips to <clips folder>` in both runs.
@@ -1063,61 +1102,66 @@ Pass:
 Record the seconds. R1 gave the plain render time for the same candidates, so
 the difference is the cost of the `subtitles` filter.
 
-### C2. Caption text and timing match the transcript
+### C2. Caption words and timing match the transcript
 
-Compares the burned-in text with the saved transcript, on the real clip with
-the highest rank. The source video may have text of its own in the picture. If
-it does, compare against the transcript and not against that text.
+Compares the burned-in words with the saved word times, on the real clip with
+the highest rank, once on the source frame and once vertical (ADR 0017). The
+source video may have text of its own in the picture. If it does, compare
+against the transcript and not against that text.
 
 ```powershell
-Reset-CapClips
-Invoke-RenderC $Src $Json $CapClips -Rank 1 -Captions
-$Clip = (Get-ChildItem $CapClips -Filter "*.mp4" | Select-Object -First 1).FullName
-$cues = @(Get-Cues $r 1)
-$cues | Format-Table @{n="Start";e={"{0:N2}" -f $_.Start}}, @{n="End";e={"{0:N2}" -f $_.End}}, `
-  @{n="Len";e={"{0:N2}" -f ($_.End - $_.Start)}}, Text -AutoSize -Wrap
-$pick = @($cues[0], $cues[[int](($cues.Count - 1) / 2)], $cues[-1])
-$n = 0
-foreach ($c in $pick) {
-  $n++
-  Save-Frame $Clip (($c.Start + $c.End) / 2) "$S\cue$n.png"
-  "cue$n.png : middle of '" + $c.Text + "'"
+$words = @(Get-Words $r 1)
+"words in rank 1: " + $words.Count
+$words | Format-Table @{n="Start";e={"{0:N2}" -f $_.Start}}, @{n="End";e={"{0:N2}" -f $_.End}}, Text -AutoSize
+$pick = @($words[0], $words[[int](($words.Count - 1) / 2)], $words[-1])
+# The longest pause between two words, which is between two chunks.
+$gap = 0..($words.Count - 2) | Sort-Object { $words[$_ + 1].Start - $words[$_].End } | Select-Object -Last 1
+$GapT = ($words[$gap].End + $words[$gap + 1].Start) / 2
+foreach ($frame in @(@{ n = "src"; f = "" }, @{ n = "vert"; f = "--vertical" })) {
+  Reset-CapClips
+  $old = $env:CLIPPER_CLIPS_DIR; $env:CLIPPER_CLIPS_DIR = $CapClips
+  try { Invoke-RenderWith $Src $Json "--rank 1 --captions $($frame.f)" | Out-Null } finally { $env:CLIPPER_CLIPS_DIR = $old }
+  "$($frame.n): exit $Code"
+  $Clip = (Get-ChildItem $CapClips -Filter "*.mp4" | Select-Object -First 1).FullName
+  $n = 0
+  foreach ($w in $pick) {
+    $n++
+    # The middle of the word, or 10 ms in for a word with no length.
+    Save-Frame $Clip (($w.Start + [Math]::Max($w.End, $w.Start + 0.02)) / 2) "$S\word-$($frame.n)-$n.png"
+    "word-$($frame.n)-$n.png : '" + $w.Text + "' in yellow, at {0:N2} s" -f $w.Start
+  }
+  Save-Frame $Clip $GapT "$S\word-$($frame.n)-gap.png"
+  "word-$($frame.n)-gap.png : pause {0:N2}-{1:N2} s" -f $words[$gap].End, $words[$gap + 1].Start
+  Remove-Item "$S\word-$($frame.n)-before.png" -ErrorAction SilentlyContinue
+  if ($words[0].Start -gt 0.5) { Save-Frame $Clip ($words[0].Start / 2) "$S\word-$($frame.n)-before.png" }
 }
-Remove-Item "$S\before.png" -ErrorAction SilentlyContinue
-if ($cues[0].Start -gt 0.5) { Save-Frame $Clip ($cues[0].Start / 2) "$S\before.png"; "before.png : before the first cue" }
-1..3 | ForEach-Object { Invoke-Item "$S\cue$_.png" }
-if (Test-Path "$S\before.png") { Invoke-Item "$S\before.png" }
+Get-ChildItem "$S\word-*.png" | ForEach-Object { Invoke-Item $_.FullName }
 ```
 
-Pass:
+`Invoke-RenderWith` is defined in R15, so run R15's helper block first.
 
-- Each `cueN.png` shows the text printed on its line, perhaps wrapped over
-  several lines, inside the frame, near the bottom.
-- `before.png`, if made, shows no caption.
+Pass, for both `src` and `vert`:
+
+- Exit 0.
+- Each `word-*-N.png` shows the word printed for it in yellow, with up to two
+  of its neighbours from the word list in white, in the order of the list. A
+  chunk does not run past a word that ends in `.`, `?` or `!`.
+- In `vert`, the caption is in the blurred fill below the picture. In `src`, it
+  is near the bottom of the frame, inside it.
+- `word-*-gap.png` shows no caption, if the pause is longer than about 0.1 s.
+  Record its length.
+- `word-*-before.png`, if made, shows no caption.
 - The text has none of `{ } < >` in it.
 
-Then list the short cues in all candidates. A segment that crosses the edge of a
-clip keeps its full text for the part inside the clip, so a short overlap
-flashes a whole sentence (ADR 0010):
-
-```powershell
-1..$r.candidates.Count | ForEach-Object {
-  $k = $_
-  Get-Cues $r $k | Where-Object { ($_.End - $_.Start) -lt 0.5 } | ForEach-Object {
-    "rank {0}: {1:N2}-{2:N2} ({3:N2} s) {4}" -f $k, $_.Start, $_.End, ($_.End - $_.Start), $_.Text
-  }
-}
-```
-
-Observe and record: how many cues are shorter than 0.5 s, and whether you
-would want a minimum overlap. ADR 0010 left that decision to this step. Do not
-fail the step on it.
+Observe and record: whether the highlighted word matches what is heard when
+you play the clip. Watch a few seconds of each. This is the first check of
+the word times against the audio (ADR 0017).
 
 ### C3. A clip with no speech renders plain, with a note (constructed)
 
 Uses `cap-nospeech.json`. Clip 1 (12.5 to 20 s) has no speech in range.
-A segment that ends exactly at 12.5 s must not count. Clip 2 (25 to 35 s) has
-one segment.
+A segment that ends exactly at 12.5 s, with words that start before it, must
+not count. Clip 2 (25 to 35 s) has one segment of five words, 1.4 s each.
 
 ```powershell
 Reset-CapClips
@@ -1136,8 +1180,24 @@ Pass:
   ` (captions)`.
 - `Rendered #2 0:00:25-0:00:35 <path> (captions)`.
 - The last line is `Rendered 2 of 2 clips to <clips folder>`.
-- `nospeech-1.png` shows no caption. `nospeech-2.png` shows `words inside the
-  second clip`.
+- No `has no word timings` note.
+- `nospeech-1.png` shows no caption. `nospeech-2.png` shows `words inside the`
+  with `the` in yellow.
+
+Then the same clips from `cap-segments.json`, which has no word times, as an
+analysis saved by v0.3 does not:
+
+```powershell
+Reset-CapClips
+Invoke-RenderC "$S\testsrc.mp4" "$S\cap-segments.json" $CapClips -Captions
+Save-Frame "$CapClips\testsrc_000012-000020.mp4" 3 "$S\segments-1.png"
+Invoke-Item "$S\segments-1.png"
+```
+
+Pass: exit 0; `Note: #1 0:00:12-0:00:20 has no word timings; captions show
+whole segments` before `Rendered #1 ... (captions)`, and the same for #2;
+`segments-1.png` shows `first clip speech` in white, in the same font and
+place as the word captions, with no word in yellow.
 
 ### C4. The temporary folder does not leak
 
@@ -1230,66 +1290,86 @@ Save-Frame $f 4.5 "$S\over-3.png"
 
 Pass: `hash changed: True`, one file in the folder (no numbered or suffixed
 copies), `over-1.png` and `over-3.png` show no caption, and `over-2.png` shows
-`second clip speech`.
+`second clip speech` with `clip` in yellow.
 
 ### C7. Awkward text (constructed)
 
-Uses `cap-awkward.json`. `build_srt` removes `{ } < > \` (ADR 0010), so the
-expected text on screen is below. The emoji is outside the Basic Multilingual
-Plane, and the last line has backslashes, which libass reads as a line break
-(`\n`) when they are left in.
+Uses `cap-awkward.json`. `build_ass` removes `{ } < > \` from spoken text
+(ADRs 0010 and 0017), so the expected text on screen is below. The builder's
+own colour tags use braces and backslashes, so a word that kept one could
+break the tag around it. The emoji is outside the Basic Multilingual Plane,
+and two segments have backslashes, which libass reads as a line break (`\n`)
+when they are left in. Segments 1 to 6 have constructed word times, one chunk
+each. Each frame is taken in the middle of the word marked yellow. Segment 7
+has no words, so it is one whole cue.
 
 ```powershell
 Reset-CapClips
 Invoke-RenderC "$S\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions
 $f = "$CapClips\testsrc_000012-000020.mp4"
-$mid = 0.625, 1.875, 3.125, 4.375, 5.625, 6.875
-for ($k = 0; $k -lt 6; $k++) { Save-Frame $f $mid[$k] "$S\awk$($k + 1).png"; Invoke-Item "$S\awk$($k + 1).png" }
+$mid = 0.5, 1.5, 2.75, 3.5, 4.5, 5.75, 6.75
+for ($k = 0; $k -lt 7; $k++) { Save-Frame $f $mid[$k] "$S\awk$($k + 1).png"; Invoke-Item "$S\awk$($k + 1).png" }
 ```
 
-| Frame | Expected on screen |
-|-------|--------------------|
-| `awk1.png` | `braces a and bbold/b end` |
-| `awk2.png` | `arrow -- and 5 3` |
-| `awk3.png` | the word `café` and the word `naïve`, with their accents |
-| `awk4.png` | `before` and `after`. Observe and record the emoji |
-| `awk5.png` | `it's 100% "fine" & ok` |
-| `awk6.png` | `path C:newtable`, on one line, with no gap and no letter missing |
+| Frame | Expected on screen | In yellow |
+|-------|--------------------|-----------|
+| `awk1.png` | `braces a bbold/b` | `a` |
+| `awk2.png` | `arrow -- 53` | `--` |
+| `awk3.png` | `café naïve`, with their accents | `naïve` |
+| `awk4.png` | `before`, the emoji, `after` | the emoji. Observe and record it |
+| `awk5.png` | `it's "fine" &` | `"fine"` |
+| `awk6.png` | `path C:newtable`, on one line, with no gap and no letter missing | `C:newtable` |
+| `awk7.png` | `whole cue C:newtable here` | nothing |
 
-Pass: exit 0 and all six frames show their text. The words around the emoji in
-`awk4.png` must be present. The emoji itself may be missing or a box, because
-the font that rendered in ADR 0010 looks like Arial. Record what you saw.
+Pass: exit 0, a `Note: #1 ... has no word timings` line (from segment 7), and
+all seven frames show their text with only the word in the last column in
+yellow, and the words after it white again. The words around the emoji in
+`awk4.png` must be present. The emoji itself may be missing or a box, since
+the captions use Arial. Record what you saw.
 
-Fail `awk6.png` if it shows `C: ew` or any `\`. That is the finding the
-backslash amendment in ADR 0010 fixed: the removal of `\` in `_MARKUP` has been
-lost.
+Fail `awk6.png` or `awk7.png` if it shows `C: ew` or any `\`. That is the
+finding the backslash amendment in ADR 0010 fixed: the removal of `\` in
+`_MARKUP` has been lost. Fail any frame that shows `c&H`, `\r` or a brace: a
+colour tag was broken.
 
 ### C8. How it looks (observe and record)
 
-The style is `FontSize=18,Outline=2,Shadow=0,MarginV=30`, looked at on two
-frames in ADR 0010 and not tuned. This step records what it looks like at two
-sizes. It has no pass line. Use the constructed 640x360 `testsrc.mp4` and the
-1280x720 copy from C0.
+The style is in `core/captions.py`: Arial bold, white with a black outline,
+the active word yellow, bottom centre. It was chosen on frames of one real
+video (ADR 0017) and is not tuned. Plain clips use a 1920x1080 canvas that
+libass scales to the source frame, so a source that is not 16:9 could stretch
+the text. This step records what it looks like on the constructed 640x360
+`testsrc.mp4`, the 1280x720 and 600x1280 copies from C0, and the vertical
+frame. It has one fail condition.
 
 ```powershell
-Reset-CapClips
-Invoke-RenderC "$S\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions | Out-Null
 $sd = "$CapClips\testsrc_000012-000020.mp4"
-Copy-Item $sd "$S\style-640.mp4"
-Invoke-RenderC "$S\hd\testsrc.mp4" "$S\cap-awkward.json" $CapClips -Captions | Out-Null
-Copy-Item $sd "$S\style-1280.mp4"
-foreach ($w in 640, 1280) {
-  Save-Frame "$S\style-$w.mp4" 0.625 "$S\style-$w-a.png"
-  Save-Frame "$S\style-$w.mp4" 3.125 "$S\style-$w-b.png"
-  Invoke-Item "$S\style-$w-a.png"; Invoke-Item "$S\style-$w-b.png"
+foreach ($v in @(@{ n = "640"; p = "$S\testsrc.mp4" }, @{ n = "1280"; p = "$S\hd\testsrc.mp4" },
+                 @{ n = "narrow"; p = "$S\narrow\testsrc.mp4" })) {
+  Reset-CapClips
+  Invoke-RenderC $v.p "$S\cap-awkward.json" $CapClips -Captions | Out-Null
+  Copy-Item $sd "$S\style-$($v.n).mp4"
+}
+Reset-CapClips
+$old = $env:CLIPPER_CLIPS_DIR; $env:CLIPPER_CLIPS_DIR = $CapClips
+try { Invoke-RenderWith "$S\testsrc.mp4" "$S\cap-awkward.json" "--captions --vertical" | Out-Null } finally { $env:CLIPPER_CLIPS_DIR = $old }
+Copy-Item $sd "$S\style-vertical.mp4"
+foreach ($n in "640", "1280", "narrow", "vertical") {
+  Save-Frame "$S\style-$n.mp4" 0.625 "$S\style-$n-a.png"
+  Save-Frame "$S\style-$n.mp4" 3.125 "$S\style-$n-b.png"
+  Invoke-Item "$S\style-$n-a.png"; Invoke-Item "$S\style-$n-b.png"
 }
 ```
 
+`-a` frames show `braces a bbold/b` with `a` in yellow, and `-b` frames show
+the `before` chunk with `before` in yellow.
+
 Record: is the text readable on the test picture, how big it is next to the
-frame at both sizes, and whether any line touches the frame edge. Fail the
-step only if text is cut off by the frame. Size and placement are a judgement
-for the maintainer, and a change to them is a code change, not part of a
-release.
+frame at each size, how many lines it takes, and whether any line touches the
+frame edge. On `narrow`, record whether round letters (`o`, `a`, `e`) look
+round or squashed. Fail the step only if text is cut off by the frame. Size,
+placement and stretching are a judgement for the maintainer, and a change to
+them is a code change, not part of a release.
 
 ## LLM detector
 
@@ -1746,11 +1826,12 @@ analysis.
 
 ### Captions reference run
 
-One run of C0 to C8 as written, for scale. It is not a pass threshold.
-2026-10-31, Windows 11, PowerShell, ffmpeg `9.0.2-full_build-www.gyan.dev`, the
-same 5:14 video (`data\test_input.mp4`) and its R0 analysis (5 candidates).
-The commands and their output were pasted back by the
-maintainer.
+One run of C0 to C8 as written at the time, for scale. It is not a pass
+threshold. It was on the v0.2 segment-level SRT captions, before V4 item 4
+rewrote these steps for word-by-word ASS captions (ADR 0017). 2026-10-31,
+Windows 11, PowerShell, ffmpeg `9.0.2-full_build-www.gyan.dev`, the same 5:14
+video (`data\test_input.mp4`) and its R0 analysis (5 candidates). The commands
+and their output were pasted back by the maintainer.
 
 - C0: 0 `clipper-captions-*` folders before any run.
 - C1: `render --captions` exited 0 and rendered 5 of 5 clips in 12.05 s, 4.79
@@ -1833,8 +1914,10 @@ script that followed the steps, with the output pasted back.
 | One failed clip stops the rest, or the exit code is 0 (R14) | The loop in `render`; ADR 0011 |
 | Something was written although the run failed before cutting (R6 to R13) | Check order in `render`; ADR 0011 |
 | Vertical clip not 1080x1920, stretched, cut off, or off-centre (R15 to R17) | `_VERTICAL_FILTER` in `adapters/rendering/ffmpeg.py`; ADR 0016 |
-| Caption text or timing wrong (C2) | `build_srt` in `core/captions.py`; `-ss` and `-vf` order in `adapters/rendering/ffmpeg.py`; ADR 0010 |
-| No note, or a note for a clip with speech (C3) | The `srt` check in `render` in `cli/main.py`; ADR 0011 |
+| Caption words, highlight or timing wrong (C2) | `build_ass`, `_chunks` and `_word_events` in `core/captions.py`; `-ss` and `-vf` order in `adapters/rendering/ffmpeg.py`; ADR 0017 |
+| No note, or a note for a clip with speech (C3) | The `ass` and `from_segments` checks in `render` in `cli/main.py`; ADR 0011, ADR 0017 |
+| Caption too big, misplaced or stretched (C8, R16) | `_VERTICAL` and `_SOURCE` in `core/captions.py`; ADR 0017 |
+| `c&H`, `\r` or a brace on screen (C7) | `_HIGHLIGHT`, `_RESET` and `_MARKUP` in `core/captions.py`; ADR 0017 |
 | Folder left in `%TEMP%` (C4) | `TemporaryDirectory` in `adapters/rendering/ffmpeg.py`; ADR 0010 |
 | Caption run fails on a path (C5) | Absolute paths and `cwd` in `adapters/rendering/ffmpeg.py`; `run_tool` in `adapters/media/_process.py`; ADR 0010 |
 | Markup, accents or backslashes mangled (C7) | `_MARKUP` in `core/captions.py`; ADR 0010 |
@@ -1868,9 +1951,10 @@ Also out of scope for the Captions section:
 - An ffmpeg build without libass (ADR 0010). It needs a different build. Until
   someone runs it, what such a build reports is unknown.
 - ffmpeg builds other than the one recorded in your run.
-- A BOM or CRLF in the SRT file. The renderer writes the bytes itself, so the
+- A BOM or CRLF in the ASS file. The renderer writes the bytes itself, so the
   CLI cannot produce them. A unit test
   (`test_captions_file_is_utf8_without_bom_or_crlf`) checks the bytes handed to
   ffmpeg, but with `subprocess.run` mocked, so it does not show how ffmpeg reads
   a BOM or CRLF.
-- Word-level captions and caption styling (ADR 0010, non-goals for V2).
+- Measuring word times against the audio. C2 compares frames with the saved
+  transcript, and listening to a few seconds is the only check of the audio.
