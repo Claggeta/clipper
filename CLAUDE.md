@@ -123,7 +123,7 @@ default, word-level captions, hardware encoders, concatenating clips, uploads,
 analytics, web UI, database, user accounts, ML training, and any change to
 the detector.
 
-## V3 scope (closing with `v0.3.0`)
+## V3 scope (shipped as `v0.3.0`)
 
 Input: saved `AnalysisResult` JSON and a hand-written labels file per video.
 Output: a measured comparison of detectors, and a local-LLM detector that
@@ -135,7 +135,7 @@ metrics, a vector database or retrieval, a trained neural network, audio or
 visual features, a labeling UI, a rename of the project, and any change to
 `render`. Campaign briefs moved to "Later" (see the V4 list).
 
-V3 closes after item 8. The Whisper experiment (item 5) moved to V4 as GPU
+V3 closed with item 8. The Whisper experiment (item 5) moved to V4 as GPU
 transcription, for speed: the labels are test examples, so `eval` cannot judge
 a Whisper change on real work.
 
@@ -191,25 +191,28 @@ All merged to `main` with green CI:
   `docs/releases/v0.1.0.md`.
 - V2: clip rendering and captions, released as `v0.2.0`. Notes are in
   `docs/releases/v0.2.0.md`.
+- V3: `clipper eval`, label files, `--detector` and the LLM detector,
+  released as `v0.3.0`. Notes are in `docs/releases/v0.3.0.md`.
 
 In progress:
 
-- V3 (scope and ADRs 0012 to 0015 are merged; items 2, 3, 4, 6, 6a and 7
-  are merged). Item 7, the LLM detector: `--detector llm` via Ollama, with
+- V4. Nothing merged yet. Next: item 1, the ADRs for the V4 decisions.
+
+V3 results, for reference. Item 7, the LLM detector: `--detector llm` via Ollama, with
   thinking off and `qwen3.5:9b` as the default model (ADR 0014 amendments).
   Its results on the two label files: `test_input.json` top 5, recall 4 of 4
   and precision 4 of 5 (1 repeat); `oFbD0Ot7nQ8.json` top 30, recall 6 of 30
   and precision 6 of 30 in 953 s, but 0 of 30 in its top 5. Both models tried
-  cluster their scores on round values. Remaining: item 8 (release); item 5
-  moved to V4. Item 0 has two label files. With one-to-one precision (ADR 0012,
-  item 6a amendment), the heuristic gives: on `test_input.json` (labels cover
-  the whole speech) recall 3 of 4 and precision 3 of 5, with 2 repeats; on
-  `oFbD0Ot7nQ8.json` recall 2 of 30 and precision 2 of 5 at top 5 (1 repeat),
-  and recall 5 of 30 and precision 5 of 30 at top 30 (`CLIPPER_TOP_N=30`,
-  2 repeats, both inside the 9.5-minute label 16). Precision is a lower bound
-  on the long video. Before 6a, precision there was 3 of 5 and 7 of 30. Seven
-  of its 30 labels are longer than two 45 s windows. Videos are downloaded by
-  hand with `uv tool run yt-dlp` into `data/videos/`, named by video ID.
+  cluster their scores on round values. Item 0 has two label files. With
+  one-to-one precision (ADR 0012, item 6a amendment), the heuristic gives: on
+  `test_input.json` (labels cover the whole speech) recall 3 of 4 and
+  precision 3 of 5, with 2 repeats; on `oFbD0Ot7nQ8.json` recall 2 of 30 and
+  precision 2 of 5 at top 5 (1 repeat), and recall 5 of 30 and precision 5 of
+  30 at top 30 (`CLIPPER_TOP_N=30`, 2 repeats, both inside the 9.5-minute
+  label 16). Precision is a lower bound on the long video. Before 6a,
+  precision there was 3 of 5 and 7 of 30. Seven of its 30 labels are longer
+  than two 45 s windows. Videos are downloaded by hand with
+  `uv tool run yt-dlp` into `data/videos/`, named by video ID.
 
 ## Pinned dependencies
 
@@ -315,7 +318,8 @@ confirmation first (see "How to work in this repo").
    (ADRs 0014, 0015), and a model choice recorded from `eval` results~~
    (done; #79, #80, #81, #82 and the default-model PR; model `qwen3.5:9b`,
    ADR 0014 amendments)
-8. Release notes and tag `v0.3.0`, with items 1 to 4, 6, 6a and 7
+8. ~~Release notes and tag `v0.3.0`, with items 1 to 4, 6, 6a and 7~~ (done;
+   notes in `docs/releases/v0.3.0.md`, F1 run before tagging)
 
 ## V4 list
 
