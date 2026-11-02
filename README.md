@@ -137,8 +137,9 @@ going down the ranking, each candidate claims the first label it hits that a
 higher-ranked candidate has not, and a candidate that hits only claimed labels
 is a repeat (`16 (repeat of #3)`) and does not count. Recall is `n/a` with no
 labels, and precision is `n/a` with no candidates. A label that ends after the
-transcript does is noted and still counted. The numbers come from one person's labels on a few videos, so treat a
-difference between detectors as a sanity check, not a measurement.
+transcript does is noted and still counted. The numbers come from one person's
+labels on a few videos, so treat a difference between detectors as a sanity
+check, not a measurement.
 
 `--detector` chooses the detector to rerun, as on `analyze`. The default is
 `heuristic`.
