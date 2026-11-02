@@ -295,13 +295,6 @@ terms, and a manual-test step.
   GitHub renders them correctly.
 - Possible mojibake in `docs/roadmap.md` and `docs/architecture.md`.
 - `.gitignore` duplicate entries (`.venv`, `dist/`, `__pycache__/`).
-- Unescaped rich markup in `cli/main.py` (found reading for V3 item 4,
-  unverified): `_render` puts `result.source` in the table title and the joined
-  `reasons` in the Why column, and `_report_evaluation` puts
-  `evaluation.source` in the "Labels:" title, none of them escaped. yt-dlp's
-  default names contain `[videoid]`, and LLM reasons (item 7) are free text.
-  What rich does with them has not been tried. Fix: `escape()` each, as the
-  error and note lines already do. Worth doing before item 7.
 - Opt-in model-load test: needs a marker, `--strict-markers`, and
   deselecting by default.
 - Captions on a build without libass: every selected clip fails with the same

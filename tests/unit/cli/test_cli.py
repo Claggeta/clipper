@@ -94,6 +94,55 @@ def test_analyze_uses_the_heuristic_by_default_and_records_it(
     assert saved.detector == "heuristic"
 
 
+def test_analyze_bracketed_file_name_is_not_parsed_as_markup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # yt-dlp's default names end in "[<video id>]".
+    video = tmp_path / "Title [oFbD0Ot7nQ8].mp4"
+    video.write_bytes(b"not a real video")
+    monkeypatch.setenv("CLIPPER_OUTPUT_DIR", str(tmp_path / "out"))
+    monkeypatch.setattr(
+        cli_main, "_build_transcriber", lambda settings: FakeTranscriber()
+    )
+
+    result = CliRunner().invoke(app, ["analyze", str(video)])
+
+    assert result.exit_code == 0, result.output
+    # rich may wrap the title or path at the space, so check the bracketed part.
+    assert "[oFbD0Ot7nQ8].mp4" in result.output
+    assert "[oFbD0Ot7nQ8].json" in result.output
+
+
+def test_analyze_bracketed_reason_is_not_parsed_as_markup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class BracketDetector:
+        def detect(self, transcript: Transcript) -> list[ClipCandidate]:
+            return [
+                ClipCandidate(
+                    start_seconds=1.0,
+                    end_seconds=2.0,
+                    score=0.5,
+                    reasons=("[/bold] stray",),
+                )
+            ]
+
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"not a real video")
+    monkeypatch.setenv("CLIPPER_OUTPUT_DIR", str(tmp_path / "out"))
+    monkeypatch.setattr(
+        cli_main, "_build_transcriber", lambda settings: FakeTranscriber()
+    )
+    monkeypatch.setattr(
+        cli_main, "_build_detector", lambda settings, name: BracketDetector()
+    )
+
+    result = CliRunner().invoke(app, ["analyze", str(video)])
+
+    assert result.exit_code == 0, result.output
+    assert "[/bold] stray" in result.output
+
+
 @pytest.mark.parametrize("name", ["llm", "fake"])
 def test_analyze_rejects_an_unknown_detector(tmp_path: Path, name: str) -> None:
     result = CliRunner().invoke(
