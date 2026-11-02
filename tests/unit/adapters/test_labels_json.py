@@ -1,10 +1,12 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
 
-from clipper.adapters.results.labels_json import load_labels
+from clipper.adapters.results.labels_json import check_labels_match, load_labels
 from clipper.domain.errors import ClipperError, LabelsError
+from clipper.domain.models import AnalysisResult, LabeledVideo, Transcript
 
 # The maintainer's labels for data/test_input.mp4 (times read while watching
 # it, 2026-11-01). The notes were written from the transcript, not by the
@@ -111,3 +113,40 @@ def test_overlap_is_reported(tmp_path: Path) -> None:
 
     with pytest.raises(LabelsError, match="labels.2 starts before labels.1 ends"):
         load_labels(_write(tmp_path, json.dumps(data)))
+
+
+# The source checks below use constructed input.
+
+
+def _result(source: str) -> AnalysisResult:
+    return AnalysisResult(
+        source=source, transcript=Transcript(segments=()), candidates=()
+    )
+
+
+def test_matching_source_passes() -> None:
+    labeled = LabeledVideo(source="talk.mp4", labels=())
+    check_labels_match(labeled, _result("talk.mp4"))
+
+
+def test_mismatched_source_raises() -> None:
+    labeled = LabeledVideo(source="a.mp4", labels=())
+    with pytest.raises(LabelsError) as excinfo:
+        check_labels_match(labeled, _result("b.mp4"))
+
+    assert str(excinfo.value) == (
+        "Labels are for 'a.mp4' but the analysis result is for 'b.mp4'"
+    )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="case-insensitive filesystems only")
+def test_case_differences_pass_on_windows() -> None:
+    check_labels_match(LabeledVideo(source="Talk.MP4", labels=()), _result("talk.mp4"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="case-sensitive filesystems only")
+def test_case_differences_fail_elsewhere() -> None:
+    with pytest.raises(LabelsError):
+        check_labels_match(
+            LabeledVideo(source="Talk.MP4", labels=()), _result("talk.mp4")
+        )

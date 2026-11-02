@@ -162,3 +162,45 @@ class LabeledVideo(BaseModel):
                     f"starts before labels.{index - 1} ends"
                 )
         return self
+
+
+class Evaluation(BaseModel):
+    """A detector's candidates compared with one video's labels. See ADR 0012.
+
+    `hits` holds `(label index, candidate index)` pairs, one per hitting pair.
+    Recall and precision are None when there is nothing to divide by.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    labels: tuple[Label, ...]
+    candidates: tuple[ClipCandidate, ...]
+    hits: tuple[tuple[int, int], ...]
+
+    @model_validator(mode="after")
+    def _hits_in_range(self) -> "Evaluation":
+        for label_index, candidate_index in self.hits:
+            if not 0 <= label_index < len(self.labels):
+                raise ValueError(f"hit names label {label_index}, which does not exist")
+            if not 0 <= candidate_index < len(self.candidates):
+                raise ValueError(
+                    f"hit names candidate {candidate_index}, which does not exist"
+                )
+        return self
+
+    @property
+    def labels_hit(self) -> int:
+        return len({label_index for label_index, _ in self.hits})
+
+    @property
+    def candidates_hit(self) -> int:
+        return len({candidate_index for _, candidate_index in self.hits})
+
+    @property
+    def recall(self) -> float | None:
+        return self.labels_hit / len(self.labels) if self.labels else None
+
+    @property
+    def precision(self) -> float | None:
+        return self.candidates_hit / len(self.candidates) if self.candidates else None

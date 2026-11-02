@@ -15,16 +15,24 @@ from clipper.adapters.results.analysis_json import (
     check_source_matches,
     load_analysis_result,
 )
+from clipper.adapters.results.labels_json import check_labels_match, load_labels
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
 from clipper.adapters.transcription.video import VideoTranscriber
 from clipper.core.captions import build_srt
 from clipper.core.config import Settings
+from clipper.core.evaluation import evaluate
 from clipper.core.interfaces import ClipRenderer, MediaProbe, Transcriber
 from clipper.core.naming import plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.domain.errors import ClipperError, ClipRenderError
-from clipper.domain.models import AnalysisResult, ClipCandidate, MediaInfo
+from clipper.domain.models import (
+    AnalysisResult,
+    ClipCandidate,
+    Evaluation,
+    MediaInfo,
+    Transcript,
+)
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
@@ -98,6 +106,91 @@ def _check_media(selected: list[ClipCandidate], info: MediaInfo) -> None:
                 f"{_fmt(candidate.end_seconds)} ends after the end of the video "
                 f"({info.duration_seconds:.1f}s)"
             )
+
+
+def _count(number: int, noun: str) -> str:
+    return f"{number} {noun}" if number == 1 else f"{number} {noun}s"
+
+
+def _ratio(hit: int, total: int, noun: str, value: float | None) -> str:
+    if value is None:
+        return f"n/a (no {noun}s)"
+    return f"{hit} of {_count(total, noun)} ({value:.0%})"
+
+
+def _report_evaluation(
+    evaluation: Evaluation, transcript: Transcript, detector: str
+) -> None:
+    """Print labels and candidates with what each hit, then the counts."""
+    hit_by: dict[int, list[int]] = {}
+    hits: dict[int, list[int]] = {}
+    for label_index, candidate_index in evaluation.hits:
+        hit_by.setdefault(label_index, []).append(candidate_index + 1)
+        hits.setdefault(candidate_index, []).append(label_index + 1)
+
+    labels = Table(title=f"Labels: {evaluation.source}")
+    for column in ("#", "Start", "End", "Hit by", "Note"):
+        labels.add_column(column)
+    for index, label in enumerate(evaluation.labels):
+        labels.add_row(
+            str(index + 1),
+            _fmt(label.start_seconds),
+            _fmt(label.end_seconds),
+            ", ".join(f"#{rank}" for rank in hit_by.get(index, [])) or "-",
+            escape(label.note or ""),
+        )
+    console.print(labels)
+
+    candidates = Table(title="Candidates")
+    for column in ("#", "Start", "End", "Score", "Hits label"):
+        candidates.add_column(column)
+    for index, candidate in enumerate(evaluation.candidates):
+        candidates.add_row(
+            str(index + 1),
+            _fmt(candidate.start_seconds),
+            _fmt(candidate.end_seconds),
+            f"{candidate.score:.2f}",
+            ", ".join(str(number) for number in hits.get(index, [])) or "-",
+        )
+    console.print(candidates)
+
+    end = transcript.duration_seconds
+    for index, label in enumerate(evaluation.labels):
+        if round(label.end_seconds * 1000) > round(end * 1000):
+            console.print(
+                f"[yellow]Note:[/yellow] label {index + 1} "
+                f"({_fmt(label.start_seconds)}-{_fmt(label.end_seconds)}) ends "
+                f"after the end of the transcript ({end:.1f}s); "
+                "no detector can reach the part past it",
+                soft_wrap=True,
+            )
+
+    n_labels, n_candidates = len(evaluation.labels), len(evaluation.candidates)
+    console.print(f"Detector: {detector}", soft_wrap=True)
+    console.print(
+        f"1 video, {_count(n_labels, 'label')}, {_count(n_candidates, 'candidate')}",
+        soft_wrap=True,
+    )
+    console.print(
+        "Recall: "
+        + _ratio(evaluation.labels_hit, n_labels, "label", evaluation.recall),
+        soft_wrap=True,
+    )
+    console.print(
+        "Precision: "
+        + _ratio(
+            evaluation.candidates_hit,
+            n_candidates,
+            "candidate",
+            evaluation.precision,
+        ),
+        soft_wrap=True,
+    )
+    console.print(
+        f"Indicative only: one labeler, 1 video, {_count(n_labels, 'label')} "
+        "(ADR 0012).",
+        soft_wrap=True,
+    )
 
 
 @app.callback()
@@ -195,3 +288,35 @@ def render(
     )
     if failures:
         raise typer.Exit(code=1)
+
+
+@app.command("eval")
+def eval_(
+    result_json: Annotated[
+        Path, typer.Argument(help="JSON saved by `clipper analyze`.")
+    ],
+    labels_json: Annotated[
+        Path | None,
+        typer.Argument(
+            help="Labels file. Default: <labels dir>/<video name>.json.",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """Rerun the detector on RESULT_JSON's transcript and compare with labels."""
+    settings = Settings()
+    try:
+        result = load_analysis_result(result_json)
+        if labels_json is None:
+            labels_json = settings.labels_dir / f"{Path(result.source).stem}.json"
+        labeled = load_labels(labels_json)
+        check_labels_match(labeled, result)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}")
+        raise typer.Exit(code=1) from exc
+
+    detector = HeuristicClipDetector(top_n=settings.top_n)
+    evaluation = evaluate(labeled, detector.detect(result.transcript))
+    _report_evaluation(
+        evaluation, result.transcript, f"heuristic (top {settings.top_n})"
+    )
