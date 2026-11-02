@@ -237,8 +237,10 @@ maintainer would not post.
 - **Windows ffmpeg exit codes.** When ffmpeg fails, its exit code is shown
   as an unsigned 32-bit number on Windows, for example `exit 3199971767`
   for invalid data. The error message itself is readable.
-- **Long videos are unmeasured.** Only the 5:14 video above has been timed.
-  Transcription time should scale roughly with audio length.
+- **Long videos are slow on CPU.** A 5:04:01 stream took 20:59 to analyse
+  cold with the Whisper `base` model on CPU (one run, model already
+  downloaded), against 14.3 s for the 5:14 video above. A rerun with the
+  transcript cached took 0.67 s. The GPU and larger models are untried.
 - **Output name collisions.** The JSON file is named after the video's file
   name without its extension, so two videos with the same name overwrite
   each other's output. Rendered clips are named the same way, so two videos
