@@ -70,8 +70,13 @@ and planned code:
 - `0012` — detectors are evaluated against hand-written label files (one JSON
   per video, `CLIPPER_LABELS_DIR`). `clipper eval` reruns a detector on the
   saved transcript. Results are indicative, not statistical.
-- `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed in
-  `_build_detector`. No test double is selectable by name. Amends 0006.
+- `0013` — `--detector` on `analyze` and `eval` (`heuristic` only until the
+  LLM detector lands; `llm` comes with V3 item 7), composed in
+  `_build_detector(settings, name)`. No test double is selectable by name.
+  `AnalysisResult.detector` records the name, `None` in older JSON; `render`
+  and `eval` don't check it. Private factories stay until more than four exist
+  or a third real detector appears; that replaces the 0006 and 0011 triggers.
+  Amends 0006.
 - `0014` — the LLM detector re-ranks the heuristic's windows, via Ollama, and
   never falls back silently. Windowing and dedup are extracted first, as a
   behaviour-neutral change.
@@ -145,8 +150,8 @@ All merged to `main` with green CI:
 In progress:
 
 - V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model, and
-  item 3, `clipper eval`, are merged). Next: item 4, `--detector` and the
-  `_build_detector` seam. Item 0 has two label files. On `test_input.json`
+  item 3, `clipper eval`, and item 4, `--detector` and the `_build_detector`
+  seam, are merged). Item 0 has two label files. On `test_input.json`
   (labels cover the whole speech), `eval` gave recall 3 of 4 and precision 5
   of 5, which shows the plumbing works. On `oFbD0Ot7nQ8.json` the heuristic
   gave recall 2 of 30 and precision 3 of 5 at top 5, and recall 5 of 30 and
@@ -242,8 +247,8 @@ confirmation first (see "How to work in this repo").
 2. ~~Label domain model, loader and `CLIPPER_LABELS_DIR`~~ (done)
 3. ~~Pure comparison function and `clipper eval`, with the first label file
    format documented~~ (done)
-4. `--detector` option and the `_build_detector` seam, with the open question
-   on recording the detector name in `AnalysisResult` (ADR 0013)
+4. ~~`--detector` option and the `_build_detector` seam, with the open question
+   on recording the detector name in `AnalysisResult` (ADR 0013)~~ (done)
 5. Whisper experiment: a larger model and/or the GPU, measured with `eval`.
    Needs a manual-test step. May end in a settings change or in nothing.
 6. Extract windowing and overlap dedup from `HeuristicClipDetector`.
@@ -281,6 +286,13 @@ terms, and a manual-test step.
   GitHub renders them correctly.
 - Possible mojibake in `docs/roadmap.md` and `docs/architecture.md`.
 - `.gitignore` duplicate entries (`.venv`, `dist/`, `__pycache__/`).
+- Unescaped rich markup in `cli/main.py` (found reading for V3 item 4,
+  unverified): `_render` puts `result.source` in the table title and the joined
+  `reasons` in the Why column, and `_report_evaluation` puts
+  `evaluation.source` in the "Labels:" title, none of them escaped. yt-dlp's
+  default names contain `[videoid]`, and LLM reasons (item 7) are free text.
+  What rich does with them has not been tried. Fix: `escape()` each, as the
+  error and note lines already do. Worth doing before item 7.
 - Opt-in model-load test: needs a marker, `--strict-markers`, and
   deselecting by default.
 - Captions on a build without libass: every selected clip fails with the same
