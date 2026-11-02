@@ -7,10 +7,13 @@ of a time sink.
 ## Vision
 A modular platform that generates ready-to-publish clips from long-form
 content. Over time it learns from performance data and generates better
-clips.
+clips. That part is long-term: it needs accounts and posted clips, and
+neither exists yet.
 
 ## Users
-V1 user: the developer, running locally. No other users are assumed.
+V1 user: the developer, running locally. No other users are assumed. As of
+2026-11-02 the developer has no accounts and is not posting yet; the target is
+4 to 10 long videos a week.
 
 ## V1 Scope
 1. Input: a local video file.
@@ -48,8 +51,24 @@ the heuristic's windows with a local LLM. Interface: `clipper eval`, and
 Non-goals for V3: downloading or URL ingestion, posting, analytics or platform
 metrics, a vector database or retrieval, a trained neural network, audio or
 visual features, a labeling UI, a rename of the project, and any change to
-`render`. Campaign briefs as a detector input are planned after the LLM
-detector works and need their own ADR.
+`render`. Campaign briefs as a detector input are unscheduled and need their
+own ADR.
+
+V3 closes with `v0.3.0`. The Whisper experiment moved to V4 as GPU
+transcription, for speed.
+
+## V4 Scope
+Input: a video URL (YouTube or Twitch) or a local file. Output: a folder per
+video of post-ready drafts: 9:16 vertical (a centre crop), styled
+word-by-word captions burned in, and a suggested hook/title per clip. The
+developer picks which to post, by hand. Interface: `clipper fetch`, changes to
+`render`, and one command from a URL to that folder.
+
+Non-goals for V4: posting or uploads, analytics or platform metrics, campaign
+briefs, any change to which moments are picked (detectors, windows,
+boundaries), audio or visual detection features, subject or face tracking for
+the crop, hosted APIs or paid services, web UI, database, user accounts, ML
+training.
 
 ## Success Criteria
 1. `clipper analyze talk.mp4` runs end to end on a local machine and outputs
@@ -67,6 +86,9 @@ detector works and need their own ADR.
    with no changes to the pipeline or domain code.
 4. Core logic has automated tests that run without a real video or
    network access.
+5. V4: one command takes a URL to a folder of vertical, captioned, titled
+   drafts on the developer's machine, with nothing paid. Its time on a long
+   stream is measured and recorded, not assumed.
 
 ## Principles
 1. Each stage is independent and replaceable.
@@ -74,6 +96,8 @@ detector works and need their own ADR.
 3. Everything runs locally and uses free and open-source tools.
 4. Build the simplest thing, and put seams where we know change is
    coming.
+5. Usefulness first. When daily usefulness and ML depth conflict, usefulness
+   wins. ML changes are measured with `eval` and grow once the tool is in use.
 
 ## Known Risks
 - Heuristic scoring may not match what audiences actually find engaging.
@@ -81,6 +105,14 @@ detector works and need their own ADR.
 - V3 labels are one person's judgment on a few videos. They can show that a
   detector change is a sanity-check improvement, not that audiences agree
   ([ADR 0012](decisions/0012-evaluate-detectors-against-hand-labels.md)).
+- The two label files so far were test examples, not a sample of the videos
+  the developer will process, so `eval` results say little about real work
+  yet.
+- About half of the moments the developer would clip are visual, and every
+  detector so far reads only the transcript.
+- Whether YouTube's and Twitch's terms allow downloading is unverified. It is
+  checked in the `clipper fetch` ADR before that code is written.
+- A centre crop can cut off a subject who is not in the middle of the frame.
 - CPU transcription of long videos may be slow. Transcripts are cached
   to mitigate this.
 - Re-encoding uses libx264, which is GPL. Clipper does not ship ffmpeg, and the
