@@ -212,8 +212,8 @@ All merged to `main` with green CI:
 
 In progress:
 
-- V4. Items 1 (ADRs 0016 to 0019) and 2 (`render --vertical`, #90) are
-  merged. Next: item 3, word timestamps.
+- V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92) and 3
+  (word timestamps, #93) are merged. Next: item 4, styled captions.
 
 V3 results, for reference:
 
@@ -357,9 +357,10 @@ picked.
 2. ~~9:16 centre crop in `render` (0016), with a manual-test step.~~ (done;
    #90, manual steps R15 to R17; the crop was then replaced by a fit over a
    blurred fill, ADR 0016 amendment)
-3. Word timestamps in the transcript (0017). A domain-model change. Whether
+3. ~~Word timestamps in the transcript (0017). A domain-model change. Whether
    faster-whisper's word timestamps are usable here, and what they cost, is
-   unverified.
+   unverified.~~ (done; #93, manual step W9; no measurable time cost, segments
+   re-split, ADR 0017 amendment)
 4. Styled, word-by-word burned-in captions (0017), with a manual-test step.
 4a. A folder per video and the manifest (0019).
 4b. Replace the CLI's private factories with a context object.
