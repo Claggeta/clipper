@@ -54,8 +54,9 @@ detector works and need their own ADR.
 ## Success Criteria
 1. `clipper analyze talk.mp4` runs end to end on a local machine and outputs
    at most 5 candidates. Measured on a 5:14 speech video on CPU with the
-   Whisper `base` model: 14.3 s cold, 0.4 s warm. A 30-minute video is not
-   yet measured, and will scale roughly with audio length.
+   Whisper `base` model: 14.3 s cold, 0.4 s warm. A 5:04:01 stream on the
+   same setup (CPU, `base`, int8, model already downloaded): 20:59 cold
+   (1,260 s), 0.67 s warm. Each video was timed once.
 2. Heuristic detection is deterministic: the same transcript always produces
    the same top 5. An LLM detector is aimed at being repeatable on one setup
    and is not guaranteed to be
