@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from clipper.domain.errors import LabelsError
-from clipper.domain.models import LabeledVideo
+from clipper.domain.models import AnalysisResult, LabeledVideo
 
 
 def load_labels(path: Path) -> LabeledVideo:
@@ -28,3 +29,15 @@ def load_labels(path: Path) -> LabeledVideo:
         raise LabelsError(
             f"{path} is not a valid labels file: {location}: {first['msg']}{more}"
         ) from exc
+
+
+def check_labels_match(labeled: LabeledVideo, result: AnalysisResult) -> None:
+    """Fail if the labels were written for a differently named video.
+
+    Compared like `check_source_matches`: by name, case-insensitive on Windows.
+    """
+    if os.path.normcase(labeled.source) != os.path.normcase(result.source):
+        raise LabelsError(
+            f"Labels are for {labeled.source!r} but the analysis result is for "
+            f"{result.source!r}"
+        )

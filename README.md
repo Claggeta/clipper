@@ -88,6 +88,50 @@ candidate past the end of the video, no video stream) print `Error: ...`, write
 nothing and exit 1. If one clip fails while others succeed, the rest are still
 rendered, each failure is printed, and the command exits 1.
 
+### Evaluating detectors
+
+`eval` measures the detector against moments you labeled by hand. It reruns the
+detector on the transcript saved by `analyze`, so nothing is transcribed again:
+
+```powershell
+uv run clipper eval data\output\video.json
+```
+
+By default it reads `<labels dir>/<video name>.json` (by default
+`data/labels/`), named after the video the JSON was saved for. Pass a second
+path to use another labels file. A labels file looks like this (constructed
+example):
+
+```json
+{
+  "source": "video.mp4",
+  "labels": [
+    { "start": "0:50", "end": "2:29", "note": "the story about the bed" },
+    { "start": "1:02:03.5", "end": "1:03:00" }
+  ]
+}
+```
+
+- `source` is the video's file name and must match the one in the analysis
+  JSON.
+- Times are `"M:SS"` or `"H:MM:SS"` strings, with optional fractional seconds.
+  Plain numbers are rejected, because `0.50` would load as half a second.
+- Labels must be in time order and must not overlap. Touching is allowed.
+  `note` is optional, and other keys are rejected.
+- An empty `labels` list is valid: nothing in the video is worth cutting.
+
+A candidate hits a label when they overlap by at least half of the shorter of
+the two. `eval` prints each label with the candidates that hit it, each
+candidate with the labels it hits, then recall (labels hit by at least one
+candidate) and precision (candidates that hit at least one label), as counts
+and percentages. Recall is `n/a` with no labels, and precision is `n/a` with no
+candidates. A label that ends after the transcript does is noted and still
+counted. The numbers come from one person's labels on a few videos, so treat a
+difference between detectors as a sanity check, not a measurement.
+
+A bad or missing file, or labels written for a different video, prints
+`Error: ...` and exits 1.
+
 ## Configuration
 
 Settings are read from environment variables. A `.env` file is not read.
@@ -101,6 +145,7 @@ repo root or set absolute paths.
 | `CLIPPER_CACHE_DIR`    | `data/cache`  | Where transcripts are cached           |
 | `CLIPPER_OUTPUT_DIR`   | `data/output` | Where result JSON is written           |
 | `CLIPPER_CLIPS_DIR`    | `data/clips`  | Where rendered clips are written       |
+| `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files    |
 
 For example, in PowerShell:
 
@@ -143,6 +188,44 @@ The console line shows both ends rounded down, while the file name rounds the
 end up, so a clip ending at 73.8 s prints `0:01:13` and is named `...-000114.mp4`.
 Rendering all 5 candidates took 12.0 s without captions and 12.05 s with them
 (Windows, same video, one run each).
+
+Evaluating that result against the maintainer's four labels for the same video
+(`data/labels/test_input.json`), from the repo root:
+
+```text
+> uv run clipper eval data\output\test_input.json
+                            Labels: test_input.mp4
+┌───┬─────────┬─────────┬────────┬────────────────────────────────────────────┐
+│ # │ Start   │ End     │ Hit by │ Note                                       │
+├───┼─────────┼─────────┼────────┼────────────────────────────────────────────┤
+│ 1 │ 0:00:00 │ 0:00:50 │ -      │ Make your bed: the opener                  │
+│ 2 │ 0:00:50 │ 0:02:29 │ #1, #4 │ SEAL bed inspection, struggles apply to    │
+│   │         │         │        │ all                                        │
+│ 3 │ 0:02:30 │ 0:03:47 │ #2, #3 │ Darkest moment, power of hope, the list    │
+│ 4 │ 0:03:48 │ 0:04:35 │ #5     │ Ring the bell                              │
+└───┴─────────┴─────────┴────────┴────────────────────────────────────────────┘
+                  Candidates
+┌───┬─────────┬─────────┬───────┬────────────┐
+│ # │ Start   │ End     │ Score │ Hits label │
+├───┼─────────┼─────────┼───────┼────────────┤
+│ 1 │ 0:00:32 │ 0:01:13 │ 0.26  │ 2          │
+│ 2 │ 0:03:17 │ 0:04:00 │ 0.23  │ 3          │
+│ 3 │ 0:02:33 │ 0:03:15 │ 0.17  │ 3          │
+│ 4 │ 0:01:47 │ 0:02:26 │ 0.09  │ 2          │
+│ 5 │ 0:04:02 │ 0:04:33 │ 0.03  │ 4          │
+└───┴─────────┴─────────┴───────┴────────────┘
+Note: label 4 (0:03:48-0:04:35) ends after the end of the transcript (273.8s); no detector can reach the part past it
+Detector: heuristic (top 5)
+1 video, 4 labels, 5 candidates
+Recall: 3 of 4 labels (75%)
+Precision: 5 of 5 candidates (100%)
+Indicative only: one labeler, 1 video, 4 labels (ADR 0012).
+```
+
+These four labels cover the whole speech, so every candidate lands inside one
+and precision cannot be anything but full. This run shows that `eval` works,
+not how good the detector is. That needs a long video with stretches the
+maintainer would not post.
 
 ## Known limitations
 

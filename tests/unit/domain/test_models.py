@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from clipper.domain.models import (
     ClipCandidate,
+    Evaluation,
     Label,
     LabeledVideo,
     MediaInfo,
@@ -236,3 +237,51 @@ def test_labeled_video_rejects_overlapping_labels() -> None:
 def test_labeled_video_rejects_unknown_keys() -> None:
     with pytest.raises(ValidationError, match="video"):
         LabeledVideo.model_validate({"source": "a.mp4", "labels": [], "video": "x"})
+
+
+# Evaluations below are constructed, not produced by `clipper eval`.
+
+
+def _evaluation(hits: tuple[tuple[int, int], ...]) -> Evaluation:
+    return Evaluation(
+        source="talk.mp4",
+        labels=(_label("0:00", "0:50"), _label("0:50", "2:29")),
+        candidates=(
+            _candidate(start_seconds=0, end_seconds=45),
+            _candidate(start_seconds=60, end_seconds=105),
+            _candidate(start_seconds=200, end_seconds=245),
+        ),
+        hits=hits,
+    )
+
+
+def test_evaluation_counts_distinct_labels_and_candidates() -> None:
+    evaluation = _evaluation(((0, 0), (1, 0), (1, 1)))
+    assert evaluation.labels_hit == 2
+    assert evaluation.candidates_hit == 2
+    assert evaluation.recall == 1.0
+    assert evaluation.precision == pytest.approx(2 / 3)
+
+
+def test_evaluation_with_no_hits() -> None:
+    evaluation = _evaluation(())
+    assert (evaluation.labels_hit, evaluation.candidates_hit) == (0, 0)
+    assert evaluation.recall == 0.0
+    assert evaluation.precision == 0.0
+
+
+@pytest.mark.parametrize(
+    ("hit", "message"),
+    [((2, 0), "label 2"), ((-1, 0), "label -1"), ((0, 3), "candidate 3")],
+)
+def test_evaluation_rejects_hits_out_of_range(
+    hit: tuple[int, int], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        _evaluation((hit,))
+
+
+def test_evaluation_is_immutable() -> None:
+    evaluation = _evaluation(())
+    with pytest.raises(ValidationError):
+        evaluation.source = "other.mp4"  # type: ignore[misc]

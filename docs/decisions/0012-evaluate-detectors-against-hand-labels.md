@@ -100,6 +100,33 @@ maintainer's own judgment of which moments in a video are worth cutting.
   stretches the maintainer would not post is needed before `eval` can tell
   detectors apart.
 
+## Amended by the eval PR (V3 item 3)
+
+- The comparison is `evaluate(labeled, candidates)` in `core/evaluation.py`.
+  It returns an `Evaluation` (`domain/models.py`) holding the labels, the
+  candidates and every hitting `(label, candidate)` pair. Recall and precision
+  are derived from the pairs.
+- The hit rule is decision 4's, with `HIT_FRACTION = 0.5` as a module constant,
+  not a setting or a flag, so it is not tuned on one video before a long one is
+  labeled. Times are rounded to milliseconds before comparing. Touching ranges
+  never hit.
+- `clipper eval <analysis.json> [labels.json]`. The labels path defaults to
+  `<CLIPPER_LABELS_DIR>/<stem of the analysis source>.json`, the item-2
+  convention. One video per run. Combining several videos into one report is
+  decided when a second label file exists.
+- `labels.source` must match `AnalysisResult.source`, compared like
+  `check_source_matches` (`check_labels_match`, raising `LabelsError`).
+- Before item 4, `eval` runs `HeuristicClipDetector(top_n=CLIPPER_TOP_N)` on
+  the saved transcript, built the same way `analyze` builds it.
+- A label that ends after the transcript's last segment is noted, not
+  rejected, and stays in the recall denominator. A moment the maintainer wanted
+  and no detector can reach is a miss, and a better transcript (item 5) can
+  then show up as higher recall. `eval` does not probe the video, so "past the
+  end" means past the transcript. On `test_input.mp4` the last label ends
+  1.2 s after the transcript.
+- With no labels, recall is reported as `n/a`, and precision is 0 of the
+  candidates. With no candidates, precision is `n/a`. Both exit 0.
+
 ## Related
 
 - 0013: detector choice on the CLI
