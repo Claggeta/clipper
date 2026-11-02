@@ -13,6 +13,7 @@ from clipper.domain.models import (
     MediaInfo,
     Segment,
     Transcript,
+    Word,
 )
 
 # All fixtures here are constructed, not produced by a real analyze run.
@@ -220,16 +221,46 @@ def test_captions_are_off_by_default(env: Env) -> None:
     assert "(captions)" not in result.output
 
 
-def test_captions_pass_srt_for_each_clip_window(env: Env) -> None:
+def test_captions_pass_ass_for_each_clip_window(env: Env) -> None:
     env.save(transcript=_SPEECH)
     result = env.run("--captions", "--rank", "1", "--rank", "2")
     assert result.exit_code == 0, result.output
     assert isinstance(env.renderer, FakeClipRenderer)
-    assert env.renderer.captions == [
-        "1\n00:00:02,000 --> 00:00:04,000\nhello there\n",
-        "1\n00:00:01,000 --> 00:00:03,000\nsecond ione/i\n",
-    ]
+    first, second = env.renderer.captions
+    assert first is not None and second is not None
+    assert first.startswith("[Script Info]\n")
+    assert "PlayResX: 1920\n" in first
+    assert first.endswith(
+        "Dialogue: 0,0:00:02.00,0:00:04.00,Default,,0,0,0,,hello there\n"
+    )
+    assert second.endswith(",second ione/i\n")
     assert result.output.count("(captions)") == 2
+
+
+def test_captions_from_segments_without_words_print_a_note(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    result = env.run("--captions", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert "#1 0:00:10-0:00:20 has no word timings" in result.output
+    assert "(captions)" in result.output
+
+
+def test_captions_with_word_timings_print_no_note(env: Env) -> None:
+    words = (
+        Word(start_seconds=12.0, end_seconds=12.5, text="hello"),
+        Word(start_seconds=12.6, end_seconds=13.0, text="there"),
+    )
+    segment = Segment(
+        start_seconds=12.0, end_seconds=13.0, text="hello there", words=words
+    )
+    env.save(transcript=Transcript(segments=(segment,)))
+    result = env.run("--captions", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    captions = env.renderer.captions[0]
+    assert captions is not None
+    assert "{\\c&H0000FFFF&}hello{\\r} there" in captions
+    assert "Note:" not in result.output
 
 
 def test_captions_with_no_speech_in_range_renders_plain_with_a_note(env: Env) -> None:
@@ -276,3 +307,7 @@ def test_vertical_with_captions_shows_both(env: Env) -> None:
     # Clip 3 has no speech: rendered vertical, without captions.
     assert "Rendered #3 0:01:00-0:01:10" in result.output
     assert result.output.count(" (vertical)") == 1
+    assert isinstance(env.renderer, FakeClipRenderer)
+    captions = env.renderer.captions[0]
+    assert captions is not None
+    assert "PlayResX: 1080\nPlayResY: 1920\n" in captions

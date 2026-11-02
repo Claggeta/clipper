@@ -1,50 +1,221 @@
-from clipper.domain.models import ClipCandidate, Transcript
+from collections.abc import Iterator
+from typing import NamedTuple
 
-# libass reads `{...}` as override tags and ffmpeg reads `<...>` as markup, and
-# libass reads `\n`, `\N` and `\h` as a line break or a space, so a real build
-# can drop or restyle spoken text that contains them (ADR 0010). There is no
-# escape for any of them in SRT, so the characters are removed.
+from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
+
+# libass reads `{...}` as override tags and `\n`, `\N` and `\h` as a line break
+# or a space, so spoken text containing them could be dropped or restyled
+# (ADR 0010). `<` and `>` were markup in ffmpeg's SRT reader; they are still
+# removed, as ADR 0017 keeps 0010's rules. Only the builder's own tags use
+# braces.
 _MARKUP = str.maketrans("", "", "{}<>\\")
+
+# ADR 0017, item 4 amendment. A chunk is at most this many words, and ends
+# early at the end of a segment or after a word that ends a sentence.
+_WORDS_PER_CHUNK = 3
+_SENTENCE_END = (".", "?", "!")
+
+# Style values chosen by eye from real frames, not tuned (ADR 0017). Colours
+# are ASS's &HAABBGGRR. The active word is drawn in _HIGHLIGHT, then `\r`
+# resets to the style.
+_FONT = "Arial"
+_WHITE = "&H00FFFFFF"
+_BLACK = "&H00000000"
+_HIGHLIGHT = "{\\c&H0000FFFF&}"
+_RESET = "{\\r}"
+
+
+class _Layout(NamedTuple):
+    width: int
+    height: int
+    font_size: int
+    outline: int
+    margin_h: int
+    margin_v: int
+
+
+# The vertical frame is ADR 0016's 1080x1920. Other clips keep the source
+# frame, whose size the builder does not know: libass scales a 16:9 canvas to
+# it exactly, and other shapes are checked by manual step C8.
+_VERTICAL = _Layout(1080, 1920, font_size=80, outline=6, margin_h=60, margin_v=420)
+_SOURCE = _Layout(1920, 1080, font_size=72, outline=5, margin_h=80, margin_v=80)
+
+
+class Captions(NamedTuple):
+    """ASS text for one clip, and whether any cue lacked word times."""
+
+    text: str
+    from_segments: bool
 
 
 def _to_ms(seconds: float) -> int:
     return round(seconds * 1000)
 
 
+def _centis(ms: int) -> int:
+    """Milliseconds to the nearest centisecond, half up."""
+    return (ms + 5) // 10
+
+
 def _timestamp(ms: int) -> str:
-    hours, rest = divmod(ms, 3_600_000)
-    minutes, rest = divmod(rest, 60_000)
-    secs, millis = divmod(rest, 1000)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+    """ASS time, H:MM:SS.cc."""
+    hours, rest = divmod(_centis(ms), 360_000)
+    minutes, rest = divmod(rest, 6_000)
+    secs, centis = divmod(rest, 100)
+    return f"{hours}:{minutes:02d}:{secs:02d}.{centis:02d}"
 
 
-def build_srt(transcript: Transcript, candidate: ClipCandidate) -> str:
-    """Build SRT text for the part of `transcript` inside the candidate's span.
+def _clean(text: str) -> str:
+    return " ".join(text.translate(_MARKUP).split())
 
-    See docs/decisions/0010. Segments that overlap the span by a positive
-    amount are kept, clamped to it, and shifted so the clip starts at zero.
-    A straddling segment keeps its full text, since there are no word times
-    to cut it by. Times are converted to whole milliseconds before clamping
-    so float noise cannot move a cue. Whitespace in the text, newlines
-    included, collapses to single spaces, because a blank line would end the
-    cue. The characters `{`, `}`, `<`, `>` and backslash are removed, since a
-    renderer would read them as markup. Cues that are empty or have no length
-    after rounding are dropped.
 
-    Returns "" when no cue remains. The caller decides what that means.
+def _header(layout: _Layout) -> str:
+    style = ",".join(
+        str(v)
+        for v in (
+            "Default",
+            _FONT,
+            layout.font_size,
+            _WHITE,
+            _WHITE,
+            _BLACK,
+            _BLACK,
+            -1,  # bold
+            0,
+            0,
+            0,
+            100,
+            100,
+            0,
+            0,
+            1,  # outline and shadow, not an opaque box
+            layout.outline,
+            0,  # no shadow
+            2,  # bottom centre
+            layout.margin_h,
+            layout.margin_h,
+            layout.margin_v,
+            1,
+        )
+    )
+    return (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        f"PlayResX: {layout.width}\n"
+        f"PlayResY: {layout.height}\n"
+        "WrapStyle: 0\n"
+        "ScaledBorderAndShadow: yes\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: {style}\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
+        "Effect, Text\n"
+    )
+
+
+def _event(start: int, end: int, text: str) -> str | None:
+    """A Dialogue line, or None when it has no length in centiseconds."""
+    if _centis(end) <= _centis(start):
+        return None
+    return f"Dialogue: 0,{_timestamp(start)},{_timestamp(end)},Default,,0,0,0,,{text}\n"
+
+
+class _Timed(NamedTuple):
+    start: int
+    end: int
+    text: str
+
+
+def _words_in_clip(
+    words: tuple[Word, ...], clip_start: int, clip_end: int
+) -> list[_Timed]:
+    """Words that start inside the clip, clamped to it and shifted to zero."""
+    kept: list[_Timed] = []
+    for word in words:
+        start = _to_ms(word.start_seconds)
+        text = _clean(word.text)
+        if not (clip_start <= start < clip_end) or not text:
+            continue
+        end = min(_to_ms(word.end_seconds), clip_end)
+        kept.append(_Timed(start - clip_start, end - clip_start, text))
+    return kept
+
+
+def _chunks(words: list[_Timed]) -> Iterator[list[_Timed]]:
+    chunk: list[_Timed] = []
+    for word in words:
+        chunk.append(word)
+        if len(chunk) == _WORDS_PER_CHUNK or word.text.endswith(_SENTENCE_END):
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+
+def _word_events(chunk: list[_Timed]) -> Iterator[str]:
+    """One event per word, showing the chunk with that word highlighted.
+
+    A word's event lasts until the next word in the chunk starts, so the chunk
+    does not flicker between words. The last word's ends with the word.
+    """
+    for i, word in enumerate(chunk):
+        end = chunk[i + 1].start if i + 1 < len(chunk) else word.end
+        text = " ".join(
+            f"{_HIGHLIGHT}{w.text}{_RESET}" if j == i else w.text
+            for j, w in enumerate(chunk)
+        )
+        event = _event(word.start, end, text)
+        if event:
+            yield event
+
+
+def _segment_event(segment: Segment, clip_start: int, clip_end: int) -> str | None:
+    """The whole segment as one cue, for a segment without word times."""
+    start = max(_to_ms(segment.start_seconds), clip_start)
+    end = min(_to_ms(segment.end_seconds), clip_end)
+    text = _clean(segment.text)
+    if end <= start or not text:
+        return None
+    return _event(start - clip_start, end - clip_start, text)
+
+
+def build_ass(
+    transcript: Transcript, candidate: ClipCandidate, *, vertical: bool
+) -> Captions:
+    """Build styled ASS captions for the part of `transcript` inside the clip.
+
+    See docs/decisions/0017. Words that start inside the candidate's span are
+    kept, clamped to it, and shifted so the clip starts at zero. They are
+    grouped into short chunks, and each word is its own event showing its
+    chunk with that word highlighted. A segment without words becomes one cue
+    with its whole text, as in ADR 0010, and sets `from_segments`. Times are
+    whole milliseconds until they are written as centiseconds; an event with
+    no length after that is dropped. `{`, `}`, `<`, `>` and backslash are
+    removed from spoken text. `vertical` picks the 1080x1920 layout; otherwise
+    the source-frame layout.
+
+    The text is "" when no event remains. The caller decides what that means.
     """
     clip_start = _to_ms(candidate.start_seconds)
     clip_end = _to_ms(candidate.end_seconds)
-    cues: list[str] = []
+    events: list[str] = []
+    from_segments = False
     for segment in transcript.segments:
-        start = max(_to_ms(segment.start_seconds), clip_start)
-        end = min(_to_ms(segment.end_seconds), clip_end)
-        text = " ".join(segment.text.translate(_MARKUP).split())
-        if end <= start or not text:
+        if not segment.words:
+            event = _segment_event(segment, clip_start, clip_end)
+            if event:
+                events.append(event)
+                from_segments = True
             continue
-        cues.append(
-            f"{len(cues) + 1}\n"
-            f"{_timestamp(start - clip_start)} --> {_timestamp(end - clip_start)}\n"
-            f"{text}\n"
-        )
-    return "\n".join(cues)
+        for chunk in _chunks(_words_in_clip(segment.words, clip_start, clip_end)):
+            events.extend(_word_events(chunk))
+    if not events:
+        return Captions("", from_segments=False)
+    layout = _VERTICAL if vertical else _SOURCE
+    return Captions(_header(layout) + "".join(events), from_segments)

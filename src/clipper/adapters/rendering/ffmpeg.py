@@ -17,13 +17,10 @@ _AUDIO_BITRATE = "128k"
 
 # ADR 0010. The filter reads a bare filename from ffmpeg's working directory, so
 # no path ever reaches the filter's escaping rules (`:` and `\` on Windows).
-# The style is one fixed default; FontSize is relative to libass's 288-pixel
-# canvas for SRT, not pixels. Values are a first guess, checked by eye only.
-_SRT_NAME = "clip.srt"
-_SUBTITLES_FILTER = (
-    f"subtitles={_SRT_NAME}:charenc=UTF-8:"
-    "force_style='FontSize=18,Outline=2,Shadow=0,MarginV=30'"
-)
+# The captions are ASS and carry their own style (ADR 0017), so there is no
+# force_style.
+_CAPTIONS_NAME = "clip.ass"
+_SUBTITLES_FILTER = f"subtitles={_CAPTIONS_NAME}:charenc=UTF-8"
 
 # ADR 0016. The whole frame, fitted inside 1080x1920 at even sizes, centred on
 # a blurred copy of itself scaled to fill the frame. The blur runs at quarter
@@ -82,7 +79,7 @@ class FfmpegClipRenderer:
                 prefix="clipper-captions-", ignore_cleanup_errors=True
             ) as folder:
                 # UTF-8 with no BOM and LF line endings, whatever the platform.
-                (Path(folder) / _SRT_NAME).write_bytes(captions.encode("utf-8"))
+                (Path(folder) / _CAPTIONS_NAME).write_bytes(captions.encode("utf-8"))
                 # ffmpeg runs in `folder`, so the other paths must not depend on
                 # the caller's working directory.
                 self._cut(

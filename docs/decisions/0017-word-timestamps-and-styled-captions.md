@@ -121,6 +121,75 @@ a scratch output folder:
 - Not measured: how accurate the word times are against the audio. Item 4's
   frames are the first check.
 
+## Amended by the styled captions PR (V4 item 4)
+
+Decisions 3 to 5 are done.
+
+- **Builder.** `build_ass(transcript, candidate, *, vertical)` in
+  `core/captions.py` replaces `build_srt`. It returns `Captions(text,
+  from_segments)`: the ASS file, or `""` when no event remains, and whether
+  any cue came from a segment without words. ADR 0011's mention of
+  `build_srt` now means this function.
+- **Words in a clip.** A word is kept if its start is inside the clip,
+  `[start, end)`, so zero-length words count. Its end is clamped to the clip.
+  A word that starts before the clip's first frame is not shown, even if it
+  is still being spoken.
+- **Chunks.** At most three words (`_WORDS_PER_CHUNK`). A chunk also ends at
+  the end of a segment and after a word ending in `.`, `?` or `!`, and the
+  first word in a clip starts a chunk.
+- **Events.** Each word is one `Dialogue` showing its chunk, with that word
+  coloured by an inline `{\c&H0000FFFF&}...{\r}` (yellow, then back to the
+  style). A word's event lasts until the next word in its chunk starts, so
+  the chunk does not flicker between words. The chunk's last word ends with
+  the word, so the screen is blank in a pause between chunks. There is no
+  hold between chunks and no character cap per chunk. Both were left out
+  until real clips show a need.
+- **Times.** Whole milliseconds, as before, then written in ASS's
+  `H:MM:SS.cc`, rounded half up to centiseconds. An event with no length
+  after that is dropped, so a zero-length word appears in its chunk but is
+  never highlighted.
+- **Layouts.** `vertical=True` writes `PlayResX/Y` 1080x1920, 0016's frame.
+  Otherwise the canvas is 1920x1080 and libass scales it to the source frame.
+  `MediaInfo` was not given the frame size (an ADR 0009 change). On the build
+  below, text on a 600x1280 and a 640x480 constructed source was not
+  stretched. It seems to scale with the frame's height: on 600x1280 a
+  three-word chunk wrapped to two lines and stayed inside the frame.
+- **Style.** One `Default` style in the file: Arial, bold, white, a black
+  outline, no shadow, bottom centre. Vertical: size 80, outline 6, side
+  margins 60, `MarginV` 420, which puts the text in the blurred fill below a
+  16:9 picture. Source frame: size 72, outline 5, side margins 80, `MarginV`
+  80. The maintainer chose both from frames of rank 1 of `test_input.mp4`,
+  comparing Arial, Arial Black and Impact, and text over the picture with
+  text in the fill. Not tuned beyond that one video.
+- **Renderer.** It writes `clip.ass`, and the filter is
+  `subtitles=clip.ass:charenc=UTF-8`, with no `force_style`, since the style
+  is in the file. The temporary folder, the bare file name and `cwd`, the
+  vertical filter first, and the cleanup are unchanged (decision 5).
+- **Old analyses.** A segment without words is one cue with its whole text,
+  clamped as in 0010. When any such cue is in a clip, `render` prints
+  `Note: #N <span> has no word timings; captions show whole segments`.
+- **Unchanged from 0010:** `{ } < > \` are removed from spoken text, and the
+  no-speech note and plain render.
+
+Checked on 2026-11-02 with ffmpeg 9.0.2 (gyan.dev full build), Windows 11, by
+the assistant in a separate process. `analyze` of `test_input.mp4` again was a
+cache hit (0.4 s). It gave candidates up to 1 s away from the v0.3 analysis,
+as expected after the re-split.
+
+- Whole transcript: 96 segments, all with words, in 271 chunks of 13
+  characters at the median and 28 at most. The longest gap inside a chunk was
+  0.9 s. Rank 1 had 126 events.
+- `render --rank 1 --captions` took 3.0 s and `--vertical --captions` took
+  4.4 s, both exit 0, with no `clipper-captions-*` folder left.
+- Mid-word frames of the vertical rank 1 at its first word, its middle and its
+  last word showed the expected chunk with the expected word in yellow. A
+  frame in the longest pause between chunks (9.78 to 11.97 s) showed no
+  caption, while the source's own burned-in subtitle showed a line there.
+  Whether that pause is silent was not checked by ear.
+- The v0.3 analysis printed the note and drew one whole segment, which
+  wrapped to two lines.
+- Arial, Arial Black and Impact all rendered by name on this build.
+
 ## Revisit when
 
 - Word times are visibly off on real clips. Then compare a larger Whisper
