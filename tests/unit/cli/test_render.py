@@ -45,6 +45,8 @@ class RaisingRenderer:
         candidate: ClipCandidate,
         output_path: Path,
         captions: str | None = None,
+        *,
+        vertical: bool = False,
     ):
         raise ClipRenderError("[aist#0:0/pcm_s16le] [/bogus] bad")
 
@@ -247,3 +249,30 @@ def test_captions_failure_renders_the_rest_and_exits_1(env: Env) -> None:
     result = env.run("--captions")
     assert result.exit_code == 1
     assert "Rendered 2 of 3 clips" in result.output
+
+
+def test_vertical_is_off_by_default(env: Env) -> None:
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert env.renderer.vertical == [False, False, False]
+    assert "(vertical" not in result.output
+
+
+def test_vertical_is_passed_for_each_clip_and_shown(env: Env) -> None:
+    result = env.run("--vertical", "--rank", "1", "--rank", "2")
+    assert result.exit_code == 0, result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert env.renderer.vertical == [True, True]
+    assert result.output.count(" (vertical)") == 2
+    assert env.written() == ["talk_000010-000020.mp4", "talk_000030-000045.mp4"]
+
+
+def test_vertical_with_captions_shows_both(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    result = env.run("--vertical", "--captions")
+    assert result.exit_code == 0, result.output
+    assert result.output.count(" (vertical, captions)") == 2
+    # Clip 3 has no speech: rendered vertical, without captions.
+    assert "Rendered #3 0:01:00-0:01:10" in result.output
+    assert result.output.count(" (vertical)") == 1

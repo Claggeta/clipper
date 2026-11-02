@@ -50,6 +50,29 @@ ffmpeg.
 - (-) The crop and scale are unverified on real footage until the manual step
   in the implementing PR.
 
+## Amended by the vertical crop PR (V4 item 2)
+
+- `ClipRenderer.render` takes a keyword-only `vertical: bool = False`. The
+  filter is the module constant `_VERTICAL_FILTER` in
+  `adapters/rendering/ffmpeg.py`:
+  `crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',scale=1080:1920,setsar=1`.
+  The quotes keep the commas inside `min()` away from the filtergraph parser.
+  `crop` centres by default. The scaler is ffmpeg's default; `setsar=1` is set
+  so players do not stretch the result.
+- With `--captions`, there is one `-vf` value: the crop chain, then the
+  `subtitles` filter, joined by a comma.
+- A successful line ends with ` (vertical)`, or ` (vertical, captions)`.
+- Checked on 2026-11-02 with ffmpeg 9.0.2 (gyan.dev full build), Windows 11,
+  manual steps R15 to R17: every clip was 1080x1920 with SAR 1:1, durations
+  0.025 to 0.028 s over the requested length on the real video, and the
+  600x1280 constructed source was cropped in height without failing.
+- Observed: `test_input.mp4` has black bars built into its 1280x720 frame.
+  The crop keeps the full height, so the bars stay at the top and bottom of
+  the vertical clip. Detecting and removing them (for example with
+  `cropdetect`) is parked, not part of this ADR.
+- The v0.2 caption style draws large on the vertical frame and wrapped to
+  three lines in R16. Item 4 (0017) restyles captions.
+
 ## Revisit when
 
 - Real clips lose their subject often enough to matter. That is the case for

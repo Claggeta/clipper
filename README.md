@@ -84,6 +84,10 @@ This renders every candidate. Options:
 - `--captions` burns the transcript text into each clip, in one fixed style. A
   clip with no speech in range is rendered without captions and a note is
   printed.
+- `--vertical` crops the middle of the frame to 9:16 and scales it to
+  1080x1920, for short-form platforms. Whatever is outside the middle is cut
+  off, and black bars built into the source stay in the clip. Captions are
+  drawn after the crop.
 
 Clips are written to `<clips dir>/<video name>_<HHMMSS>-<HHMMSS>.mp4` (by
 default `data/clips/`) and re-encoded as H.264 video and AAC audio. The name

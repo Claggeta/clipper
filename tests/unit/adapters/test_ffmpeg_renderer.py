@@ -285,6 +285,41 @@ def test_captions_temp_dir_is_removed_after_success(
     assert not run.cwds[0].exists()
 
 
+_VERTICAL = (
+    "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',"
+    "scale=1080:1920,setsar=1"
+)
+
+
+def test_vertical_adds_crop_and_scale_filter(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", vertical=True)
+
+    command = captured[0]
+    assert command[command.index("-vf") + 1] == _VERTICAL
+    assert command.index("-map") < command.index("-vf") < command.index("-c:v")
+    assert command[command.index("-pix_fmt") + 1] == "yuv420p"
+
+
+def test_vertical_with_captions_crops_before_subtitles(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _Run(monkeypatch)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", captions=_SRT, vertical=True
+    )
+
+    command = run.commands[0]
+    assert command.count("-vf") == 1
+    vf = command[command.index("-vf") + 1]
+    assert vf.startswith(_VERTICAL + ",subtitles=clip.srt:")
+
+
 def test_captions_temp_dir_is_removed_after_failure(
     video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

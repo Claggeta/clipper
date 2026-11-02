@@ -433,5 +433,9 @@ Later, not scheduled:
 - `OllamaClient` ignores `done_reason`. A reply cut off at the length limit
   shows as `not a valid score ... (got '')` instead of saying it was cut off.
   Not hit since `think: false` (ADR 0014).
+- Letterboxed sources keep their bars under `--vertical` (ADR 0016, manual
+  step R15): `test_input.mp4` has black bars in its 1280x720 frame, and the
+  crop takes the full height. Fix: detect the picture area first (ffmpeg's
+  `cropdetect`, untried here) and crop inside it. An ADR 0016 amendment.
 - `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
   temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.
