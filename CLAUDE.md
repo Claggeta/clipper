@@ -146,10 +146,15 @@ In progress:
 
 - V3 (scope and ADRs 0012 to 0015 are merged; item 2, the label model, and
   item 3, `clipper eval`, are merged). Next: item 4, `--detector` and the
-  `_build_detector` seam. Item 0 is started: one label file,
-  `data/labels/test_input.json`, whose four labels cover the whole speech (ADR
-  0012, item 2 amendment). On it, `eval` gave recall 3 of 4 and precision 5 of
-  5, which shows the plumbing works, not detector quality.
+  `_build_detector` seam. Item 0 has two label files. On `test_input.json`
+  (labels cover the whole speech), `eval` gave recall 3 of 4 and precision 5
+  of 5, which shows the plumbing works. On `oFbD0Ot7nQ8.json` the heuristic
+  gave recall 2 of 30 and precision 3 of 5 at top 5, and recall 5 of 30 and
+  precision 7 of 30 at top 30 (`CLIPPER_TOP_N=30`); precision is a lower
+  bound there. Three of the seven top-30 hits are 45 s candidates inside the
+  one 9.5-minute label, so the half-overlap rule is due a revisit. Videos are
+  downloaded by hand with `uv tool run yt-dlp` into `data/videos/`, named by
+  video ID.
 
 ## Pinned dependencies
 
@@ -230,7 +235,9 @@ confirmation first (see "How to work in this repo").
 0. Not a PR: the maintainer collects long videos (Twitch/YouTube VODs,
    podcasts, a mix of campaign and non-campaign), runs `analyze` on them, and
    writes label files. `eval` cannot say anything about real media until this
-   exists. Started: labels for `test_input.mp4` only. No long videos yet.
+   exists. Two label files so far: `test_input.mp4` (whole speech) and
+   `oFbD0Ot7nQ8.mp4` (a 5:04:01 YouTube stream, 30 of the maintainer's main
+   clips, not all clippable moments; ADR 0012 amendment).
 1. ~~ADRs 0012 to 0015 and the V3 scope (one docs PR)~~ (done)
 2. ~~Label domain model, loader and `CLIPPER_LABELS_DIR`~~ (done)
 3. ~~Pure comparison function and `clipper eval`, with the first label file
@@ -246,6 +253,10 @@ confirmation first (see "How to work in this repo").
 8. Release notes and tag `v0.3.0`, if the items above land
 
 Later, not scheduled: campaign briefs as a detector input (needs an ADR).
+`clipper fetch <url>` after V3: runs the `yt-dlp` program as a subprocess
+behind a `Downloader` Protocol, saves to `data/videos/<id>.mp4`, and leaves
+`analyze` unchanged. Needs a scope change, an ADR (0016) covering platform
+terms, and a manual-test step.
 
 ## Parked
 
