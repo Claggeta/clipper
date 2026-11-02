@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Superseded in part by: 0017 (word-level, styled captions replace segment
+  text; the burn-in mechanism stands)
 
 ## Context
 

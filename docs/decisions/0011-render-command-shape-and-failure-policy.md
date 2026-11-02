@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-30
 - Amends: 0006 (the "revisit when" trigger)
+- Amended by: 0016 (`--vertical`), 0018 (`--titles`)
 
 ## Context
 
