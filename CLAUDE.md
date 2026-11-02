@@ -123,7 +123,7 @@ default, word-level captions, hardware encoders, concatenating clips, uploads,
 analytics, web UI, database, user accounts, ML training, and any change to
 the detector.
 
-## V3 scope (in progress)
+## V3 scope (closing with `v0.3.0`)
 
 Input: saved `AnalysisResult` JSON and a hand-written labels file per video.
 Output: a measured comparison of detectors, and a local-LLM detector that
@@ -133,13 +133,47 @@ on `analyze` and `eval`.
 Non-goals for V3: downloading or URL ingestion, posting, analytics or platform
 metrics, a vector database or retrieval, a trained neural network, audio or
 visual features, a labeling UI, a rename of the project, and any change to
-`render`. Campaign briefs as a detector input come after the LLM detector
-works and need their own ADR.
+`render`. Campaign briefs moved to "Later" (see the V4 list).
 
-The maintainer's goal for the project, as stated: a personal tool, used daily
-and eventually mostly unattended, that turns long-form videos into clips for
-niche short-form accounts, with the ML side growing over time and costs kept
-near zero. V3 serves that by making "better" measurable first.
+V3 closes after item 8. The Whisper experiment (item 5) moved to V4 as GPU
+transcription, for speed: the labels are test examples, so `eval` cannot judge
+a Whisper change on real work.
+
+## V4 scope (next)
+
+Input: a video URL (YouTube or Twitch) or a local file. Output: a folder per
+video of post-ready drafts: 9:16 vertical (a centre crop), styled
+word-by-word captions burned in, and a suggested hook/title per clip. The
+maintainer picks which to post, by hand. Interface: `clipper fetch`, changes
+to `render`, and one command from a URL to that folder.
+
+Non-goals for V4: posting or uploads, analytics or platform metrics, campaign
+briefs, any change to which moments are picked (detectors, windows, boundaries),
+audio or visual detection features, subject or face tracking for the crop,
+hosted APIs or paid services, web UI, database, user accounts, ML training.
+
+## Maintainer's goals
+
+As stated: a personal tool, used daily and eventually mostly unattended, that
+turns long-form videos into clips for niche short-form accounts, with the ML
+side growing over time and costs kept near zero.
+
+From the alignment interview on 2026-11-02:
+
+- No accounts and no clipping yet. Target 4 to 10 long videos a week from
+  Twitch VODs, YouTube streams, podcasts and Vyro/Whop campaigns. The niche is
+  open.
+- Finding moments is the expected time sink. Not yet measured.
+- About half of clip-worthy moments are visual. Clip length should follow the
+  moment, not a fixed window.
+- Must-haves before daily use: 9:16 vertical, styled captions, hook/title
+  text. "Unattended" means: give a URL, come back to rendered, edited clips in
+  a folder, and choose which to post. Posting stays manual.
+- Campaign briefs: none read yet, so whether they steer detection is open.
+- Usefulness wins over ML depth when they conflict. For interviews: a working
+  product whose ML choices are measured, built with ADRs, tests and CI.
+- Strictly local and free; RTX 4070 Ti; 5 to 10 hours a week.
+- The two label files were test examples, not a sample of real work.
 
 ## Current state
 
@@ -166,8 +200,8 @@ In progress:
   Its results on the two label files: `test_input.json` top 5, recall 4 of 4
   and precision 4 of 5 (1 repeat); `oFbD0Ot7nQ8.json` top 30, recall 6 of 30
   and precision 6 of 30 in 953 s, but 0 of 30 in its top 5. Both models tried
-  cluster their scores on round values. Remaining: item 5 (Whisper
-  experiment) and item 8 (release). Item 0 has two label files. With one-to-one precision (ADR 0012,
+  cluster their scores on round values. Remaining: item 8 (release); item 5
+  moved to V4. Item 0 has two label files. With one-to-one precision (ADR 0012,
   item 6a amendment), the heuristic gives: on `test_input.json` (labels cover
   the whole speech) recall 3 of 4 and precision 3 of 5, with 2 repeats; on
   `oFbD0Ot7nQ8.json` recall 2 of 30 and precision 2 of 5 at top 5 (1 repeat),
@@ -258,15 +292,17 @@ confirmation first (see "How to work in this repo").
    writes label files. `eval` cannot say anything about real media until this
    exists. Two label files so far: `test_input.mp4` (whole speech) and
    `oFbD0Ot7nQ8.mp4` (a 5:04:01 YouTube stream, 30 of the maintainer's main
-   clips, not all clippable moments; ADR 0012 amendment).
+   clips, not all clippable moments; ADR 0012 amendment). Both were test
+   examples, not a sample of the videos the maintainer will process.
 1. ~~ADRs 0012 to 0015 and the V3 scope (one docs PR)~~ (done)
 2. ~~Label domain model, loader and `CLIPPER_LABELS_DIR`~~ (done)
 3. ~~Pure comparison function and `clipper eval`, with the first label file
    format documented~~ (done)
 4. ~~`--detector` option and the `_build_detector` seam, with the open question
    on recording the detector name in `AnalysisResult` (ADR 0013)~~ (done)
-5. Whisper experiment: a larger model and/or the GPU, measured with `eval`.
-   Needs a manual-test step. May end in a settings change or in nothing.
+5. ~~Whisper experiment: a larger model and/or the GPU, measured with `eval`.
+   Needs a manual-test step. May end in a settings change or in nothing.~~
+   (moved to V4 item 7, as GPU transcription for speed)
 6. ~~Extract windowing and overlap dedup from `HeuristicClipDetector`.
    Behaviour-neutral; the heuristic's tests stay unchanged (ADR 0014).~~
    (done; `adapters/detection/windows.py`)
@@ -279,13 +315,46 @@ confirmation first (see "How to work in this repo").
    (ADRs 0014, 0015), and a model choice recorded from `eval` results~~
    (done; #79, #80, #81, #82 and the default-model PR; model `qwen3.5:9b`,
    ADR 0014 amendments)
-8. Release notes and tag `v0.3.0`, if the items above land
+8. Release notes and tag `v0.3.0`, with items 1 to 4, 6, 6a and 7
 
-Later, not scheduled: campaign briefs as a detector input (needs an ADR).
-`clipper fetch <url>` after V3: runs the `yt-dlp` program as a subprocess
-behind a `Downloader` Protocol, saves to `data/videos/<id>.mp4`, and leaves
-`analyze` unchanged. Needs a scope change, an ADR (0016) covering platform
-terms, and a manual-test step.
+## V4 list
+
+Each item is one PR, and each code item states its design and waits for
+confirmation first. Output first: nothing here changes which moments are
+picked.
+
+1. ADRs for the V4 decisions (one docs PR): the 9:16 centre crop (amends 0007
+   and 0011), word timestamps and styled captions (supersede part of 0010),
+   hook/title generation via Ollama, `clipper fetch` (0016, with YouTube's and
+   Twitch's terms checked first; unverified so far), and the one-command flow
+   with a folder per video (amends 0008).
+2. 9:16 centre crop in `render`, one code path, with a manual-test step.
+3. Word timestamps in the transcript. A domain-model change; the transcript
+   cache must handle older entries. Whether faster-whisper's word timestamps
+   are usable here is unverified.
+4. Styled, word-by-word burned-in captions, with a manual-test step.
+5. A hook/title per clip from the existing Ollama client, with a manual-test
+   step.
+6. `clipper fetch <url>`: runs the `yt-dlp` program as a subprocess behind a
+   `Downloader` Protocol, saves to `data/videos/<id>.mp4`, and leaves
+   `analyze` unchanged. Manual-test step.
+7. GPU transcription (was V3 item 5): time the long video on the GPU against
+   the CPU's 20:59. May end in a settings change or in nothing. Manual-test
+   step. No `eval` claim.
+8. One command from a URL or file to a folder of drafts: fetch, analyze,
+   render.
+9. Release notes and tag `v0.4.0`, if the items above land.
+
+Later, not scheduled:
+
+- Picking, a candidate for V5: clip boundaries that follow the moment (ADR
+  0014 "revisit when"); a local signal for visual moments, such as audio
+  loudness (untried); and label files for the first niche chosen, so `eval`
+  reflects real work.
+- Campaign briefs as a detector input, once the maintainer has read some.
+  Needs an ADR.
+- Subject or face tracking for the vertical crop.
+- Posting and performance data, once accounts exist.
 
 ## Parked
 
