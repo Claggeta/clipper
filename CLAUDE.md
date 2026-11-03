@@ -109,7 +109,10 @@ and planned code:
 - `0018` — `render --titles`: a `TitleWriter` Protocol and an Ollama adapter
   reusing `OllamaClient` write a title and hook per clip to the manifest. A
   title failure is that clip's failure; no fallback. Built through the context
-  object that replaces the factories first.
+  object that replaces the factories first. Item 5 amendment: the model sees
+  only `clip_text` (what the captions show); the title is written before the
+  clip is cut; no speech means a note and no title; one line, length not
+  checked; `AppContext.title_writer`; manifest `titles`, `title`, `hook`.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
@@ -219,8 +222,8 @@ In progress:
 
 - V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92), 3
   (word timestamps, #93), 4 (styled captions, #95), 4a (a folder per video
-  and the manifest, #97) and 4b (the CLI context object, #99) are merged.
-  Next: item 5, `render --titles`.
+  and the manifest, #97), 4b (the CLI context object, #99) and 5
+  (`render --titles`, #101) are merged. Next: item 6, the fetch ADR (0020).
 
 V3 results, for reference:
 
@@ -375,8 +378,8 @@ picked.
 4b. ~~Replace the CLI's private factories with a context object.
    Behaviour-neutral; ADR 0013's trigger, since titles would be the fifth
    factory. A 0013 amendment.~~ (done; #99, `AppContext` in `cli/context.py`)
-5. A title and hook per clip, `render --titles` (0018), with a manual-test
-   step.
+5. ~~A title and hook per clip, `render --titles` (0018), with a manual-test
+   step.~~ (done; #101, manual step R19; ADR 0018 amendment)
 6. `clipper fetch <url>`: first an ADR (0020) on YouTube's and Twitch's terms
    (unverified so far; it may limit `fetch` to sources with permission, or
    drop it), then the `yt-dlp` program as a subprocess behind a `Downloader`
@@ -462,3 +465,10 @@ Later, not scheduled:
   An ADR 0016 amendment.
 - `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
   temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.
+- `OllamaClient` lives in `adapters/detection/` but titles use it too, so
+  `adapters/titles/` imports across adapters, and the client raises
+  `DetectionError`, which the title writer re-raises as `TitleError`. Fix:
+  move it to a shared adapter module with its own error, behaviour-neutral.
+- Title quality (manual step R19, `qwen3.5:9b`): one of five titles was over
+  the asked 60 characters, and rank 5's title and hook inverted the speaker's
+  point. Judged by eye; revisit the prompt if real clips show it often.
