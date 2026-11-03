@@ -117,6 +117,15 @@ and planned code:
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
   titles fields until item 5; a failure before cutting leaves the manifest.
+- `0020` — `clipper fetch <url>`: one YouTube video or Twitch VOD per call,
+  chosen by hand, via the yt-dlp program behind a `Downloader` Protocol.
+  Both platforms' terms forbid downloading with a tool (quoted, read
+  2026-11-03); the maintainer accepts the risk for personal use, and the
+  README and `--help` say so. No playlists, channels, cookies or logins.
+  Campaign sources unknown. Item 6 amendment: URL rules in
+  `core/sources.py` before yt-dlp runs, `<videos dir>/<id>.mp4`
+  (`CLIPPER_VIDEOS_DIR`, Twitch `v<number>`), `--ignore-config`, 1080p cap,
+  no codec choice (YouTube gave AV1, which renders), an existing file reused.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -223,7 +232,8 @@ In progress:
 - V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92), 3
   (word timestamps, #93), 4 (styled captions, #95), 4a (a folder per video
   and the manifest, #97), 4b (the CLI context object, #99) and 5
-  (`render --titles`, #101) are merged. Next: item 6, the fetch ADR (0020).
+  (`render --titles`, #101) and 6 (ADR 0020, #103; `clipper fetch`, #104)
+  are merged. Next: item 7, GPU transcription.
 
 V3 results, for reference:
 
@@ -380,11 +390,11 @@ picked.
    factory. A 0013 amendment.~~ (done; #99, `AppContext` in `cli/context.py`)
 5. ~~A title and hook per clip, `render --titles` (0018), with a manual-test
    step.~~ (done; #101, manual step R19; ADR 0018 amendment)
-6. `clipper fetch <url>`: first an ADR (0020) on YouTube's and Twitch's terms
-   (unverified so far; it may limit `fetch` to sources with permission, or
-   drop it), then the `yt-dlp` program as a subprocess behind a `Downloader`
+6. ~~`clipper fetch <url>`: first an ADR (0020) on YouTube's and Twitch's
+   terms, then the `yt-dlp` program as a subprocess behind a `Downloader`
    Protocol, saving to `data/videos/<id>.mp4`, with `analyze` unchanged.
-   Manual-test step.
+   Manual-test step.~~ (done; ADR 0020 #103, `fetch` #104, manual steps D0 to
+   D8; ADR 0020 amendment)
 7. GPU transcription (was V3 item 5): time the long video on the GPU against
    the CPU's 20:59. May end in a settings change or in nothing. Manual-test
    step. No `eval` claim.
@@ -472,3 +482,7 @@ Later, not scheduled:
 - Title quality (manual step R19, `qwen3.5:9b`): one of five titles was over
   the asked 60 characters, and rank 5's title and hook inverted the speaker's
   point. Judged by eye; revisit the prompt if real clips show it often.
+- yt-dlp warns on every YouTube request that no JavaScript runtime was found
+  and "some formats may be missing" (it asks for deno). Downloads worked in
+  manual step D1. Revisit if YouTube downloads fail or lose formats (ADR 0020
+  "revisit when").
