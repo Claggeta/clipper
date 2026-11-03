@@ -13,6 +13,7 @@ _MANIFEST = RenderManifest(
     detector="heuristic",
     vertical=True,
     captions=True,
+    titles=True,
     clips=(
         ManifestClip(
             rank=1,
@@ -22,6 +23,8 @@ _MANIFEST = RenderManifest(
             reasons=("tést",),
             file="talk_000001-000010.mp4",
             captions="words",
+            title="Tïtle",
+            hook="A hook.",
         ),
     ),
 )

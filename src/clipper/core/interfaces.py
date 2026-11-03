@@ -3,6 +3,7 @@ from typing import Protocol, runtime_checkable
 
 from clipper.domain.models import (
     ClipCandidate,
+    ClipTitle,
     MediaInfo,
     RenderedClip,
     Transcript,
@@ -63,3 +64,15 @@ class ClipRenderer(Protocol):
         *,
         vertical: bool = False,
     ) -> RenderedClip: ...
+
+
+@runtime_checkable
+class TitleWriter(Protocol):
+    """Suggests a title and hook for one clip from its spoken text.
+
+    `text` is what is said inside the clip (see `clipper.core.captions`), never
+    empty. Raises `TitleError` on failure; there is no fallback text (see
+    docs/decisions/0018).
+    """
+
+    def write(self, text: str) -> ClipTitle: ...

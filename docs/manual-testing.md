@@ -20,7 +20,7 @@ filter.
 
 The [LLM detector](#llm-detector) section covers `--detector llm`. Its tests
 use a fake generator and a mocked HTTP call, so nothing in CI talks to a real
-Ollama server or model.
+Ollama server or model. Step R19 does the same for `render --titles`.
 
 ## When to run it
 
@@ -38,7 +38,9 @@ Ollama server or model.
 - After any change to `src/clipper/adapters/detection/llm.py` or `ollama.py`
   (the prompt included), after upgrading Ollama, or before changing
   `CLIPPER_LLM_MODEL`'s default. Run the [LLM detector](#llm-detector)
-  section.
+  section, and step R19 (titles share the client and the model).
+- After any change to `src/clipper/adapters/titles/` (the prompt included) or
+  `clip_text` in `core/captions.py`. Run step R19.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -438,7 +440,9 @@ Covers `clipper render` ([ADR 0007](decisions/0007-cut-clips-by-re-encoding.md),
 [0008](decisions/0008-clip-output-location-and-naming.md),
 [0009](decisions/0009-render-reads-saved-json-and-probes-media.md),
 [0011](decisions/0011-render-command-shape-and-failure-policy.md),
-[0019](decisions/0019-a-folder-per-video.md)). Clips go to a folder per video,
+[0019](decisions/0019-a-folder-per-video.md), and
+[0018](decisions/0018-suggested-titles-via-ollama.md) in R19). Clips go to a
+folder per video,
 `<clips folder>\<stem>`, with a `manifest.json`. It is
 independent of the ffmpeg and Whisper steps above, with its own setup, scratch
 folder and helpers. Run R0 first in a fresh PowerShell window, and keep that
@@ -966,6 +970,124 @@ Pass:
   `error` starts `ffmpeg failed (exit` and holds the same cause as the
   `Failed: #2` line.
 - d) `exit 1, manifest unchanged: True`.
+
+### R19. `--titles`: a title and hook per clip from the real Ollama server
+
+Covers [ADR 0018](decisions/0018-suggested-titles-via-ollama.md). The title
+tests use a fake writer and a fake generator, so nothing in CI sends the title
+request to a real model. This step checks that Ollama accepts it, what the
+titles look like, how long they take, and whether two runs agree.
+
+It needs Ollama running with the model `CLIPPER_LLM_MODEL` names (default
+`qwen3.5:9b`) pulled; L0 has the setup. Never copy a title into the docs that
+did not come from a run.
+
+```powershell
+# Helper: like Invoke-Render, with the flags passed as one string and extra
+# CLIPPER_ variables set for this one command, then put back.
+function Invoke-Titles {
+  param([string]$Video, [string]$ResultJson, [string]$Flags, [hashtable]$Extra = @{})
+  $old = @{}
+  foreach ($k in $Extra.Keys) {
+    $old[$k] = [Environment]::GetEnvironmentVariable($k, "Process")
+    [Environment]::SetEnvironmentVariable($k, $Extra[$k], "Process")
+  }
+  try {
+    $t = Measure-Command {
+      cmd /c "uv run clipper render `"$Video`" `"$ResultJson`" $Flags > `"$S\last.txt`" 2>&1"
+    }
+    $script:Code = $LASTEXITCODE
+  } finally {
+    foreach ($k in $Extra.Keys) {
+      [Environment]::SetEnvironmentVariable($k, $old[$k], "Process")
+    }
+  }
+  $script:Seconds = [Math]::Round($t.TotalSeconds, 1)
+  $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  "exit $Code, $Seconds s"
+  $Text
+}
+# Helper: the titles and hooks in a video's manifest, with their lengths.
+function Show-Titles([string]$Manifest) {
+  (Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).clips |
+    ForEach-Object { [pscustomobject]@{
+      rank = $_.rank; title = $_.title; tlen = "$($_.title)".Length
+      hook = $_.hook; hlen = "$($_.hook)".Length; error = $_.error } } |
+    Format-List
+}
+$Model = if ($env:CLIPPER_LLM_MODEL) { $env:CLIPPER_LLM_MODEL } else { "qwen3.5:9b" }
+$Dir = "$env:CLIPPER_CLIPS_DIR\$Stem"
+
+# a) Every candidate, vertical with captions and titles. Unload the model
+# first, so the time includes loading it.
+ollama stop $Model
+Reset-Clips
+Invoke-Titles $Src $Json "--vertical --captions --titles"
+$m = Get-Content "$Dir\manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+"titles: $($m.titles)"
+Show-Titles "$Dir\manifest.json"
+Copy-Item "$Dir\manifest.json" "$S\titles-1.json"
+
+# b) The same again, for repeatability (ADR 0015). Titles only, so it is quick.
+Invoke-Titles $Src $Json "--titles" | Out-Null
+"b) exit $Code, $Seconds s"
+$one = (Get-Content "$S\titles-1.json" -Raw -Encoding UTF8 | ConvertFrom-Json).clips |
+  ForEach-Object { "$($_.rank)|$($_.title)|$($_.hook)" }
+$two = (Get-Content "$Dir\manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json).clips |
+  ForEach-Object { "$($_.rank)|$($_.title)|$($_.hook)" }
+"same titles and hooks: " + (-not (Compare-Object $one $two))
+Compare-Object $one $two
+
+# c) Model not pulled. The tag is deliberately one that does not exist.
+Reset-Clips
+Invoke-Titles $Src $Json "--titles" @{ CLIPPER_LLM_MODEL = "no-such-model-clipper:latest" }
+"clips in the folder: " + @(Get-ChildItem $Dir -Filter "*.mp4" -ErrorAction SilentlyContinue).Count
+Show-Titles "$Dir\manifest.json"
+
+# d) Nothing listening on the URL.
+Invoke-Titles $Src $Json "--titles --rank 1" @{ CLIPPER_LLM_URL = "http://127.0.0.1:1" }
+
+# e) A v0.3-style analysis: the same result with every segment's words removed.
+$v3 = Get-Content $Json -Raw -Encoding UTF8 | ConvertFrom-Json
+$v3.transcript.segments | ForEach-Object { $_.words = @() }
+[IO.File]::WriteAllText("$S\out\$Stem-v03.json", ($v3 | ConvertTo-Json -Depth 10),
+  (New-Object System.Text.UTF8Encoding $false))
+Reset-Clips
+Invoke-Titles $Src "$S\out\$Stem-v03.json" "--titles --rank 1"
+Show-Titles "$Dir\manifest.json"
+
+# f) No speech in range (constructed: testsrc.json has an empty transcript).
+Reset-Clips
+Invoke-Titles "$S\testsrc.mp4" "$S\testsrc.json" "--titles"
+Show-Titles "$env:CLIPPER_CLIPS_DIR\testsrc\manifest.json"
+```
+
+Pass:
+
+- a) Exit 0. Each `Rendered #N ...` line ends with
+  ` (vertical, captions, titles)` and is followed by `  Title: ...` and
+  `  Hook: ...` lines. `titles: True`. Every clip has a non-empty `title` and
+  `hook` on one line, about what is said in it, with no hashtags, and no
+  `error`. Record the time, each title and hook as printed, and their lengths
+  (the prompt asks for about 60 and 100 characters; length is not checked by
+  the code).
+- b) Exit 0. Record whether `same titles and hooks` is `True`, and any rows
+  `Compare-Object` lists. A difference is recorded, not a failure (ADR 0015).
+- c) Exit 1. Every clip has a `Failed: #N ...` line with Ollama's HTTP 404
+  message and the `ollama pull` hint, `clips in the folder: 0`, and every
+  manifest entry has that `error` and no title.
+- d) Exit 1. `Failed: #1 ...: Cannot reach Ollama at http://127.0.0.1:1: ...
+  Is it running?`. Record the time.
+- e) Exit 0, with a title and hook for rank 1. Rank 1's title may differ from
+  a), since the text sent may differ (whole segments overlapping the clip,
+  not only the words inside it).
+- f) Exit 0, `Note: #1 0:00:12-0:00:20 has no speech in range; no title`, no
+  `Title:` line, and the manifest's clip has a `file` and an empty `title` and
+  `hook`.
+
+The empty `CLIPPER_LLM_MODEL` error (`Error: Set CLIPPER_LLM_MODEL ... to use
+--titles`, before cutting) is not checked here: Windows does not keep an empty
+environment variable (see L2). The CLI unit tests cover it.
 
 ## Captions
 
@@ -1888,6 +2010,44 @@ analysis.
 - An earlier run the same day used a centre crop, which cut off most of the
   frame (the source's burned-in subtitle lost both ends). The maintainer
   rejected it, and the fit replaced it before release (ADR 0016).
+
+**R19**, 2026-11-03, run by the assistant: R0 and R19 extracted from this file
+as written and run in a child PowerShell process, with `TEMP` pointed at a
+scratch folder and `Invoke-Item` stubbed. Windows 11, ffmpeg and ffprobe
+`9.0.2-full_build-www.gyan.dev`, Ollama 0.40.13, `qwen3.5:9b` (default
+`CLIPPER_LLM_MODEL`, `100% GPU`), `data\test_input.mp4` analysed afresh by R0
+(5 candidates, heuristic).
+
+- a) Exit 0 in 32.5 s for 5 clips with `--vertical --captions --titles`,
+  including the model load. Every line ended ` (vertical, captions, titles)`.
+  `titles: True`. The titles and hooks, as printed:
+
+  | # | Title (chars) | Hook (chars) |
+  |---|---|---|
+  | 1 | Why Navy SEALs Inspect Your Bed Every Morning (45) | If you can't do the little things right, you'll never be able to do the big things right. (89) |
+  | 2 | Ring the Bell to Quit: The Ultimate Test of Will (48) | Find someone to help you through life and face down bullies until you never give up. (84) |
+  | 3 | Be Your Best in the Darkest Moments to Change the World (55) | One person can change the world by giving others hope during their darkest moments. (83) |
+  | 4 | It Matters Not Your Background: Changing Lives Happens Everywhere (65) | You don't need to be in uniform or have a specific background to change lives forever. (86) |
+  | 5 | Stop Ringing The Bell To Change The World (41) | Ring the bell and stop enduring hardships, but if you want to change the world, never do it. (92) |
+
+  All on one line, no hashtags. Title 4 is over the 60 characters asked for.
+  Rank 5's title and hook garble the speaker's point (never ring the bell).
+- b) Exit 0 in 16.7 s (`--titles` only). `same titles and hooks: True`.
+- c) Exit 1 in 0.5 s. All 5 clips failed with `Ollama at
+  http://127.0.0.1:11434 returned HTTP 404 for model
+  'no-such-model-clipper:latest': model 'no-such-model-clipper:latest' not
+  found. Is the model pulled? (...)`, `clips in the folder: 0`, and every
+  manifest entry held that error and no title.
+- d) Exit 1 in 2.5 s: `Cannot reach Ollama at http://127.0.0.1:1: [WinError
+  10061] No connection could be made because the target machine actively
+  refused it. Is it running?`.
+- e) Exit 0 in 3.6 s. Rank 1 of the analysis without words got the same title
+  and hook as in a).
+- f) Exit 0, `Note: #1 0:00:12-0:00:20 has no speech in range; no title`, no
+  `Title:` line, and a manifest entry with a `file` and no title or hook.
+- `ollama stop` printed terminal control codes on stderr; they are Ollama's
+  progress display, not Clipper output.
+- Not covered by this run: a long video, another model, and non-ASCII titles.
 
 ### Captions reference run
 

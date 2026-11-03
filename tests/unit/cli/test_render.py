@@ -7,10 +7,11 @@ from typer.testing import CliRunner, Result
 from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.cli.context import AppContext
 from clipper.cli.main import app
-from clipper.domain.errors import ClipRenderError, MediaProbeError
+from clipper.domain.errors import ClipRenderError, MediaProbeError, TitleError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
+    ClipTitle,
     ManifestClip,
     MediaInfo,
     RenderManifest,
@@ -55,6 +56,24 @@ class RaisingRenderer:
         raise ClipRenderError("[aist#0:0/pcm_s16le] [/bogus] bad")
 
 
+class FakeTitleWriter:
+    """Titles each clip from its text; fails on texts listed in `fail_on`."""
+
+    def __init__(self, fail_on: tuple[str, ...] = ()) -> None:
+        self.texts: list[str] = []
+        self._fail_on = fail_on
+
+    def write(self, text: str) -> ClipTitle:
+        self.texts.append(text)
+        if text in self._fail_on:
+            raise TitleError("Model reply is not a valid title: [bad]")
+        return ClipTitle(title=f"Title: {text}", hook=f"Hook: {text}")
+
+
+def _no_title_writer(settings: object) -> FakeTitleWriter:
+    raise AssertionError("the title writer was built without --titles")
+
+
 class Env:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.video = tmp_path / "talk.mp4"
@@ -68,6 +87,7 @@ class Env:
         self.save()
         self.use_probe(FakeProbe())
         self.use_renderer(self.renderer)
+        self.context = dataclasses.replace(self.context, title_writer=_no_title_writer)
 
     def save(
         self,
@@ -91,6 +111,9 @@ class Env:
             self.context,
             renderer=lambda s: renderer,  # type: ignore[arg-type,return-value]
         )
+
+    def use_title_writer(self, writer: FakeTitleWriter) -> None:
+        self.context = dataclasses.replace(self.context, title_writer=lambda s: writer)
 
     def run(self, *extra: str) -> Result:
         args = ["render", str(self.video), str(self.json), *extra]
@@ -339,6 +362,7 @@ def test_clips_go_to_a_folder_per_video_with_a_manifest(env: Env) -> None:
         detector=None,
         vertical=False,
         captions=False,
+        titles=False,
         clips=(
             ManifestClip(
                 rank=1,
@@ -447,3 +471,112 @@ def test_manifest_write_failure_is_an_error(env: Env) -> None:
     assert "Error: Cannot write manifest" in result.output
     assert "Rendered 1 of 1 clips" in result.output
     assert env.written() == ["talk_000010-000020.mp4"]
+
+
+def test_titles_are_off_by_default(env: Env) -> None:
+    # The default env's title builder fails the test if it is called.
+    env.save(transcript=_SPEECH)
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    manifest = env.manifest()
+    assert manifest.titles is False
+    assert [c.title for c in manifest.clips] == [None, None, None]
+    assert "Title:" not in result.output
+
+
+def test_titles_are_written_from_each_clips_text_to_the_manifest(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1", "--rank", "2")
+    assert result.exit_code == 0, result.output
+    # Markup is removed from the text, as in captions.
+    assert writer.texts == ["hello there", "second ione/i"]
+    manifest = env.manifest()
+    assert manifest.titles is True
+    assert [(c.title, c.hook) for c in manifest.clips] == [
+        ("Title: hello there", "Hook: hello there"),
+        ("Title: second ione/i", "Hook: second ione/i"),
+    ]
+    assert result.output.count(" (titles)") == 2
+    assert "  Title: Title: hello there\n  Hook: Hook: hello there\n" in result.output
+
+
+def test_titles_with_other_flags_are_shown_together(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.use_title_writer(FakeTitleWriter())
+    result = env.run("--titles", "--vertical", "--captions", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert " (vertical, captions, titles)" in result.output
+
+
+def test_title_text_is_not_parsed_as_markup(env: Env) -> None:
+    class Bracketed:
+        def write(self, text: str) -> ClipTitle:
+            return ClipTitle(title="[bold]x[/bold]", hook="[red]y")
+
+    env.save(transcript=_SPEECH)
+    env.context = dataclasses.replace(env.context, title_writer=lambda s: Bracketed())
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert "Title: [bold]x[/bold]" in result.output
+    assert "Hook: [red]y" in result.output
+
+
+def test_a_clip_with_no_speech_gets_a_note_and_no_title(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles")
+    assert result.exit_code == 0, result.output
+    assert "#3 0:01:00-0:01:10 has no speech in range; no title" in result.output
+    assert len(writer.texts) == 2
+    clip = env.manifest().clips[2]
+    assert (clip.file, clip.title, clip.hook) == ("talk_000100-000110.mp4", None, None)
+    assert "Rendered 3 of 3 clips" in result.output
+
+
+def test_a_title_failure_fails_that_clip_before_it_is_cut(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.use_title_writer(FakeTitleWriter(fail_on=("hello there",)))
+    result = env.run("--titles")
+    assert result.exit_code == 1
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert [c for _, c, _ in env.renderer.calls] == [CANDIDATES[1], CANDIDATES[2]]
+    assert env.written() == ["talk_000030-000045.mp4", "talk_000100-000110.mp4"]
+    assert (
+        "Failed: #1 0:00:10-0:00:20: Model reply is not a valid title: [bad]"
+        in result.output
+    )
+    assert "Rendered 2 of 3 clips" in result.output
+    clip = env.manifest().clips[0]
+    assert (clip.file, clip.title, clip.hook) == (None, None, None)
+    assert clip.error == "Model reply is not a valid title: [bad]"
+
+
+def test_a_render_failure_after_its_title_records_no_title(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.use_title_writer(FakeTitleWriter())
+    env.use_renderer(FakeClipRenderer(fail_on=[CANDIDATES[0]]))
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 1
+    clip = env.manifest().clips[0]
+    assert (clip.title, clip.hook) == (None, None)
+    assert clip.error == "Fake render failed for talk_000010-000020.mp4"
+
+
+def test_titles_with_an_empty_model_fail_before_cutting(env: Env) -> None:
+    env.run()
+    before = (env.folder / "manifest.json").read_bytes()
+    env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
+    # The real builder, so its empty-model check runs.
+    env.context = dataclasses.replace(
+        env.context, title_writer=AppContext().title_writer
+    )
+    env.use_renderer(FakeClipRenderer())
+    result = env.run("--titles")
+    assert result.exit_code == 1
+    assert "Error: Set CLIPPER_LLM_MODEL" in result.output
+    assert isinstance(env.renderer, FakeClipRenderer)
+    assert env.renderer.calls == []
+    assert (env.folder / "manifest.json").read_bytes() == before

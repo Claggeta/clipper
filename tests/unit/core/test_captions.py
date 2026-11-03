@@ -1,4 +1,4 @@
-from clipper.core.captions import Captions, build_ass
+from clipper.core.captions import Captions, build_ass, clip_text
 from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
 
 # All transcripts here are constructed, not Whisper output.
@@ -214,3 +214,32 @@ def test_header_has_one_bold_bottom_centre_style_and_events_follow_it() -> None:
     )
     assert text.endswith("\n")
     assert "\r" not in text
+
+
+def test_clip_text_joins_the_words_that_start_inside_the_clip() -> None:
+    transcript = _t(
+        _wseg((0.0, 0.5, "before"), (0.9, 1.2, "edge")),
+        _wseg((2.0, 2.5, "one"), (2.6, 3.0, "two")),
+        _wseg((4.0, 4.5, "three"), (5.0, 5.5, "after")),
+    )
+    assert clip_text(transcript, _c(1.0, 5.0)) == "one two three"
+
+
+def test_clip_text_uses_the_whole_text_of_a_segment_without_words() -> None:
+    transcript = _t(
+        _seg(0.0, 2.0, "  starts  before "),
+        _wseg((3.0, 3.5, "word")),
+        _seg(9.0, 12.0, "ends after"),
+        _seg(12.0, 13.0, "outside"),
+    )
+    assert clip_text(transcript, _c(1.0, 10.0)) == "starts before word ends after"
+
+
+def test_clip_text_removes_caption_markup() -> None:
+    transcript = _t(_seg(0.0, 2.0, "a {b} <i>c</i> d\\N"))
+    assert clip_text(transcript, _c(0.0, 2.0)) == "a b ic/i dN"
+
+
+def test_clip_text_is_empty_with_no_speech_in_range() -> None:
+    transcript = _t(_seg(0.0, 1.0, "early"), _wseg((5.0, 5.5, "late")))
+    assert clip_text(transcript, _c(1.0, 5.0)) == ""

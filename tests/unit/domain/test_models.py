@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from clipper.domain.models import (
     ClipCandidate,
+    ClipTitle,
     Evaluation,
     Label,
     LabeledVideo,
@@ -400,3 +401,50 @@ def test_manifest_clip_rejects_unknown_caption_kinds_and_rank_zero() -> None:
         ManifestClip.model_validate(_entry(file="a.mp4", captions="srt"))
     with pytest.raises(ValidationError):
         ManifestClip.model_validate(_entry(file="a.mp4", rank=0))
+
+
+def test_manifest_clip_with_a_title_and_hook() -> None:
+    clip = ManifestClip.model_validate(_entry(file="a.mp4", title="T", hook="H"))
+    assert (clip.title, clip.hook) == ("T", "H")
+
+
+@pytest.mark.parametrize(
+    ("fields", "message"),
+    [
+        ({"file": "a.mp4", "title": "T"}, "title and hook must be set together"),
+        ({"file": "a.mp4", "hook": "H"}, "title and hook must be set together"),
+        ({"error": "boom", "title": "T", "hook": "H"}, "need a rendered file"),
+    ],
+)
+def test_manifest_clip_title_and_hook_go_together_on_a_file(
+    fields: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        ManifestClip.model_validate(_entry(**fields))
+
+
+def test_clip_title_is_stripped() -> None:
+    title = ClipTitle(title="  A title ", hook=" A hook.  ")
+    assert (title.title, title.hook) == ("A title", "A hook.")
+
+
+@pytest.mark.parametrize(
+    ("title", "hook", "message"),
+    [
+        ("  ", "hook", "at least 1 character"),
+        ("title", "", "at least 1 character"),
+        ("two\nlines", "hook", "must be one line"),
+        ("title", "carriage\rreturn", "must be one line"),
+    ],
+)
+def test_clip_title_rejects_empty_or_multiline_text(
+    title: str, hook: str, message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        ClipTitle(title=title, hook=hook)
+
+
+def test_clip_title_is_immutable() -> None:
+    title = ClipTitle(title="t", hook="h")
+    with pytest.raises(ValidationError):
+        title.title = "u"  # type: ignore[misc]

@@ -219,3 +219,25 @@ def build_ass(
         return Captions("", from_segments=False)
     layout = _VERTICAL if vertical else _SOURCE
     return Captions(_header(layout) + "".join(events), from_segments)
+
+
+def clip_text(transcript: Transcript, candidate: ClipCandidate) -> str:
+    """The words spoken inside the clip, as one line of plain text.
+
+    Selects what `build_ass` shows: words that start inside the candidate's
+    span, and the whole text of a segment without words that overlaps it. The
+    markup characters captions remove are removed here too. "" when no speech
+    is in range. Used for titles (see docs/decisions/0018).
+    """
+    clip_start = _to_ms(candidate.start_seconds)
+    clip_end = _to_ms(candidate.end_seconds)
+    parts: list[str] = []
+    for segment in transcript.segments:
+        if not segment.words:
+            if _segment_event(segment, clip_start, clip_end):
+                parts.append(_clean(segment.text))
+            continue
+        parts.extend(
+            w.text for w in _words_in_clip(segment.words, clip_start, clip_end)
+        )
+    return " ".join(parts)

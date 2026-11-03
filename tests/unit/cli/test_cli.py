@@ -7,13 +7,19 @@ from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.detection.llm import LlmClipDetector
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.titles.ollama import OllamaTitleWriter
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.fake import FakeTranscriber
-from clipper.cli.context import AppContext, DetectorName, build_detector
+from clipper.cli.context import (
+    AppContext,
+    DetectorName,
+    build_detector,
+    build_title_writer,
+)
 from clipper.cli.main import app
 from clipper.core.config import Settings
 from clipper.core.pipeline import AnalysisPipeline
-from clipper.domain.errors import AudioExtractionError, DetectionError
+from clipper.domain.errors import AudioExtractionError, DetectionError, TitleError
 from clipper.domain.models import AnalysisResult, ClipCandidate, Transcript
 
 
@@ -258,3 +264,9 @@ def test_the_default_context_composes_the_real_adapters() -> None:
     assert isinstance(detector, HeuristicClipDetector)
     assert isinstance(context.renderer(settings), FfmpegClipRenderer)
     assert isinstance(context.probe(), FfprobeMediaProbe)
+    assert isinstance(context.title_writer(settings), OllamaTitleWriter)
+
+
+def test_build_title_writer_needs_a_model() -> None:
+    with pytest.raises(TitleError, match="Set CLIPPER_LLM_MODEL .* --titles"):
+        build_title_writer(Settings(llm_model=""))
