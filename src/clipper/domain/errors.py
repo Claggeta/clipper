@@ -36,3 +36,7 @@ class LabelsError(ClipperError):
 
 class DetectionError(ClipperError):
     """Raised when a detector cannot score a transcript."""
+
+
+class TitleError(ClipperError):
+    """Raised when a title and hook cannot be written for a clip."""

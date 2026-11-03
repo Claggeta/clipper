@@ -8,12 +8,19 @@ from clipper.adapters.detection.ollama import OllamaClient
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.titles.ollama import OllamaTitleWriter
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
 from clipper.adapters.transcription.video import VideoTranscriber
 from clipper.core.config import Settings
-from clipper.core.interfaces import ClipDetector, ClipRenderer, MediaProbe, Transcriber
-from clipper.domain.errors import DetectionError
+from clipper.core.interfaces import (
+    ClipDetector,
+    ClipRenderer,
+    MediaProbe,
+    TitleWriter,
+    Transcriber,
+)
+from clipper.domain.errors import DetectionError, TitleError
 
 
 class DetectorName(StrEnum):
@@ -58,6 +65,15 @@ def build_probe() -> MediaProbe:
     return FfprobeMediaProbe()
 
 
+def build_title_writer(settings: Settings) -> TitleWriter:
+    """Compose the title writer, on the detector's model (ADR 0018)."""
+    if not settings.llm_model:
+        raise TitleError(
+            "Set CLIPPER_LLM_MODEL to an Ollama model name to use --titles"
+        )
+    return OllamaTitleWriter(OllamaClient(settings.llm_url, settings.llm_model))
+
+
 @dataclass(frozen=True)
 class AppContext:
     """How the commands build their adapters. See docs/decisions/0013.
@@ -72,3 +88,4 @@ class AppContext:
     detector: Callable[[Settings, DetectorName], ClipDetector] = build_detector
     renderer: Callable[[Settings], ClipRenderer] = build_renderer
     probe: Callable[[], MediaProbe] = build_probe
+    title_writer: Callable[[Settings], TitleWriter] = build_title_writer

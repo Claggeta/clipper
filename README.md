@@ -93,6 +93,13 @@ This renders every candidate. Options:
   whole frame, scaled to fit the width, centred on a blurred copy of itself.
   Nothing is cut off. Black bars built into the source stay in the picture.
   Captions are drawn on the vertical frame.
+- `--titles` suggests a title and a hook line per clip with a local model
+  through [Ollama](https://ollama.com), the same server and model as
+  `--detector llm` (`CLIPPER_LLM_MODEL`, default `qwen3.5:9b`). They are
+  printed under each clip and written to the manifest, not drawn on the video.
+  The model only sees what is said in the clip. A clip with no speech in range
+  gets no title, with a note. If the title fails (Ollama not running, model not
+  pulled, a bad reply), that clip is not rendered and counts as a failure.
 
 Clips are written to a folder per video,
 `<clips dir>/<video name>/<video name>_<HHMMSS>-<HHMMSS>.mp4` (by default
@@ -106,8 +113,9 @@ Each run also writes `manifest.json` in the video's folder, replacing the one
 before. It records the video, the analysis JSON, the detector, the flags, and
 one entry per selected clip with its rank, span, score, reasons, file name,
 which captions were burned in (`words`, `segments` for an analysis without word
-times, or `null`), and the error if it failed. A `--rank` run lists only the
-ranks it rendered. One entry from a real run with `--vertical --captions`:
+times, or `null`), the title and hook with `--titles`, and the error if it
+failed. A `--rank` run lists only the ranks it rendered. One entry from a real
+run with `--vertical --captions --titles` (`qwen3.5:9b`):
 
 ```json
 {
@@ -121,6 +129,8 @@ ranks it rendered. One entry from a real run with `--vertical --captions`:
   ],
   "file": "test_input_000032-000113.mp4",
   "captions": "words",
+  "title": "Why Navy SEALs Inspect Your Bed Every Morning",
+  "hook": "If you can't do the little things right, you'll never be able to do the big things right.",
   "error": null
 }
 ```

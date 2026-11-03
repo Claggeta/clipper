@@ -14,7 +14,7 @@ from clipper.adapters.results.analysis_json import (
 from clipper.adapters.results.labels_json import check_labels_match, load_labels
 from clipper.adapters.results.manifest_json import save_manifest
 from clipper.cli.context import AppContext, DetectorName
-from clipper.core.captions import build_ass
+from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
 from clipper.core.naming import clip_folder, plan_clip_paths
@@ -269,6 +269,14 @@ def render(
             help="Fit the whole frame into 9:16 at 1080x1920, on a blurred fill.",
         ),
     ] = False,
+    titles: Annotated[
+        bool,
+        typer.Option(
+            "--titles",
+            help="Suggest a title and hook per clip with the local LLM "
+            "(CLIPPER_LLM_MODEL), written to the manifest.",
+        ),
+    ] = False,
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""
     settings = Settings()
@@ -281,6 +289,7 @@ def render(
         _check_media(selected, build.probe().probe(video))
         folder = clip_folder(video, settings.clips_dir)
         paths = plan_clip_paths(video, selected, folder)
+        writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
@@ -316,7 +325,17 @@ def render(
                 "captions show whole segments",
                 soft_wrap=True,
             )
+        text = clip_text(result.transcript, candidate) if writer else ""
+        if writer and not text:
+            console.print(
+                f"[yellow]Note:[/yellow] #{number} {span} has no speech in range; "
+                "no title",
+                soft_wrap=True,
+            )
         try:
+            # The title comes first, so a clip whose title fails is not cut
+            # (ADR 0018).
+            title = writer.write(text) if writer and text else None
             clip = renderer.render(
                 video, candidate, path, captions=ass or None, vertical=vertical
             )
@@ -328,13 +347,25 @@ def render(
         burned = None
         if ass and built:
             burned = "segments" if built.from_segments else "words"
-        entries.append(ManifestClip(**entry, file=path.name, captions=burned))
-        tags = [t for t, on in (("vertical", vertical), ("captions", ass)) if on]
+        entries.append(
+            ManifestClip(
+                **entry,
+                file=path.name,
+                captions=burned,
+                title=title.title if title else None,
+                hook=title.hook if title else None,
+            )
+        )
+        flags = (("vertical", vertical), ("captions", ass), ("titles", title))
+        tags = [t for t, on in flags if on]
         suffix = f" ({', '.join(tags)})" if tags else ""
         console.print(
             f"Rendered #{number} {span} {escape(str(clip.path))}{suffix}",
             soft_wrap=True,
         )
+        if title:
+            console.print(f"  Title: {escape(title.title)}", soft_wrap=True)
+            console.print(f"  Hook: {escape(title.hook)}", soft_wrap=True)
 
     for failure in failures:
         console.print(f"[red]Failed:[/red] {failure}", soft_wrap=True)
@@ -348,6 +379,7 @@ def render(
         detector=result.detector,
         vertical=vertical,
         captions=captions,
+        titles=titles,
         clips=tuple(entries),
     )
     try:

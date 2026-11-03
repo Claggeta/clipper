@@ -142,13 +142,33 @@ class RenderedClip(BaseModel):
     path: Path
 
 
+class ClipTitle(BaseModel):
+    """A suggested title and hook for one clip. See docs/decisions/0018.
+
+    Both are stripped, must not be empty, and must be one line.
+    """
+
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    title: str = Field(min_length=1)
+    hook: str = Field(min_length=1)
+
+    @field_validator("title", "hook")
+    @classmethod
+    def _one_line(cls, value: str) -> str:
+        if "\n" in value or "\r" in value:
+            raise ValueError("must be one line")
+        return value
+
+
 class ManifestClip(BaseModel):
     """One selected clip in a render manifest. See docs/decisions/0019.
 
     `file` is the clip's name inside the manifest's folder, set when it was
     rendered; `error` is the failure message otherwise. `captions` is what was
     burned in: word-by-word, whole segments (a transcript without word times),
-    or nothing.
+    or nothing. `title` and `hook` are set together, only on a rendered clip
+    run with `--titles` that had speech in range (ADR 0018).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -160,6 +180,8 @@ class ManifestClip(BaseModel):
     reasons: tuple[str, ...]
     file: str | None = None
     captions: Literal["words", "segments"] | None = None
+    title: str | None = None
+    hook: str | None = None
     error: str | None = None
 
     @model_validator(mode="after")
@@ -168,12 +190,20 @@ class ManifestClip(BaseModel):
             raise ValueError("exactly one of file and error must be set")
         return self
 
+    @model_validator(mode="after")
+    def _title_with_hook_on_a_file(self) -> "ManifestClip":
+        if (self.title is None) != (self.hook is None):
+            raise ValueError("title and hook must be set together")
+        if self.title is not None and self.file is None:
+            raise ValueError("title and hook need a rendered file")
+        return self
+
 
 class RenderManifest(BaseModel):
     """What one `render` run wrote to a video's folder. See docs/decisions/0019.
 
-    `vertical` and `captions` are the flags the run was given. `analysis` is
-    the result JSON path as given on the command line.
+    `vertical`, `captions` and `titles` are the flags the run was given.
+    `analysis` is the result JSON path as given on the command line.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -183,6 +213,7 @@ class RenderManifest(BaseModel):
     detector: str | None
     vertical: bool
     captions: bool
+    titles: bool
     clips: tuple[ManifestClip, ...]
 
 
