@@ -30,6 +30,7 @@ from clipper.domain.models import (
     MediaInfo,
     RenderManifest,
     Transcript,
+    VideoSource,
 )
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
@@ -228,16 +229,24 @@ def fetch(
     settings = Settings()
     build = _context(ctx)
     try:
-        source = parse_video_url(url)
-        existing = video_path(source, settings.videos_dir)
-        if existing.is_file():
-            console.print(f"Already fetched: {escape(str(existing))}", soft_wrap=True)
-            return
-        saved = build.downloader(settings).download(source, settings.videos_dir)
+        _fetch_video(settings, build, parse_video_url(url))
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
+
+
+def _fetch_video(settings: Settings, build: AppContext, source: VideoSource) -> Path:
+    """Download one video, or reuse the file already there (ADR 0020).
+
+    Returns the video's path. Raises `ClipperError` if the download fails.
+    """
+    existing = video_path(source, settings.videos_dir)
+    if existing.is_file():
+        console.print(f"Already fetched: {escape(str(existing))}", soft_wrap=True)
+        return existing
+    saved = build.downloader(settings).download(source, settings.videos_dir)
     console.print(f"Saved: {escape(str(saved))}", soft_wrap=True)
+    return saved
 
 
 @app.command()
@@ -478,6 +487,74 @@ def _cut_clips(
         raise typer.Exit(code=1) from exc
     console.print(f"Manifest: {escape(str(written))}", soft_wrap=True)
     return bool(failures)
+
+
+@app.command()
+def drafts(
+    ctx: typer.Context,
+    source: Annotated[
+        str,
+        typer.Argument(help="A YouTube video or Twitch VOD URL, or a video file."),
+    ],
+    vertical: Annotated[
+        bool,
+        typer.Option(
+            "--vertical/--no-vertical",
+            help="Fit the whole frame into 9:16 at 1080x1920, on a blurred fill.",
+        ),
+    ] = True,
+    captions: Annotated[
+        bool,
+        typer.Option("--captions/--no-captions", help="Burn captions into each clip."),
+    ] = True,
+    titles: Annotated[
+        bool,
+        typer.Option(
+            "--titles/--no-titles",
+            help="Suggest a title and hook per clip with the local LLM "
+            "(CLIPPER_LLM_MODEL), written to the manifest.",
+        ),
+    ] = True,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+    detector: DetectorOption = DetectorName.HEURISTIC,
+) -> None:
+    """Turn SOURCE into a folder of clip drafts: fetch, analyze, then render.
+
+    SOURCE starting with http:// or https:// is fetched as `fetch` does (see
+    docs/decisions/0020); anything else is a local video file. Every
+    candidate is rendered, by default vertical, captioned and titled (see
+    docs/decisions/0022).
+    """
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
+    settings = Settings()
+    build = _context(ctx)
+    try:
+        # Everything that can fail on input or settings fails before a
+        # download or a transcription starts (ADR 0022).
+        url = source.lower().startswith(("http://", "https://"))
+        fetched = parse_video_url(source) if url else None
+        video = Path(source)
+        if fetched is None and not video.is_file():
+            raise ClipperError(f"Input file not found: {video}")
+        writer = build.title_writer(settings) if titles else None
+        if fetched is not None:
+            video = _fetch_video(settings, build, fetched)
+        result, result_json = _analyze_video(settings, build, video, detector)
+        plan = _plan_render(settings, build, video, result, None)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+
+    flags = _RenderFlags(captions=captions, vertical=vertical, titles=titles)
+    failed = _cut_clips(
+        settings, build, video, result, result_json, plan, writer, flags
+    )
+    console.print(f"Drafts: {escape(str(plan.folder))}", soft_wrap=True)
+    if failed:
+        raise typer.Exit(code=1)
 
 
 @app.command("eval")

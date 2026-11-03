@@ -47,6 +47,8 @@ nothing in CI downloads.
 - After any change to `src/clipper/adapters/download/` or
   `core/sources.py`, after upgrading yt-dlp, or when a `fetch` that used to
   work fails. Run the [Fetch](#fetch) section.
+- After any change to the `drafts` command, or to the shared analyze, render
+  or fetch steps in `cli/main.py`. Run steps D8 to D10.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -2013,10 +2015,74 @@ Pass: exit 0, a table of candidates, and `Saved:` with
 than about a minute of speech may give no candidates; that is not a fetch
 failure.
 
-### D8. Clean up
+### D8. `drafts` from a URL to a folder of drafts
+
+Covers [ADR 0022](decisions/0022-one-command-to-drafts.md). Needs Ollama
+running with the default model (L0), since titles are on by default. Use a
+second short video with speech.
 
 ```powershell
-Remove-Item Env:CLIPPER_VIDEOS_DIR, Env:CLIPPER_CACHE_DIR, Env:CLIPPER_OUTPUT_DIR, Env:COLUMNS
+$DraftsUrl = "<another short public YouTube video URL>"
+$env:CLIPPER_CLIPS_DIR = "$S\clips"
+Invoke-Fetch "drafts `"$DraftsUrl`""
+$id = (Get-ChildItem "$env:CLIPPER_VIDEOS_DIR" -Filter "*.mp4" | Sort-Object LastWriteTime | Select-Object -Last 1).BaseName
+$m = Get-Content "$env:CLIPPER_CLIPS_DIR\$id\manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$m | Select-Object source, analysis, detector, vertical, captions, titles | Format-List
+$m.clips | Format-List rank, file, captions, title, hook, error
+$clip = (Get-ChildItem "$env:CLIPPER_CLIPS_DIR\$id" -Filter "*.mp4" | Select-Object -First 1).FullName
+Show-Video $clip
+ffmpeg -hide_banner -loglevel error -y -ss 5 -i "$clip" -frames:v 1 "$S\drafts.png"
+Invoke-Item "$S\drafts.png"
+```
+
+Pass: exit 0. The output shows the fetch (`Saved:`), the candidates table,
+`Saved: <output folder>\<id>.json`, one `Rendered #N ... (vertical,
+captions, titles)` line with a title and hook per clip, `Manifest: ...`, and
+last `Drafts: <clips folder>\<id>`. The manifest has `vertical`, `captions`
+and `titles` true, `analysis` is that JSON, and every clip has a `file`, a
+`title` and a `hook`. The clip is H.264 1080x1920 and the frame shows the
+fitted picture on a blurred fill. Record the time.
+
+### D9. `drafts` on a long stream, timed (criterion 5)
+
+The long-stream time for [vision criterion 5](vision.md). From a local file,
+so the time is not a download's. The cache folder is the scratch one, so the
+transcription is cold. It takes about as long as a cold `analyze` (21 minutes
+for a 5-hour stream on the reference machine) plus rendering.
+
+```powershell
+$LongVideo = "<a long local video, e.g. data\videos\oFbD0Ot7nQ8.mp4>"
+Invoke-Fetch "drafts `"$LongVideo`"" | Select-Object -Last 12
+$stem = [IO.Path]::GetFileNameWithoutExtension($LongVideo)
+(Get-Content "$env:CLIPPER_CLIPS_DIR\$stem\manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json).clips |
+  Format-Table rank, start_seconds, end_seconds, file, title, error -AutoSize
+```
+
+Pass: exit 0, `Drafts: ...` last, and every clip has a `file` and a title.
+Record the video's length and the total time.
+
+### D10. Ollama unreachable: titles fail, `--no-titles` renders
+
+`CLIPPER_LLM_URL` points at a port nothing listens on, which is what a
+stopped Ollama looks like to Clipper. The analysis is cached from D8.
+
+```powershell
+$env:CLIPPER_LLM_URL = "http://127.0.0.1:1"
+Invoke-Fetch "drafts `"$DraftsUrl`"" | Select-Object -Last 8
+"clips: " + @(Get-ChildItem "$env:CLIPPER_CLIPS_DIR\$id" -Filter "*.mp4").Count
+Invoke-Fetch "drafts `"$DraftsUrl`" --no-titles" | Select-Object -Last 4
+Remove-Item Env:CLIPPER_LLM_URL
+```
+
+Pass: the first run exits 1, with a `Failed: #N ...: Cannot reach Ollama at
+http://127.0.0.1:1 ...` line per clip, `Rendered 0 of N clips` and
+`Drafts: ...` last. `clips:` still counts D8's files, since nothing was
+deleted. The second run exits 0 with every clip rendered and no title lines.
+
+### D11. Clean up
+
+```powershell
+Remove-Item Env:CLIPPER_VIDEOS_DIR, Env:CLIPPER_CACHE_DIR, Env:CLIPPER_OUTPUT_DIR, Env:CLIPPER_CLIPS_DIR, Env:COLUMNS
 Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothing
 Remove-Item -Recurse -Force $S
 ```
@@ -2256,7 +2322,8 @@ and their output were pasted back by the maintainer.
 
 ### Fetch reference run
 
-One run of D0 to D8 as written, for scale. It is not a pass threshold.
+One run of D0 to D7 and the clean-up as written at the time, before D8 to
+D10 were added. For scale; it is not a pass threshold.
 2026-11-03, Windows 11, PowerShell 5.1, yt-dlp 2026.10.26 (a uv tool, put on
 `PATH` for the run only), ffmpeg `9.0.2-full_build-www.gyan.dev`. Run by the
 assistant: the steps were extracted from this file and run in a child
@@ -2288,6 +2355,32 @@ Twitch VOD (`1691281504`).
   AV1 source renders.
 - Not covered: a long VOD, a YouTube video above 1080p, a Short, a video that
   is still live, and a run with a JavaScript runtime installed.
+
+**D0 to D11**, 2026-11-03, the same setup and method, with Ollama 0.40.13
+and `qwen3.5:9b` for titles. D0 to D7 matched the run above (D2 took 29.7 s
+this time). For `drafts`, the maintainer's second YouTube video
+(`lCN6FjqDcHg`, 8:53) and the 5:04:01 stream as a local file:
+
+- D8: exit 0 in 71.5 s from the URL: `Saved:` for the video, the table (5
+  candidates, 0.59 to 0.15), `Saved:` for the JSON, five lines ending
+  ` (vertical, captions, titles)` each with a title and hook, `Manifest:`,
+  then `Drafts: ...\clips\lCN6FjqDcHg`. The manifest had all three flags
+  true, `analysis` the saved JSON, and every clip a `file`, `captions:
+  words`, a title and a hook. Rank 1: H.264 1080x1920, 43.77 s; its frame
+  showed the fitted picture on the blurred fill and a three-word caption with
+  the active word in yellow. Titles were 43 to 76 characters (two over the
+  60 asked for), hooks 73 to 117.
+- D9: exit 0 in **1,378 s (22:58)** for the 5:04:01 stream, cold, from a
+  local file: 5 candidates (0.85 to 0.80), all 5 rendered vertical,
+  captioned and titled. A cold `analyze` of the same stream took 1,260 s
+  (vision criterion 1, before word timestamps), so rendering and titles
+  added about two minutes. One hook repeated a swear word from the speech.
+- D10: with `CLIPPER_LLM_URL` at port 1, exit 1 in 10.8 s: `Already
+  fetched`, the cached analysis, a `Failed: #N ...: Cannot reach Ollama at
+  http://127.0.0.1:1: [WinError 10061] ...` line per clip, `Rendered 0 of 5
+  clips`, then `Drafts:`; `clips: 5` (D8's). With `--no-titles`: exit 0 in
+  26.6 s, all 5 rendered ` (vertical, captions)`, no title lines.
+- D11: no `CLIPPER_` variable left; the scratch folder was removed.
 
 ### LLM detector reference run
 
