@@ -186,7 +186,7 @@ V3 closed with item 8. The Whisper experiment (item 5) moved to V4 as GPU
 transcription, for speed: the labels are test examples, so `eval` cannot judge
 a Whisper change on real work.
 
-## V4 scope (next)
+## V4 scope (shipped as `v0.4.0`)
 
 Input: a video URL (YouTube or Twitch) or a local file. Output: a folder per
 video of post-ready drafts: 9:16 vertical (whole frame, blurred fill), styled
@@ -198,6 +198,10 @@ Non-goals for V4: posting or uploads, analytics or platform metrics, campaign
 briefs, any change to which moments are picked (detectors, windows, boundaries),
 audio or visual detection features, subject or face tracking for the crop,
 hosted APIs or paid services, web UI, database, user accounts, ML training.
+
+V4 closed with item 9. GPU transcription (item 7) was measured and not adopted
+(ADR 0021). V5's scope is not decided; the candidates are under "Later" in the
+V4 list.
 
 ## Maintainer's goals
 
@@ -240,16 +244,16 @@ All merged to `main` with green CI:
   `docs/releases/v0.2.0.md`.
 - V3: `clipper eval`, label files, `--detector` and the LLM detector,
   released as `v0.3.0`. Notes are in `docs/releases/v0.3.0.md`.
+- V4: `clipper drafts` from a URL or file to a folder of vertical,
+  word-captioned, titled drafts; `clipper fetch`; `render --vertical`,
+  styled captions, `--titles` and a folder per video with a manifest.
+  Released as `v0.4.0` (pre-release, tag on 603e410). Notes are in
+  `docs/releases/v0.4.0.md`.
 
 In progress:
 
-- V4. Items 1 (ADRs 0016 to 0019), 2 (`render --vertical`, #90, #92), 3
-  (word timestamps, #93), 4 (styled captions, #95), 4a (a folder per video
-  and the manifest, #97), 4b (the CLI context object, #99) and 5
-  (`render --titles`, #101) and 6 (ADR 0020, #103; `clipper fetch`, #104)
-  are merged. Item 7 (GPU transcription) ended in no change (ADR 0021,
-  #106). Item 8 (`clipper drafts`: ADR 0022 #108, extraction #109, command
-  #110) is merged. Next: item 9, release notes and tag `v0.4.0`.
+- Nothing. Next: plan V5 with the maintainer (scope, non-goals and a list,
+  as for V2 to V4). The candidates are under "Later" in the V4 list.
 
 V3 results, for reference:
 
@@ -419,7 +423,9 @@ picked.
    render with `--vertical --captions --titles`. Its command shape needs an
    ADR or a 0011 amendment, decided in that item.~~ (done; `clipper drafts`,
    ADR 0022 #108, extraction #109, command #110, manual steps D8 to D10)
-9. Release notes and tag `v0.4.0`, if the items above land.
+9. ~~Release notes and tag `v0.4.0`, if the items above land.~~ (done; notes
+   #112, F1 run before tagging, tag `v0.4.0` and pre-release by the
+   maintainer)
 
 Later, not scheduled:
 
