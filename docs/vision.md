@@ -91,7 +91,10 @@ training.
    network access.
 5. V4: one command takes a URL to a folder of vertical, captioned, titled
    drafts on the developer's machine, with nothing paid. Its time on a long
-   stream is measured and recorded, not assumed.
+   stream is measured and recorded, not assumed. Measured: `clipper drafts`
+   on the 5:04:01 stream from a local file, cold, took 22:58 (1,378 s) for 5
+   drafts; a short video from its URL took 71.5 s
+   ([ADR 0022](decisions/0022-one-command-to-drafts.md)). Timed once each.
 
 ## Principles
 1. Each stage is independent and replaceable.

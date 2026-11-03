@@ -83,6 +83,32 @@ order across them, gets its own record.
 - (-) A long stream still takes about 21 minutes to transcribe on the CPU
   (0021) before the first clip renders.
 
+## Amended by the `drafts` PR (V4 item 8)
+
+- **Extraction done** (#109, behaviour-neutral): `_analyze_video`,
+  `_plan_render` and `_cut_clips` in `cli/main.py`, with no test changed and
+  every command's `--help` byte-identical. This PR also moves `fetch`'s body
+  into `_fetch_video`, with its output unchanged, so `drafts` fetches through
+  the same code.
+- **URL or file**: a `<source>` starting with `http://` or `https://`, in
+  any case, is a URL. A file that does not exist is `Error: Input file not
+  found: <path>`, the pipeline's own message, raised before the title writer
+  is built.
+- **Order inside the checks**: refused URL or missing file, then the title
+  writer (an empty `CLIPPER_LLM_MODEL`), then the fetch, the analysis, and
+  `render`'s checks before cutting. `Drafts: <folder>` is printed after the
+  manifest even when a clip failed, then the exit code is 1.
+- **Manual steps D8 to D10** (Fetch section). "Ollama not running" is
+  checked by pointing `CLIPPER_LLM_URL` at a port nothing listens on, which
+  Clipper cannot tell from a stopped server and which leaves the user's
+  Ollama alone.
+- **First real run**, 2026-11-03, run by the assistant in a child process:
+  an 8:53 YouTube URL to 5 titled vertical drafts in 71.5 s; the 5:04:01
+  stream from a local file, cold, in **1,378 s (22:58)**, against 1,260 s for
+  a cold `analyze` alone (vision criterion 5); with Ollama unreachable every
+  clip failed its title in 10.8 s, and `--no-titles` rendered all 5 in
+  26.6 s.
+
 ## Revisit when
 
 - A second front end (a scheduler, a watch folder, a UI) needs the same

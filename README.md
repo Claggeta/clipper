@@ -164,6 +164,23 @@ nothing and exit 1. If one clip fails while others succeed, the rest are still
 rendered, each failure is printed and listed in the manifest, and the command
 exits 1.
 
+### One command: from a URL or file to drafts
+
+```powershell
+uv run clipper drafts "https://www.youtube.com/watch?v=<id>"
+uv run clipper drafts path\to\video.mp4
+```
+
+`drafts` runs `fetch` (for a URL), `analyze` and `render` in one go and ends
+with `Drafts: <clips dir>/<video name>`: a folder with every candidate as a
+vertical, captioned clip, and a suggested title and hook for each in the
+manifest. `--no-vertical`, `--no-captions` and `--no-titles` turn those off;
+use `--no-titles` when Ollama is not running. `--detector` and `-v` work as
+for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
+it before anything is downloaded or transcribed. If one clip fails, the rest
+still render and it exits 1. A URL is subject to the same terms warning as
+`fetch`. See [ADR 0022](docs/decisions/0022-one-command-to-drafts.md).
+
 ### Evaluating detectors
 
 `eval` measures the detector against moments you labeled by hand. It reruns the
