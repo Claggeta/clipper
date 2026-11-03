@@ -126,6 +126,12 @@ and planned code:
   `core/sources.py` before yt-dlp runs, `<videos dir>/<id>.mp4`
   (`CLIPPER_VIDEOS_DIR`, Twitch `v<number>`), `--ignore-config`, 1080p cap,
   no codec choice (YouTube gave AV1, which renders), an existing file reused.
+- `0021` — GPU transcription measured and not adopted: the 5:04:01 stream
+  took 593 s on the GPU (`int8_float16`) against 1,260 s on the CPU, but its
+  transcript drifted (87.4% word match, far fewer `.` and `?`), and the
+  setup needs ~1 GB of NVIDIA cuBLAS/cuDNN packages plus Windows DLL-path
+  code. Unquantised GPU types drop nearly all punctuation. Transcription
+  stays CPU `int8`; revisit with a larger Whisper model (V5).
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -233,7 +239,8 @@ In progress:
   (word timestamps, #93), 4 (styled captions, #95), 4a (a folder per video
   and the manifest, #97), 4b (the CLI context object, #99) and 5
   (`render --titles`, #101) and 6 (ADR 0020, #103; `clipper fetch`, #104)
-  are merged. Next: item 7, GPU transcription.
+  are merged. Item 7 (GPU transcription) ended in no change (ADR 0021,
+  #106). Next: item 8, one command from a URL or file to a folder of drafts.
 
 V3 results, for reference:
 
@@ -395,9 +402,10 @@ picked.
    Protocol, saving to `data/videos/<id>.mp4`, with `analyze` unchanged.
    Manual-test step.~~ (done; ADR 0020 #103, `fetch` #104, manual steps D0 to
    D8; ADR 0020 amendment)
-7. GPU transcription (was V3 item 5): time the long video on the GPU against
-   the CPU's 20:59. May end in a settings change or in nothing. Manual-test
-   step. No `eval` claim.
+7. ~~GPU transcription (was V3 item 5): time the long video on the GPU
+   against the CPU's 20:59. May end in a settings change or in nothing.
+   Manual-test step. No `eval` claim.~~ (done; ended in nothing: 593 s on the
+   GPU, but the transcript drifted; ADR 0021, #106)
 8. One command from a URL or file to a folder of drafts: fetch, analyze,
    render with `--vertical --captions --titles`. Its command shape needs an
    ADR or a 0011 amendment, decided in that item.
@@ -409,6 +417,9 @@ Later, not scheduled:
   0014 "revisit when"); a local signal for visual moments, such as audio
   loudness (untried); and label files for the first niche chosen, so `eval`
   reflects real work.
+- A larger Whisper model (`small`, `medium`) on the GPU, a candidate for V5
+  with picking, since it changes transcripts and so which moments are picked.
+  ADR 0021 has the measured GPU setup and its punctuation caveats.
 - Campaign briefs as a detector input, once the maintainer has read some.
   Needs an ADR.
 - Subject or face tracking for the vertical crop.
