@@ -1,0 +1,84 @@
+from pathlib import Path
+
+import pytest
+
+from clipper.core.sources import parse_video_url, video_path, video_url
+from clipper.domain.errors import DownloadError
+from clipper.domain.models import VideoSource
+
+# The IDs below are constructed; no real video is implied.
+_YT = VideoSource(platform="youtube", video_id="abcDEF123_-")
+_TW = VideoSource(platform="twitch", video_id="v1234567890")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=abcDEF123_-",
+        "https://youtube.com/watch?v=abcDEF123_-",
+        "https://m.youtube.com/watch?v=abcDEF123_-",
+        "http://www.youtube.com/watch?v=abcDEF123_-",
+        "https://www.youtube.com/watch?v=abcDEF123_-&t=90s",
+        "https://www.youtube.com/watch?v=abcDEF123_-&list=PLxyz&index=3",
+        "https://youtu.be/abcDEF123_-",
+        "https://youtu.be/abcDEF123_-?si=share",
+        "https://www.youtube.com/shorts/abcDEF123_-",
+        "https://www.youtube.com/live/abcDEF123_-",
+        "  https://www.YouTube.com/watch?v=abcDEF123_-  ",
+    ],
+)
+def test_youtube_video_urls(url: str) -> None:
+    assert parse_video_url(url) == _YT
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.twitch.tv/videos/1234567890",
+        "https://twitch.tv/videos/1234567890",
+        "https://m.twitch.tv/videos/1234567890?t=1h2m3s",
+        "https://www.twitch.tv/videos/1234567890/",
+    ],
+)
+def test_twitch_vod_urls(url: str) -> None:
+    assert parse_video_url(url) == _TW
+
+
+@pytest.mark.parametrize(
+    ("url", "message"),
+    [
+        ("https://www.youtube.com/playlist?list=PLxyz", "Playlist URLs are not"),
+        ("https://www.youtube.com/@somechannel", "Not a single YouTube video"),
+        ("https://www.youtube.com/channel/UCxyz", "Not a single YouTube video"),
+        ("https://www.youtube.com/", "Not a single YouTube video"),
+        ("https://www.youtube.com/watch", "Not a YouTube video ID"),
+        ("https://www.youtube.com/watch?v=short", "Not a YouTube video ID"),
+        ("https://youtu.be/", "Not a YouTube video or Twitch VOD URL"),
+        ("https://www.twitch.tv/somechannel", "Only Twitch VOD URLs"),
+        ("https://www.twitch.tv/videos/abc", "Only Twitch VOD URLs"),
+        ("https://www.twitch.tv/somechannel/clip/Name", "Only Twitch VOD URLs"),
+        ("https://clips.twitch.tv/Name", "Only Twitch VOD URLs"),
+        ("https://vimeo.com/123", "Not a YouTube video or Twitch VOD URL"),
+        ("ftp://www.youtube.com/watch?v=abcDEF123_-", "Not a YouTube video or"),
+        ("data/videos/abc.mp4", "Not a YouTube video or Twitch VOD URL"),
+        ("", "Not a YouTube video or Twitch VOD URL"),
+    ],
+)
+def test_other_urls_are_refused(url: str, message: str) -> None:
+    with pytest.raises(DownloadError, match=message):
+        parse_video_url(url)
+
+
+def test_refusals_cite_the_adr() -> None:
+    with pytest.raises(DownloadError, match="docs/decisions/0020"):
+        parse_video_url("https://www.youtube.com/playlist?list=PLxyz")
+
+
+def test_video_url_is_plain() -> None:
+    assert video_url(_YT) == "https://www.youtube.com/watch?v=abcDEF123_-"
+    assert video_url(_TW) == "https://www.twitch.tv/videos/1234567890"
+
+
+def test_video_path_is_named_by_id() -> None:
+    assert video_path(_YT, Path("data/videos")) == Path("data/videos/abcDEF123_-.mp4")
+    assert video_path(_TW, Path("v")) == Path("v/v1234567890.mp4")

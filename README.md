@@ -30,6 +30,8 @@ comes next.
 - [ffmpeg](https://ffmpeg.org) available on your PATH, with `ffprobe` (it
   ships with ffmpeg). Check with `ffmpeg -version`. Captions need a build that
   includes libass.
+- For `fetch` only: [yt-dlp](https://github.com/yt-dlp/yt-dlp) on your PATH,
+  e.g. `uv tool install yt-dlp`, then `uv tool update-shell` once.
 
 The first run downloads the Whisper model, so it needs network access once.
 
@@ -69,6 +71,26 @@ Transcripts are cached in `data/cache/`, so analysing the same video again
 skips transcription. Transcripts include the time of each word. Transcripts
 cached by v0.3 and earlier have no word times, so the first `analyze` of a
 video after upgrading transcribes it again.
+
+### Fetching a video by URL
+
+Instead of a local file, you can start from one YouTube video or Twitch VOD:
+
+```powershell
+uv run clipper fetch "https://www.youtube.com/watch?v=<id>"
+uv run clipper analyze data\videos\<id>.mp4
+```
+
+`fetch` downloads with yt-dlp to `<videos dir>/<id>.mp4` (by default
+`data/videos/`), named by the platform's video ID (`v<number>` for Twitch), at
+up to 1080p, and prints `Saved: <path>`. If that file exists it is reused.
+One video per call: playlist, channel, Twitch live and clip URLs are refused.
+It uses no cookies or logins, so videos that need an account fail.
+
+**Downloading from YouTube or Twitch is against their terms of service.**
+Clipper is a personal tool; you are responsible for having the right to
+download a video. See
+[ADR 0020](docs/decisions/0020-fetch-a-video-by-url.md) for the clauses.
 
 ### Rendering clips
 
@@ -206,6 +228,7 @@ repo root or set absolute paths.
 | `CLIPPER_OUTPUT_DIR`   | `data/output` | Where result JSON is written           |
 | `CLIPPER_CLIPS_DIR`    | `data/clips`  | Where rendered clips are written       |
 | `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files    |
+| `CLIPPER_VIDEOS_DIR`   | `data/videos` | Where `fetch` saves downloaded videos  |
 | `CLIPPER_LLM_URL`      | `http://127.0.0.1:11434` | Ollama server for `--detector llm` |
 | `CLIPPER_LLM_MODEL`    | `qwen3.5:9b`  | Ollama model for `--detector llm`      |
 

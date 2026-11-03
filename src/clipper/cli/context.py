@@ -5,6 +5,7 @@ from enum import StrEnum
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.detection.llm import LlmClipDetector
 from clipper.adapters.detection.ollama import OllamaClient
+from clipper.adapters.download.ytdlp import YtDlpDownloader
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
@@ -16,6 +17,7 @@ from clipper.core.config import Settings
 from clipper.core.interfaces import (
     ClipDetector,
     ClipRenderer,
+    Downloader,
     MediaProbe,
     TitleWriter,
     Transcriber,
@@ -74,6 +76,11 @@ def build_title_writer(settings: Settings) -> TitleWriter:
     return OllamaTitleWriter(OllamaClient(settings.llm_url, settings.llm_model))
 
 
+def build_downloader(settings: Settings) -> Downloader:
+    """Compose the real downloader (ADR 0020)."""
+    return YtDlpDownloader()
+
+
 @dataclass(frozen=True)
 class AppContext:
     """How the commands build their adapters. See docs/decisions/0013.
@@ -89,3 +96,4 @@ class AppContext:
     renderer: Callable[[Settings], ClipRenderer] = build_renderer
     probe: Callable[[], MediaProbe] = build_probe
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
+    downloader: Callable[[Settings], Downloader] = build_downloader

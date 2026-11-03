@@ -7,6 +7,7 @@ from clipper.domain.models import (
     MediaInfo,
     RenderedClip,
     Transcript,
+    VideoSource,
 )
 
 
@@ -76,3 +77,15 @@ class TitleWriter(Protocol):
     """
 
     def write(self, text: str) -> ClipTitle: ...
+
+
+@runtime_checkable
+class Downloader(Protocol):
+    """Downloads one video into a folder.
+
+    The file is `video_path(source, folder)` (see `clipper.core.sources`). The
+    downloader creates the folder, returns that path, and raises
+    `DownloadError` on failure (see docs/decisions/0020).
+    """
+
+    def download(self, source: VideoSource, folder: Path) -> Path: ...

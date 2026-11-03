@@ -123,9 +123,60 @@ the clips are good enough to use.
 - (-) The repo is public, so this decision is visible to anyone reading it,
   including interviewers. The ADR is the record that it was made knowingly.
 
+## Amended by the `fetch` PR (V4 item 6)
+
+- **URL rules in pure code**, `parse_video_url` in `core/sources.py`, before
+  yt-dlp runs, so decision 2 is enforced by Clipper and the file name is known
+  first. Accepted: YouTube `watch?v=`, `youtu.be/`, `shorts/` and `live/` on
+  `youtube.com`, `www.` or `m.`, and Twitch `twitch.tv/videos/<number>`.
+  Query parameters other than `v` are ignored, so a video URL carrying
+  `list=` names one video. Refused with `Error:` and exit 1, citing this ADR:
+  playlist and channel URLs, Twitch channel (live) and clip URLs, and
+  anything else. A URL shape not listed is refused until it is added.
+- **`VideoSource`** (`domain/models.py`) holds the platform and the video ID.
+  The ID is the file stem: YouTube's 11 characters, or `v` and the Twitch VOD
+  number, which is also yt-dlp's Twitch ID (manual step D2).
+- **`Downloader.download(source, folder) -> Path`** in `core/interfaces.py`,
+  `DownloadError` in `domain/errors.py`. yt-dlp is given the plain URL built
+  from the source (`video_url`), never the one typed.
+- **`YtDlpDownloader`** (`adapters/download/ytdlp.py`) finds `yt-dlp` on
+  `PATH`, like ffmpeg; a missing program names `uv tool install yt-dlp` and
+  `uv tool update-shell`. Arguments: `--ignore-config` (the user's config,
+  which could add cookies, is not read: decision 3), `--no-playlist`,
+  `--match-filter "!is_live"`, `-S res:1080,ext:mp4:m4a`,
+  `--merge-output-format mp4`, `--remux-video mp4`, `-P <folder>` and
+  `-o <id>.%(ext)s`. yt-dlp's progress goes to the console; stderr is
+  captured, and a non-zero exit is `yt-dlp failed (exit N): <last 10 lines>`
+  through `format_failure` (0004). Exit 0 with no file (a live video, which
+  the filter skips) is an error too.
+- **1080p cap.** The vertical frame is 1080 wide, so more only costs disk. A
+  4K horizontal clip would need it raised.
+- **Codec is not chosen.** `ext:mp4` prefers the mp4 container, not H.264: in
+  D1 YouTube gave AV1 video. `render` re-encodes (0007), and an AV1 source
+  rendered `--vertical --captions` to H.264 in 5.7 s for a 41 s clip. If a
+  player or an ffmpeg build cannot decode a fetched file, prefer `vcodec:h264`
+  in the sort, in a further amendment.
+- **An existing `<videos dir>/<id>.mp4` is reused**: `Already fetched:
+  <path>`, no download. Delete it to fetch again. A failed download may leave
+  yt-dlp's `.part` files, which it resumes on the next run.
+- **Setting** `CLIPPER_VIDEOS_DIR`, default `data/videos`. `AppContext` gains
+  `downloader(settings)`. `analyze` still takes only a file; one command from
+  a URL is item 8.
+- **First real run** (manual steps D0 to D8, 2026-11-03, yt-dlp 2026.10.26,
+  run by the assistant in a child process): a 7:54 YouTube video in 7.5 s
+  (50.8 MB, AV1 1280x720 and AAC, its highest resolution), a 7:32 Twitch VOD
+  in 53.6 s (H.264 1920x1080 and AAC, `v1691281504.mp4`), a second fetch reused
+  the file, the four refused URLs failed at once with their messages, a
+  made-up YouTube ID gave yt-dlp's `This video is unavailable`, a missing
+  yt-dlp gave the install hint, and `analyze` on the fetched file found 5
+  candidates. yt-dlp warned on every YouTube request that no JavaScript
+  runtime was found ("some formats may be missing"); downloads still worked.
+
 ## Revisit when
 
 - Either platform's terms change, or an account receives a warning.
+- YouTube downloads fail or lose formats without a JavaScript runtime (yt-dlp
+  asks for deno).
 - Campaign sources become known. If they supply files or links, the
   authorised-sources alternative may cover the real work.
 - `fetch` is wanted for anything beyond one video at a time (playlists,

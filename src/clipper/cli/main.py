@@ -19,6 +19,7 @@ from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
+from clipper.core.sources import parse_video_url, video_path
 from clipper.domain.errors import ClipperError, ClipRenderError
 from clipper.domain.models import (
     AnalysisResult,
@@ -210,6 +211,32 @@ def _root(ctx: typer.Context) -> None:
     """Clipper command line interface."""
     if ctx.obj is None:
         ctx.obj = AppContext()
+
+
+@app.command()
+def fetch(
+    ctx: typer.Context,
+    url: Annotated[str, typer.Argument(help="A YouTube video or Twitch VOD URL.")],
+) -> None:
+    """Download one YouTube video or Twitch VOD to the videos folder.
+
+    Downloading from YouTube or Twitch is against their terms of service (see
+    docs/decisions/0020). You are responsible for having the right to download
+    the video. One video per call; playlists and channels are refused.
+    """
+    settings = Settings()
+    build = _context(ctx)
+    try:
+        source = parse_video_url(url)
+        existing = video_path(source, settings.videos_dir)
+        if existing.is_file():
+            console.print(f"Already fetched: {escape(str(existing))}", soft_wrap=True)
+            return
+        saved = build.downloader(settings).download(source, settings.videos_dir)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+    console.print(f"Saved: {escape(str(saved))}", soft_wrap=True)
 
 
 @app.command()
