@@ -132,6 +132,14 @@ and planned code:
   setup needs ~1 GB of NVIDIA cuBLAS/cuDNN packages plus Windows DLL-path
   code. Unquantised GPU types drop nearly all punctuation. Transcription
   stays CPU `int8`; revisit with a larger Whisper model (V5).
+- `0022` — `clipper drafts <source>`: a `http(s)://` source is fetched
+  (0020), anything else is a file; then the same analyze and render code
+  (`_analyze_video`, `_plan_render`, `_cut_clips`, `_fetch_video` in
+  `cli/main.py`). Vertical, captions and titles on by default, each with a
+  `--no-` switch; no `--rank`. A refused URL, missing file or empty
+  `CLIPPER_LLM_MODEL` fails before any download or transcription; clip
+  failures follow 0011/0018 and `Drafts: <folder>` still prints. Measured
+  (criterion 5): the 5:04:01 stream cold from a file in 22:58.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -240,7 +248,8 @@ In progress:
   and the manifest, #97), 4b (the CLI context object, #99) and 5
   (`render --titles`, #101) and 6 (ADR 0020, #103; `clipper fetch`, #104)
   are merged. Item 7 (GPU transcription) ended in no change (ADR 0021,
-  #106). Next: item 8, one command from a URL or file to a folder of drafts.
+  #106). Item 8 (`clipper drafts`: ADR 0022 #108, extraction #109, command
+  #110) is merged. Next: item 9, release notes and tag `v0.4.0`.
 
 V3 results, for reference:
 
@@ -406,9 +415,10 @@ picked.
    against the CPU's 20:59. May end in a settings change or in nothing.
    Manual-test step. No `eval` claim.~~ (done; ended in nothing: 593 s on the
    GPU, but the transcript drifted; ADR 0021, #106)
-8. One command from a URL or file to a folder of drafts: fetch, analyze,
+8. ~~One command from a URL or file to a folder of drafts: fetch, analyze,
    render with `--vertical --captions --titles`. Its command shape needs an
-   ADR or a 0011 amendment, decided in that item.
+   ADR or a 0011 amendment, decided in that item.~~ (done; `clipper drafts`,
+   ADR 0022 #108, extraction #109, command #110, manual steps D8 to D10)
 9. Release notes and tag `v0.4.0`, if the items above land.
 
 Later, not scheduled:
@@ -492,7 +502,10 @@ Later, not scheduled:
   move it to a shared adapter module with its own error, behaviour-neutral.
 - Title quality (manual step R19, `qwen3.5:9b`): one of five titles was over
   the asked 60 characters, and rank 5's title and hook inverted the speaker's
-  point. Judged by eye; revisit the prompt if real clips show it often.
+  point. Judged by eye; revisit the prompt if real clips show it often. In
+  manual step D8, two of five titles ran to 74 and 76 characters and a hook
+  to 117; in D9 a hook repeated a swear word from the speech. If titles must
+  be safe to post as they are, that is a prompt change (ADR 0018).
 - yt-dlp warns on every YouTube request that no JavaScript runtime was found
   and "some formats may be missing" (it asks for deno). Downloads worked in
   manual step D1. Revisit if YouTube downloads fail or lose formats (ADR 0020
