@@ -110,8 +110,10 @@ training.
   yet.
 - About half of the moments the developer would clip are visual, and every
   detector so far reads only the transcript.
-- Whether YouTube's and Twitch's terms allow downloading is unverified. It is
-  checked in the `clipper fetch` ADR before that code is written.
+- YouTube's and Twitch's terms forbid downloading with a tool, as read on
+  2026-11-03. `clipper fetch` downloads one video at a time for personal use,
+  with that risk accepted and stated
+  ([ADR 0020](decisions/0020-fetch-a-video-by-url.md)).
 - Fitting a 16:9 frame into 9:16 makes the picture small: about a third of
   the vertical frame. Following the subject instead needs tracking, a V4
   non-goal.
