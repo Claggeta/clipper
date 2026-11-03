@@ -113,6 +113,11 @@ and planned code:
   only `clip_text` (what the captions show); the title is written before the
   clip is cut; no speech means a note and no title; one line, length not
   checked; `AppContext.title_writer`; manifest `titles`, `title`, `hook`.
+  Title prompt amendment (#114): limits in words (title <= 8, hook <= 15),
+  keep the speaker's meaning, no emoji or swear words; on 35 clips no title
+  over 60 or hook over 100 characters (7 and 6 before). One clip still
+  swears under every prompt tried, and meaning errors remain; not handled in
+  code.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
@@ -252,8 +257,15 @@ All merged to `main` with green CI:
 
 In progress:
 
-- Nothing. Next: plan V5 with the maintainer (scope, non-goals and a list,
-  as for V2 to V4). The candidates are under "Later" in the V4 list.
+- A trial week by the maintainer (agreed 2026-11-03, no code): `drafts` on 5
+  to 10 real target videos, noting which drafts would be posted, fixed or
+  dropped, and writing label files for the moments worth clipping. V5 is
+  scoped from those notes and `eval` on the new labels.
+- Back burner, decided later: audience signals (YouTube "most replayed",
+  chat activity, viewers over time, Twitch community clips). Checked
+  2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
+  chat replay on any, no viewer history after a stream, no Twitch VOD chat
+  via yt-dlp. Viewer counts need live monitoring, which ADR 0020 rules out.
 
 V3 results, for reference:
 
@@ -506,12 +518,11 @@ Later, not scheduled:
   `adapters/titles/` imports across adapters, and the client raises
   `DetectionError`, which the title writer re-raises as `TitleError`. Fix:
   move it to a shared adapter module with its own error, behaviour-neutral.
-- Title quality (manual step R19, `qwen3.5:9b`): one of five titles was over
-  the asked 60 characters, and rank 5's title and hook inverted the speaker's
-  point. Judged by eye; revisit the prompt if real clips show it often. In
-  manual step D8, two of five titles ran to 74 and 76 characters and a hook
-  to 117; in D9 a hook repeated a swear word from the speech. If titles must
-  be safe to post as they are, that is a prompt change (ADR 0018).
+- Title quality after the prompt fix (#114, `qwen3.5:9b`): lengths are
+  within the limits on 35 clips, but one clip keeps "Ass" in its title under
+  every prompt tried, and some hooks misstate the speaker or may add details
+  (ADR 0018's title prompt amendment). Next levers if the trial shows it
+  often: a rewrite request for listed words, or another model.
 - yt-dlp warns on every YouTube request that no JavaScript runtime was found
   and "some formats may be missing" (it asks for deno). Downloads worked in
   manual step D1. Revisit if YouTube downloads fail or lose formats (ADR 0020
