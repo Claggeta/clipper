@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NamedTuple
 
 import typer
 from rich.console import Console
@@ -17,6 +17,7 @@ from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
+from clipper.core.interfaces import TitleWriter
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.sources import parse_video_url, video_path
@@ -253,24 +254,11 @@ def analyze(
     )
     settings = Settings()
     build = _context(ctx)
-    label = _detector_label(settings, detector)
     try:
-        pipeline = AnalysisPipeline(
-            build.transcriber(settings),
-            build.detector(settings, detector),
-            detector_name=label,
-        )
-        result = pipeline.run(video)
+        _analyze_video(settings, build, video, detector)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
-
-    settings.output_dir.mkdir(parents=True, exist_ok=True)
-    out_file = settings.output_dir / f"{video.stem}.json"
-    out_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
-    _render(result)
-    console.print(f"Detector: {escape(label)}", soft_wrap=True)
-    console.print(f"Saved: {escape(str(out_file))}")
 
 
 @app.command()
@@ -311,16 +299,90 @@ def render(
     try:
         result = load_analysis_result(result_json)
         check_source_matches(result, video)
-        ranks = _select_ranks(result, rank)
-        selected = [result.candidates[r - 1] for r in ranks]
-        _check_media(selected, build.probe().probe(video))
-        folder = clip_folder(video, settings.clips_dir)
-        paths = plan_clip_paths(video, selected, folder)
+        plan = _plan_render(settings, build, video, result, rank)
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
+    flags = _RenderFlags(captions=captions, vertical=vertical, titles=titles)
+    if _cut_clips(settings, build, video, result, result_json, plan, writer, flags):
+        raise typer.Exit(code=1)
+
+
+def _analyze_video(
+    settings: Settings, build: AppContext, video: Path, detector: DetectorName
+) -> tuple[AnalysisResult, Path]:
+    """Transcribe VIDEO, detect candidates, save the result JSON and print it.
+
+    Returns the result and the JSON's path. Raises `ClipperError` before
+    anything is written if transcription or detection fails.
+    """
+    label = _detector_label(settings, detector)
+    pipeline = AnalysisPipeline(
+        build.transcriber(settings),
+        build.detector(settings, detector),
+        detector_name=label,
+    )
+    result = pipeline.run(video)
+
+    settings.output_dir.mkdir(parents=True, exist_ok=True)
+    out_file = settings.output_dir / f"{video.stem}.json"
+    out_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+    _render(result)
+    console.print(f"Detector: {escape(label)}", soft_wrap=True)
+    console.print(f"Saved: {escape(str(out_file))}")
+    return result, out_file
+
+
+class _RenderPlan(NamedTuple):
+    """The selected candidates, by rank, and where each clip goes."""
+
+    ranks: list[int]
+    selected: list[ClipCandidate]
+    folder: Path
+    paths: list[Path]
+
+
+class _RenderFlags(NamedTuple):
+    captions: bool
+    vertical: bool
+    titles: bool
+
+
+def _plan_render(
+    settings: Settings,
+    build: AppContext,
+    video: Path,
+    result: AnalysisResult,
+    rank: list[int] | None,
+) -> _RenderPlan:
+    """The checks before cutting (ADR 0011). Raises `ClipperError`."""
+    ranks = _select_ranks(result, rank)
+    selected = [result.candidates[r - 1] for r in ranks]
+    _check_media(selected, build.probe().probe(video))
+    folder = clip_folder(video, settings.clips_dir)
+    paths = plan_clip_paths(video, selected, folder)
+    return _RenderPlan(ranks, selected, folder, paths)
+
+
+def _cut_clips(
+    settings: Settings,
+    build: AppContext,
+    video: Path,
+    result: AnalysisResult,
+    result_json: Path,
+    plan: _RenderPlan,
+    writer: TitleWriter | None,
+    flags: _RenderFlags,
+) -> bool:
+    """Render every planned clip, then write the manifest (ADRs 0011, 0019).
+
+    Returns True if any clip failed. A manifest that cannot be written is
+    `Error:` and exit 1.
+    """
+    ranks, selected, folder, paths = plan
+    captions, vertical, titles = flags
     renderer = build.renderer(settings)
     failures: list[str] = []
     entries: list[ManifestClip] = []
@@ -383,8 +445,8 @@ def render(
                 hook=title.hook if title else None,
             )
         )
-        flags = (("vertical", vertical), ("captions", ass), ("titles", title))
-        tags = [t for t, on in flags if on]
+        shown = (("vertical", vertical), ("captions", ass), ("titles", title))
+        tags = [t for t, on in shown if on]
         suffix = f" ({', '.join(tags)})" if tags else ""
         console.print(
             f"Rendered #{number} {span} {escape(str(clip.path))}{suffix}",
@@ -415,8 +477,7 @@ def render(
         console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
     console.print(f"Manifest: {escape(str(written))}", soft_wrap=True)
-    if failures:
-        raise typer.Exit(code=1)
+    return bool(failures)
 
 
 @app.command("eval")
