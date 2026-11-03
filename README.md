@@ -2,9 +2,11 @@
 
 AI-assisted tool that finds clip-worthy moments in long-form video.
 
-**Status:** V1 and V2 work locally as a command-line tool (v0.2.0). `analyze`
-finds the clip-worthy moments and `render` cuts them into video files,
-optionally with captions. Uploads and analytics are not built yet.
+**Status:** V1 to V4 work locally as a command-line tool (v0.4.0).
+`clipper drafts` takes a YouTube or Twitch URL, or a local file, to a folder of
+vertical clips with word-by-word captions and a suggested title and hook for
+each. `fetch`, `analyze`, `render` and `eval` are also separate commands.
+Posting, uploads and analytics are not built.
 
 ## What it does
 
