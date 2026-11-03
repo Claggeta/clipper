@@ -22,6 +22,9 @@ The [LLM detector](#llm-detector) section covers `--detector llm`. Its tests
 use a fake generator and a mocked HTTP call, so nothing in CI talks to a real
 Ollama server or model. Step R19 does the same for `render --titles`.
 
+The [Fetch](#fetch) section covers `clipper fetch`. Its tests mock yt-dlp, so
+nothing in CI downloads.
+
 ## When to run it
 
 - Before tagging a release.
@@ -41,6 +44,9 @@ Ollama server or model. Step R19 does the same for `render --titles`.
   section, and step R19 (titles share the client and the model).
 - After any change to `src/clipper/adapters/titles/` (the prompt included) or
   `clip_text` in `core/captions.py`. Run step R19.
+- After any change to `src/clipper/adapters/download/` or
+  `core/sources.py`, after upgrading yt-dlp, or when a `fetch` that used to
+  work fails. Run the [Fetch](#fetch) section.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -1864,6 +1870,157 @@ Out of scope here: models that do not fit in VRAM, a remote Ollama server,
 parallel requests, and caching scores between `eval` runs. Each is a separate
 item if the timings in L5 call for it.
 
+## Fetch
+
+Covers `clipper fetch` ([ADR 0020](decisions/0020-fetch-a-video-by-url.md)).
+The tests check the URL rules in pure code, mock `subprocess.run` for the
+yt-dlp adapter, and pass a fake downloader to the CLI, so nothing in CI runs
+yt-dlp or downloads. This section checks that the real yt-dlp accepts the
+command, what lands on disk, and how failures read.
+
+Downloading from YouTube or Twitch is against their terms (ADR 0020). Use
+videos you have the right to download, such as your own or ones under a
+Creative Commons licence. Short ones are quicker: a few minutes with speech
+is enough. For Twitch, a highlight is shorter than a past broadcast and has
+the same `twitch.tv/videos/<number>` URL.
+
+### D0. Setup
+
+yt-dlp must be on `PATH`. With uv: `uv tool install yt-dlp`, then
+`uv tool update-shell` once, and open a new terminal. In a fresh PowerShell
+window at the repo root:
+
+```powershell
+yt-dlp --version
+$YouTubeUrl = "<a short public YouTube video URL>"
+$TwitchUrl  = "<a short public Twitch VOD or highlight URL>"
+$S = Join-Path $env:TEMP "manual-test-clipper-fetch"
+New-Item -ItemType Directory -Force $S | Out-Null
+$env:COLUMNS = "500"
+$env:CLIPPER_VIDEOS_DIR = "$S\videos"
+$env:CLIPPER_CACHE_DIR  = "$S\cache"
+$env:CLIPPER_OUTPUT_DIR = "$S\out"
+
+# Helper: runs `clipper <Arguments>`, keeps the exit code, the seconds taken
+# and the text, and prints them. yt-dlp's progress goes to the same file.
+function Invoke-Fetch {
+  param([string]$Arguments)
+  $t = Measure-Command {
+    cmd /c "uv run clipper $Arguments > `"$S\last.txt`" 2>&1"
+  }
+  $script:Code = $LASTEXITCODE
+  $script:Seconds = [Math]::Round($t.TotalSeconds, 1)
+  $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  "exit $Code, $Seconds s"
+  $Text
+}
+# Helper: what ffprobe says about a fetched file's streams and length.
+function Show-Video([string]$Path) {
+  ffprobe -v error -show_entries "stream=codec_type,codec_name,width,height:format=duration" -of compact=p=0 "$Path"
+}
+```
+
+Pass: `yt-dlp --version` prints a version. Record it.
+
+### D1. A YouTube video
+
+```powershell
+Invoke-Fetch "fetch `"$YouTubeUrl`""
+Get-ChildItem "$env:CLIPPER_VIDEOS_DIR" | Select-Object Name, Length | Format-Table -AutoSize
+$YouTubeFile = (Get-ChildItem "$env:CLIPPER_VIDEOS_DIR" -Filter "*.mp4" | Select-Object -First 1).FullName
+Show-Video $YouTubeFile
+```
+
+Pass: exit 0, yt-dlp's progress lines, then `Saved: <videos folder>\<id>.mp4`,
+where `<id>` is the 11-character ID from the URL. The folder holds that one
+`.mp4` and no `.part` or other files. The streams include video and audio, and
+the height is at most 1080. The video codec may be AV1 or H.264; `render`
+re-encodes either. Record the time, the size, the codecs and the resolution.
+yt-dlp may warn that no JavaScript runtime was found; record it, and whether
+the download still worked.
+
+### D2. A Twitch VOD
+
+```powershell
+Invoke-Fetch "fetch `"$TwitchUrl`""
+$TwitchFile = (Get-ChildItem "$env:CLIPPER_VIDEOS_DIR" -Filter "v*.mp4" | Select-Object -First 1).FullName
+Show-Video $TwitchFile
+```
+
+Pass: exit 0 and `Saved: <videos folder>\v<number>.mp4`, with the number from
+the URL. Streams as in D1. Record the time, the size, the codecs and the
+resolution.
+
+### D3. A second fetch reuses the file
+
+```powershell
+$h = (Get-FileHash $YouTubeFile).Hash
+Invoke-Fetch "fetch `"$YouTubeUrl`""
+"unchanged: " + ((Get-FileHash $YouTubeFile).Hash -eq $h)
+```
+
+Pass: exit 0 in a few seconds, `Already fetched: <the D1 path>`, no yt-dlp
+output, and `unchanged: True`.
+
+### D4. Playlist, channel and other URLs are refused
+
+```powershell
+Invoke-Fetch "fetch `"https://www.youtube.com/playlist?list=PLclipperManualTest`""
+Invoke-Fetch "fetch `"https://www.youtube.com/@youtube`""
+Invoke-Fetch "fetch `"https://www.twitch.tv/twitch`""
+Invoke-Fetch "fetch `"https://vimeo.com/1`""
+"files: " + @(Get-ChildItem "$env:CLIPPER_VIDEOS_DIR").Count
+```
+
+Pass: each exits 1 at once with one `Error:` line: `Playlist URLs are not
+fetched`, `Not a single YouTube video URL`, `Only Twitch VOD URLs` and
+`Not a YouTube video or Twitch VOD URL`. The first three cite
+`docs/decisions/0020`. `files:` is the same count as after D2.
+
+### D5. An unavailable video (observe and record)
+
+The ID is made up; if it happens to exist, pick another.
+
+```powershell
+Invoke-Fetch "fetch `"https://www.youtube.com/watch?v=zzzzzzzzzz0`""
+Get-ChildItem "$env:CLIPPER_VIDEOS_DIR" -Filter "zzzzzzzzzz0*"
+```
+
+Pass: exit 1, `Error: yt-dlp failed (exit 1): ...` with yt-dlp's own
+`ERROR:` line, no traceback, and no file for that ID. Record the message.
+
+### D6. yt-dlp missing from `PATH`
+
+```powershell
+$oldPath = $env:PATH
+$dir = Split-Path (Get-Command yt-dlp).Source
+$env:PATH = ($env:PATH -split ";" | Where-Object { $_.TrimEnd("\") -ne $dir.TrimEnd("\") }) -join ";"
+Invoke-Fetch "fetch `"https://www.youtube.com/watch?v=zzzzzzzzzz1`""
+$env:PATH = $oldPath
+```
+
+Pass: exit 1, `Error: 'yt-dlp' not found on PATH. Install it with ...`, with
+the `uv tool install` hint.
+
+### D7. `analyze` reads a fetched file
+
+```powershell
+Invoke-Fetch "analyze `"$YouTubeFile`""
+```
+
+Pass: exit 0, a table of candidates, and `Saved:` with
+`<output folder>\<id>.json`, the same stem as the video. A video with less
+than about a minute of speech may give no candidates; that is not a fetch
+failure.
+
+### D8. Clean up
+
+```powershell
+Remove-Item Env:CLIPPER_VIDEOS_DIR, Env:CLIPPER_CACHE_DIR, Env:CLIPPER_OUTPUT_DIR, Env:COLUMNS
+Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothing
+Remove-Item -Recurse -Force $S
+```
+
 ## Record your run
 
 | Field | Value |
@@ -2096,6 +2253,41 @@ and their output were pasted back by the maintainer.
   reported.
 - Not covered by this run: a build without libass, other ffmpeg builds, and a
   second drive.
+
+### Fetch reference run
+
+One run of D0 to D8 as written, for scale. It is not a pass threshold.
+2026-11-03, Windows 11, PowerShell 5.1, yt-dlp 2026.10.26 (a uv tool, put on
+`PATH` for the run only), ffmpeg `9.0.2-full_build-www.gyan.dev`. Run by the
+assistant: the steps were extracted from this file and run in a child
+PowerShell process with `TEMP` pointed at a scratch folder. The videos were
+chosen by the maintainer: a 7:54 YouTube talk (`bbz2boNSeL0`) and a 7:32
+Twitch VOD (`1691281504`).
+
+- D0: `2026.10.26`.
+- D1: exit 0 in 7.5 s. yt-dlp chose format `398+140-20` and merged them;
+  `Saved: ...\videos\bbz2boNSeL0.mp4`, 50,834,383 bytes, the only file. AV1
+  1280x720 video (the video's highest resolution) and AAC audio, 473.76 s.
+  yt-dlp warned that no JavaScript runtime was found and "some formats may be
+  missing"; the download worked.
+- D2: exit 0 in 53.6 s, format `1080p60`, 46 HLS fragments, then yt-dlp's
+  MPEG-TS fix-up. `Saved: ...\videos\v1691281504.mp4`: H.264 1920x1080 and
+  AAC, 451.98 s.
+- D3: exit 0 in 0.4 s, `Already fetched: ...\bbz2boNSeL0.mp4`,
+  `unchanged: True`.
+- D4: all four exit 1 in 0.4 s with the messages in the step; `files: 2`.
+- D5: exit 1 in 1.5 s: `Error: yt-dlp failed (exit 1):` followed by the
+  JavaScript runtime warning and `ERROR: [youtube] zzzzzzzzzz0: This video is
+  unavailable`. No file.
+- D6: exit 1, `Error: 'yt-dlp' not found on PATH. Install it with ...`.
+- D7: exit 0 in 20.1 s (transcription included), 5 candidates from 0.36 to
+  0.10, `Saved: ...\out\bbz2boNSeL0.json`.
+- Outside the steps, the same YouTube file was analysed and rank 1 rendered
+  with `--vertical --captions`: exit 0 in 5.7 s, an H.264 1080x1920 clip of
+  41.54 s, and a frame showed the fitted picture on its blurred fill. So an
+  AV1 source renders.
+- Not covered: a long VOD, a YouTube video above 1080p, a Short, a video that
+  is still live, and a run with a JavaScript runtime installed.
 
 ### LLM detector reference run
 

@@ -142,6 +142,19 @@ class RenderedClip(BaseModel):
     path: Path
 
 
+class VideoSource(BaseModel):
+    """One video named by a URL that `fetch` accepts. See docs/decisions/0020.
+
+    `video_id` is the file stem: YouTube's 11-character ID, or a Twitch VOD's
+    number after a `v`.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    platform: Literal["youtube", "twitch"]
+    video_id: str = Field(min_length=1)
+
+
 class ClipTitle(BaseModel):
     """A suggested title and hook for one clip. See docs/decisions/0018.
 

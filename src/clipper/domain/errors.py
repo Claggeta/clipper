@@ -40,3 +40,7 @@ class DetectionError(ClipperError):
 
 class TitleError(ClipperError):
     """Raised when a title and hook cannot be written for a clip."""
+
+
+class DownloadError(ClipperError):
+    """Raised when a URL is not fetched or a video cannot be downloaded."""
