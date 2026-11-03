@@ -109,11 +109,59 @@ Ollama server, with the standard library, structured JSON output, temperature
   Quality is judged by eye, as the Consequences say; the titles are in the
   manual-test reference run.
 
+## Amended by the title prompt PR (after V4)
+
+Three runs of `render --titles` and `drafts` (R19, D8, D9) gave titles up to
+76 characters and hooks up to 117 against the "about 60" and "about 100"
+asked for, one hook repeating a swear word from the speech, and a title and
+hook that turned the speaker's point into its opposite.
+
+- **The prompt changed; nothing else did.** It now asks for a title of at
+  most 8 words and a one-sentence hook of at most 15 words, says to keep the
+  speaker's meaning and not to turn a claim into its opposite, and forbids
+  emoji and swear words "of any kind, not even mild ones such as "ass",
+  "damn" or "hell"". The limits are in words because the model keeps to them
+  and does not keep to character counts. Validation is unchanged: one line,
+  not empty, length not checked.
+- **Measured** on 2026-11-03 with a scratch script that ran the real
+  `OllamaTitleWriter` (`qwen3.5:9b`, Ollama 0.40.13) on `clip_text` for the
+  heuristic's 5 candidates of `test_input.mp4` and top 30 of
+  `oFbD0Ot7nQ8.mp4`, from cached transcripts, once per prompt:
+
+  | 35 clips | Old prompt | New prompt |
+  |---|---|---|
+  | Titles: characters (median, max) | 50, 70 | 33, 47 |
+  | Titles: words (median, max) | 10, 13 | 6, 9 |
+  | Titles over 60 characters | 7 | 0 |
+  | Hooks: characters (median, max) | 84, 123 | 58, 80 |
+  | Hooks: words (median, max) | 17, 25 | 11, 15 |
+  | Hooks over 100 characters | 6 | 0 |
+  | Titles or hooks with a swear word | 1 | 1 |
+  | Time | 26.7 s | 22.2 s |
+
+  The old prompt gave the same numbers on two runs. A first draft of the new
+  prompt, without the named examples, gave the same lengths except one hook
+  of 106 characters.
+- **Swearing is not fixed.** On 12 clips of the long stream whose speech
+  swears, every prompt tried, old, first draft and new, swore in 1: the same
+  clip, titled "...Hire His Ass...". Naming the word in the prompt did not
+  change it. It is recorded, not handled in code: posting is manual, so every
+  title is read first. A rewrite request on a listed word, or masking it, is
+  the next step if real use shows it often.
+- **Meaning is not fixed either**, judged by eye. The inverted title on
+  `test_input.mp4` rank 5 now reads "Why You Should Never Ring The Bell", but
+  its hook still misstates the speaker, and two long-stream hooks may add
+  details the clip does not contain ("an easy birdie", "moved to tears"),
+  unverified without watching the clips.
+- Manual step R19's pass criteria now check the word limits.
+
 ## Revisit when
 
 - Titles need a different model from the detector.
 - The maintainer wants the hook on screen.
 - Titles run past the asked length often enough to matter: add a cap.
+- Swear words or changed meaning in titles show up often in real use: add a
+  rewrite request for listed words, or try another model.
 
 ## Related
 

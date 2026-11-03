@@ -4,15 +4,20 @@ from clipper.adapters.detection.llm import TextGenerator
 from clipper.domain.errors import DetectionError, TitleError
 from clipper.domain.models import ClipTitle
 
+# Limits are in words: the model keeps to them, not to character counts (ADR
+# 0018, title prompt amendment).
 SYSTEM_PROMPT = (
     "You write post text for short clips cut from long-form videos, such as "
     "streams, podcasts and talks. Each message is the transcript of one clip, "
     "transcribed automatically, so punctuation may be missing. Write a "
-    '"title" of at most about 60 characters, and a "hook": one sentence of at '
-    "most about 100 characters that makes a viewer want to watch, to open the "
-    "post's caption. Use only what the transcript says; do not invent names "
-    "or facts. No hashtags. Write in the language of the transcript. Reply "
-    'with JSON only: "title" and "hook", each one line.'
+    '"title" of at most 8 words, and a "hook": one sentence of at most 15 '
+    "words that makes a viewer want to watch, to open the post's caption. Use "
+    "only what the transcript says and keep the speaker's meaning: do not "
+    "invent names or facts, or turn a claim into its opposite. No hashtags and "
+    "no emoji. No swear words of any kind, not even mild ones such as "
+    '"ass", "damn" or "hell": if the speaker swears, say it another way or '
+    "leave the word out. Write in the language of the transcript. Reply with "
+    'JSON only: "title" and "hook", each one line.'
 )
 # Enough of a bad reply to see what went wrong.
 _REPLY_LIMIT = 200

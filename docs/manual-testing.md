@@ -1075,10 +1075,11 @@ Pass:
 - a) Exit 0. Each `Rendered #N ...` line ends with
   ` (vertical, captions, titles)` and is followed by `  Title: ...` and
   `  Hook: ...` lines. `titles: True`. Every clip has a non-empty `title` and
-  `hook` on one line, about what is said in it, with no hashtags, and no
-  `error`. Record the time, each title and hook as printed, and their lengths
-  (the prompt asks for about 60 and 100 characters; length is not checked by
-  the code).
+  `hook` on one line, about what is said in it, with no hashtags or emoji, and
+  no `error`. Titles have at most 8 words and hooks at most 15, the prompt's
+  limits; the code does not check them, so record any over. Record the time,
+  each title and hook as printed, their lengths, any swear word, and any that
+  changes what the speaker meant (ADR 0018's title prompt amendment).
 - b) Exit 0. Record whether `same titles and hooks` is `True`, and any rows
   `Compare-Object` lists. A difference is recorded, not a failure (ADR 0015).
 - c) Exit 1. Every clip has a `Failed: #N ...` line with Ollama's HTTP 404
