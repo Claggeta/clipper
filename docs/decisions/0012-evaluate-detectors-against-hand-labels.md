@@ -260,6 +260,12 @@ maintainer's own judgment of which moments in a video are worth cutting.
   moment the maintainer chose: precision against clips is a lower bound, and
   on this VOD a loose one. Over three VODs, 14 clips: the heuristic found 1
   at top 30, the LLM none.
+- Fourth VOD, 2922589775 (adapt, 5:18:27 by the transcript, `drafts` on
+  2026-11-09): 5 clips gave 5 labels of 12 to 30 s, 2.2 minutes. Recall 0 of
+  5 for both detectors at top 5 and top 30 (the LLM once at top 30, 1,168 s,
+  every score 0.85 to 0.95). The maintainer would post 1 of the 5 heuristic
+  drafts, and it hits no clip. Over four VODs, 19 clips: the heuristic found
+  1 at top 30, the LLM none.
 
 ## Related
 

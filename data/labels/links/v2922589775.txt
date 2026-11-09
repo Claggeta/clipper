@@ -1,0 +1,8 @@
+# Twitch community clips from Adapt's stream of 7 Nov 2026, VOD 2922589775.
+# Collected by hand by the maintainer, 2026-11-09. Per line: the clip and its
+# "Watch full video" link (ADR 0012, Twitch clips amendment).
+https://www.twitch.tv/adapt/clip/ExpensiveStylishCheesePoooound-fpL_BQd3qmyCmvTu?range=7d https://www.twitch.tv/videos/2922589775?t=0h9m57s
+https://www.twitch.tv/adapt/clip/DistinctGlamorousWaterCurseLit-iLNYhbfHK_dHSEJO?range=7d https://www.twitch.tv/videos/2922589775?t=1h54m32s
+https://www.twitch.tv/adapt/clip/EvilStylishAntSpicyBoy-6wyEYV8QPq5ucqT6?range=7d https://www.twitch.tv/videos/2922589775?t=2h5m18s
+https://www.twitch.tv/adapt/clip/PreciousPleasantYamSoonerLater-ssOwx9gZ6EabI4R_?range=7d https://www.twitch.tv/videos/2922589775?t=1h16m21s
+https://www.twitch.tv/adapt/clip/LuckyFantasticHeronPRChase-jSmvNsbE8VP067JF?range=7d https://www.twitch.tv/videos/2922589775?t=5h11m14s
