@@ -102,6 +102,11 @@ analysis of the same video gave `captions` `segments` and `detector` `null`.
   `draft_start_seconds`/`draft_end_seconds` (together, or neither) to the
   detector's span, which the review page finds judgments by. Absent means
   the clip was never re-rendered.
+- **Model title amendment (after V5 item 3d)**: `model_title` keeps the
+  title `render --titles` wrote, set by the page's first write to the clip
+  (Save or Trash) and never changed after; None if the model wrote none.
+  The page's Reset puts it back, and V5 item 8b compares it with `title`.
+  Manifests the page wrote before this have none.
 - The page replaces `manifest.json` whole, as `render` does. A later
   `render` or `drafts` run on the folder still replaces it and loses these
   fields (decision 3); the judged labels are separate files.

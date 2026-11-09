@@ -360,9 +360,12 @@ document.getElementById("set-end").addEventListener("click", () => {
   drawMarks();
 });
 
+// Back to the draft: its span and the model's title. Notes stay; nothing
+// is written until Save.
 document.getElementById("reset").addEventListener("click", () => {
   span.start = current.draft_start;
   span.end = current.draft_end;
+  titleBox.value = current.model_title || "";
   notice("");
   fit();
 });

@@ -169,6 +169,9 @@ def test_payload_clamps_each_range_to_the_video(tmp_path: Path) -> None:
         (380.0, 600.0),
     ]
     assert clips[0]["title"] == "A title"
+    # Before the page writes a clip, its title is the model's.
+    assert clips[0]["model_title"] == "A title"
+    assert clips[1]["model_title"] is None
     assert clips[0]["hook"] == "A hook."
     assert clips[2]["file"] is None
     assert clips[2]["error"] == "ffmpeg failed"
@@ -348,6 +351,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
     assert status == 200
     assert clip["reviewed"] == "saved"
     assert clip["title"] == "Ron at the pump"
+    assert clip["model_title"] == "A title"
     assert clip["hook"] == "A hook."
     assert clip["judgment"] == {
         "verdict": "post",

@@ -289,6 +289,15 @@ until the drafts rarely need editing.
   file deleted and the draft span kept. The page is checked by manual step
   RV8.
 
+## Amended by the model title fix (after V5 item 3d)
+
+- **Reset puts back the draft's span and the model's title**; notes stay,
+  and nothing is written until Save. Found in RV8: Reset left an edited
+  title, and the model's title was lost on the first edit.
+- The page's first write to a clip keeps the model's title in the
+  manifest's `model_title` (0019 amendment); `/api/clips` sends
+  `model_title`, the current title until the page has written the clip.
+
 ## Related
 
 - 0011: render's failure policy

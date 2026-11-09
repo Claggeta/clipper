@@ -163,7 +163,8 @@ def clip_payload(
     """One clip as the page sees it: its range, clamped, and its judgment.
 
     `start` and `end` are what the file covers; `draft_start` and `draft_end`
-    are the detector's span, the same until a re-render.
+    are the detector's span, the same until a re-render. `model_title` is
+    the model's title, kept once the page has written the clip.
     """
     draft_start, draft_end = clip.draft_span
     return {
@@ -172,6 +173,7 @@ def clip_payload(
         "end": clip.end_seconds,
         "draft_start": draft_start,
         "draft_end": draft_end,
+        "model_title": clip.model_title if clip.reviewed else clip.title,
         "range_start": max(clip.start_seconds - RANGE_SECONDS, 0.0),
         "range_end": min(clip.end_seconds + RANGE_SECONDS, session.duration_seconds),
         "title": clip.title,

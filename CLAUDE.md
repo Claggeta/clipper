@@ -209,7 +209,8 @@ and planned code:
   stands if the render fails (`render_error`); the draft span is kept in
   the manifest; Save brings a trashed clip back; `review` loads the
   analysis for captions before serving; about 12 s per re-render; manual
-  step RV8.
+  step RV8. Model title amendment: the page's first write keeps the
+  model's title as `model_title`; Reset restores the draft's span and it.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
