@@ -112,6 +112,28 @@ video {
   border-radius: 8px;
 }
 
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.steps button {
+  min-width: 60px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.steps button:hover { border-color: var(--accent); }
+
 .details h2 { margin: 16px 0 4px; font-size: 18px; }
 
 .details p { margin: 0 0 12px; }

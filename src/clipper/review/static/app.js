@@ -1,10 +1,9 @@
 // The review page (ADR 0024). Item 3a: list the clips and play the source
-// video around the chosen one; trimming and saving come in later items.
+// video anywhere, with step buttons; trimming and saving come in later items.
 "use strict";
 
 const player = document.getElementById("player");
 const list = document.getElementById("clips");
-let current = null;
 
 function fmt(seconds) {
   const whole = Math.floor(seconds);
@@ -19,7 +18,6 @@ function text(id, value) {
 }
 
 function select(clip, button) {
-  current = clip;
   for (const other of list.querySelectorAll("button")) {
     other.setAttribute("aria-current", String(other === button));
   }
@@ -29,20 +27,20 @@ function select(clip, button) {
   text("hook", clip.hook || "");
   text("clip-span", `${fmt(clip.start)} - ${fmt(clip.end)}`);
   text("clip-length", `${(clip.end - clip.start).toFixed(1)} s`);
-  text("range-span", `${fmt(clip.range_start)} - ${fmt(clip.range_end)}`);
   const error = document.getElementById("error");
   error.hidden = !clip.error;
   error.textContent = clip.error ? `Render failed: ${clip.error}` : "";
   player.currentTime = clip.start;
 }
 
-// Stop at the end of the chosen clip's range.
-player.addEventListener("timeupdate", () => {
-  if (current && !player.paused && player.currentTime >= current.range_end) {
-    player.pause();
-    player.currentTime = current.range_end;
-  }
-});
+// Move the playhead by a step, anywhere in the video.
+for (const button of document.querySelectorAll("[data-step]")) {
+  button.addEventListener("click", () => {
+    const end = Number.isFinite(player.duration) ? player.duration : Infinity;
+    const next = player.currentTime + Number(button.dataset.step);
+    player.currentTime = Math.min(Math.max(next, 0), end);
+  });
+}
 
 async function load() {
   const response = await fetch("/api/clips");
