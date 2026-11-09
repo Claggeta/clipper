@@ -622,9 +622,10 @@ Items 8 and 9 do not depend on picking and may land earlier.
      handles. Manual step.~~ (done; whole-VOD player and step buttons #132,
      film strip #133; manual steps RV5 and RV6 passed, run by the
      maintainer)
-   - 3c. Save, Trash, title and notes, writing judged labels and the
+   - 3c. ~~Save, Trash, title and notes, writing judged labels and the
      manifest (ADR 0019 amendment). Unit tests on the endpoints; manual
-     step.
+     step.~~ (done; #135; ADR 0024, 0019 and 0018 amendments; manual step
+     RV7 passed, run by the maintainer)
    - 3d. Re-render one clip on Save (ADR 0011 amendment). Manual step.
    - 3e. Add clip from the current range. Manual step.
 4. Not code, a docs PR: the baseline. Heuristic and LLM top 10 on the trial
