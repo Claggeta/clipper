@@ -221,6 +221,10 @@ class ManifestClip(BaseModel):
     `model_title` is the title `render --titles` wrote, kept by the page's
     first write to the clip (None if there was none); `title` may then be
     the maintainer's.
+
+    `added` marks a clip the maintainer added in the review page (item 3e
+    amendment), ranked after the drafts, with score 0 and the reason
+    "added in review". Its draft span is its last saved span.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -239,6 +243,7 @@ class ManifestClip(BaseModel):
     draft_start_seconds: float | None = None
     draft_end_seconds: float | None = None
     model_title: str | None = None
+    added: bool = False
 
     @model_validator(mode="after")
     def _file_or_error(self) -> "ManifestClip":

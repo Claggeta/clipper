@@ -4,9 +4,12 @@ import pytest
 
 from clipper.core.judging import (
     check_judged_labels,
+    drop_clip,
     is_own_label,
     judged_labels_path,
     mark_clip,
+    next_rank,
+    remove_judgment,
     save_judgment,
     trash_judgment,
 )
@@ -79,14 +82,46 @@ def test_an_overlap_with_another_label_is_refused() -> None:
     assert len(save_judgment(labeled, "t.mp4", ONE, 100.0, 300.0, None).labels) == 2
 
 
-def test_an_added_label_is_nobodys_own() -> None:
+def test_an_added_label_belongs_only_to_an_added_clip() -> None:
     labeled = LabeledVideo.model_validate(
         {
             "source": "t.mp4",
             "labels": [{"start": "0:01:40", "end": "0:02:25.2", "verdict": "added"}],
         }
     )
+    added = _clip(2, 100.0, 145.2).model_copy(update={"added": True})
+
     assert not is_own_label(labeled.labels[0], _clip(1, 100.0, 145.2))
+    assert is_own_label(labeled.labels[0], added)
+
+
+def test_an_added_clip_is_saved_as_added_and_removed_without_a_trace() -> None:
+    added = _clip(2, 100.0, 145.2).model_copy(update={"added": True})
+
+    labeled = save_judgment(None, "t.mp4", added, 99.0, 150.0, None)
+    [label] = labeled.labels
+    assert (label.verdict, label.draft) == ("added", None)
+
+    moved = added.model_copy(
+        update={"draft_start_seconds": 99.0, "draft_end_seconds": 150.0}
+    )
+    emptied = remove_judgment(labeled, "t.mp4", moved)
+    assert (emptied.labels, emptied.rejected) == ((), ())
+
+
+def test_next_rank_and_drop_clip() -> None:
+    manifest = RenderManifest(
+        source="t.mp4",
+        analysis="a.json",
+        detector=None,
+        vertical=False,
+        captions=False,
+        titles=False,
+        clips=(ONE, TWO),
+    )
+    assert next_rank(manifest) == 3
+    assert next_rank(manifest.model_copy(update={"clips": ()})) == 1
+    assert drop_clip(manifest, 1).clips == (TWO,)
 
 
 def test_trash_replaces_a_label_with_a_rejected_span() -> None:

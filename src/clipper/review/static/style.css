@@ -111,6 +111,10 @@ body {
 
 .clips .badge[data-state="trashed"] { color: var(--muted); }
 
+.clips .badge[data-state="added"] { color: #7cc4ff; }
+
+.clips .badge[data-state="new"] { color: var(--text); }
+
 .clips .span {
   grid-column: 2 / 4;
   color: var(--muted);
@@ -144,6 +148,12 @@ video {
 }
 
 .steps { justify-content: center; }
+
+.steps .add {
+  margin-left: 12px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 .strip-bar { margin-top: 16px; }
 

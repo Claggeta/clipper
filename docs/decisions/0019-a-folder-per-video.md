@@ -107,6 +107,10 @@ analysis of the same video gave `captions` `segments` and `detector` `null`.
   (Save or Trash) and never changed after; None if the model wrote none.
   The page's Reset puts it back, and V5 item 8b compares it with `title`.
   Manifests the page wrote before this have none.
+- **Add clip amendment (V5 item 3e)**: a clip added in the review page has
+  `added: true`, a rank after every clip so far, score 0 and the reason
+  `added in review`; its draft span fields hold its last saved span. Trash
+  removes its entry. Older manifests read as `added: false`.
 - The page replaces `manifest.json` whole, as `render` does. A later
   `render` or `drafts` run on the folder still replaces it and loses these
   fields (decision 3); the judged labels are separate files.

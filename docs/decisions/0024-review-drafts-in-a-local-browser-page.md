@@ -298,6 +298,34 @@ until the drafts rarely need editing.
   manifest's `model_title` (0019 amendment); `/api/clips` sends
   `model_title`, the current title until the page has written the clip.
 
+## Amended by the Add clip PR (V5 item 3e)
+
+- **Verdict `added`, not `post`** (decision 7): 0012's item 2 amendment
+  defined `added` for a moment no draft proposed, and `eval` counts it as a
+  keeper. Added clips reach anywhere in the VOD (whole-VOD amendment), not
+  only the current range.
+- **In the page**: "Add clip here" makes a new clip in the list from the
+  playhead, 30 s long, clamped to the video. Until Save it lives only in
+  the page; Trash discards it. It has no model title.
+- **Save** (`POST /api/clips/add`, `{start, end, title, note}`, the same
+  checks and cross-site rules as Save) writes an `added` label, renders the
+  clip like any Save, and appends a manifest entry ranked after every clip
+  so far, with score 0, the reason `added in review` and `added: true`
+  (0019 amendment). Saving it again (`/api/clips/<rank>/save`) keeps
+  `added` and moves its span. An overlap or a taken file name writes
+  nothing; a failed render keeps the label and records the error.
+- **Its own label is found by its last saved span**, kept in the draft span
+  fields, since it has no detector span.
+- **Trash removes an added clip outright**: its label, its file and its
+  manifest entry, answering `{"removed": <rank>}`. A rejected span means a
+  draft judged and dropped; an addition taken back was never a draft, and
+  a rejected span would count candidates there as bad picks.
+- **Checked by the assistant** (2026-11-09, on a copy of
+  `data/clips/v2917872953`, no browser): an add at 1:23:20 rendered in
+  8.4 s as rank 6 with an `added` label; Trash removed the file, the label
+  and the entry, with no rejected span. The page is checked by manual step
+  RV9.
+
 ## Related
 
 - 0011: render's failure policy
