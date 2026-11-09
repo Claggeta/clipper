@@ -606,9 +606,12 @@ Items 8 and 9 do not depend on picking and may land earlier.
      plus 120 s either side. Decides the HTTP server (standard library or a
      framework, checked against 0003) and where the code lives. Manual
      step.~~ (done; #130; standard library, `src/clipper/review/`, manual
-     steps RV0 to RV4; RV2 and RV3 run, RV1 in a browser not yet)
-   - 3b. Film strip from cached ffmpeg thumbnails, with start and end
-     handles. Manual step.
+     steps RV0 to RV4; RV2 and RV3 run; RV1, run later by the maintainer,
+     found the range-stop bug fixed in #132)
+   - 3b. ~~Film strip from cached ffmpeg thumbnails, with start and end
+     handles. Manual step.~~ (done; whole-VOD player and step buttons #132,
+     film strip #133; manual steps RV5 and RV6 passed, run by the
+     maintainer)
    - 3c. Save, Trash, title and notes, writing judged labels and the
      manifest (ADR 0019 amendment). Unit tests on the endpoints; manual
      step.
