@@ -295,6 +295,17 @@ In progress:
     happening; 1 and 4 dropped as Adapt reacting to a compilation (4 is a
     compilation of himself), all over the place with no firm topic. A
     picking failure again. The clip labels count 0 of 5.
+  - 2026-11-09, VOD 2924046310 (ohnepixel, 4:03), `drafts` with the
+    heuristic: 3 of 5 worth posting. Draft 1 (0:19:42-0:20:27, marketing
+    to IT) as is, relatable to students. Draft 4 (0:17:42-0:18:24) needs a
+    couple of seconds more at the end; its title is good. Draft 5
+    (2:40:42-2:41:26) cuts off right after he opens the food, before he
+    tries it. Draft 2 dropped as boring; draft 3 (0:16:43-0:17:28) dropped
+    for lacking context, unless it gets more at the start or end. Draft 3
+    is the only one that hits a clip ("dutch bars"), so the one clip hit
+    in five VODs' top 5 is a draft the maintainer would not post as cut.
+    Two of the three keepers need more at the end: the boundaries item
+    again.
 - Labels from Twitch community clips (option B), done: ADR 0012 and 0020
   amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
@@ -306,7 +317,9 @@ In progress:
   `v2917872953.json` (5 clips): 0 of 5 for both, though the maintainer would
   post all 5 heuristic drafts. Fourth VOD, `v2922589775.json` (5 clips): 0
   of 5 for both; the LLM took 1,168 s and scored all its top 30 0.85 to
-  0.95. Over 19 clips the heuristic found 1 at top 30, the LLM none. Clips
+  0.95. Fifth VOD, `v2924046310.json` (6 clips): heuristic 1 of 6 at top 5,
+  2 of 6 at top 30; LLM 0 at top 5, 1 of 6 at top 30 (707 s). Over 25 clips
+  the heuristic found 1 at top 5 and 3 at top 30, the LLM 1 at top 30. Clips
   and the maintainer's picks disagree, so clip labels are a weak stand-in
   for "worth posting"; trial notes count more. Small samples.
 - Back burner, decided later: audience signals (YouTube "most replayed",
