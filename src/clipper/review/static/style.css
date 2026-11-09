@@ -1,0 +1,138 @@
+:root {
+  --bg: #0f1115;
+  --panel: #161a20;
+  --raised: #1d222a;
+  --line: #2a303a;
+  --text: #e6e8eb;
+  --muted: #8b93a1;
+  --accent: #f5c518;
+  --error: #ff6b6b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.bar h1 { margin: 0; font-size: 16px; font-weight: 600; }
+
+.muted { color: var(--muted); }
+
+.flags { margin-left: auto; display: flex; gap: 6px; }
+
+.flags span {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 49px);
+}
+
+.sidebar {
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.clips { list-style: none; margin: 0; padding: 8px; }
+
+.clips button {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.clips button:hover { background: var(--raised); }
+
+.clips button[aria-current="true"] {
+  background: var(--raised);
+  border-color: var(--accent);
+}
+
+.clips .rank {
+  grid-row: span 2;
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.clips .name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clips .span {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.clips .failed { color: var(--error); }
+
+.main {
+  overflow-y: auto;
+  padding: 20px;
+}
+
+video {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  background: #000;
+  border-radius: 8px;
+}
+
+.details h2 { margin: 16px 0 4px; font-size: 18px; }
+
+.details p { margin: 0 0 12px; }
+
+.times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0;
+}
+
+.times dt { color: var(--muted); font-size: 12px; }
+
+.times dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.error { color: var(--error); }
+
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; height: auto; }
+  .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+}

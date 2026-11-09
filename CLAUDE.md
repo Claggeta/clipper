@@ -175,7 +175,12 @@ and planned code:
   deletes the file and writes a rejected span; Add clip saves a new span
   from the current range. No URL box until the drafts chain moves to
   `core/` (0022). The page is checked by manual steps. Amends the web UI
-  non-goal, 0011 and 0019.
+  non-goal, 0011 and 0019. Item 3a amendment: standard-library
+  `ThreadingHTTPServer` on 127.0.0.1 (`--port 8765`), `parse_range` for
+  seeking, `SO_REUSEADDR` off on Windows (it let two servers share a port),
+  a fixed list of paths, the video from `<videos dir>/<manifest source>` or
+  `--video`, code in `src/clipper/review/` composed by `cli/` through
+  `AppContext.serve`; manual steps RV0 to RV4.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -653,6 +658,9 @@ Later, not scheduled:
 - Posting and performance data, once accounts exist.
 
 ## Parked
+
+- `pyproject.toml` says `version = "0.2.0"`, but `v0.4.0` is tagged (seen
+  in V5 item 3a). Fix with the `v0.5.0` release notes (V5 item 14).
 
 - ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
   `exit 3199971767` for invalid data. Fix: normalise negative `AVERROR`

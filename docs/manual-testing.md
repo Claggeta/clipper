@@ -2220,6 +2220,79 @@ Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothi
 Remove-Item -Recurse -Force $S
 ```
 
+## Review page
+
+Covers `clipper review`
+([ADR 0024](decisions/0024-review-drafts-in-a-local-browser-page.md), item 3a
+amendment). The tests run the server on a free port with a small file, and no
+browser. This section checks the page in a real browser on a real drafts
+folder, seeking in a multi-GB VOD, and the errors before the server starts.
+Nothing is written.
+
+### RV0. Setup
+
+You need a folder made by `drafts` (or `render`), with its `manifest.json`,
+and its source video in `data\videos\` under the manifest's `source` name.
+Chrome or Edge.
+
+```powershell
+$Folder = "data\clips\v2917872953"   # any drafts folder
+$U = "http://127.0.0.1:8765"
+```
+
+### RV1. The page in a browser
+
+```powershell
+uv run clipper review $Folder
+```
+
+Pass: it prints `Review: http://127.0.0.1:8765/ (N clips; Ctrl+C to stop)`
+and opens the page. The page is dark, names the source and the folder's
+flags, and lists every clip with its rank, title (or `Clip N`) and span; a
+failed clip is red. Clicking a clip jumps the player to its start and shows
+its title, hook, span, length and range (the clip plus 2 minutes either side,
+clamped to the video). Seeking far ahead and back plays within a second or
+two. Played on, the video stops at the end of the range. Ctrl+C stops the
+server.
+
+### RV2. Range requests on the real file
+
+With RV1's server running, in a second terminal (`curl.exe`, not the
+PowerShell alias):
+
+```powershell
+curl.exe -s -o NUL -D - -H "Range: bytes=0-1023" "$U/video" | Select-String "HTTP|Content-"
+curl.exe -s -o NUL -w "%{http_code} %{size_download}B %{time_total}s`n" -H "Range: bytes=-1048576" "$U/video"
+curl.exe -s -o NUL -w "%{http_code}`n" -H "Range: bytes=999999999999-" "$U/video"
+curl.exe -s -o NUL -w "%{http_code}`n" "$U/nope"
+```
+
+Pass: `206 Partial Content`, `Content-Range: bytes 0-1023/<file size>`,
+`Content-Length: 1024`, `Content-Type: video/mp4`; the last 1 MB in well under
+a second with `206`; `416` past the end; `404` for any other path.
+
+### RV3. Errors before the server starts
+
+With RV1's server still running:
+
+```powershell
+uv run clipper review $Folder --no-open; "exit $LASTEXITCODE"
+uv run clipper review $Folder --video data\videos\oFbD0Ot7nQ8.mp4 --no-open --port 8766; "exit $LASTEXITCODE"
+uv run clipper review data\clips --no-open --port 8766; "exit $LASTEXITCODE"
+```
+
+Pass, each exit 1: `Error: Cannot listen on 127.0.0.1:8765: ...` (the port is
+taken, and a second server must not share it); `Error: Manifest is for
+'<source>' but the video is 'oFbD0Ot7nQ8.mp4'`; `Error: Manifest not found:
+data\clips\manifest.json`. Stop RV1's server with Ctrl+C.
+
+### RV4. An AV1 source (observe and record)
+
+YouTube gave AV1 for `oFbD0Ot7nQ8.mp4` (ADR 0020). If a drafts folder exists
+for an AV1 source, repeat RV1 on it and record whether the browser plays and
+seeks it. Making one needs `drafts` or `render` on that video; its transcript
+is cached.
+
 ## Record your run
 
 | Field | Value |

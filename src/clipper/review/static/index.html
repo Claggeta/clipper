@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clipper Review</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>Clipper Review</h1>
+    <span id="source" class="muted"></span>
+    <span id="flags" class="flags"></span>
+  </header>
+  <div class="layout">
+    <nav class="sidebar" aria-label="Clips">
+      <ol id="clips" class="clips"></ol>
+    </nav>
+    <main class="main">
+      <video id="player" src="/video" controls preload="metadata"></video>
+      <section id="details" class="details" hidden>
+        <h2 id="title"></h2>
+        <p id="hook" class="muted"></p>
+        <dl class="times">
+          <div><dt>Clip</dt><dd id="clip-span"></dd></div>
+          <div><dt>Length</dt><dd id="clip-length"></dd></div>
+          <div><dt>Range</dt><dd id="range-span"></dd></div>
+        </dl>
+        <p id="error" class="error" hidden></p>
+      </section>
+      <p id="empty" class="muted">Choose a clip.</p>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
