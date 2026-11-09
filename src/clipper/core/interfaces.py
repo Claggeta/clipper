@@ -27,6 +27,18 @@ class AudioExtractor(Protocol):
 
 
 @runtime_checkable
+class FrameExtractor(Protocol):
+    """Saves one still frame of a video, at a time in seconds, as a JPEG.
+
+    Creates the output's parent directory, overwrites an existing file,
+    returns `output_path`, and raises `FrameError` on failure (see
+    docs/decisions/0024, film strip amendment).
+    """
+
+    def extract(self, video_path: Path, seconds: float, output_path: Path) -> Path: ...
+
+
+@runtime_checkable
 class ClipDetector(Protocol):
     """Finds clip-worthy time ranges in a transcript."""
 

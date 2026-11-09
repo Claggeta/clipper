@@ -46,6 +46,11 @@ class FakeProbe:
         return self._info
 
 
+class FakeFrames:
+    def extract(self, video_path: Path, seconds: float, output_path: Path) -> Path:
+        raise AssertionError("review must not take frames before serving")
+
+
 class Env:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.folder = tmp_path / "clips" / "talk"
@@ -55,7 +60,10 @@ class Env:
         save_manifest(MANIFEST, self.folder)
         self.videos.mkdir()
         self.video.write_bytes(b"video")
+        self.cache = tmp_path / "cache"
+        monkeypatch.setenv("CLIPPER_CACHE_DIR", str(self.cache))
         self.probe = FakeProbe()
+        self.frames = FakeFrames()
         self.calls: list[tuple[ReviewSession, int, bool]] = []
         self.error: ReviewError | None = None
 
@@ -72,7 +80,9 @@ class Env:
         announce(f"http://127.0.0.1:{port}/")
 
     def run(self, *extra: str) -> Result:
-        context = AppContext(probe=lambda: self.probe, serve=self.serve)
+        context = AppContext(
+            probe=lambda: self.probe, frames=lambda: self.frames, serve=self.serve
+        )
         return CliRunner().invoke(
             app, ["review", str(self.folder), *extra], obj=context
         )
@@ -92,6 +102,9 @@ def test_serves_the_folder_with_the_video_from_the_videos_dir(env: Env) -> None:
     assert session.manifest == MANIFEST
     assert session.video == env.video
     assert session.duration_seconds == 600.0
+    assert session.frames is env.frames
+    # Named by the video's stem and its size, 5 bytes.
+    assert session.frames_dir == env.cache / "frames" / "talk-5"
     assert (port, open_browser) == (DEFAULT_PORT, True)
     assert env.probe.seen == [env.video]
     assert f"Review: http://127.0.0.1:{DEFAULT_PORT}/ (1 clip; Ctrl+C to stop)" in (

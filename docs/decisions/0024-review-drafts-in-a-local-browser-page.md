@@ -169,6 +169,39 @@ until the drafts rarely need editing.
 - The (-) consequence that Add clip only reaches moments within 2 minutes of
   a draft no longer holds.
 
+## Amended by the film strip PR (V5 item 3b)
+
+- **Frames, one ffmpeg call each, on demand.** A `FrameExtractor` Protocol in
+  `core/interfaces.py` (`extract(video, seconds, output) -> Path`, raising
+  the new `FrameError`) and `FfmpegFrameExtractor` in
+  `adapters/media/frames.py`, through `run_tool` (0004): `-ss <t>` before
+  `-i`, one frame, scaled to 72 px high, JPEG quality 5. A run over the whole
+  window would decode every frame in it and cannot serve a view that zooms
+  and pans. `AppContext.frames` builds it; `review/` imports no adapter.
+- **`GET /frames/<whole second>.jpg`**, 404 for any other form or a second
+  at or past the duration. Frames are cached per video, not per clip
+  (decision 4), at `<cache dir>/frames/<stem>-<size in bytes>/<s>.jpg`,
+  written under a temporary name and renamed, so parallel requests never
+  half-write one; the browser may keep them for a day. A `FrameError` is
+  `500` and a blank tile. Nothing prunes the cache.
+- **The strip** opens on the clip plus 120 s either side (`range_start` and
+  `range_end`), as many 96 px frames as fit, at fixed steps of 1, 2, 5, 10,
+  15, 30 or 60 s per frame on a grid, so views share cached frames. Zoom,
+  pan by half a strip, Fit clip. Clicking a frame seeks.
+- **Handles** for start and end, dragged (the player shows the frame under
+  them; the strip pans past its edges) or set from the playhead with Set
+  start and Set end. The span is at least 0.5 s, times to 0.01 s. Lengths
+  outside 15 to 90 s (0023) are shown in red, not refused. Edits are kept
+  per clip while the page is open; saving them is 3c.
+- **Preview span** plays from the start handle and pauses at the end
+  handle, checked every animation frame. It only stops a playback it
+  started: a seek or a pause cancels it, so the 3a bug (a stop that also
+  caught seeks) does not return.
+- **Measured** (2026-11-09, `v2917872953`, by the assistant, no browser):
+  about 220 ms per frame; a strip of 20 frames, fetched 6 at a time, 1.34 s
+  cold and 0.02 s cached. A second past the end made ffmpeg exit non-zero.
+  The page itself is checked by manual steps RV5 and RV6.
+
 ## Related
 
 - 0011: render's failure policy

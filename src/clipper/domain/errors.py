@@ -18,6 +18,10 @@ class MediaProbeError(ClipperError):
     """Raised when a media file cannot be probed."""
 
 
+class FrameError(ClipperError):
+    """Raised when a still frame cannot be taken from a video."""
+
+
 class AnalysisResultError(ClipperError):
     """Raised when a saved analysis result cannot be loaded or does not match."""
 

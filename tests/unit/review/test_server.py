@@ -8,13 +8,15 @@ from pathlib import Path
 import pytest
 
 import clipper.review.server as server_module
-from clipper.domain.errors import ClipperError, ReviewError
+from clipper.domain.errors import ClipperError, FrameError, ReviewError
 from clipper.domain.models import ManifestClip, RenderManifest
 from clipper.review.server import (
     RANGE_SECONDS,
     ReviewSession,
     UnsatisfiableRange,
+    cached_frame,
     clips_payload,
+    frames_folder,
     make_server,
     parse_range,
 )
@@ -51,11 +53,33 @@ MANIFEST = RenderManifest(
 VIDEO = bytes(range(256)) * 4  # 1,024 bytes
 
 
-def _session(tmp_path: Path) -> ReviewSession:
+class FakeFrames:
+    """Writes `frame <seconds>` as the JPEG, or half a file and fails."""
+
+    def __init__(self, error: bool = False) -> None:
+        self.error = error
+        self.calls: list[tuple[Path, float]] = []
+
+    def extract(self, video_path: Path, seconds: float, output_path: Path) -> Path:
+        self.calls.append((video_path, seconds))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.error:
+            output_path.write_bytes(b"half a fr")
+            raise FrameError("ffmpeg failed (exit 1): bad frame")
+        output_path.write_bytes(f"frame {seconds:g}".encode())
+        return output_path
+
+
+def _session(tmp_path: Path, frames: FakeFrames | None = None) -> ReviewSession:
     video = tmp_path / "talk.mp4"
     video.write_bytes(VIDEO)
     return ReviewSession(
-        folder=tmp_path, manifest=MANIFEST, video=video, duration_seconds=600.0
+        folder=tmp_path,
+        manifest=MANIFEST,
+        video=video,
+        duration_seconds=600.0,
+        frames=frames or FakeFrames(),
+        frames_dir=tmp_path / "cache" / "frames" / "talk-1024",
     )
 
 
@@ -119,8 +143,13 @@ def test_payload_clamps_each_range_to_the_video(tmp_path: Path) -> None:
 
 
 @pytest.fixture
-def base_url(tmp_path: Path) -> Iterator[str]:
-    server = make_server(_session(tmp_path), 0)
+def frames() -> FakeFrames:
+    return FakeFrames()
+
+
+@pytest.fixture
+def base_url(tmp_path: Path, frames: FakeFrames) -> Iterator[str]:
+    server = make_server(_session(tmp_path, frames), 0)
     thread = threading.Thread(
         target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
     )
@@ -203,6 +232,95 @@ def test_other_paths_are_not_found(base_url: str, path: str) -> None:
 
 def test_query_strings_are_ignored(base_url: str) -> None:
     assert _get(base_url + "/api/clips?x=1")[0] == 200
+
+
+def test_serves_a_frame_and_lets_the_browser_keep_it(
+    base_url: str, frames: FakeFrames, tmp_path: Path
+) -> None:
+    status, headers, body = _get(base_url + "/frames/12.jpg")
+
+    assert status == 200
+    assert headers["Content-Type"] == "image/jpeg"
+    assert headers["Cache-Control"] == "max-age=86400"
+    assert body == b"frame 12"
+    assert frames.calls == [(tmp_path / "talk.mp4", 12.0)]
+
+
+def test_a_second_request_reads_the_cache(base_url: str, frames: FakeFrames) -> None:
+    _get(base_url + "/frames/30.jpg")
+    status, _, body = _get(base_url + "/frames/30.jpg")
+
+    assert (status, body) == (200, b"frame 30")
+    assert len(frames.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/frames/600.jpg", "/frames/-1.jpg", "/frames/1.5.jpg", "/frames/abc.jpg",
+     "/frames/12.png", "/frames/12345678.jpg", "/frames/"],
+)  # fmt: skip
+def test_frames_outside_the_video_or_badly_named_are_not_found(
+    base_url: str, frames: FakeFrames, path: str
+) -> None:
+    assert _get(base_url + path)[0] == 404
+    assert frames.calls == []
+
+
+def test_a_frame_failure_is_a_server_error(base_url: str, frames: FakeFrames) -> None:
+    frames.error = True
+
+    status, _, body = _get(base_url + "/frames/12.jpg")
+
+    assert status == 500
+    assert b"bad frame" in body
+
+
+def test_cached_frame_leaves_no_partial_file(tmp_path: Path) -> None:
+    session = _session(tmp_path, FakeFrames(error=True))
+    with pytest.raises(FrameError):
+        cached_frame(session, 5)
+    assert list(session.frames_dir.iterdir()) == []
+
+    session = _session(tmp_path)
+    assert cached_frame(session, 5).read_bytes() == b"frame 5"
+    assert [p.name for p in session.frames_dir.iterdir()] == ["5.jpg"]
+
+
+def test_cached_frame_tolerates_a_rename_blocked_by_a_reader(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = _session(tmp_path)
+
+    def blocked(source: Path, target: Path) -> None:
+        # Another request made the frame first and is reading it.
+        Path(target).write_bytes(b"frame 7")
+        raise PermissionError("in use")
+
+    monkeypatch.setattr("os.replace", blocked)
+
+    assert cached_frame(session, 7).read_bytes() == b"frame 7"
+    assert [p.name for p in session.frames_dir.iterdir()] == ["7.jpg"]
+
+
+def test_cached_frame_reports_a_rename_that_fails_for_another_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def denied(source: Path, target: Path) -> None:
+        raise PermissionError("denied")
+
+    monkeypatch.setattr("os.replace", denied)
+
+    with pytest.raises(PermissionError):
+        cached_frame(_session(tmp_path), 7)
+
+
+def test_frames_folder_is_named_by_video_and_size(tmp_path: Path) -> None:
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(VIDEO)
+
+    assert frames_folder(tmp_path / "cache", video) == (
+        tmp_path / "cache" / "frames" / "talk-1024"
+    )
 
 
 def test_serve_announces_the_url_and_opens_the_browser(

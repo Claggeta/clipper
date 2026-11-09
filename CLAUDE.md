@@ -184,6 +184,11 @@ and planned code:
   player and handles cover the whole video, not the clip plus 120 s (the
   pause at the range's end also broke Play), with -15 to +15 s step
   buttons; `range_start`/`range_end` stay as 3b's starting strip view.
+  Item 3b amendment: a `FrameExtractor` Protocol and ffmpeg adapter (`-ss`
+  before `-i`, 72 px JPEG), `/frames/<second>.jpg` cached per video under
+  `<cache dir>/frames/`; a strip at fixed 1 to 60 s steps with zoom and pan;
+  handles dragged or set from the playhead; Preview span; manual steps RV5
+  and RV6.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

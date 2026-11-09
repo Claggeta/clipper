@@ -6,6 +6,7 @@ from typer.testing import CliRunner, Result
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.detection.llm import LlmClipDetector
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
+from clipper.adapters.media.frames import FfmpegFrameExtractor
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.adapters.titles.ollama import OllamaTitleWriter
 from clipper.adapters.transcription.caching import CachingTranscriber
@@ -264,6 +265,7 @@ def test_the_default_context_composes_the_real_adapters() -> None:
     assert isinstance(detector, HeuristicClipDetector)
     assert isinstance(context.renderer(settings), FfmpegClipRenderer)
     assert isinstance(context.probe(), FfprobeMediaProbe)
+    assert isinstance(context.frames(), FfmpegFrameExtractor)
     assert isinstance(context.title_writer(settings), OllamaTitleWriter)
 
 

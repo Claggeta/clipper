@@ -8,6 +8,7 @@ from clipper.adapters.detection.ollama import OllamaClient
 from clipper.adapters.download.ytdlp import YtDlpClipLookup, YtDlpDownloader
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
+from clipper.adapters.media.frames import FfmpegFrameExtractor
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.adapters.titles.ollama import OllamaTitleWriter
 from clipper.adapters.transcription.caching import CachingTranscriber
@@ -19,6 +20,7 @@ from clipper.core.interfaces import (
     ClipLookup,
     ClipRenderer,
     Downloader,
+    FrameExtractor,
     MediaProbe,
     TitleWriter,
     Transcriber,
@@ -70,6 +72,11 @@ def build_probe() -> MediaProbe:
     return FfprobeMediaProbe()
 
 
+def build_frames() -> FrameExtractor:
+    """Compose the frame extractor for the review page's film strip."""
+    return FfmpegFrameExtractor()
+
+
 def build_title_writer(settings: Settings) -> TitleWriter:
     """Compose the title writer, on the detector's model (ADR 0018)."""
     if not settings.llm_model:
@@ -103,6 +110,7 @@ class AppContext:
     detector: Callable[[Settings, DetectorName], ClipDetector] = build_detector
     renderer: Callable[[Settings], ClipRenderer] = build_renderer
     probe: Callable[[], MediaProbe] = build_probe
+    frames: Callable[[], FrameExtractor] = build_frames
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     downloader: Callable[[Settings], Downloader] = build_downloader
     clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup
