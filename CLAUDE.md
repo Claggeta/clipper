@@ -268,6 +268,13 @@ In progress:
   to 10 real target videos, noting which drafts would be posted, fixed or
   dropped, and writing label files for the moments worth clipping. V5 is
   scoped from those notes and `eval` on the new labels.
+  Trial notes so far:
+  - 2026-11-09, VOD 2922695332 (jasontheween, 6:31), `drafts` with the
+    heuristic: drafts 4 (1:39:11-1:39:49, "Why He Never Asked Her Out") and
+    5 (5:24:04-5:24:49, "The Best Part About Japan") are the best to post;
+    1 to 3 not chosen, reasons not given. Neither pick overlaps a community
+    clip, so by the maintainer's judgment the top 5 had 2 worth posting
+    where the clip labels count 0.
 - Labels from Twitch community clips (option B), done: ADR 0012 and 0020
   amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
