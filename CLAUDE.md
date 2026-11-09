@@ -647,7 +647,12 @@ Items 8 and 9 do not depend on picking and may land earlier.
      (done; #137; ADR 0024, 0019 and 0011 amendments; manual step RV8
      passed, run by the maintainer, who found Reset leaves an edited title
      and the model's title is not kept; a follow-up PR)
-   - 3e. Add clip from the current range. Manual step.
+   - 3e. ~~Add clip from the current range. Manual step.~~ (done; #140;
+     from the playhead anywhere in the VOD, verdict `added`; ADR 0024 and
+     0019 amendments; manual step RV9 passed, run by the maintainer)
+
+   Item 3 is done: whole-VOD player #132, film strip #133, Save/Trash #135,
+   re-render #137, model title #139, Add clip #140.
 4. Not code, a docs PR: the baseline. Heuristic and LLM top 10 on the trial
    VODs (`CLIPPER_TOP_N=10` in a child process, cached transcripts; ask
    before any download), every draft judged in `review`, the first judged
