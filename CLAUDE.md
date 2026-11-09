@@ -482,9 +482,9 @@ Later, not scheduled:
 
 - Picking, a candidate for V5: clip boundaries that follow the moment (ADR
   0014 "revisit when"; trial evidence: clips end on the last word and 4 of 5
-  needed seconds more, and neighbouring windows split one moment); a local signal for visual moments, such as audio
-  loudness (untried); and label files for the first niche chosen, so `eval`
-  reflects real work.
+  needed seconds more, and neighbouring windows split one moment); a local
+  signal for visual moments, such as audio loudness (untried); and label
+  files for the first niche chosen, so `eval` reflects real work.
 - A larger Whisper model (`small`, `medium`) on the GPU, a candidate for V5
   with picking, since it changes transcripts and so which moments are picked.
   ADR 0021 has the measured GPU setup and its punctuation caveats.
