@@ -65,7 +65,9 @@ and planned code:
 - `0010` — captions are burned in from segment-level text via a pure SRT
   builder. Word-level captions are out of scope.
 - `0011` — `render` is a separate command (`--rank`, `--captions`). If one clip
-  fails, the rest still render, then it exits 1.
+  fails, the rest still render, then it exits 1. Review amendment (V5 3d):
+  the review page's Save is a second caller of the same render path; a
+  failure leaves the old file in place.
 - `0012` — detectors are evaluated against hand-written label files (one JSON
   per video, `CLIPPER_LABELS_DIR`). `clipper eval` reruns a detector on the
   saved transcript. Results are indicative, not statistical. A candidate hits
@@ -137,6 +139,8 @@ and planned code:
   titles fields until item 5; a failure before cutting leaves the manifest.
   Review amendment (V5 3c): `reviewed` (`saved`/`trashed`) per clip; a
   trashed clip has no file; Save leaves start and end until a re-render.
+  Re-render amendment (V5 3d): start, end and file follow the new span, and
+  `draft_start_seconds`/`draft_end_seconds` keep the detector's.
 - `0020` — `clipper fetch <url>`: one YouTube video or Twitch VOD per call,
   chosen by hand, via the yt-dlp program behind a `Downloader` Protocol.
   Both platforms' terms forbid downloading with a tool (quoted, read
@@ -198,7 +202,14 @@ and planned code:
   a span over another clip's label is refused (409), as is Save on a
   trashed clip until 3d; POSTs need a JSON content type, the page's Origin
   and a loopback Host (403 otherwise); `core/judging.py`, a `ReviewFiles`
-  Protocol, `review/store.py`; manual step RV7.
+  Protocol, `review/store.py`; manual step RV7. Item 3d amendment: Save
+  re-renders when the span differs from the file's or there is no file,
+  through the same renderer with the folder's flags, to `<name>.part.mp4`
+  then renamed, the old file deleted; the label is written first and
+  stands if the render fails (`render_error`); the draft span is kept in
+  the manifest; Save brings a trashed clip back; `review` loads the
+  analysis for captions before serving; about 12 s per re-render; manual
+  step RV8.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

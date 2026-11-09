@@ -83,6 +83,16 @@ one can fail while others succeed.
   message.
 - The file name does not change with `--captions` (0008).
 
+## Amended by the review page's re-render PR (V5 item 3d)
+
+- **A second caller of the same render path.** Save in the review page
+  (0024) re-renders one clip with the folder's flags through the same
+  `ClipRenderer` and caption builder, not a second code path (0007).
+- **Its failure policy differs from `render`'s**: there is one clip, so
+  nothing else to continue with. The clip renders to a temporary file
+  first, so a failure leaves the clip's old file in place; the judged label
+  is written regardless, and the page shows the error.
+
 ## Revisit when
 
 - A third command or a third injected dependency appears. Move to the context

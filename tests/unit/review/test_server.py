@@ -5,15 +5,23 @@ import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 import clipper.review.server as server_module
+from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.adapters.results.labels_json import load_labels
 from clipper.adapters.results.manifest_json import load_manifest
 from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.domain.errors import ClipperError, FrameError, ReviewError
-from clipper.domain.models import ManifestClip, RenderManifest
+from clipper.domain.models import (
+    ClipCandidate,
+    ManifestClip,
+    RenderManifest,
+    Segment,
+    Transcript,
+)
 from clipper.review.server import (
     RANGE_SECONDS,
     ReviewSession,
@@ -56,6 +64,10 @@ MANIFEST = RenderManifest(
     ),
 )
 VIDEO = bytes(range(256)) * 4  # 1,024 bytes
+# Speech in clip 1 only; segments without word times, so whole-segment cues.
+TRANSCRIPT = Transcript(
+    segments=(Segment(start_seconds=62.0, end_seconds=70.0, text="Hello there."),)
+)
 
 
 class FakeFrames:
@@ -75,7 +87,11 @@ class FakeFrames:
         return output_path
 
 
-def _session(tmp_path: Path, frames: FakeFrames | None = None) -> ReviewSession:
+def _session(
+    tmp_path: Path,
+    frames: FakeFrames | None = None,
+    renderer: FakeClipRenderer | None = None,
+) -> ReviewSession:
     video = tmp_path / "talk.mp4"
     video.write_bytes(VIDEO)
     folder = tmp_path / "clips" / "talk"
@@ -93,6 +109,8 @@ def _session(tmp_path: Path, frames: FakeFrames | None = None) -> ReviewSession:
         labels=None,
         labels_path=tmp_path / "labels" / "picks" / "talk.json",
         files=JsonReviewFiles(),
+        renderer=renderer or FakeClipRenderer(),
+        transcript=TRANSCRIPT,
     )
 
 
@@ -163,8 +181,15 @@ def frames() -> FakeFrames:
 
 
 @pytest.fixture
-def base_url(tmp_path: Path, frames: FakeFrames) -> Iterator[str]:
-    server = make_server(_session(tmp_path, frames), 0)
+def renderer() -> FakeClipRenderer:
+    return FakeClipRenderer()
+
+
+@pytest.fixture
+def base_url(
+    tmp_path: Path, frames: FakeFrames, renderer: FakeClipRenderer
+) -> Iterator[str]:
+    server = make_server(_session(tmp_path, frames, renderer), 0)
     thread = threading.Thread(
         target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
     )
@@ -292,7 +317,7 @@ def _post(
     data: object,
     headers: dict[str, str] | None = None,
     raw: bytes | None = None,
-) -> tuple[int, dict[str, object]]:
+) -> tuple[int, dict[str, Any]]:
     sent = {
         "Content-Type": "application/json",
         "Origin": base_url,
@@ -344,8 +369,8 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
     )
 
 
-def test_save_with_moved_handles_writes_a_fix_with_the_draft(
-    base_url: str, tmp_path: Path
+def test_save_with_moved_handles_writes_a_fix_and_re_renders(
+    base_url: str, tmp_path: Path, renderer: FakeClipRenderer
 ) -> None:
     status, clip = _post(base_url, "/api/clips/2/save", {"start": 398.5, "end": 446.25})
 
@@ -358,6 +383,30 @@ def test_save_with_moved_handles_writes_a_fix_with_the_draft(
     assert label.note is None
     # An empty title box clears the title.
     assert clip["title"] is None
+    # Re-rendered under the new span's name, with the folder's flags.
+    assert (clip["file"], clip["start"], clip["end"]) == (
+        "talk_000638-000727.mp4",
+        398.5,
+        446.25,
+    )
+    assert (clip["draft_start"], clip["draft_end"]) == (400.0, 440.0)
+    assert (clip["render_error"], clip["warning"]) == (None, None)
+    [(_, candidate, output)] = renderer.calls
+    assert (candidate.start_seconds, candidate.end_seconds) == (398.5, 446.25)
+    assert output.name == "talk_000638-000727.part.mp4"
+    assert renderer.vertical == [True]
+    folder = _folder(tmp_path)
+    assert (folder / "talk_000638-000727.mp4").exists()
+    assert not (folder / "talk_2.mp4").exists()
+    assert not output.exists()
+
+
+def test_save_unchanged_does_not_render(
+    base_url: str, renderer: FakeClipRenderer
+) -> None:
+    _post(base_url, "/api/clips/2/save", {"start": 400.0, "end": 440.0, "title": "T"})
+
+    assert renderer.calls == []
 
 
 def test_saving_again_replaces_the_clips_label(base_url: str, tmp_path: Path) -> None:
@@ -411,13 +460,43 @@ def test_a_failed_clip_can_be_trashed(base_url: str) -> None:
     assert (clip["reviewed"], clip["error"]) == ("trashed", "ffmpeg failed")
 
 
-def test_saving_a_trashed_clip_is_refused(base_url: str) -> None:
+def test_saving_a_trashed_clip_renders_it_again(base_url: str, tmp_path: Path) -> None:
     _post(base_url, "/api/clips/2/trash", {})
 
-    status, reply = _post(base_url, "/api/clips/2/save", {"start": 400, "end": 440})
+    status, clip = _post(base_url, "/api/clips/2/save", {"start": 400, "end": 440})
 
-    assert status == 409
-    assert "trashed" in str(reply["error"])
+    assert status == 200
+    assert (clip["reviewed"], clip["file"]) == ("saved", "talk_000640-000720.mp4")
+    assert clip["judgment"]["verdict"] == "post"
+    assert (_folder(tmp_path) / "talk_000640-000720.mp4").exists()
+
+
+def test_a_failed_re_render_keeps_the_label_and_says_so(
+    tmp_path: Path, frames: FakeFrames
+) -> None:
+    moved = ClipCandidate(
+        start_seconds=398.0, end_seconds=440.0, score=0.5, reasons=("test",)
+    )
+    server = make_server(
+        _session(tmp_path, frames, FakeClipRenderer(fail_on=[moved])), 0
+    )
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        status, clip = _post(url, "/api/clips/2/save", {"start": 398, "end": 440})
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert status == 200
+    assert clip["render_error"] == "Fake render failed for talk_000638-000720.part.mp4"
+    # The old file and its span stay; the label is written.
+    assert (clip["file"], clip["start"], clip["error"]) == ("talk_2.mp4", 400.0, None)
+    assert clip["judgment"]["verdict"] == "fix"
+    assert (_folder(tmp_path) / "talk_2.mp4").exists()
 
 
 def test_the_clip_list_shows_judgments_after_writes(base_url: str) -> None:

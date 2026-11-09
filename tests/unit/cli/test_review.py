@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner, Result
 
+from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.adapters.results.labels_json import save_labels
 from clipper.adapters.results.manifest_json import save_manifest
 from clipper.adapters.results.review_files import JsonReviewFiles
@@ -11,10 +12,13 @@ from clipper.cli.context import AppContext
 from clipper.cli.main import app
 from clipper.domain.errors import MediaProbeError, ReviewError
 from clipper.domain.models import (
+    AnalysisResult,
     LabeledVideo,
     ManifestClip,
     MediaInfo,
     RenderManifest,
+    Segment,
+    Transcript,
 )
 from clipper.review.server import DEFAULT_PORT, ReviewSession
 
@@ -58,13 +62,27 @@ class FakeFrames:
         raise AssertionError("review must not take frames before serving")
 
 
+TRANSCRIPT = Transcript(
+    segments=(Segment(start_seconds=62.0, end_seconds=70.0, text="Hello there."),)
+)
+
+
+def _write_analysis(path: Path, source: str = "talk.mp4") -> None:
+    result = AnalysisResult(source=source, transcript=TRANSCRIPT, candidates=())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(result.model_dump_json(), encoding="utf-8")
+
+
 class Env:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.folder = tmp_path / "clips" / "talk"
         self.videos = tmp_path / "videos"
         self.video = self.videos / "talk.mp4"
         monkeypatch.setenv("CLIPPER_VIDEOS_DIR", str(self.videos))
-        save_manifest(MANIFEST, self.folder)
+        self.analysis = tmp_path / "output" / "talk.json"
+        _write_analysis(self.analysis)
+        self.manifest = MANIFEST.model_copy(update={"analysis": str(self.analysis)})
+        save_manifest(self.manifest, self.folder)
         self.videos.mkdir()
         self.video.write_bytes(b"video")
         self.cache = tmp_path / "cache"
@@ -75,6 +93,7 @@ class Env:
         self.files = JsonReviewFiles()
         self.probe = FakeProbe()
         self.frames = FakeFrames()
+        self.renderer = FakeClipRenderer()
         self.calls: list[tuple[ReviewSession, int, bool]] = []
         self.error: ReviewError | None = None
 
@@ -95,6 +114,7 @@ class Env:
             probe=lambda: self.probe,
             frames=lambda: self.frames,
             review_files=lambda: self.files,
+            renderer=lambda settings: self.renderer,
             serve=self.serve,
         )
         return CliRunner().invoke(
@@ -113,7 +133,7 @@ def test_serves_the_folder_with_the_video_from_the_videos_dir(env: Env) -> None:
     assert result.exit_code == 0, result.output
     [(session, port, open_browser)] = env.calls
     assert session.folder == env.folder
-    assert session.manifest == MANIFEST
+    assert session.manifest == env.manifest
     assert session.video == env.video
     assert session.duration_seconds == 600.0
     assert session.frames is env.frames
@@ -122,6 +142,8 @@ def test_serves_the_folder_with_the_video_from_the_videos_dir(env: Env) -> None:
     assert session.labels is None
     assert session.labels_path == env.picks
     assert session.files is env.files
+    assert session.renderer is env.renderer
+    assert session.transcript == TRANSCRIPT
     assert (port, open_browser) == (DEFAULT_PORT, True)
     assert env.probe.seen == [env.video]
     assert f"Review: http://127.0.0.1:{DEFAULT_PORT}/ (1 clip; Ctrl+C to stop)" in (
@@ -239,6 +261,37 @@ def test_unusable_judged_labels_stop_before_serving(
     assert result.exit_code == 1
     assert message in result.output
     assert env.calls == []
+
+
+def test_a_missing_analysis_stops_before_serving(env: Env) -> None:
+    env.analysis.unlink()
+
+    result = env.run()
+
+    assert result.exit_code == 1
+    assert "Error: Analysis not found:" in result.output
+    assert "Save cannot re-render with captions" in result.output
+    assert env.calls == []
+
+
+def test_an_analysis_for_another_video_stops_before_serving(env: Env) -> None:
+    _write_analysis(env.analysis, source="other.mp4")
+
+    result = env.run()
+
+    assert result.exit_code == 1
+    assert "other.mp4" in result.output
+    assert env.calls == []
+
+
+def test_a_folder_without_captions_needs_no_analysis(env: Env) -> None:
+    save_manifest(env.manifest.model_copy(update={"captions": False}), env.folder)
+    env.analysis.unlink()
+
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    assert env.calls[0][0].transcript is None
 
 
 def test_server_error_is_reported(env: Env) -> None:

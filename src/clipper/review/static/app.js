@@ -29,6 +29,7 @@ let current = null;
 const buttons = new Map(); // rank -> the clip's button in the list
 const edits = new Map(); // rank -> {start, end}, kept while the page is open
 let trashArmed = null; // the timer while Trash waits for its second click
+let busy = false; // while a Save is waiting on the server (a re-render)
 let span = null; // the chosen clip's edited {start, end}
 const view = { start: 0, step: 5, count: 10 };
 let preview = null; // {end, settling} while Preview span plays
@@ -215,8 +216,22 @@ function drawBadge(clip) {
   const badge = buttons.get(clip.rank).querySelector(".badge");
   badge.textContent = badgeText(clip);
   badge.dataset.state = badgeText(clip).toLowerCase();
-  const name = buttons.get(clip.rank).querySelector(".name");
+  const button = buttons.get(clip.rank);
+  const name = button.querySelector(".name");
   name.textContent = clip.title || (clip.error ? "Render failed" : `Clip ${clip.rank}`);
+  name.classList.toggle("failed", Boolean(clip.error) && !clip.file);
+  button.querySelector(".span").textContent = `${fmt(clip.start)} - ${fmt(clip.end)}`;
+}
+
+// The parts of the details that follow the manifest: the hook, the
+// draft's span (which a re-render keeps), and a render error.
+function drawClipInfo(clip) {
+  text("hook", clip.hook || "");
+  text("clip-span", `${fmt(clip.draft_start)} - ${fmt(clip.draft_end)}`);
+  const error = document.getElementById("error");
+  const failed = Boolean(clip.error) && !clip.file;
+  error.hidden = !failed;
+  error.textContent = failed ? `Render failed: ${clip.error}` : "";
 }
 
 // --- Choosing a clip ---
@@ -235,21 +250,15 @@ function select(clip, button) {
   disarmTrash();
   notice("");
   judgeNotice(
-    clip.reviewed === "trashed"
-      ? "Trashed. Saving it again needs a re-render, which is not built yet."
-      : "",
+    clip.reviewed === "trashed" ? "Trashed. Save renders it again." : "",
   );
   document.getElementById("empty").hidden = true;
   document.getElementById("details").hidden = false;
   titleBox.value = clip.title || "";
   noteBox.value = (clip.judgment && clip.judgment.note) || "";
   drawJudged(clip);
-  text("hook", clip.hook || "");
-  text("clip-span", `${fmt(clip.start)} - ${fmt(clip.end)}`);
-  const error = document.getElementById("error");
-  error.hidden = !clip.error;
-  error.textContent = clip.error ? `Render failed: ${clip.error}` : "";
-  player.currentTime = clip.start;
+  drawClipInfo(clip);
+  player.currentTime = span.start;
   fit();
 }
 
@@ -352,8 +361,8 @@ document.getElementById("set-end").addEventListener("click", () => {
 });
 
 document.getElementById("reset").addEventListener("click", () => {
-  span.start = current.start;
-  span.end = current.end;
+  span.start = current.draft_start;
+  span.end = current.draft_end;
   notice("");
   fit();
 });
@@ -366,13 +375,30 @@ function judgeNotice(message, failed = false) {
   line.classList.toggle("error", failed);
 }
 
+// A trashed clip can be saved again (it is re-rendered), not trashed again.
+// While a Save is rendering, neither button is pressed again.
 function drawJudged(clip) {
-  const trashed = clip.reviewed === "trashed";
-  saveButton.disabled = trashed;
-  trashButton.disabled = trashed;
-  titleBox.disabled = trashed;
-  noteBox.disabled = trashed;
+  saveButton.disabled = busy;
+  trashButton.disabled = busy || clip.reviewed === "trashed";
   text("title", clip.title || `Clip ${clip.rank}`);
+}
+
+// Whether Save will re-render: the span differs from what the file covers,
+// or there is no file.
+function rendersOnSave(clip) {
+  return !clip.file || !sameTime(span.start, clip.start) || !sameTime(span.end, clip.end);
+}
+
+function savedMessage(reply, rendered) {
+  if (reply.render_error) {
+    const kept = reply.file ? " The old file is kept." : "";
+    return [`Label saved; re-render failed: ${reply.render_error}.${kept}`, true];
+  }
+  if (reply.warning) {
+    return [reply.warning, true];
+  }
+  const how = rendered ? "; re-rendered" : "";
+  return [`Saved as ${reply.judgment.verdict}${how}.`, false];
 }
 
 async function post(path, body) {
@@ -394,13 +420,19 @@ function judged(clip, reply) {
   drawBadge(clip);
   if (clip === current) {
     drawJudged(clip);
+    drawClipInfo(clip);
     drawUnsaved();
   }
 }
 
 saveButton.addEventListener("click", async () => {
   const clip = current;
+  const rendered = rendersOnSave(clip);
   disarmTrash();
+  busy = true;
+  saveButton.textContent = rendered ? "Rendering…" : "Saving…";
+  drawJudged(clip);
+  judgeNotice(rendered ? "Re-rendering the clip; this takes a few seconds." : "");
   try {
     const reply = await post(`/api/clips/${clip.rank}/save`, {
       start: span.start,
@@ -409,9 +441,17 @@ saveButton.addEventListener("click", async () => {
       note: noteBox.value,
     });
     judged(clip, reply);
-    judgeNotice(`Saved as ${reply.judgment.verdict}.`);
+    if (clip === current) {
+      judgeNotice(...savedMessage(reply, rendered));
+    }
   } catch (error) {
-    judgeNotice(error.message, true);
+    if (clip === current) {
+      judgeNotice(error.message, true);
+    }
+  } finally {
+    busy = false;
+    saveButton.textContent = "Save";
+    drawJudged(current);
   }
 });
 

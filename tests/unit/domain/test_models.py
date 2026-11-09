@@ -614,6 +614,27 @@ def test_a_trashed_clip_has_no_file(fields: dict[str, object]) -> None:
         ManifestClip.model_validate(_entry(reviewed="trashed", file="a.mp4"))
 
 
+def test_draft_span_defaults_to_the_clips_own() -> None:
+    clip = ManifestClip.model_validate(_entry(file="a.mp4"))
+    assert clip.draft_span == (1.0, 2.0)
+
+    moved = ManifestClip.model_validate(
+        _entry(
+            file="a.mp4",
+            start_seconds=0.5,
+            end_seconds=4.0,
+            draft_start_seconds=1.0,
+            draft_end_seconds=2.0,
+        )
+    )
+    assert moved.draft_span == (1.0, 2.0)
+
+
+def test_draft_span_fields_go_together() -> None:
+    with pytest.raises(ValidationError, match="must be set together"):
+        ManifestClip.model_validate(_entry(file="a.mp4", draft_start_seconds=1.0))
+
+
 def test_a_saved_clip_still_needs_a_file_or_an_error() -> None:
     assert ManifestClip.model_validate(_entry(file="a.mp4", reviewed="saved"))
     with pytest.raises(ValidationError, match="exactly one of file and error"):

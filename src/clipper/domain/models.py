@@ -212,6 +212,11 @@ class ManifestClip(BaseModel):
     `reviewed` is what the review page did with the clip (ADR 0024, item 3c
     amendment). A trashed clip's file was deleted, so it has no `file`, and
     may keep the `error` it had.
+
+    `start_seconds` and `end_seconds` are what the file covers. The review
+    page's re-render (item 3d amendment) moves them, and keeps the draft's
+    span in `draft_start_seconds` and `draft_end_seconds`, set together;
+    `draft_span` is that span, or the clip's own when never re-rendered.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -227,6 +232,8 @@ class ManifestClip(BaseModel):
     hook: str | None = None
     error: str | None = None
     reviewed: Literal["saved", "trashed"] | None = None
+    draft_start_seconds: float | None = None
+    draft_end_seconds: float | None = None
 
     @model_validator(mode="after")
     def _file_or_error(self) -> "ManifestClip":
@@ -236,6 +243,21 @@ class ManifestClip(BaseModel):
         elif (self.file is None) == (self.error is None):
             raise ValueError("exactly one of file and error must be set")
         return self
+
+    @model_validator(mode="after")
+    def _draft_span_together(self) -> "ManifestClip":
+        if (self.draft_start_seconds is None) != (self.draft_end_seconds is None):
+            raise ValueError(
+                "draft_start_seconds and draft_end_seconds must be set together"
+            )
+        return self
+
+    @property
+    def draft_span(self) -> tuple[float, float]:
+        """The span the detector proposed, before any re-render."""
+        if self.draft_start_seconds is None or self.draft_end_seconds is None:
+            return self.start_seconds, self.end_seconds
+        return self.draft_start_seconds, self.draft_end_seconds
 
 
 class RenderManifest(BaseModel):

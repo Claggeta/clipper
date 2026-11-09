@@ -21,11 +21,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
 
-from clipper.core.interfaces import FrameExtractor, ReviewFiles
+from clipper.core.interfaces import ClipRenderer, FrameExtractor, ReviewFiles
 from clipper.domain.errors import ClipperError, FrameError, JudgingError, ReviewError
-from clipper.domain.models import LabeledVideo, ManifestClip, RenderManifest
+from clipper.domain.models import (
+    LabeledVideo,
+    ManifestClip,
+    RenderManifest,
+    Transcript,
+)
 from clipper.review.store import (
     BadRequest,
+    RenderInputs,
     ReviewStore,
     UnknownClip,
     parse_save,
@@ -59,6 +65,8 @@ class ReviewSession:
 
     `labels` are the judged labels at `labels_path` when the run started, or
     None if there were none yet; `files` writes them and the manifest.
+    `renderer` re-renders a saved clip, with captions from `transcript`
+    (None when the folder has no captions).
     """
 
     folder: Path
@@ -70,6 +78,8 @@ class ReviewSession:
     labels: LabeledVideo | None
     labels_path: Path
     files: ReviewFiles
+    renderer: ClipRenderer
+    transcript: Transcript | None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -143,17 +153,25 @@ def make_store(session: ReviewSession) -> ReviewStore:
         session.labels,
         session.labels_path,
         session.files,
+        RenderInputs(session.video, session.renderer, session.transcript),
     )
 
 
 def clip_payload(
     session: ReviewSession, store: ReviewStore, clip: ManifestClip
 ) -> dict[str, object]:
-    """One clip as the page sees it: its range, clamped, and its judgment."""
+    """One clip as the page sees it: its range, clamped, and its judgment.
+
+    `start` and `end` are what the file covers; `draft_start` and `draft_end`
+    are the detector's span, the same until a re-render.
+    """
+    draft_start, draft_end = clip.draft_span
     return {
         "rank": clip.rank,
         "start": clip.start_seconds,
         "end": clip.end_seconds,
+        "draft_start": draft_start,
+        "draft_end": draft_end,
         "range_start": max(clip.start_seconds - RANGE_SECONDS, 0.0),
         "range_end": min(clip.end_seconds + RANGE_SECONDS, session.duration_seconds),
         "title": clip.title,
@@ -212,10 +230,16 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
                 return
             rank, verb = int(action.group(1)), action.group(2)
+            extra: dict[str, object] = {}
             try:
                 data = self._read_json()
                 if verb == "save":
-                    clip = store.save(rank, parse_save(data, session.duration_seconds))
+                    saved = store.save(rank, parse_save(data, session.duration_seconds))
+                    clip = saved.clip
+                    extra = {
+                        "render_error": saved.render_error,
+                        "warning": saved.warning,
+                    }
                 else:
                     clip = store.trash(rank, parse_trash(data))
             except BadRequest as exc:
@@ -227,7 +251,8 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             except (ClipperError, OSError) as exc:
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
             else:
-                self._send_json(HTTPStatus.OK, clip_payload(session, store, clip))
+                reply = clip_payload(session, store, clip) | extra
+                self._send_json(HTTPStatus.OK, reply)
 
         def _trusted(self) -> bool:
             """Whether a POST comes from the page itself.
