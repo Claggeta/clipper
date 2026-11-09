@@ -288,6 +288,13 @@ In progress:
     speech starts 0 to 0.74 s later on 4 of 5. Drafts 1 and 3 are one
     moment (the gas pump) split into neighbouring windows 2.5 s apart. Both
     are the boundaries item under "Later" (V5 picking).
+  - 2026-11-09, VOD 2922589775 (adapt, 5:18), `drafts` with the heuristic:
+    only draft 2 (2:00:28-2:01:13, the Warzone pirate token) worth posting,
+    retitled "Adapt learns about the Pirate Token" (the model wrote "New
+    Warzone Pirate Token Explained"). Drafts 3 and 5 dropped as nothing
+    happening; 1 and 4 dropped as Adapt reacting to a compilation (4 is a
+    compilation of himself), all over the place with no firm topic. A
+    picking failure again. The clip labels count 0 of 5.
 - Labels from Twitch community clips (option B), done: ADR 0012 and 0020
   amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
@@ -297,9 +304,11 @@ In progress:
   maintainer's first trial `drafts` run): 0 of 4 for both detectors at top 5
   and top 30; two of its clips have almost no speech. Third VOD,
   `v2917872953.json` (5 clips): 0 of 5 for both, though the maintainer would
-  post all 5 heuristic drafts. Over 14 clips the heuristic found 1 at top 30,
-  the LLM none. Clips and the maintainer's picks disagree, so clip labels are
-  a weak stand-in for "worth posting"; trial notes count more. Small samples.
+  post all 5 heuristic drafts. Fourth VOD, `v2922589775.json` (5 clips): 0
+  of 5 for both; the LLM took 1,168 s and scored all its top 30 0.85 to
+  0.95. Over 19 clips the heuristic found 1 at top 30, the LLM none. Clips
+  and the maintainer's picks disagree, so clip labels are a weak stand-in
+  for "worth posting"; trial notes count more. Small samples.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -565,6 +574,7 @@ Later, not scheduled:
   often: a rewrite request for listed words, or another model. Trial
   (v2917872953): the maintainer rewrote all 5 titles to name the people and
   the angle; the model sees only the clip's words and not who is on stream.
+  Again on v2922589775: "Adapt learns about the Pirate Token".
   A lever: give the prompt the channel or known names. Needs an ADR 0018
   amendment.
 - Candidates too short to post. A window is the whole segments inside 45 s
