@@ -97,6 +97,11 @@ analysis of the same video gave `captions` `segments` and `detector` `null`.
 - **Start and end are unchanged by Save** in this item: the file still
   covers the draft's span until a re-render (V5 item 3d). The saved span is
   in the judged label.
+- **Re-render amendment (V5 item 3d)**: a Save that re-renders moves
+  `start_seconds`/`end_seconds` and `file` to the new span, and sets
+  `draft_start_seconds`/`draft_end_seconds` (together, or neither) to the
+  detector's span, which the review page finds judgments by. Absent means
+  the clip was never re-rendered.
 - The page replaces `manifest.json` whole, as `render` does. A later
   `render` or `drafts` run on the folder still replaces it and loses these
   fields (decision 3); the judged labels are separate files.

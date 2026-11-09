@@ -732,7 +732,8 @@ def review(
 
     The page plays the source video, with a film strip of frames cached
     under the cache dir. Save and Trash write judged labels to
-    <labels dir>/picks/<stem>.json and update the manifest; Trash deletes
+    <labels dir>/picks/<stem>.json and update the manifest; Save re-renders
+    a clip whose span changed, with the folder's flags, and Trash deletes
     the clip's file. It is served on the loopback address only, until Ctrl+C.
     """
     settings = Settings()
@@ -754,6 +755,17 @@ def review(
         labels = files.load_labels(labels_path)
         if labels is not None:
             check_judged_labels(labels, manifest.source, labels_path)
+        transcript = None
+        if manifest.captions:
+            analysis = Path(manifest.analysis)
+            if not analysis.is_file():
+                raise ReviewError(
+                    f"Analysis not found: {analysis}; Save cannot re-render "
+                    "with captions"
+                )
+            result = load_analysis_result(analysis)
+            check_source_matches(result, video)
+            transcript = result.transcript
         session = ReviewSession(
             folder=folder,
             manifest=manifest,
@@ -764,6 +776,8 @@ def review(
             labels=labels,
             labels_path=labels_path,
             files=files,
+            renderer=build.renderer(settings),
+            transcript=transcript,
         )
         build.serve(
             session,

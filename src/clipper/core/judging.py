@@ -47,9 +47,13 @@ def _ms(seconds: float) -> int:
     return round(seconds * 1000)
 
 
-def _same(span: Span | ManifestClip, start: float, end: float) -> bool:
+def same_span(a: tuple[float, float], b: tuple[float, float]) -> bool:
     """Same start and end, to the millisecond a labels file keeps."""
-    return _ms(span.start_seconds) == _ms(start) and _ms(span.end_seconds) == _ms(end)
+    return (_ms(a[0]), _ms(a[1])) == (_ms(b[0]), _ms(b[1]))
+
+
+def _span(span: Span) -> tuple[float, float]:
+    return span.start_seconds, span.end_seconds
 
 
 def _overlaps(span: Span, start: float, end: float) -> bool:
@@ -64,19 +68,19 @@ def is_own_label(label: Label, clip: ManifestClip) -> bool:
     """Whether `label` is the judgment of `clip`: found by the draft's span.
 
     A `post` label has the draft's span; a `fix` label keeps it in `draft`.
-    An `added` label belongs to no draft.
+    An `added` label belongs to no draft. The draft's span survives a
+    re-render in the manifest (`ManifestClip.draft_span`).
     """
-    draft = (clip.start_seconds, clip.end_seconds)
     if label.verdict == "post":
-        return _same(label, *draft)
+        return same_span(_span(label), clip.draft_span)
     if label.verdict == "fix" and label.draft is not None:
-        return _same(label.draft, *draft)
+        return same_span(_span(label.draft), clip.draft_span)
     return False
 
 
 def is_own_rejection(span: RejectedSpan, clip: ManifestClip) -> bool:
     """Whether a rejected span is the judgment of `clip`."""
-    return _same(span, clip.start_seconds, clip.end_seconds)
+    return same_span(_span(span), clip.draft_span)
 
 
 def _without_clip(
@@ -111,11 +115,11 @@ def save_judgment(
                 "this span, or trash it as a duplicate"
             )
     fields: dict[str, object] = {**_times(start, end), "note": note}
-    if _same(clip, start, end):
+    if same_span(clip.draft_span, (start, end)):
         fields["verdict"] = "post"
     else:
         fields["verdict"] = "fix"
-        fields["draft"] = _times(clip.start_seconds, clip.end_seconds)
+        fields["draft"] = _times(*clip.draft_span)
     labels.append(Label.model_validate(fields))
     labels.sort(key=lambda label: label.start_seconds)
     return LabeledVideo(source=source, labels=tuple(labels), rejected=tuple(rejected))
@@ -127,12 +131,10 @@ def trash_judgment(
     clip: ManifestClip,
     note: str | None,
 ) -> LabeledVideo:
-    """The labels with `clip` rejected, replacing its earlier judgment."""
+    """The labels with `clip`'s draft rejected, replacing its earlier judgment."""
     labels, rejected = _without_clip(labeled, clip)
     rejected.append(
-        RejectedSpan.model_validate(
-            {**_times(clip.start_seconds, clip.end_seconds), "note": note}
-        )
+        RejectedSpan.model_validate({**_times(*clip.draft_span), "note": note})
     )
     rejected.sort(key=lambda span: span.start_seconds)
     return LabeledVideo(source=source, labels=tuple(labels), rejected=tuple(rejected))

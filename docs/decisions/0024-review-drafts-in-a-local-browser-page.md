@@ -253,6 +253,42 @@ until the drafts rarely need editing.
   2.5 s early), 1 rejected, 2 unjudged. The page is checked by manual step
   RV7.
 
+## Amended by the re-render PR (V5 item 3d)
+
+- **Save re-renders when the video changed**: the span differs from what
+  the file covers (to the millisecond), or there is no file (trashed, or
+  its render failed). A title or notes change alone does not re-render;
+  titles are not burned in.
+- **Same render path** as `render` and `drafts` (0007): the `ClipRenderer`
+  from `AppContext.renderer`, the folder's `vertical` and `captions`,
+  captions from the analysis transcript through `build_ass`, the draft's
+  score and reasons. The file is named from the new span (0008), rendered
+  to `<name>.part.mp4`, renamed into place, and the old file deleted if its
+  name differs. A new name that is another clip's file is `409`, before
+  anything is written.
+- **The label is written first and stands** (decision 5). A failed render
+  leaves a clip with a file its old file and span; a clip without a file
+  gets the error in the manifest. The reply is `200` with `render_error`;
+  an old file that could not be deleted is a `warning`.
+- **The draft's span survives a re-render** in the manifest's
+  `draft_start_seconds`/`draft_end_seconds` (0019 amendment), so the clip's
+  own judgment, post or fix, and Reset still use it; `start`/`end` stay
+  what the file covers. `/api/clips` gives `draft_start`/`draft_end`.
+- **Save on a trashed clip re-renders it**, replacing 3c's refusal; a
+  mistaken Trash is undone by Save.
+- **`review` loads the analysis the manifest names** when the folder has
+  captions, for its transcript, and checks its source; missing or for
+  another video is `Error:`, exit 1, before serving, not a failure on the
+  first Save. A folder without captions needs none.
+- Writes stay one at a time, so a Save waits behind another's render; the
+  page shows `Rendering…` and keeps playing.
+- **Measured** (2026-11-09, by the assistant, on a copy of
+  `data/clips/v2917872953`, no browser): a fix re-rendered in 11.8 s (a
+  45.5 s 1080x1920 clip with word captions, checked with ffprobe), a
+  trashed clip brought back in 11.1 s, a title-only Save 0.02 s; the old
+  file deleted and the draft span kept. The page is checked by manual step
+  RV8.
+
 ## Related
 
 - 0011: render's failure policy

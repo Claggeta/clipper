@@ -2355,20 +2355,43 @@ cmd /c "set CLIPPER_LABELS_DIR=data\rv7-labels&& uv run clipper review data\clip
 1. Choose a clip. The title box holds the model's title (or is empty).
    Change the title, type a note, press Save. Pass: `Saved as post.`, a
    green POST badge in the list, the heading shows the new title.
-2. On another clip, move the end handle, press Save. Pass: `Saved as fix.`
-   and a yellow FIX badge. Change the note: `Unsaved` appears; Save again
-   clears it.
+2. On another clip, move the end handle, press Save. Pass: `Saved as fix;
+   re-rendered.` (since item 3d; see RV8) and a yellow FIX badge. Change the
+   note: `Unsaved` appears; Save again clears it.
 3. Move a clip's start handle into the span of a clip saved in step 1 and
    press Save. Pass: a red message `Overlaps the label ...`; nothing changes.
 4. On a third clip press Trash once: it reads `Confirm trash` and goes back
    after 3 s. Press it twice. Pass: `Trashed; the clip's file is deleted.`,
-   a TRASHED badge, Save and the boxes disabled, and the clip's `.mp4` gone
-   from the folder.
+   a TRASHED badge, Trash disabled, and the clip's `.mp4` gone from the
+   folder.
 5. Reload the page. Pass: badges, titles, saved spans and notes come back.
 6. Stop the server. `data\rv7-labels\picks\<stem>.json` has the `post` and
    `fix` labels (the fix with its `draft` span) and the rejected span, with
    the notes; `data\clips\rv7-copy\manifest.json` has `reviewed`, the typed
    title, and no `file` on the trashed clip.
+
+Keep the copy for RV8, then delete `data\clips\rv7-copy` and
+`data\rv7-labels`.
+
+### RV8. Re-render on Save
+
+With RV7's copy served again (same `cmd /c` line):
+
+1. On a clip, move the end handle a few seconds later and press Save. Pass:
+   Save reads `Rendering…`, both buttons are disabled, the player keeps
+   playing; then `Saved as fix; re-rendered.` Record the seconds it took.
+   The list shows the new span; in the folder the old `.mp4` is gone and
+   one named for the new span is there. Play it: vertical, captions on, and
+   it ends where the end handle was.
+2. Change only the title and Save. Pass: `Saving…`, done at once, no new
+   file.
+3. Press Reset, then Save. Pass: `Saved as post; re-rendered.`; the file is
+   named for the draft's span again.
+4. On the clip trashed in RV7, press Save. Pass: `Saved as post;
+   re-rendered.`, a POST badge, and its `.mp4` back in the folder.
+5. Stop the server. In `manifest.json` the clip from step 1 has
+   `draft_start_seconds`/`draft_end_seconds` (the draft) and
+   `start_seconds`/`end_seconds` (its file).
 
 Then delete `data\clips\rv7-copy` and `data\rv7-labels`.
 
