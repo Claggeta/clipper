@@ -241,6 +241,17 @@ maintainer's own judgment of which moments in a video are worth cutting.
   30 (not timed). Its nearest candidates start about 2 minutes before label
   3. Its scores cluster as before: 15 of the top 30 are 0.85. Its top
   candidate is a 0.5 s window holding one word, "Strongest", scored 1.00.
+- Second VOD, 2922695332 (jasontheween, 6:31:25 by the transcript, fetched
+  and analysed by `drafts` on 2026-11-09): 4 clips the maintainer collected
+  gave 4 labels of 17 to 60 s, 2.3 minutes. Recall 0 of 4 for both detectors
+  at top 5 and top 30, so precision 0. The heuristic ran at each N; the LLM
+  ran once at top 30 (909 s), and its top 5 are its first 5 rows, since
+  `select_top` picks greedily in score order. Two of the clips have almost no
+  speech in the transcript ("Oh, my god." in 30 s, and nothing in 17 s), and
+  one has 23 broken-up words in 60 s: moments a transcript-only detector
+  cannot see. The nearest miss is the LLM's candidate 18, 5:38:25-5:38:49,
+  which starts 1 s after label 4 ends. Over both VODs, 9 clips: the heuristic
+  found 1 at top 30, the LLM none.
 
 ## Related
 
