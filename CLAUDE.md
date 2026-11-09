@@ -272,8 +272,9 @@ In progress:
   amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
   `data/labels/links/`). Heuristic `eval` on it: recall 0 of 5 at top 5, 1 of
-  5 at top 30 (precision 1 of 30). Five clips are a small sample; more clip
-  links per VOD make the numbers worth more.
+  5 at top 30 (precision 1 of 30). LLM (`qwen3.5:9b`): 0 of 5 at top 5
+  (822 s) and at top 30. Five clips are a small sample; more clip links per
+  VOD make the numbers worth more.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -536,6 +537,14 @@ Later, not scheduled:
   every prompt tried, and some hooks misstate the speaker or may add details
   (ADR 0018's title prompt amendment). Next levers if the trial shows it
   often: a rewrite request for listed words, or another model.
+- Candidates too short to post. A window is the whole segments inside 45 s
+  (`sliding_windows`), so a window with little speech becomes a candidate
+  only as long as that speech. On v2917438534 the LLM's top candidate was
+  2:37:54-2:37:55, the one word "Strongest" (0.5 s), scored 1.00, and two
+  more top-30 candidates were 9 s. Fix: a minimum candidate length or word
+  count before scoring, for both detectors; the threshold is unmeasured.
+  Changes which moments are picked, so it needs an ADR 0014 amendment and
+  `eval` results.
 - `eval` ends with "Indicative only: one labeler, ..." even when the labels
   come from Twitch clips, which many viewers made. Fix: word it by source, or
   drop "one labeler"; how `eval` would know the source is undecided (a field

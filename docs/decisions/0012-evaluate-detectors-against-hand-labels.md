@@ -236,6 +236,11 @@ maintainer's own judgment of which moments in a video are worth cutting.
   (4:37:36-4:38:06) by 4 s, short of the 15 s a hit needs; shifting the label
   by the up-to-4 s error would not reach it either. Five clips are a small
   sample, and the transcript was cached from an earlier run.
+- The LLM detector on the same labels (`llm:qwen3.5:9b`, 2026-11-09): recall
+  0 of 5 and precision 0 of 5 at top 5 (822 s), and 0 of 5 and 0 of 30 at top
+  30 (not timed). Its nearest candidates start about 2 minutes before label
+  3. Its scores cluster as before: 15 of the top 30 are 0.85. Its top
+  candidate is a 0.5 s window holding one word, "Strongest", scored 1.00.
 
 ## Related
 
