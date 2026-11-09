@@ -129,11 +129,14 @@ and planned code:
   keep the speaker's meaning, no emoji or swear words; on 35 clips no title
   over 60 or hook over 100 characters (7 and 6 before). One clip still
   swears under every prompt tried, and meaning errors remain; not handled in
-  code.
+  code. Review amendment (V5 3c): the review page may change or clear a
+  title alone, so title and hook are no longer required together.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
   titles fields until item 5; a failure before cutting leaves the manifest.
+  Review amendment (V5 3c): `reviewed` (`saved`/`trashed`) per clip; a
+  trashed clip has no file; Save leaves start and end until a re-render.
 - `0020` — `clipper fetch <url>`: one YouTube video or Twitch VOD per call,
   chosen by hand, via the yt-dlp program behind a `Downloader` Protocol.
   Both platforms' terms forbid downloading with a tool (quoted, read
@@ -188,7 +191,14 @@ and planned code:
   before `-i`, 72 px JPEG), `/frames/<second>.jpg` cached per video under
   `<cache dir>/frames/`; a strip at fixed 1 to 60 s steps with zoom and pan;
   handles dragged or set from the playhead; Preview span; manual steps RV5
-  and RV6.
+  and RV6. Item 3c amendment: Save writes a `post` or `fix` label to
+  `<labels dir>/picks/<stem>.json` and the title and `reviewed` to the
+  manifest; Trash writes a rejected span, deletes the file, marks it
+  trashed; a clip's own judgment is found by its draft span and replaced;
+  a span over another clip's label is refused (409), as is Save on a
+  trashed clip until 3d; POSTs need a JSON content type, the page's Origin
+  and a loopback Host (403 otherwise); `core/judging.py`, a `ReviewFiles`
+  Protocol, `review/store.py`; manual step RV7.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

@@ -5,8 +5,10 @@ from clipper.domain.models import (
     ClipCandidate,
     ClipInfo,
     ClipTitle,
+    LabeledVideo,
     MediaInfo,
     RenderedClip,
+    RenderManifest,
     Transcript,
     VideoSource,
 )
@@ -36,6 +38,21 @@ class FrameExtractor(Protocol):
     """
 
     def extract(self, video_path: Path, seconds: float, output_path: Path) -> Path: ...
+
+
+@runtime_checkable
+class ReviewFiles(Protocol):
+    """Reads and writes what the review page judges (docs/decisions/0024).
+
+    `load_labels` returns None when the judged labels file does not exist
+    yet. Failures raise `LabelsError` or `ManifestError`.
+    """
+
+    def load_labels(self, path: Path) -> LabeledVideo | None: ...
+
+    def save_labels(self, labeled: LabeledVideo, path: Path) -> None: ...
+
+    def save_manifest(self, manifest: RenderManifest, folder: Path) -> None: ...
 
 
 @runtime_checkable

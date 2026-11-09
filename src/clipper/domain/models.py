@@ -205,8 +205,13 @@ class ManifestClip(BaseModel):
     `file` is the clip's name inside the manifest's folder, set when it was
     rendered; `error` is the failure message otherwise. `captions` is what was
     burned in: word-by-word, whole segments (a transcript without word times),
-    or nothing. `title` and `hook` are set together, only on a rendered clip
-    run with `--titles` that had speech in range (ADR 0018).
+    or nothing. `render --titles` sets `title` and `hook` together on a
+    rendered clip with speech in range (ADR 0018); the review page may then
+    change or clear the title alone.
+
+    `reviewed` is what the review page did with the clip (ADR 0024, item 3c
+    amendment). A trashed clip's file was deleted, so it has no `file`, and
+    may keep the `error` it had.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -221,19 +226,15 @@ class ManifestClip(BaseModel):
     title: str | None = None
     hook: str | None = None
     error: str | None = None
+    reviewed: Literal["saved", "trashed"] | None = None
 
     @model_validator(mode="after")
     def _file_or_error(self) -> "ManifestClip":
-        if (self.file is None) == (self.error is None):
+        if self.reviewed == "trashed":
+            if self.file is not None:
+                raise ValueError("a trashed clip has no file")
+        elif (self.file is None) == (self.error is None):
             raise ValueError("exactly one of file and error must be set")
-        return self
-
-    @model_validator(mode="after")
-    def _title_with_hook_on_a_file(self) -> "ManifestClip":
-        if (self.title is None) != (self.hook is None):
-            raise ValueError("title and hook must be set together")
-        if self.title is not None and self.file is None:
-            raise ValueError("title and hook need a rendered file")
         return self
 
 

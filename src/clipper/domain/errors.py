@@ -38,6 +38,10 @@ class ReviewError(ClipperError):
     """Raised when the review page cannot be served."""
 
 
+class JudgingError(ClipperError):
+    """Raised when a judgment in the review page conflicts with an earlier one."""
+
+
 class LabelsError(ClipperError):
     """Raised when a labels file cannot be loaded."""
 

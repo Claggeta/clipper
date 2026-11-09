@@ -61,7 +61,7 @@ body {
 
 .clips button {
   display: grid;
-  grid-template-columns: 28px 1fr;
+  grid-template-columns: 28px 1fr auto;
   gap: 2px 8px;
   width: 100%;
   padding: 10px;
@@ -89,12 +89,30 @@ body {
 }
 
 .clips .name {
+  grid-column: 2;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
+.clips .badge {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clips .badge[data-state="post"] { color: #5ad18a; }
+
+.clips .badge[data-state="fix"] { color: var(--accent); }
+
+.clips .badge[data-state="trashed"] { color: var(--muted); }
+
 .clips .span {
+  grid-column: 2 / 4;
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -252,6 +270,81 @@ video {
   left: 6px;
   width: 2px;
   background: rgb(0 0 0 / 0.5);
+}
+
+.judge {
+  display: grid;
+  gap: 6px;
+  max-width: 640px;
+  margin-top: 16px;
+}
+
+.judge label { color: var(--muted); font-size: 12px; }
+
+.judge input,
+.judge textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.judge textarea { resize: vertical; }
+
+.judge input:focus,
+.judge textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.judge-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.judge-actions button {
+  min-width: 96px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.judge-notice {
+  min-height: 1.45em;
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.judge-notice.error { color: var(--error); }
+
+.judge-actions .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #111;
+}
+
+.judge-actions .danger:hover,
+.judge-actions .danger.armed {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.judge-actions .danger.armed { background: rgb(255 107 107 / 0.12); }
+
+.judge-actions button:disabled,
+.judge input:disabled,
+.judge textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .warn { color: var(--error); }

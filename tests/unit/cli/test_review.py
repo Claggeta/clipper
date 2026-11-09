@@ -4,11 +4,18 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner, Result
 
+from clipper.adapters.results.labels_json import save_labels
 from clipper.adapters.results.manifest_json import save_manifest
+from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.cli.context import AppContext
 from clipper.cli.main import app
 from clipper.domain.errors import MediaProbeError, ReviewError
-from clipper.domain.models import ManifestClip, MediaInfo, RenderManifest
+from clipper.domain.models import (
+    LabeledVideo,
+    ManifestClip,
+    MediaInfo,
+    RenderManifest,
+)
 from clipper.review.server import DEFAULT_PORT, ReviewSession
 
 # All fixtures here are constructed, not produced by a real render run.
@@ -62,6 +69,10 @@ class Env:
         self.video.write_bytes(b"video")
         self.cache = tmp_path / "cache"
         monkeypatch.setenv("CLIPPER_CACHE_DIR", str(self.cache))
+        self.labels_dir = tmp_path / "labels"
+        monkeypatch.setenv("CLIPPER_LABELS_DIR", str(self.labels_dir))
+        self.picks = self.labels_dir / "picks" / "talk.json"
+        self.files = JsonReviewFiles()
         self.probe = FakeProbe()
         self.frames = FakeFrames()
         self.calls: list[tuple[ReviewSession, int, bool]] = []
@@ -81,7 +92,10 @@ class Env:
 
     def run(self, *extra: str) -> Result:
         context = AppContext(
-            probe=lambda: self.probe, frames=lambda: self.frames, serve=self.serve
+            probe=lambda: self.probe,
+            frames=lambda: self.frames,
+            review_files=lambda: self.files,
+            serve=self.serve,
         )
         return CliRunner().invoke(
             app, ["review", str(self.folder), *extra], obj=context
@@ -105,6 +119,9 @@ def test_serves_the_folder_with_the_video_from_the_videos_dir(env: Env) -> None:
     assert session.frames is env.frames
     # Named by the video's stem and its size, 5 bytes.
     assert session.frames_dir == env.cache / "frames" / "talk-5"
+    assert session.labels is None
+    assert session.labels_path == env.picks
+    assert session.files is env.files
     assert (port, open_browser) == (DEFAULT_PORT, True)
     assert env.probe.seen == [env.video]
     assert f"Review: http://127.0.0.1:{DEFAULT_PORT}/ (1 clip; Ctrl+C to stop)" in (
@@ -182,6 +199,46 @@ def test_video_without_a_picture(env: Env) -> None:
 
     assert result.exit_code == 1
     assert "has no video stream to show" in result.output
+
+
+def test_earlier_judgments_are_loaded(env: Env) -> None:
+    judged = LabeledVideo.model_validate(
+        {
+            "source": "talk.mp4",
+            "labels": [{"start": "0:01:00", "end": "0:01:45", "verdict": "post"}],
+        }
+    )
+    save_labels(judged, env.picks)
+
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    assert env.calls[0][0].labels == judged
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("{", "Invalid JSON in labels file"),
+        ('{"source": "other.mp4", "labels": []}', "is for 'other.mp4'"),
+        (
+            '{"source": "talk.mp4", "labels": [{"start": "0:01", "end": "0:02"}]}',
+            "labels without verdicts",
+        ),
+    ],
+    ids=["broken", "another video", "unjudged"],
+)
+def test_unusable_judged_labels_stop_before_serving(
+    env: Env, text: str, message: str
+) -> None:
+    env.picks.parent.mkdir(parents=True)
+    env.picks.write_text(text, encoding="utf-8")
+
+    result = env.run()
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert env.calls == []
 
 
 def test_server_error_is_reported(env: Env) -> None:

@@ -2227,8 +2227,10 @@ Covers `clipper review`
 amendment). The tests run the server on a free port with a small file, a fake
 frame extractor, and no browser. This section checks the page in a real
 browser on a real drafts folder, seeking in a multi-GB VOD, the film strip
-and handles, and the errors before the server starts. Only film strip frames
-are written, under `data\cache\frames\` (film strip amendment).
+and handles, Save and Trash, and the errors before the server starts. RV0 to
+RV6 write only film strip frames, under `data\cache\frames\` (film strip
+amendment); RV7 writes labels and a manifest and deletes a clip file, on a
+copy.
 
 ### RV0. Setup
 
@@ -2334,9 +2336,41 @@ With RV5's page open, on one clip:
    on past the end (seeking cancels the preview).
 5. A length under 15 s or over 90 s shows in red.
 6. Choose another clip and come back: the edit is kept. Reset returns to the
-   draft's span. Reloading the page drops edits (Save is item 3c).
+   draft's span. Reloading the page drops unsaved edits.
 
 Ctrl+C stops the server.
+
+### RV7. Save, Trash, title and notes
+
+Trash deletes a clip's file, so use a copy of a drafts folder, and keep the
+judged labels away from `data\labels\picks\` unless they are real
+judgments. The variable is set in a `cmd` child process only, so Ctrl+C
+cannot leave it set in your session:
+
+```powershell
+Copy-Item -Recurse $Folder data\clips\rv7-copy
+cmd /c "set CLIPPER_LABELS_DIR=data\rv7-labels&& uv run clipper review data\clips\rv7-copy --video data\videos\<source>"
+```
+
+1. Choose a clip. The title box holds the model's title (or is empty).
+   Change the title, type a note, press Save. Pass: `Saved as post.`, a
+   green POST badge in the list, the heading shows the new title.
+2. On another clip, move the end handle, press Save. Pass: `Saved as fix.`
+   and a yellow FIX badge. Change the note: `Unsaved` appears; Save again
+   clears it.
+3. Move a clip's start handle into the span of a clip saved in step 1 and
+   press Save. Pass: a red message `Overlaps the label ...`; nothing changes.
+4. On a third clip press Trash once: it reads `Confirm trash` and goes back
+   after 3 s. Press it twice. Pass: `Trashed; the clip's file is deleted.`,
+   a TRASHED badge, Save and the boxes disabled, and the clip's `.mp4` gone
+   from the folder.
+5. Reload the page. Pass: badges, titles, saved spans and notes come back.
+6. Stop the server. `data\rv7-labels\picks\<stem>.json` has the `post` and
+   `fix` labels (the fix with its `draft` span) and the rejected span, with
+   the notes; `data\clips\rv7-copy\manifest.json` has `reviewed`, the typed
+   title, and no `file` on the trashed clip.
+
+Then delete `data\clips\rv7-copy` and `data\rv7-labels`.
 
 ## Record your run
 

@@ -590,18 +590,34 @@ def test_manifest_clip_with_a_title_and_hook() -> None:
 
 
 @pytest.mark.parametrize(
-    ("fields", "message"),
+    "fields",
     [
-        ({"file": "a.mp4", "title": "T"}, "title and hook must be set together"),
-        ({"file": "a.mp4", "hook": "H"}, "title and hook must be set together"),
-        ({"error": "boom", "title": "T", "hook": "H"}, "need a rendered file"),
+        {"file": "a.mp4", "title": "Typed in review"},
+        {"file": "a.mp4", "hook": "H"},
+        {"error": "boom", "title": "T", "hook": "H"},
     ],
+    ids=["title alone", "hook alone", "on a failed clip"],
 )
-def test_manifest_clip_title_and_hook_go_together_on_a_file(
-    fields: dict[str, object], message: str
+def test_manifest_clip_title_and_hook_are_independent(
+    fields: dict[str, object],
 ) -> None:
-    with pytest.raises(ValidationError, match=message):
-        ManifestClip.model_validate(_entry(**fields))
+    # The review page edits the title alone (ADR 0018, review amendment).
+    ManifestClip.model_validate(_entry(**fields))
+
+
+@pytest.mark.parametrize("fields", [{}, {"error": "boom"}], ids=["clean", "failed"])
+def test_a_trashed_clip_has_no_file(fields: dict[str, object]) -> None:
+    clip = ManifestClip.model_validate(_entry(reviewed="trashed", **fields))
+    assert clip.file is None
+
+    with pytest.raises(ValidationError, match="a trashed clip has no file"):
+        ManifestClip.model_validate(_entry(reviewed="trashed", file="a.mp4"))
+
+
+def test_a_saved_clip_still_needs_a_file_or_an_error() -> None:
+    assert ManifestClip.model_validate(_entry(file="a.mp4", reviewed="saved"))
+    with pytest.raises(ValidationError, match="exactly one of file and error"):
+        ManifestClip.model_validate(_entry(reviewed="saved"))
 
 
 def test_clip_title_is_stripped() -> None:

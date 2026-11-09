@@ -1,3 +1,4 @@
+import http.client
 import json
 import threading
 import urllib.error
@@ -8,6 +9,9 @@ from pathlib import Path
 import pytest
 
 import clipper.review.server as server_module
+from clipper.adapters.results.labels_json import load_labels
+from clipper.adapters.results.manifest_json import load_manifest
+from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.domain.errors import ClipperError, FrameError, ReviewError
 from clipper.domain.models import ManifestClip, RenderManifest
 from clipper.review.server import (
@@ -18,6 +22,7 @@ from clipper.review.server import (
     clips_payload,
     frames_folder,
     make_server,
+    make_store,
     parse_range,
 )
 
@@ -73,13 +78,21 @@ class FakeFrames:
 def _session(tmp_path: Path, frames: FakeFrames | None = None) -> ReviewSession:
     video = tmp_path / "talk.mp4"
     video.write_bytes(VIDEO)
+    folder = tmp_path / "clips" / "talk"
+    folder.mkdir(parents=True, exist_ok=True)
+    for clip in MANIFEST.clips:
+        if clip.file is not None:
+            (folder / clip.file).write_bytes(b"clip")
     return ReviewSession(
-        folder=tmp_path,
+        folder=folder,
         manifest=MANIFEST,
         video=video,
         duration_seconds=600.0,
         frames=frames or FakeFrames(),
         frames_dir=tmp_path / "cache" / "frames" / "talk-1024",
+        labels=None,
+        labels_path=tmp_path / "labels" / "picks" / "talk.json",
+        files=JsonReviewFiles(),
     )
 
 
@@ -119,7 +132,8 @@ def test_unsatisfiable_ranges(header: str, size: int) -> None:
 
 
 def test_payload_clamps_each_range_to_the_video(tmp_path: Path) -> None:
-    payload = clips_payload(_session(tmp_path))
+    session = _session(tmp_path)
+    payload = clips_payload(session, make_store(session))
 
     assert RANGE_SECONDS == 120.0
     assert payload["source"] == "talk.mp4"
@@ -140,6 +154,7 @@ def test_payload_clamps_each_range_to_the_video(tmp_path: Path) -> None:
     assert clips[0]["hook"] == "A hook."
     assert clips[2]["file"] is None
     assert clips[2]["error"] == "ffmpeg failed"
+    assert [(c["reviewed"], c["judgment"]) for c in clips] == [(None, None)] * 3
 
 
 @pytest.fixture
@@ -160,9 +175,11 @@ def base_url(tmp_path: Path, frames: FakeFrames) -> Iterator[str]:
 
 
 def _get(
-    url: str, headers: dict[str, str] | None = None
+    url: str,
+    headers: dict[str, str] | None = None,
+    body: bytes | None = None,
 ) -> tuple[int, dict[str, str], bytes]:
-    request = urllib.request.Request(url, headers=headers or {})
+    request = urllib.request.Request(url, data=body, headers=headers or {})
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
             return response.status, dict(response.headers), response.read()
@@ -264,6 +281,256 @@ def test_frames_outside_the_video_or_badly_named_are_not_found(
 ) -> None:
     assert _get(base_url + path)[0] == 404
     assert frames.calls == []
+
+
+# --- Save and Trash ---
+
+
+def _post(
+    base_url: str,
+    path: str,
+    data: object,
+    headers: dict[str, str] | None = None,
+    raw: bytes | None = None,
+) -> tuple[int, dict[str, object]]:
+    sent = {
+        "Content-Type": "application/json",
+        "Origin": base_url,
+        **(headers or {}),
+    }
+    body = raw if raw is not None else json.dumps(data).encode()
+    status, _, reply = _get(base_url + path, sent, body)
+    return status, json.loads(reply) if reply.startswith(b"{") else {}
+
+
+def _labels_path(tmp_path: Path) -> Path:
+    return tmp_path / "labels" / "picks" / "talk.json"
+
+
+def _folder(tmp_path: Path) -> Path:
+    return tmp_path / "clips" / "talk"
+
+
+def test_save_unchanged_writes_a_post_label_and_the_title(
+    base_url: str, tmp_path: Path
+) -> None:
+    status, clip = _post(
+        base_url,
+        "/api/clips/1/save",
+        {"start": 60.0, "end": 105.0, "title": " Ron at the pump ", "note": "good"},
+    )
+
+    assert status == 200
+    assert clip["reviewed"] == "saved"
+    assert clip["title"] == "Ron at the pump"
+    assert clip["hook"] == "A hook."
+    assert clip["judgment"] == {
+        "verdict": "post",
+        "start": 60.0,
+        "end": 105.0,
+        "note": "good",
+    }
+    [label] = load_labels(_labels_path(tmp_path)).labels
+    assert (label.verdict, label.start_seconds, label.end_seconds) == (
+        "post",
+        60.0,
+        105.0,
+    )
+    saved = load_manifest(_folder(tmp_path)).clips[0]
+    assert (saved.reviewed, saved.title, saved.file) == (
+        "saved",
+        "Ron at the pump",
+        "talk_1.mp4",
+    )
+
+
+def test_save_with_moved_handles_writes_a_fix_with_the_draft(
+    base_url: str, tmp_path: Path
+) -> None:
+    status, clip = _post(base_url, "/api/clips/2/save", {"start": 398.5, "end": 446.25})
+
+    assert status == 200
+    [label] = load_labels(_labels_path(tmp_path)).labels
+    assert label.verdict == "fix"
+    assert (label.start_seconds, label.end_seconds) == (398.5, 446.25)
+    assert label.draft is not None
+    assert (label.draft.start_seconds, label.draft.end_seconds) == (400.0, 440.0)
+    assert label.note is None
+    # An empty title box clears the title.
+    assert clip["title"] is None
+
+
+def test_saving_again_replaces_the_clips_label(base_url: str, tmp_path: Path) -> None:
+    _post(base_url, "/api/clips/1/save", {"start": 55.0, "end": 110.0})
+    _post(base_url, "/api/clips/1/save", {"start": 60.0, "end": 105.0, "note": "n"})
+
+    [label] = load_labels(_labels_path(tmp_path)).labels
+    assert (label.verdict, label.note) == ("post", "n")
+
+
+def test_a_span_over_another_clips_label_is_refused(
+    base_url: str, tmp_path: Path
+) -> None:
+    _post(base_url, "/api/clips/2/save", {"start": 400.0, "end": 440.0})
+
+    status, reply = _post(base_url, "/api/clips/1/save", {"start": 60.0, "end": 405.0})
+
+    assert status == 409
+    assert "Overlaps the label 0:06:40-0:07:20 (post)" in str(reply["error"])
+    assert len(load_labels(_labels_path(tmp_path)).labels) == 1
+
+
+def test_trash_deletes_the_file_and_writes_a_rejected_span(
+    base_url: str, tmp_path: Path
+) -> None:
+    status, clip = _post(base_url, "/api/clips/2/trash", {"note": "boring"})
+
+    assert status == 200
+    assert (clip["reviewed"], clip["file"]) == ("trashed", None)
+    assert clip["judgment"] == {"verdict": "trashed", "note": "boring"}
+    assert not (_folder(tmp_path) / "talk_2.mp4").exists()
+    labels = load_labels(_labels_path(tmp_path))
+    assert labels.labels == ()
+    assert [(r.start_seconds, r.note) for r in labels.rejected] == [(400.0, "boring")]
+    assert load_manifest(_folder(tmp_path)).clips[1].reviewed == "trashed"
+
+
+def test_trash_after_save_replaces_the_label(base_url: str, tmp_path: Path) -> None:
+    _post(base_url, "/api/clips/1/save", {"start": 50.0, "end": 105.0})
+    _post(base_url, "/api/clips/1/trash", {})
+
+    labels = load_labels(_labels_path(tmp_path))
+    assert labels.labels == ()
+    assert len(labels.rejected) == 1
+
+
+def test_a_failed_clip_can_be_trashed(base_url: str) -> None:
+    status, clip = _post(base_url, "/api/clips/3/trash", {})
+
+    assert status == 200
+    assert (clip["reviewed"], clip["error"]) == ("trashed", "ffmpeg failed")
+
+
+def test_saving_a_trashed_clip_is_refused(base_url: str) -> None:
+    _post(base_url, "/api/clips/2/trash", {})
+
+    status, reply = _post(base_url, "/api/clips/2/save", {"start": 400, "end": 440})
+
+    assert status == 409
+    assert "trashed" in str(reply["error"])
+
+
+def test_the_clip_list_shows_judgments_after_writes(base_url: str) -> None:
+    _post(base_url, "/api/clips/1/save", {"start": 60.0, "end": 100.0})
+    _post(base_url, "/api/clips/2/trash", {})
+
+    clips = json.loads(_get(base_url + "/api/clips")[2])["clips"]
+
+    assert [c["reviewed"] for c in clips] == ["saved", "trashed", None]
+    assert clips[0]["judgment"]["verdict"] == "fix"
+    assert clips[1]["judgment"]["verdict"] == "trashed"
+
+
+def test_an_unknown_rank_or_action_is_not_found(base_url: str) -> None:
+    assert _post(base_url, "/api/clips/9/save", {"start": 1, "end": 2})[0] == 404
+    assert _post(base_url, "/api/clips/1/delete", {})[0] == 404
+    assert _post(base_url, "/api/clips", {})[0] == 404
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        ([], "JSON object"),
+        ({"start": 60, "end": 60}, "end must be after the start"),
+        ({"start": -1, "end": 60}, "inside the video"),
+        ({"start": 60, "end": 601}, "inside the video"),
+        ({"start": True, "end": 60}, "start must be a number"),
+        ({"start": "60", "end": 90}, "start must be a number"),
+        ({"end": 90}, "start must be a number"),
+        ({"start": 60, "end": 90, "title": "a\nb"}, "one line"),
+        ({"start": 60, "end": 90, "title": "x" * 201}, "at most 200"),
+        ({"start": 60, "end": 90, "note": 5}, "note must be text"),
+    ],
+)
+def test_a_bad_save_body_is_a_bad_request(
+    base_url: str, tmp_path: Path, data: object, message: str
+) -> None:
+    status, reply = _post(base_url, "/api/clips/1/save", data)
+
+    assert status == 400
+    assert message in str(reply["error"])
+    assert not _labels_path(tmp_path).exists()
+
+
+def test_odd_bodies_are_bad_requests(base_url: str) -> None:
+    # Python's json reads NaN, which is no time.
+    raw = b'{"start": NaN, "end": 90}'
+    status, reply = _post(base_url, "/api/clips/1/save", None, raw=raw)
+    assert (status, reply["error"]) == (400, "start must be a number of seconds")
+
+    status, reply = _post(base_url, "/api/clips/1/trash", ["not", "an", "object"])
+    assert (status, reply["error"]) == (400, "the body must be a JSON object")
+
+
+def test_a_body_without_a_length_is_a_bad_request(base_url: str) -> None:
+    host = base_url.removeprefix("http://")
+    connection = http.client.HTTPConnection(host, timeout=5)
+    connection.putrequest("POST", "/api/clips/1/trash")
+    connection.putheader("Content-Type", "application/json")
+    connection.putheader("Origin", base_url)
+    connection.endheaders()
+    response = connection.getresponse()
+
+    assert response.status == 400
+    assert json.loads(response.read())["error"] == "a Content-Length is needed"
+    connection.close()
+
+
+def test_invalid_json_and_oversized_bodies_are_bad_requests(base_url: str) -> None:
+    status, reply = _post(base_url, "/api/clips/1/trash", None, raw=b"{nope")
+    assert (status, reply["error"]) == (400, "the body is not valid JSON")
+
+    status, reply = _post(base_url, "/api/clips/1/trash", None, raw=b" " * 70_000)
+    assert status == 400
+    assert "at most 65536 bytes" in str(reply["error"])
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Origin": "https://example.com"},
+        {"Origin": ""},
+        {"Content-Type": "text/plain"},
+        {"Content-Type": "application/x-www-form-urlencoded"},
+        {"Host": "evil.example"},
+    ],
+    ids=["other origin", "empty origin", "text", "form", "other host"],
+)
+def test_writes_from_anywhere_but_the_page_are_forbidden(
+    base_url: str, tmp_path: Path, headers: dict[str, str]
+) -> None:
+    status, reply = _post(base_url, "/api/clips/2/trash", {}, headers)
+
+    assert status == 403
+    assert reply["error"] == "Only the review page may write"
+    assert (_folder(tmp_path) / "talk_2.mp4").exists()
+
+
+def test_localhost_is_trusted_like_the_loopback_address(base_url: str) -> None:
+    port = base_url.rsplit(":", 1)[1]
+    origin = f"http://localhost:{port}"
+    headers = {"Host": f"localhost:{port}", "Origin": origin}
+
+    assert _post(base_url, "/api/clips/3/trash", {}, headers)[0] == 200
+
+
+def test_a_write_failure_is_a_server_error(base_url: str, tmp_path: Path) -> None:
+    _labels_path(tmp_path).mkdir(parents=True)
+
+    status, reply = _post(base_url, "/api/clips/1/save", {"start": 60, "end": 105})
+
+    assert status == 500
+    assert "Cannot write labels file" in str(reply["error"])
 
 
 def test_a_frame_failure_is_a_server_error(base_url: str, frames: FakeFrames) -> None:

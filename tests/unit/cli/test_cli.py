@@ -8,6 +8,7 @@ from clipper.adapters.detection.llm import LlmClipDetector
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.adapters.titles.ollama import OllamaTitleWriter
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.fake import FakeTranscriber
@@ -266,6 +267,7 @@ def test_the_default_context_composes_the_real_adapters() -> None:
     assert isinstance(context.renderer(settings), FfmpegClipRenderer)
     assert isinstance(context.probe(), FfprobeMediaProbe)
     assert isinstance(context.frames(), FfmpegFrameExtractor)
+    assert isinstance(context.review_files(), JsonReviewFiles)
     assert isinstance(context.title_writer(settings), OllamaTitleWriter)
 
 

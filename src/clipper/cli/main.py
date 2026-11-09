@@ -28,6 +28,7 @@ from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
 from clipper.core.evaluation import boundary_gaps, evaluate
 from clipper.core.interfaces import TitleWriter
+from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
@@ -730,8 +731,9 @@ def review(
     """Review a folder of drafts in a local browser page (docs/decisions/0024).
 
     The page plays the source video, with a film strip of frames cached
-    under the cache dir. It is served on the loopback address only, until
-    Ctrl+C.
+    under the cache dir. Save and Trash write judged labels to
+    <labels dir>/picks/<stem>.json and update the manifest; Trash deletes
+    the clip's file. It is served on the loopback address only, until Ctrl+C.
     """
     settings = Settings()
     build = _context(ctx)
@@ -747,6 +749,11 @@ def review(
         info = build.probe().probe(video)
         if not info.has_video:
             raise ReviewError(f"{video} has no video stream to show")
+        files = build.review_files()
+        labels_path = judged_labels_path(settings.labels_dir, manifest.source)
+        labels = files.load_labels(labels_path)
+        if labels is not None:
+            check_judged_labels(labels, manifest.source, labels_path)
         session = ReviewSession(
             folder=folder,
             manifest=manifest,
@@ -754,6 +761,9 @@ def review(
             duration_seconds=info.duration_seconds,
             frames=build.frames(),
             frames_dir=frames_folder(settings.cache_dir, video),
+            labels=labels,
+            labels_path=labels_path,
+            files=files,
         )
         build.serve(
             session,
