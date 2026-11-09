@@ -68,9 +68,12 @@ def is_own_label(label: Label, clip: ManifestClip) -> bool:
     """Whether `label` is the judgment of `clip`: found by the draft's span.
 
     A `post` label has the draft's span; a `fix` label keeps it in `draft`.
-    An `added` label belongs to no draft. The draft's span survives a
-    re-render in the manifest (`ManifestClip.draft_span`).
+    The draft's span survives a re-render in the manifest
+    (`ManifestClip.draft_span`). An `added` label belongs only to a clip
+    added in the page, whose draft span is its last saved span.
     """
+    if clip.added:
+        return label.verdict == "added" and same_span(_span(label), clip.draft_span)
     if label.verdict == "post":
         return same_span(_span(label), clip.draft_span)
     if label.verdict == "fix" and label.draft is not None:
@@ -79,8 +82,9 @@ def is_own_label(label: Label, clip: ManifestClip) -> bool:
 
 
 def is_own_rejection(span: RejectedSpan, clip: ManifestClip) -> bool:
-    """Whether a rejected span is the judgment of `clip`."""
-    return same_span(_span(span), clip.draft_span)
+    """Whether a rejected span is the judgment of `clip`; an added clip has
+    none, since Trash removes it outright."""
+    return not clip.added and same_span(_span(span), clip.draft_span)
 
 
 def _without_clip(
@@ -101,7 +105,8 @@ def save_judgment(
     end: float,
     note: str | None,
 ) -> LabeledVideo:
-    """The labels with `clip` saved as `post` (span unchanged) or `fix`.
+    """The labels with `clip` saved as `post` (span unchanged) or `fix`, or
+    as `added` for a clip added in the page, whatever its span.
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
     if the span overlaps another label: one label per moment.
@@ -115,7 +120,9 @@ def save_judgment(
                 "this span, or trash it as a duplicate"
             )
     fields: dict[str, object] = {**_times(start, end), "note": note}
-    if same_span(clip.draft_span, (start, end)):
+    if clip.added:
+        fields["verdict"] = "added"
+    elif same_span(clip.draft_span, (start, end)):
         fields["verdict"] = "post"
     else:
         fields["verdict"] = "fix"
@@ -138,6 +145,25 @@ def trash_judgment(
     )
     rejected.sort(key=lambda span: span.start_seconds)
     return LabeledVideo(source=source, labels=tuple(labels), rejected=tuple(rejected))
+
+
+def remove_judgment(
+    labeled: LabeledVideo | None, source: str, clip: ManifestClip
+) -> LabeledVideo:
+    """The labels without `clip`'s judgment: Trash on a clip added in the page."""
+    labels, rejected = _without_clip(labeled, clip)
+    return LabeledVideo(source=source, labels=tuple(labels), rejected=tuple(rejected))
+
+
+def next_rank(manifest: RenderManifest) -> int:
+    """The rank for a clip added in the page: after every clip so far."""
+    return max((clip.rank for clip in manifest.clips), default=0) + 1
+
+
+def drop_clip(manifest: RenderManifest, rank: int) -> RenderManifest:
+    """The manifest without clip `rank`."""
+    clips = tuple(clip for clip in manifest.clips if clip.rank != rank)
+    return manifest.model_copy(update={"clips": clips})
 
 
 def mark_clip(manifest: RenderManifest, rank: int, **changes: object) -> RenderManifest:

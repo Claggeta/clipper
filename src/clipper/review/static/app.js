@@ -1,6 +1,7 @@
 // The review page (ADR 0024). List the clips, play the source video
-// anywhere, trim with a film strip and two handles (3b), and Save or Trash
-// each clip with its title and notes (3c).
+// anywhere, trim with a film strip and two handles (3b), Save or Trash each
+// clip with its title and notes (3c), re-rendered on Save (3d), and add
+// clips no draft proposed (3e).
 "use strict";
 
 const player = document.getElementById("player");
@@ -23,11 +24,16 @@ const MIN_LENGTH = 15;
 const MAX_LENGTH = 90;
 // How long Trash waits for its confirming second click, in milliseconds.
 const CONFIRM_MS = 3000;
+// The strip's first view: a clip plus this much either side (the server's
+// RANGE_SECONDS, for clips made in the page).
+const RANGE_SECONDS = 120;
 
 let duration = 0;
 let current = null;
-const buttons = new Map(); // rank -> the clip's button in the list
-const edits = new Map(); // rank -> {start, end}, kept while the page is open
+// Keyed by `clip.key`: the rank, or `new-<n>` for a clip added in the page,
+// which keeps its key once Save gives it a rank.
+const buttons = new Map(); // key -> the clip's button in the list
+const edits = new Map(); // key -> {start, end}, kept while the page is open
 let trashArmed = null; // the timer while Trash waits for its second click
 let busy = false; // while a Save is waiting on the server (a re-render)
 let span = null; // the chosen clip's edited {start, end}
@@ -192,6 +198,7 @@ function drawUnsaved() {
   }
   const saved = savedState(current);
   const changed =
+    current.isNew ||
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
     titleBox.value.trim() !== saved.title ||
@@ -200,8 +207,14 @@ function drawUnsaved() {
 }
 
 function badgeText(clip) {
+  if (clip.isNew) {
+    return "New";
+  }
   if (clip.reviewed === "trashed") {
     return "Trashed";
+  }
+  if (clip.added) {
+    return "Added";
   }
   if (clip.judgment && clip.judgment.verdict === "fix") {
     return "Fix";
@@ -212,13 +225,24 @@ function badgeText(clip) {
   return "";
 }
 
+function clipName(clip) {
+  if (clip.title) {
+    return clip.title;
+  }
+  if (clip.isNew) {
+    return "New clip";
+  }
+  return clip.error && !clip.file ? "Render failed" : `Clip ${clip.rank}`;
+}
+
 function drawBadge(clip) {
-  const badge = buttons.get(clip.rank).querySelector(".badge");
+  const button = buttons.get(clip.key);
+  const badge = button.querySelector(".badge");
   badge.textContent = badgeText(clip);
   badge.dataset.state = badgeText(clip).toLowerCase();
-  const button = buttons.get(clip.rank);
+  button.querySelector(".rank").textContent = clip.isNew ? "+" : clip.rank;
   const name = button.querySelector(".name");
-  name.textContent = clip.title || (clip.error ? "Render failed" : `Clip ${clip.rank}`);
+  name.textContent = clipName(clip);
   name.classList.toggle("failed", Boolean(clip.error) && !clip.file);
   button.querySelector(".span").textContent = `${fmt(clip.start)} - ${fmt(clip.end)}`;
 }
@@ -241,11 +265,11 @@ function select(clip, button) {
   for (const other of list.querySelectorAll("button")) {
     other.setAttribute("aria-current", String(other === button));
   }
-  if (!edits.has(clip.rank)) {
+  if (!edits.has(clip.key)) {
     const saved = savedState(clip);
-    edits.set(clip.rank, { start: saved.start, end: saved.end });
+    edits.set(clip.key, { start: saved.start, end: saved.end });
   }
-  span = edits.get(clip.rank);
+  span = edits.get(clip.key);
   preview = null;
   disarmTrash();
   notice("");
@@ -383,7 +407,7 @@ function judgeNotice(message, failed = false) {
 function drawJudged(clip) {
   saveButton.disabled = busy;
   trashButton.disabled = busy || clip.reviewed === "trashed";
-  text("title", clip.title || `Clip ${clip.rank}`);
+  text("title", clipName(clip));
 }
 
 // Whether Save will re-render: the span differs from what the file covers,
@@ -437,12 +461,14 @@ saveButton.addEventListener("click", async () => {
   drawJudged(clip);
   judgeNotice(rendered ? "Re-rendering the clip; this takes a few seconds." : "");
   try {
-    const reply = await post(`/api/clips/${clip.rank}/save`, {
+    const path = clip.isNew ? "/api/clips/add" : `/api/clips/${clip.rank}/save`;
+    const reply = await post(path, {
       start: span.start,
       end: span.end,
       title: titleBox.value,
       note: noteBox.value,
     });
+    clip.isNew = false;
     judged(clip, reply);
     if (clip === current) {
       judgeNotice(...savedMessage(reply, rendered));
@@ -474,15 +500,92 @@ trashButton.addEventListener("click", async () => {
   }
   disarmTrash();
   const clip = current;
+  if (clip.isNew) {
+    removeClip(clip);
+    return;
+  }
   try {
     const reply = await post(`/api/clips/${clip.rank}/trash`, {
       note: noteBox.value,
     });
+    if (reply.removed !== undefined) {
+      removeClip(clip);
+      return;
+    }
     judged(clip, reply);
     judgeNotice("Trashed; the clip's file is deleted.");
   } catch (error) {
     judgeNotice(error.message, true);
   }
+});
+
+// Take a clip out of the list: an unsaved new one, or an added one the
+// server removed.
+function removeClip(clip) {
+  buttons.get(clip.key).closest("li").remove();
+  buttons.delete(clip.key);
+  edits.delete(clip.key);
+  if (clip === current) {
+    current = null;
+    span = null;
+    preview = null;
+    document.getElementById("details").hidden = true;
+    document.getElementById("empty").hidden = false;
+  }
+}
+
+// --- Add clip: a moment no draft proposed ---
+
+let newClips = 0;
+// How long a new clip starts out, in seconds; then set with the handles.
+const NEW_LENGTH = 30;
+
+function addListItem(clip) {
+  const item = document.createElement("li");
+  const button = document.createElement("button");
+  button.type = "button";
+  const rank = document.createElement("span");
+  rank.className = "rank";
+  const name = document.createElement("span");
+  name.className = "name";
+  const clipSpan = document.createElement("span");
+  clipSpan.className = "span";
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  button.append(rank, name, badge, clipSpan);
+  button.addEventListener("click", () => select(clip, button));
+  item.append(button);
+  list.append(item);
+  buttons.set(clip.key, button);
+  drawBadge(clip);
+  return button;
+}
+
+document.getElementById("add").addEventListener("click", () => {
+  const start = Math.min(Math.max(player.currentTime, 0), Math.max(duration - 1, 0));
+  const end = Math.min(start + NEW_LENGTH, duration);
+  newClips += 1;
+  const clip = {
+    key: `new-${newClips}`,
+    isNew: true,
+    added: true,
+    rank: null,
+    start,
+    end,
+    draft_start: start,
+    draft_end: end,
+    range_start: Math.max(start - RANGE_SECONDS, 0),
+    range_end: Math.min(end + RANGE_SECONDS, duration),
+    title: null,
+    model_title: null,
+    hook: null,
+    file: null,
+    error: null,
+    reviewed: null,
+    judgment: null,
+  };
+  select(clip, addListItem(clip));
+  judgeNotice("New clip: set the handles, then Save to render it.");
 });
 
 titleBox.addEventListener("input", drawUnsaved);
@@ -559,26 +662,9 @@ async function load() {
     }
   }
   for (const clip of data.clips) {
-    const item = document.createElement("li");
-    const button = document.createElement("button");
-    button.type = "button";
-    const rank = document.createElement("span");
-    rank.className = "rank";
-    rank.textContent = clip.rank;
-    const name = document.createElement("span");
-    name.className = clip.error ? "name failed" : "name";
-    name.textContent = clip.title || (clip.error ? "Render failed" : `Clip ${clip.rank}`);
-    const clipSpan = document.createElement("span");
-    clipSpan.className = "span";
-    clipSpan.textContent = `${fmt(clip.start)} - ${fmt(clip.end)}`;
-    const badge = document.createElement("span");
-    badge.className = "badge";
-    button.append(rank, name, badge, clipSpan);
-    button.addEventListener("click", () => select(clip, button));
-    item.append(button);
-    list.append(item);
-    buttons.set(clip.rank, button);
-    drawBadge(clip);
+    // The key stays the same when a new clip gets its rank on Save.
+    clip.key = clip.rank;
+    addListItem(clip);
   }
 }
 

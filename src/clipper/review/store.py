@@ -15,9 +15,12 @@ from pathlib import Path
 from clipper.core.captions import build_ass
 from clipper.core.interfaces import ClipRenderer, ReviewFiles
 from clipper.core.judging import (
+    drop_clip,
     is_own_label,
     is_own_rejection,
     mark_clip,
+    next_rank,
+    remove_judgment,
     same_span,
     save_judgment,
     trash_judgment,
@@ -33,6 +36,8 @@ from clipper.domain.models import (
 )
 
 MAX_TITLE = 200
+# The reason listed for a clip added in the page (ADR 0019, 3e amendment).
+ADDED_REASON = "added in review"
 
 
 class BadRequest(Exception):
@@ -178,50 +183,81 @@ class ReviewStore:
         its span; one without records the error.
         """
         with self._lock:
-            clip = self._clip(rank)
-            span = (request.start, request.end)
-            needs_render = clip.file is None or not same_span(
-                (clip.start_seconds, clip.end_seconds), span
-            )
-            candidate = ClipCandidate(
+            return self._save(self._clip(rank), request, self.manifest)
+
+    def add(self, request: SaveRequest) -> SaveResult:
+        """Save a moment no draft proposed as a new clip, ranked after the rest.
+
+        Its label is `added`; it is rendered like any Save. Nothing is written
+        if the span overlaps a label or its file name is taken.
+        """
+        with self._lock:
+            clip = ManifestClip(
+                rank=next_rank(self.manifest),
                 start_seconds=request.start,
                 end_seconds=request.end,
-                score=clip.score,
-                reasons=clip.reasons,
+                score=0.0,
+                reasons=(ADDED_REASON,),
+                # Replaced by the file, or by the render's own error.
+                error="not rendered yet",
+                added=True,
             )
-            name = clip_file_name(self._render.video, candidate)
-            if needs_render:
-                self._check_name(clip, name)
-            labels = save_judgment(
-                self.labels,
-                self.manifest.source,
-                clip,
-                request.start,
-                request.end,
-                request.note,
+            base = self.manifest.model_copy(
+                update={"clips": (*self.manifest.clips, clip)}
             )
-            self._files.save_labels(labels, self._labels_path)
-            self.labels = labels
+            return self._save(clip, request, base)
 
-            changes: dict[str, object] = {
-                "reviewed": "saved",
-                "title": request.title,
-                **_first_write(clip),
-            }
-            render_error = warning = None
-            if needs_render:
-                try:
-                    changes |= self._rerender(clip, candidate, name)
-                except ClipperError as exc:
-                    render_error = str(exc)
-                    if clip.file is None:
-                        changes["error"] = render_error
-                else:
-                    warning = self._delete_old(clip, name)
-            manifest = mark_clip(self.manifest, rank, **changes)
-            self._files.save_manifest(manifest, self._folder)
-            self.manifest = manifest
-            return SaveResult(self._clip(rank), render_error, warning)
+    def _save(
+        self, clip: ManifestClip, request: SaveRequest, base: RenderManifest
+    ) -> SaveResult:
+        """Save `clip` as listed in `base`; the caller holds the lock."""
+        span = (request.start, request.end)
+        needs_render = clip.file is None or not same_span(
+            (clip.start_seconds, clip.end_seconds), span
+        )
+        candidate = ClipCandidate(
+            start_seconds=request.start,
+            end_seconds=request.end,
+            score=clip.score,
+            reasons=clip.reasons,
+        )
+        name = clip_file_name(self._render.video, candidate)
+        if needs_render:
+            self._check_name(clip, name)
+        labels = save_judgment(
+            self.labels,
+            self.manifest.source,
+            clip,
+            request.start,
+            request.end,
+            request.note,
+        )
+        self._files.save_labels(labels, self._labels_path)
+        self.labels = labels
+
+        changes: dict[str, object] = {
+            "reviewed": "saved",
+            "title": request.title,
+            **_first_write(clip),
+        }
+        render_error = warning = None
+        if needs_render:
+            try:
+                changes |= self._rerender(clip, candidate, name)
+            except ClipperError as exc:
+                render_error = str(exc)
+                if clip.file is None:
+                    changes["error"] = render_error
+            else:
+                warning = self._delete_old(clip, name)
+        if clip.added:
+            # An added clip's own label is found by its last saved span.
+            changes["draft_start_seconds"] = request.start
+            changes["draft_end_seconds"] = request.end
+        manifest = mark_clip(base, clip.rank, **changes)
+        self._files.save_manifest(manifest, self._folder)
+        self.manifest = manifest
+        return SaveResult(self._clip(clip.rank), render_error, warning)
 
     def _check_name(self, clip: ManifestClip, name: str) -> None:
         for other in self.manifest.clips:
@@ -288,31 +324,44 @@ class ReviewStore:
             return f"Re-rendered, but the old file {clip.file} was not deleted: {exc}"
         return None
 
-    def trash(self, rank: int, note: str | None) -> ManifestClip:
+    def trash(self, rank: int, note: str | None) -> ManifestClip | None:
         """Write a rejected span, delete the clip's file, then mark it trashed.
 
+        A clip added in the page was never a draft, so it is removed instead:
+        its label, its file and its manifest entry; then None is returned.
         Each step can be repeated, so a Trash that failed part way (a file
         held open by a player on Windows) can be retried.
         """
         with self._lock:
             clip = self._clip(rank)
-            labels = trash_judgment(self.labels, self.manifest.source, clip, note)
+            source = self.manifest.source
+            if clip.added:
+                labels = remove_judgment(self.labels, source, clip)
+            else:
+                labels = trash_judgment(self.labels, source, clip, note)
             self._files.save_labels(labels, self._labels_path)
             self.labels = labels
-            if clip.file is not None:
-                if Path(clip.file).name != clip.file:
-                    raise ReviewError(f"Not deleting {clip.file!r}: not a file name")
-                try:
-                    (self._folder / clip.file).unlink(missing_ok=True)
-                except OSError as exc:
-                    raise ReviewError(f"Cannot delete {clip.file}: {exc}") from exc
-            manifest = mark_clip(
-                self.manifest,
-                rank,
-                reviewed="trashed",
-                file=None,
-                **_first_write(clip),
-            )
+            self._delete_file(clip)
+            if clip.added:
+                manifest = drop_clip(self.manifest, rank)
+            else:
+                manifest = mark_clip(
+                    self.manifest,
+                    rank,
+                    reviewed="trashed",
+                    file=None,
+                    **_first_write(clip),
+                )
             self._files.save_manifest(manifest, self._folder)
             self.manifest = manifest
-            return self._clip(rank)
+            return None if clip.added else self._clip(rank)
+
+    def _delete_file(self, clip: ManifestClip) -> None:
+        if clip.file is None:
+            return
+        if Path(clip.file).name != clip.file:
+            raise ReviewError(f"Not deleting {clip.file!r}: not a file name")
+        try:
+            (self._folder / clip.file).unlink(missing_ok=True)
+        except OSError as exc:
+            raise ReviewError(f"Cannot delete {clip.file}: {exc}") from exc

@@ -2395,6 +2395,31 @@ With RV7's copy served again (same `cmd /c` line):
    `draft_start_seconds`/`draft_end_seconds` (the draft) and
    `start_seconds`/`end_seconds` (its file).
 
+Keep the copy for RV9, then delete `data\clips\rv7-copy` and
+`data\rv7-labels`.
+
+### RV9. Add clip
+
+With RV7's copy served again (same `cmd /c` line):
+
+1. Seek to a moment no draft covers and press "Add clip here". Pass: a
+   `New clip` appears at the end of the list with a `+` and a NEW badge,
+   selected, its handles 30 s apart from the playhead; `Unsaved` shows.
+2. Set the handles and a title, press Save. Pass: `Rendering…`, then
+   `Saved as added; re-rendered.`; the clip gets the next rank and a blue
+   ADDED badge, and a new `.mp4` is in the folder. Reload: it is still
+   listed.
+3. Move a handle and Save again. Pass: still ADDED; the file is renamed for
+   the new span.
+4. Add another clip whose span overlaps a saved clip's, and Save. Pass:
+   `Overlaps the label ...`; it stays NEW.
+5. Trash that unsaved new clip (two clicks). Pass: it leaves the list; no
+   request is needed.
+6. Trash the added clip from step 2. Pass: it leaves the list and its
+   `.mp4` is gone.
+7. Stop the server. The labels file has no `added` label left and no
+   rejected span for it; `manifest.json` has no entry for it.
+
 Then delete `data\clips\rv7-copy` and `data\rv7-labels`.
 
 ## Record your run

@@ -54,8 +54,9 @@ _STATIC = {
 _FRAME_PATH = re.compile(r"/frames/(\d{1,7})\.jpg")
 # Frames never change for a given video, so the browser may keep them.
 _FRAME_CACHE = "max-age=86400"
-# A judgment on one clip: /api/clips/<rank>/save or /trash.
+# A judgment on one clip: /api/clips/<rank>/save or /trash; or a new clip.
 _ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash)")
+_ADD_PATH = "/api/clips/add"
 _MAX_BODY = 64 * 1024
 
 
@@ -174,6 +175,7 @@ def clip_payload(
         "draft_start": draft_start,
         "draft_end": draft_end,
         "model_title": clip.model_title if clip.reviewed else clip.title,
+        "added": clip.added,
         "range_start": max(clip.start_seconds - RANGE_SECONDS, 0.0),
         "range_end": min(clip.end_seconds + RANGE_SECONDS, session.duration_seconds),
         "title": clip.title,
@@ -225,25 +227,35 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
         def do_POST(self) -> None:
             path = self.path.split("?", 1)[0]
             action = _ACTION_PATH.fullmatch(path)
-            if action is None:
+            if path == _ADD_PATH:
+                rank, verb = 0, "add"
+            elif action is not None:
+                rank, verb = int(action.group(1)), action.group(2)
+            else:
                 self._not_found()
                 return
             if not self._trusted():
                 self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
                 return
-            rank, verb = int(action.group(1)), action.group(2)
-            extra: dict[str, object] = {}
+            reply: dict[str, object]
             try:
                 data = self._read_json()
-                if verb == "save":
-                    saved = store.save(rank, parse_save(data, session.duration_seconds))
-                    clip = saved.clip
-                    extra = {
+                if verb == "trash":
+                    trashed = store.trash(rank, parse_trash(data))
+                    if trashed is None:
+                        reply = {"removed": rank}
+                    else:
+                        reply = clip_payload(session, store, trashed)
+                else:
+                    request = parse_save(data, session.duration_seconds)
+                    if verb == "add":
+                        saved = store.add(request)
+                    else:
+                        saved = store.save(rank, request)
+                    reply = clip_payload(session, store, saved.clip) | {
                         "render_error": saved.render_error,
                         "warning": saved.warning,
                     }
-                else:
-                    clip = store.trash(rank, parse_trash(data))
             except BadRequest as exc:
                 self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             except UnknownClip:
@@ -253,7 +265,6 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             except (ClipperError, OSError) as exc:
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
             else:
-                reply = clip_payload(session, store, clip) | extra
                 self._send_json(HTTPStatus.OK, reply)
 
         def _trusted(self) -> bool:

@@ -144,6 +144,82 @@ def test_no_model_title_is_kept_as_none(tmp_path: Path) -> None:
     assert (clip.title, clip.model_title) == ("Typed", None)
 
 
+def test_add_saves_a_new_clip_ranked_after_the_drafts(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+
+    result = env.store.add(SaveRequest(100.0, 130.0, "Missed moment", "funny"))
+
+    clip = result.clip
+    assert (clip.rank, clip.added, clip.reviewed) == (2, True, "saved")
+    assert (clip.score, clip.reasons) == (0.0, ("added in review",))
+    assert (clip.file, clip.error, clip.title) == (
+        "talk_000140-000210.mp4",
+        None,
+        "Missed moment",
+    )
+    assert clip.draft_span == (100.0, 130.0)
+    assert (env.folder / "talk_000140-000210.mp4").exists()
+    [label] = load_labels(env.labels_path).labels
+    assert (label.verdict, label.draft, label.note) == ("added", None, "funny")
+    assert [c.rank for c in env.store.manifest.clips] == [1, 2]
+
+
+def test_saving_an_added_clip_again_keeps_added_and_moves_it(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.store.add(SaveRequest(100.0, 130.0, None, None))
+
+    clip = env.save(2, 95.0, 131.0)
+
+    assert (clip.start_seconds, clip.end_seconds) == (95.0, 131.0)
+    assert clip.draft_span == (95.0, 131.0)
+    [label] = load_labels(env.labels_path).labels
+    assert (label.verdict, label.start_seconds) == ("added", 95.0)
+    assert sorted(p.name for p in env.folder.iterdir()) == [
+        "manifest.json",
+        "talk_000135-000211.mp4",
+        "talk_1.mp4",
+    ]
+
+
+def test_an_add_over_a_label_writes_nothing(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.save(1, 10.0, 40.0)
+
+    with pytest.raises(JudgingError, match="Overlaps the label"):
+        env.store.add(SaveRequest(30.0, 60.0, None, None))
+
+    assert [c.rank for c in env.store.manifest.clips] == [1]
+    assert len(load_labels(env.labels_path).labels) == 1
+
+
+def test_an_added_clip_whose_render_fails_records_the_error(tmp_path: Path) -> None:
+    moved = ClipCandidate(
+        start_seconds=100.0, end_seconds=130.0, score=0.0, reasons=("added in review",)
+    )
+    env = Env(tmp_path, renderer=FakeClipRenderer(fail_on=[moved]))
+
+    result = env.store.add(SaveRequest(100.0, 130.0, None, None))
+
+    assert result.render_error is not None
+    assert (result.clip.file, result.clip.error) == (None, result.render_error)
+    assert load_labels(env.labels_path).labels[0].verdict == "added"
+
+
+def test_trash_removes_an_added_clip_outright(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.store.add(SaveRequest(100.0, 130.0, None, None))
+
+    assert env.store.trash(2, "changed my mind") is None
+
+    assert [c.rank for c in env.store.manifest.clips] == [1]
+    labels = load_labels(env.labels_path)
+    assert (labels.labels, labels.rejected) == ((), ())
+    assert sorted(p.name for p in env.folder.iterdir()) == [
+        "manifest.json",
+        "talk_1.mp4",
+    ]
+
+
 def test_a_re_render_under_the_same_name_replaces_the_file(tmp_path: Path) -> None:
     env = Env(tmp_path, _clip(1, 10.2, 39.8, "talk_000010-000040.mp4"))
 
@@ -243,7 +319,9 @@ def test_a_file_that_cannot_be_deleted_leaves_the_manifest_and_can_be_retried(
     assert store.manifest.clips[0].reviewed is None
 
     monkeypatch.setattr(Path, "unlink", real_unlink)
-    assert store.trash(1, "dull").reviewed == "trashed"
+    trashed = store.trash(1, "dull")
+    assert trashed is not None
+    assert trashed.reviewed == "trashed"
     assert len(store.labels.rejected if store.labels else ()) == 1
 
 

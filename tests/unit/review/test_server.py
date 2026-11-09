@@ -503,6 +503,46 @@ def test_a_failed_re_render_keeps_the_label_and_says_so(
     assert (_folder(tmp_path) / "talk_2.mp4").exists()
 
 
+def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) -> None:
+    status, clip = _post(
+        base_url,
+        "/api/clips/add",
+        {"start": 200.0, "end": 230.0, "title": "Missed", "note": "good"},
+    )
+
+    assert status == 200
+    assert (clip["rank"], clip["added"], clip["file"]) == (
+        4,
+        True,
+        "talk_000320-000350.mp4",
+    )
+    assert clip["judgment"] == {
+        "verdict": "added",
+        "start": 200.0,
+        "end": 230.0,
+        "note": "good",
+    }
+    assert (clip["render_error"], clip["model_title"]) == (None, None)
+    listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
+    assert [c["rank"] for c in listed] == [1, 2, 3, 4]
+
+    status, reply = _post(base_url, "/api/clips/4/trash", {})
+
+    assert (status, reply) == (200, {"removed": 4})
+    listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
+    assert [c["rank"] for c in listed] == [1, 2, 3]
+    assert not (_folder(tmp_path) / "talk_000320-000350.mp4").exists()
+
+
+def test_an_add_needs_a_good_body_and_the_page_itself(base_url: str) -> None:
+    status, reply = _post(base_url, "/api/clips/add", {"start": 30, "end": 20})
+    assert (status, reply["error"]) == (400, "the end must be after the start")
+
+    headers = {"Origin": "https://example.com"}
+    status, _ = _post(base_url, "/api/clips/add", {"start": 1, "end": 20}, headers)
+    assert status == 403
+
+
 def test_the_clip_list_shows_judgments_after_writes(base_url: str) -> None:
     _post(base_url, "/api/clips/1/save", {"start": 60.0, "end": 100.0})
     _post(base_url, "/api/clips/2/trash", {})

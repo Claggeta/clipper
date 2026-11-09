@@ -140,7 +140,8 @@ and planned code:
   Review amendment (V5 3c): `reviewed` (`saved`/`trashed`) per clip; a
   trashed clip has no file; Save leaves start and end until a re-render.
   Re-render amendment (V5 3d): start, end and file follow the new span, and
-  `draft_start_seconds`/`draft_end_seconds` keep the detector's.
+  `draft_start_seconds`/`draft_end_seconds` keep the detector's; `added`
+  marks a clip added in the page (V5 3e).
 - `0020` — `clipper fetch <url>`: one YouTube video or Twitch VOD per call,
   chosen by hand, via the yt-dlp program behind a `Downloader` Protocol.
   Both platforms' terms forbid downloading with a tool (quoted, read
@@ -211,6 +212,10 @@ and planned code:
   analysis for captions before serving; about 12 s per re-render; manual
   step RV8. Model title amendment: the page's first write keeps the
   model's title as `model_title`; Reset restores the draft's span and it.
+  Item 3e amendment: "Add clip here" from the playhead; Save writes an
+  `added` label (not `post`), renders it and appends a manifest entry
+  (`added: true`, ranked last, score 0); Trash removes an added clip
+  outright, with no rejected span; manual step RV9.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
