@@ -72,7 +72,11 @@ and planned code:
   a label at an overlap of half the shorter range (`HIT_FRACTION = 0.5`).
   Precision is one-to-one: in rank order each candidate claims the earliest
   unclaimed label it hits, and one on a claimed label is a repeat. Recall
-  counts labels with any hit.
+  counts labels with any hit. Twitch clips amendment: `clipper labels <links
+  file>` writes `<labels dir>/v<id>.json` from hand-collected clip links and
+  their "Watch full video" links; a clip spans `t - length` to `t` (`t` up to
+  4 s before the real end, on 4 clips), overlaps merge, `--force` to
+  overwrite. Precision against clips is a lower bound.
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
@@ -131,6 +135,9 @@ and planned code:
   `core/sources.py` before yt-dlp runs, `<videos dir>/<id>.mp4`
   (`CLIPPER_VIDEOS_DIR`, Twitch `v<number>`), `--ignore-config`, 1080p cap,
   no codec choice (YouTube gave AV1, which renders), an existing file reused.
+  Clip lookups amendment: `labels` reads clip metadata with yt-dlp
+  (`--skip-download`), one request per hand-listed clip, under the same
+  accepted risk; clips stay refused by `fetch`.
 - `0021` — GPU transcription measured and not adopted: the 5:04:01 stream
   took 593 s on the GPU (`int8_float16`) against 1,260 s on the CPU, but its
   transcript drifted (87.4% word match, far fewer `.` and `?`), and the
@@ -261,6 +268,12 @@ In progress:
   to 10 real target videos, noting which drafts would be posted, fixed or
   dropped, and writing label files for the moments worth clipping. V5 is
   scoped from those notes and `eval` on the new labels.
+- Labels from Twitch community clips (option B), done: ADR 0012 and 0020
+  amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
+  first labels, `data/labels/v2917438534.json` from 5 clips (links in
+  `data/labels/links/`). Heuristic `eval` on it: recall 0 of 5 at top 5, 1 of
+  5 at top 30 (precision 1 of 30). Five clips are a small sample; more clip
+  links per VOD make the numbers worth more.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -523,6 +536,13 @@ Later, not scheduled:
   every prompt tried, and some hooks misstate the speaker or may add details
   (ADR 0018's title prompt amendment). Next levers if the trial shows it
   often: a rewrite request for listed words, or another model.
+- `eval` ends with "Indicative only: one labeler, ..." even when the labels
+  come from Twitch clips, which many viewers made. Fix: word it by source, or
+  drop "one labeler"; how `eval` would know the source is undecided (a field
+  in the labels file, or the note prefix). Seen in manual step T5.
+- Manual steps D9 and D10 pipe `Invoke-Fetch` into
+  `Select-Object -Last N`, which does nothing: the helper returns the text as
+  one string. Fix: split the text into lines, or drop the pipe.
 - yt-dlp warns on every YouTube request that no JavaScript runtime was found
   and "some formats may be missing" (it asks for deno). Downloads worked in
   manual step D1. Revisit if YouTube downloads fail or lose formats (ADR 0020
