@@ -321,6 +321,73 @@ def test_label_ending_with_the_transcript_is_not_noted(env: Env) -> None:
     assert "Note:" not in env.run().output
 
 
+def _write_judged(env: Env) -> None:
+    # Constructed judged labels (ADR 0012, V5 amendment). CANDIDATES are
+    # 10-55, 100-145 and 200-245.
+    env.labels.write_text(
+        json.dumps(
+            {
+                "source": "talk.mp4",
+                "labels": [
+                    {
+                        "start": "0:10",
+                        "end": "0:58",
+                        "verdict": "fix",
+                        "draft": {"start": "0:10", "end": "0:55"},
+                        "note": "needs the reaction",
+                    },
+                    {"start": "1:40", "end": "2:25", "verdict": "post"},
+                ],
+                "rejected": [{"start": "5:00", "end": "5:45"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_judged_labels_report_keepers_gaps_and_unjudged(env: Env) -> None:
+    _write_judged(env)
+
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    assert "Verdict" in result.output
+    assert "unjudged" in result.output
+    assert (
+        "Judged: 2 on a keeper (1 as cut, 1 ends early, 0 start late), 0 repeats, "
+        "0 rejected, 1 unjudged"
+    ) in result.output
+    assert (
+        "End gap (label - candidate): median +1.5 s, +0.0 to +3.0 s over 2 keepers"
+    ) in result.output
+    assert (
+        "Start gap (label - candidate): median +0.0 s, +0.0 to +0.0 s over 2 keepers"
+    ) in result.output
+    assert "Note: 1 unjudged candidate; judge them before comparing" in (result.output)
+
+
+def test_a_candidate_on_a_rejected_span_is_judged(env: Env) -> None:
+    _write_judged(env)
+    env.detect([_c(10, 55, 0.9), _c(100, 145, 0.7), _c(300, 345, 0.5)])
+
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    assert "rejected" in result.output
+    assert "1 rejected, 0 unjudged" in result.output
+    assert "Note:" not in result.output
+
+
+def test_labels_without_verdicts_report_as_before(env: Env) -> None:
+    result = env.run()
+
+    assert result.exit_code == 0, result.output
+    assert "Verdict" not in result.output
+    assert "unjudged" not in result.output
+    assert "Judged:" not in result.output
+    assert "gap" not in result.output
+
+
 def test_real_heuristic_runs_end_to_end(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

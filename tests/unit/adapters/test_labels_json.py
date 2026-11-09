@@ -159,6 +159,37 @@ def test_saved_labels_use_the_hand_written_format(tmp_path: Path) -> None:
     assert "✨" in raw.decode("utf-8")
 
 
+def test_saved_judged_labels_keep_verdicts_drafts_and_rejected(
+    tmp_path: Path,
+) -> None:
+    # Constructed judged labels (ADR 0012, V5 amendment).
+    data = {
+        "source": "v1.mp4",
+        "labels": [
+            {
+                "start": "1:39:11",
+                "end": "1:39:55",
+                "verdict": "fix",
+                "draft": {"start": "1:39:11", "end": "1:39:49"},
+                "note": "needs the reaction",
+            },
+            {"start": "2:10:00", "end": "2:10:40", "verdict": "added"},
+            {"start": "5:24:04", "end": "5:24:49", "verdict": "post"},
+        ],
+        "rejected": [
+            {"start": "0:12:00", "end": "0:12:45", "note": "nothing happening"},
+            {"start": "0:12:10", "end": "0:12:55"},
+        ],
+    }
+    labeled = LabeledVideo.model_validate(data)
+    path = tmp_path / "v1.json"
+
+    save_labels(labeled, path)
+
+    assert json.loads(path.read_text(encoding="utf-8")) == data
+    assert load_labels(path) == labeled
+
+
 def test_save_labels_reports_a_write_failure(tmp_path: Path) -> None:
     blocker = tmp_path / "file"
     blocker.write_text("not a folder", encoding="utf-8")

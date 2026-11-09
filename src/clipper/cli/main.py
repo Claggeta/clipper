@@ -1,4 +1,5 @@
 import logging
+import statistics
 from pathlib import Path
 from typing import Annotated, NamedTuple
 
@@ -21,7 +22,7 @@ from clipper.adapters.results.manifest_json import save_manifest
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
-from clipper.core.evaluation import evaluate
+from clipper.core.evaluation import boundary_gaps, evaluate
 from clipper.core.interfaces import TitleWriter
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths
@@ -122,6 +123,41 @@ def _ratio(hit: int, total: int, noun: str, value: float | None) -> str:
     return f"{hit} of {_count(total, noun)} ({value:.0%})"
 
 
+def _report_judged(evaluation: Evaluation) -> None:
+    """Print how the candidates fall on judged labels (ADR 0012, V5 amendment)."""
+    gaps = boundary_gaps(evaluation)
+    ends_early = sum(gap.ends_early for gap in gaps)
+    starts_late = sum(gap.starts_late for gap in gaps)
+    as_cut = sum(not (gap.ends_early or gap.starts_late) for gap in gaps)
+    repeats = evaluation.repeats
+    unjudged = evaluation.candidates_unjudged
+    console.print(
+        f"Judged: {len(gaps)} on a keeper ({as_cut} as cut, {ends_early} "
+        f"{'ends' if ends_early == 1 else 'end'} early, {starts_late} "
+        f"{'starts' if starts_late == 1 else 'start'} late), "
+        f"{_count(repeats, 'repeat')}, {len(evaluation.on_rejected)} rejected, "
+        f"{unjudged} unjudged",
+        soft_wrap=True,
+    )
+    for name, values in (
+        ("End", [gap.end for gap in gaps]),
+        ("Start", [gap.start for gap in gaps]),
+    ):
+        if values:
+            console.print(
+                f"{name} gap (label - candidate): median "
+                f"{statistics.median(values):+.1f} s, {min(values):+.1f} to "
+                f"{max(values):+.1f} s over {_count(len(values), 'keeper')}",
+                soft_wrap=True,
+            )
+    if unjudged:
+        console.print(
+            f"[yellow]Note:[/yellow] {_count(unjudged, 'unjudged candidate')}; "
+            "judge them before comparing variants",
+            soft_wrap=True,
+        )
+
+
 def _report_evaluation(
     evaluation: Evaluation, transcript: Transcript, detector: str
 ) -> None:
@@ -133,9 +169,12 @@ def _report_evaluation(
         hits.setdefault(candidate_index, []).append(label_index + 1)
     matched_by = {label: candidate for label, candidate in evaluation.matches}
     matched = set(matched_by.values())
+    on_rejected = set(evaluation.on_rejected)
 
     def hits_cell(index: int) -> str:
         numbers = hits.get(index, [])
+        if not numbers and evaluation.judged:
+            return "rejected" if index in on_rejected else "unjudged"
         if index in matched or not numbers:
             return ", ".join(str(number) for number in numbers) or "-"
         return ", ".join(
@@ -143,16 +182,22 @@ def _report_evaluation(
         )
 
     labels = Table(title=f"Labels: {escape(evaluation.source)}")
-    for column in ("#", "Start", "End", "Hit by", "Note"):
+    columns = ["#", "Start", "End", "Hit by", "Note"]
+    if evaluation.judged:
+        columns.insert(3, "Verdict")
+    for column in columns:
         labels.add_column(column)
     for index, label in enumerate(evaluation.labels):
-        labels.add_row(
+        row = [
             str(index + 1),
             _fmt(label.start_seconds),
             _fmt(label.end_seconds),
             ", ".join(f"#{rank}" for rank in hit_by.get(index, [])) or "-",
             escape(label.note or ""),
-        )
+        ]
+        if evaluation.judged:
+            row.insert(3, label.verdict or "")
+        labels.add_row(*row)
     console.print(labels)
 
     candidates = Table(title="Candidates")
@@ -207,6 +252,8 @@ def _report_evaluation(
         ),
         soft_wrap=True,
     )
+    if evaluation.judged:
+        _report_judged(evaluation)
     console.print(
         f"Indicative only: one labeler, 1 video, {_count(n_labels, 'label')} "
         "(ADR 0012).",

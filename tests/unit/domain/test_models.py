@@ -290,6 +290,115 @@ def test_labeled_video_rejects_unknown_keys() -> None:
         LabeledVideo.model_validate({"source": "a.mp4", "labels": [], "video": "x"})
 
 
+# Judged labels (ADR 0012, V5 amendment), constructed.
+
+
+def _judged(**fields: object) -> Label:
+    return Label.model_validate({"start": "1:00", "end": "1:45", **fields})
+
+
+def test_label_without_a_verdict_has_none() -> None:
+    label = _label("0:00", "0:50")
+    assert (label.verdict, label.draft) == (None, None)
+
+
+@pytest.mark.parametrize("verdict", ["post", "added"])
+def test_post_and_added_labels_have_no_draft(verdict: str) -> None:
+    assert _judged(verdict=verdict).verdict == verdict
+    with pytest.raises(ValidationError, match='only a "fix" label has a "draft"'):
+        _judged(verdict=verdict, draft={"start": "1:00", "end": "1:40"})
+
+
+def test_fix_label_keeps_the_draft_span() -> None:
+    label = _judged(verdict="fix", draft={"start": "1:00", "end": "1:40"})
+    assert label.draft is not None
+    assert (label.draft.start_seconds, label.draft.end_seconds) == (60.0, 100.0)
+
+
+def test_fix_label_needs_a_draft() -> None:
+    with pytest.raises(ValidationError, match='needs the draft\'s span in "draft"'):
+        _judged(verdict="fix")
+
+
+def test_fix_label_must_move_the_span() -> None:
+    with pytest.raises(ValidationError, match="must differ from its draft"):
+        _judged(verdict="fix", draft={"start": "1:00", "end": "1:45.0001"})
+
+
+def test_draft_without_a_verdict_is_rejected() -> None:
+    with pytest.raises(ValidationError, match='only a "fix" label has a "draft"'):
+        _judged(draft={"start": "1:00", "end": "1:40"})
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"verdict": "keep"},
+        {"verdict": "fix", "draft": {"start": "1:40", "end": "1:00"}},
+        {"verdict": "fix", "draft": {"start": "1:00", "end": "1:40", "x": "y"}},
+    ],
+)
+def test_bad_verdict_or_draft_is_rejected(fields: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        _judged(**fields)
+
+
+def _judged_video(
+    labels: list[dict[str, object]], rejected: list[dict[str, object]]
+) -> LabeledVideo:
+    return LabeledVideo.model_validate(
+        {"source": "v1.mp4", "labels": labels, "rejected": rejected}
+    )
+
+
+def test_judged_video_with_rejected_spans() -> None:
+    video = _judged_video(
+        [{"start": "1:00", "end": "1:45", "verdict": "post"}],
+        [
+            {"start": "0:30", "end": "1:15", "note": "the other half"},
+            {"start": "5:00", "end": "5:45"},
+            {"start": "5:10", "end": "5:55"},
+        ],
+    )
+    assert video.judged
+    assert [span.start_seconds for span in video.rejected] == [30.0, 300.0, 310.0]
+    assert video.rejected[0].note == "the other half"
+
+
+def test_rejected_spans_alone_make_a_judged_file() -> None:
+    assert _judged_video([], [{"start": "0:30", "end": "1:15"}]).judged
+
+
+def test_a_file_without_verdicts_is_not_judged() -> None:
+    assert not _video(_label("0:00", "0:50")).judged
+    assert not _video().judged
+
+
+def test_verdicts_on_some_labels_only_are_rejected() -> None:
+    with pytest.raises(ValidationError, match="labels.1 has no verdict"):
+        _judged_video(
+            [
+                {"start": "1:00", "end": "1:45", "verdict": "post"},
+                {"start": "2:00", "end": "2:45"},
+            ],
+            [],
+        )
+
+
+def test_rejected_spans_need_verdicts() -> None:
+    with pytest.raises(ValidationError, match="need a verdict on every label"):
+        _judged_video(
+            [{"start": "1:00", "end": "1:45"}], [{"start": "0:30", "end": "1:15"}]
+        )
+
+
+def test_rejected_spans_must_be_ordered_by_start() -> None:
+    with pytest.raises(ValidationError, match="rejected.1 starts before rejected.0"):
+        _judged_video(
+            [], [{"start": "5:00", "end": "5:45"}, {"start": "0:30", "end": "1:15"}]
+        )
+
+
 @pytest.mark.parametrize(
     ("seconds", "text"),
     [
@@ -394,6 +503,40 @@ def test_evaluation_rejects_hits_out_of_range(
 ) -> None:
     with pytest.raises(ValidationError, match=message):
         _evaluation((hit,))
+
+
+def _with(judged: bool, on_rejected: tuple[int, ...]) -> Evaluation:
+    plain = _evaluation(((0, 0),), ((0, 0),))
+    return Evaluation(
+        source=plain.source,
+        labels=plain.labels,
+        candidates=plain.candidates,
+        hits=plain.hits,
+        matches=plain.matches,
+        judged=judged,
+        on_rejected=on_rejected,
+    )
+
+
+def test_evaluation_counts_unjudged_only_for_judged_labels() -> None:
+    assert _evaluation(((0, 0),), ((0, 0),)).candidates_unjudged == 0
+    assert _with(True, (1,)).candidates_unjudged == 1
+    assert _with(True, ()).candidates_unjudged == 2
+
+
+@pytest.mark.parametrize(
+    ("judged", "on_rejected", "message"),
+    [
+        (True, (3,), "candidate 3, which does not exist"),
+        (True, (0,), "candidate 0 hits a label"),
+        (False, (1,), "on_rejected needs judged labels"),
+    ],
+)
+def test_evaluation_rejects_bad_on_rejected(
+    judged: bool, on_rejected: tuple[int, ...], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        _with(judged, on_rejected)
 
 
 def test_evaluation_is_immutable() -> None:
