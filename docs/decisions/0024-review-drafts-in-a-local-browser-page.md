@@ -151,6 +151,24 @@ until the drafts rarely need editing.
   manifest each failed with their `Error:` line. The page in a browser (RV1)
   was not checked: the browser extension was not connected.
 
+## Amended by the whole-VOD PR (V5 item 3a follow-up)
+
+- **The player and the handles cover the whole video**, not the clip plus
+  120 s: the maintainer asked to set a start or end anywhere in the VOD.
+  Supersedes the range in decisions 2, 3 and 7 and the 3a page's pause at
+  the end of the range. That pause was also a defect: seeking past the range
+  and pressing Play snapped back to its end, and Play there paused at once
+  (RV1, run by the maintainer).
+- **Step buttons** under the player move the playhead by -15, -5, -1, +1,
+  +5 and +15 s, clamped to the video. They move the playhead, not the
+  handles; 3b's handles are planned to take the playhead's time.
+- **`range_start` and `range_end` stay in `/api/clips`** as the film strip's
+  starting view (planned for 3b: the clip plus 120 s, with zoom and pan; a
+  strip over 5 hours is about 10 s per pixel). The page no longer shows the
+  range.
+- The (-) consequence that Add clip only reaches moments within 2 minutes of
+  a draft no longer holds.
+
 ## Related
 
 - 0011: render's failure policy

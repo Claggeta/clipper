@@ -2250,10 +2250,11 @@ Pass: it prints `Review: http://127.0.0.1:8765/ (N clips; Ctrl+C to stop)`
 and opens the page. The page is dark, names the source and the folder's
 flags, and lists every clip with its rank, title (or `Clip N`) and span; a
 failed clip is red. Clicking a clip jumps the player to its start and shows
-its title, hook, span, length and range (the clip plus 2 minutes either side,
-clamped to the video). Seeking far ahead and back plays within a second or
-two. Played on, the video stops at the end of the range. Ctrl+C stops the
-server.
+its title, hook, span and length. Seeking far ahead (an hour past the clip)
+and back plays within a second or two, and Play there plays from that point
+with no jump back. Each step button (-15, -5, -1, +1, +5, +15 s) moves the
+playhead by that much, playing or paused; -15 s near the start stops at
+0:00:00 and +15 s near the end stops at the end. Ctrl+C stops the server.
 
 ### RV2. Range requests on the real file
 

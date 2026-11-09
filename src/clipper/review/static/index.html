@@ -18,13 +18,20 @@
     </nav>
     <main class="main">
       <video id="player" src="/video" controls preload="metadata"></video>
+      <div class="steps" aria-label="Step">
+        <button type="button" data-step="-15">−15 s</button>
+        <button type="button" data-step="-5">−5 s</button>
+        <button type="button" data-step="-1">−1 s</button>
+        <button type="button" data-step="1">+1 s</button>
+        <button type="button" data-step="5">+5 s</button>
+        <button type="button" data-step="15">+15 s</button>
+      </div>
       <section id="details" class="details" hidden>
         <h2 id="title"></h2>
         <p id="hook" class="muted"></p>
         <dl class="times">
           <div><dt>Clip</dt><dd id="clip-span"></dd></div>
           <div><dt>Length</dt><dd id="clip-length"></dd></div>
-          <div><dt>Range</dt><dd id="range-span"></dd></div>
         </dl>
         <p id="error" class="error" hidden></p>
       </section>

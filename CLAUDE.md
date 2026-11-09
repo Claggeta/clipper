@@ -180,7 +180,10 @@ and planned code:
   seeking, `SO_REUSEADDR` off on Windows (it let two servers share a port),
   a fixed list of paths, the video from `<videos dir>/<manifest source>` or
   `--video`, code in `src/clipper/review/` composed by `cli/` through
-  `AppContext.serve`; manual steps RV0 to RV4.
+  `AppContext.serve`; manual steps RV0 to RV4. Whole-VOD amendment: the
+  player and handles cover the whole video, not the clip plus 120 s (the
+  pause at the range's end also broke Play), with -15 to +15 s step
+  buttons; `range_start`/`range_end` stay as 3b's starting strip view.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
