@@ -1,0 +1,7 @@
+# Twitch community clips from jasontheween's stream, VOD 2922695332.
+# Collected by hand by the maintainer, 2026-11-09. Per line: the clip and its
+# "Watch full video" link (ADR 0012, Twitch clips amendment).
+https://www.twitch.tv/jasontheween/clip/EmpathicEvilSlothBCWarrior-Qq0vCn2RNwc0Uxxw?range=7d https://www.twitch.tv/videos/2922695332?t=0h29m21s
+https://www.twitch.tv/jasontheween/clip/SavoryBlueCatBCouch-iLlbTsSOhvfHeyW2?range=7d https://www.twitch.tv/videos/2922695332?t=1h18m27s
+https://www.twitch.tv/jasontheween/clip/GiftedBoredLlamaPraiseIt-FINIK8mz8XeMX-G4?range=7d https://www.twitch.tv/videos/2922695332?t=5h31m2s
+https://www.twitch.tv/jasontheween/clip/UninterestedExcitedEelOhMyDog-bN49ZTnOCa6wLpEu?range=7d https://www.twitch.tv/videos/2922695332?t=5h38m24s

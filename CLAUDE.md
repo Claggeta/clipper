@@ -273,8 +273,12 @@ In progress:
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
   `data/labels/links/`). Heuristic `eval` on it: recall 0 of 5 at top 5, 1 of
   5 at top 30 (precision 1 of 30). LLM (`qwen3.5:9b`): 0 of 5 at top 5
-  (822 s) and at top 30. Five clips are a small sample; more clip links per
-  VOD make the numbers worth more.
+  (822 s) and at top 30. Second VOD, `v2922695332.json` (4 clips, from the
+  maintainer's first trial `drafts` run): 0 of 4 for both detectors at top 5
+  and top 30; two of its clips have almost no speech. Over 9 clips the
+  heuristic found 1 at top 30, the LLM none: the strongest evidence so far
+  for a non-transcript signal (V5 picking). Small samples; more clip links
+  per VOD make the numbers worth more.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -541,7 +545,8 @@ Later, not scheduled:
   (`sliding_windows`), so a window with little speech becomes a candidate
   only as long as that speech. On v2917438534 the LLM's top candidate was
   2:37:54-2:37:55, the one word "Strongest" (0.5 s), scored 1.00, and two
-  more top-30 candidates were 9 s. Fix: a minimum candidate length or word
+  more top-30 candidates were 9 s. On v2922695332, 8 of the LLM's top 30
+  were under 15 s, three of them about 1 s, two in its top 5. Fix: a minimum candidate length or word
   count before scoring, for both detectors; the threshold is unmeasured.
   Changes which moments are picked, so it needs an ADR 0014 amendment and
   `eval` results.
