@@ -272,7 +272,8 @@ In progress:
   - 2026-11-09, VOD 2922695332 (jasontheween, 6:31), `drafts` with the
     heuristic: drafts 4 (1:39:11-1:39:49, "Why He Never Asked Her Out") and
     5 (5:24:04-5:24:49, "The Best Part About Japan") are the best to post;
-    1 to 3 not chosen, reasons not given. Neither pick overlaps a community
+    1 to 3 dropped as boring moments, nothing happening: a picking failure,
+    not a cut or title one. Neither pick overlaps a community
     clip, so by the maintainer's judgment the top 5 had 2 worth posting
     where the clip labels count 0.
 - Labels from Twitch community clips (option B), done: ADR 0012 and 0020
