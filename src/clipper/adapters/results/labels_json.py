@@ -1,10 +1,17 @@
+import json
 import os
 from pathlib import Path
 
 from pydantic import ValidationError
 
+from clipper.core.labeling import parse_links
 from clipper.domain.errors import LabelsError
-from clipper.domain.models import AnalysisResult, LabeledVideo
+from clipper.domain.models import (
+    AnalysisResult,
+    ClipLink,
+    LabeledVideo,
+    format_timestamp,
+)
 
 
 def load_labels(path: Path) -> LabeledVideo:
@@ -29,6 +36,41 @@ def load_labels(path: Path) -> LabeledVideo:
         raise LabelsError(
             f"{path} is not a valid labels file: {location}: {first['msg']}{more}"
         ) from exc
+
+
+def save_labels(labeled: LabeledVideo, path: Path) -> None:
+    """Write a labels file in the hand-written format, times as "H:MM:SS".
+
+    Overwrites `path`; the caller decides whether that is allowed.
+    """
+    labels = []
+    for label in labeled.labels:
+        entry = {
+            "start": format_timestamp(label.start_seconds),
+            "end": format_timestamp(label.end_seconds),
+        }
+        if label.note is not None:
+            entry["note"] = label.note
+        labels.append(entry)
+    text = json.dumps(
+        {"source": labeled.source, "labels": labels}, indent=2, ensure_ascii=False
+    )
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8", newline="\n")
+    except OSError as exc:
+        raise LabelsError(f"Cannot write labels file {path}: {exc}") from exc
+
+
+def load_links(path: Path) -> list[ClipLink]:
+    """Read a links file of Twitch clips. See docs/decisions/0012."""
+    if not path.is_file():
+        raise LabelsError(f"Links file not found: {path}")
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise LabelsError(f"Cannot read links file {path}: {exc}") from exc
+    return parse_links(text, str(path))
 
 
 def check_labels_match(labeled: LabeledVideo, result: AnalysisResult) -> None:

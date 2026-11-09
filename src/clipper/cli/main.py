@@ -11,17 +11,23 @@ from clipper.adapters.results.analysis_json import (
     check_source_matches,
     load_analysis_result,
 )
-from clipper.adapters.results.labels_json import check_labels_match, load_labels
+from clipper.adapters.results.labels_json import (
+    check_labels_match,
+    load_labels,
+    load_links,
+    save_labels,
+)
 from clipper.adapters.results.manifest_json import save_manifest
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
 from clipper.core.evaluation import evaluate
 from clipper.core.interfaces import TitleWriter
+from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.sources import parse_video_url, video_path
-from clipper.domain.errors import ClipperError, ClipRenderError
+from clipper.domain.errors import ClipperError, ClipRenderError, LabelsError
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
@@ -589,3 +595,55 @@ def eval_(
     evaluation = evaluate(labeled, candidates)
     label = _detector_label(settings, detector)
     _report_evaluation(evaluation, result.transcript, f"{label} (top {settings.top_n})")
+
+
+@app.command()
+def labels(
+    ctx: typer.Context,
+    links_file: Annotated[
+        Path,
+        typer.Argument(
+            help="Links file: a clip URL and its VOD URL with ?t= per line."
+        ),
+    ],
+    force: Annotated[
+        bool, typer.Option("--force", help="Replace an existing labels file.")
+    ] = False,
+) -> None:
+    """Write a labels file for one Twitch VOD from its community clips.
+
+    Each line of LINKS_FILE is a clip URL and the clip's "Watch full video"
+    URL; `t` marks the clip's end. Clip titles and lengths are read with
+    yt-dlp, without downloading, which is against Twitch's terms of service
+    (see docs/decisions/0020). Overlapping clips merge into one label
+    (docs/decisions/0012).
+    """
+    settings = Settings()
+    build = _context(ctx)
+    try:
+        links = load_links(links_file)
+        vod = links[0].vod
+        target = settings.labels_dir / f"{vod.video_id}.json"
+        if target.exists() and not force:
+            raise LabelsError(f"{target} already exists; pass --force to replace it")
+        lookup = build.clip_lookup(settings)
+        infos = []
+        for index, link in enumerate(links, start=1):
+            info = lookup.lookup(link.clip_id)
+            console.print(
+                f"Clip {index} of {len(links)}: {escape(info.title)} "
+                f"({info.duration_seconds:g} s, ends {_fmt(link.end_seconds)})",
+                soft_wrap=True,
+            )
+            infos.append(info)
+        labeled = clip_labels(video_path(vod, Path()).name, links, infos)
+        save_labels(labeled, target)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+
+    minutes = sum(label.duration_seconds for label in labeled.labels) / 60
+    console.print(f"Clips read: {len(links)}")
+    console.print(f"Labels after merging: {len(labeled.labels)}")
+    console.print(f"Minutes covered: {minutes:.1f}")
+    console.print(f"Saved: {escape(str(target))}", soft_wrap=True)

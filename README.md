@@ -5,7 +5,8 @@ AI-assisted tool that finds clip-worthy moments in long-form video.
 **Status:** V1 to V4 work locally as a command-line tool (v0.4.0).
 `clipper drafts` takes a YouTube or Twitch URL, or a local file, to a folder of
 vertical clips with word-by-word captions and a suggested title and hook for
-each. `fetch`, `analyze`, `render` and `eval` are also separate commands.
+each. `fetch`, `analyze`, `render` and `eval` are also separate commands, and
+`labels` turns a Twitch VOD's community clips into a labels file for `eval`.
 Posting, uploads and analytics are not built.
 
 ## What it does
@@ -32,8 +33,9 @@ comes next.
 - [ffmpeg](https://ffmpeg.org) available on your PATH, with `ffprobe` (it
   ships with ffmpeg). Check with `ffmpeg -version`. Captions need a build that
   includes libass.
-- For `fetch` only: [yt-dlp](https://github.com/yt-dlp/yt-dlp) on your PATH,
-  e.g. `uv tool install yt-dlp`, then `uv tool update-shell` once.
+- For `fetch`, `drafts` from a URL, and `labels` only:
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp) on your PATH, e.g.
+  `uv tool install yt-dlp`, then `uv tool update-shell` once.
 
 The first run downloads the Whisper model, so it needs network access once.
 
@@ -233,6 +235,40 @@ check, not a measurement.
 A bad or missing file, or labels written for a different video, prints
 `Error: ...` and exits 1.
 
+### Labels from Twitch clips
+
+For a Twitch VOD, the moments viewers clipped can stand in for hand labels.
+List each clip's link and its "Watch full video" link (a VOD URL with `?t=`)
+in a links file, one clip per line, with `#` comments allowed:
+
+```text
+# data\labels\links\v1234567890.txt (constructed example)
+https://www.twitch.tv/somechannel/clip/SomeClipName-AbC123 https://www.twitch.tv/videos/1234567890?t=4h36m45s
+https://clips.twitch.tv/OtherClipName-XyZ789 https://www.twitch.tv/videos/1234567890?t=1h44m34s
+```
+
+```powershell
+uv run clipper labels data\labels\links\v1234567890.txt
+```
+
+This writes `<labels dir>/v<VOD number>.json`, the same format as above, for
+`v<VOD number>.mp4`, the name `fetch` gives the VOD. Each clip's title and
+length are read with yt-dlp, without downloading. `t` marks where a clip ends,
+so a clip covers `t` minus its length to `t`; measured on four clips, `t` was
+up to 4 s before the real end. Overlapping clips merge into one label whose
+note lists their titles. The command prints each clip, then the clips read,
+the labels after merging, the minutes covered and the path.
+
+Every line must name the same VOD; a bad line prints `Error:` with the file
+and line number, before anything is looked up. An existing labels file is
+not replaced unless you pass `--force`. Like `fetch`, reading Twitch with a
+tool is against its terms of service
+([ADR 0020](docs/decisions/0020-fetch-a-video-by-url.md)).
+
+Clips show what viewers reacted to, not every moment worth cutting, so
+precision against them is a lower bound; read recall first. See
+[ADR 0012](docs/decisions/0012-evaluate-detectors-against-hand-labels.md).
+
 ## Configuration
 
 Settings are read from environment variables. A `.env` file is not read.
@@ -246,7 +282,7 @@ repo root or set absolute paths.
 | `CLIPPER_CACHE_DIR`    | `data/cache`  | Where transcripts are cached           |
 | `CLIPPER_OUTPUT_DIR`   | `data/output` | Where result JSON is written           |
 | `CLIPPER_CLIPS_DIR`    | `data/clips`  | Where rendered clips are written       |
-| `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files    |
+| `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files, and `labels` writes them |
 | `CLIPPER_VIDEOS_DIR`   | `data/videos` | Where `fetch` saves downloaded videos  |
 | `CLIPPER_LLM_URL`      | `http://127.0.0.1:11434` | Ollama server for `--detector llm` |
 | `CLIPPER_LLM_MODEL`    | `qwen3.5:9b`  | Ollama model for `--detector llm`      |

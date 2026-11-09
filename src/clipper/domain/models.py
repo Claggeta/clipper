@@ -155,6 +155,31 @@ class VideoSource(BaseModel):
     video_id: str = Field(min_length=1)
 
 
+class ClipLink(BaseModel):
+    """One line of a links file: a Twitch clip and its VOD link's `t`.
+
+    `end_seconds` is `t`, which marks the clip's end in the VOD to within 4 s
+    (docs/decisions/0012, Twitch clips amendment). `clip_id` is the clip's
+    slug, the same for every URL form of one clip.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    line: int = Field(ge=1)
+    clip_id: str = Field(min_length=1)
+    vod: VideoSource
+    end_seconds: float = Field(gt=0)
+
+
+class ClipInfo(BaseModel):
+    """A Twitch clip's title and length, read from its metadata."""
+
+    model_config = ConfigDict(frozen=True)
+
+    title: str
+    duration_seconds: float = Field(gt=0, allow_inf_nan=False)
+
+
 class ClipTitle(BaseModel):
     """A suggested title and hook for one clip. See docs/decisions/0018.
 
@@ -246,6 +271,19 @@ def _parse_timestamp(value: object) -> float:
     if hours is not None and (len(minutes) != 2 or int(minutes) >= 60):
         raise ValueError(_TIMESTAMP_HINT)
     return int(hours or 0) * 3600 + int(minutes) * 60 + float(seconds)
+
+
+def format_timestamp(seconds: float) -> str:
+    """Write seconds as "H:MM:SS", with milliseconds only when they are not zero.
+
+    The inverse of the labels file's timestamp parsing, to the millisecond.
+    """
+    millis = round(seconds * 1000)
+    whole, fraction = divmod(millis, 1000)
+    minutes, secs = divmod(whole, 60)
+    hours, minutes = divmod(minutes, 60)
+    text = f"{hours:d}:{minutes:02d}:{secs:02d}"
+    return f"{text}.{fraction:03d}".rstrip("0") if fraction else text
 
 
 class Label(BaseModel):

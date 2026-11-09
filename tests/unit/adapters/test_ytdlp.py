@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from clipper.adapters.download.ytdlp import YtDlpDownloader
-from clipper.core.interfaces import Downloader
+from clipper.adapters.download.ytdlp import YtDlpClipLookup, YtDlpDownloader
+from clipper.core.interfaces import ClipLookup, Downloader
 from clipper.domain.errors import DownloadError
-from clipper.domain.models import VideoSource
+from clipper.domain.models import ClipInfo, VideoSource
 
 # Constructed ID and stderr; nothing here ran the real yt-dlp.
 _SOURCE = VideoSource(platform="youtube", video_id="abcDEF123_-")
@@ -100,3 +100,84 @@ def test_exit_zero_without_a_file_raises(
     monkeypatch.setattr(subprocess, "run", _fake_run(calls, write=False))
     with pytest.raises(DownloadError, match="exited 0 but wrote no file.*live"):
         YtDlpDownloader().download(_SOURCE, tmp_path)
+
+
+# Clip lookups. Constructed clip ID and JSON; the real output's shape was
+# checked by hand (`-J` on a clips.twitch.tv URL gave title and duration).
+
+
+def _fake_json_run(
+    calls: list[tuple[list[str], dict[str, object]]],
+    stdout: str,
+    code: int = 0,
+    stderr: str = "",
+) -> object:
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, code, stdout, stderr)
+
+    return run
+
+
+def test_clip_lookup_satisfies_protocol() -> None:
+    assert isinstance(YtDlpClipLookup(), ClipLookup)
+
+
+@pytest.mark.usefixtures("on_path")
+def test_clip_lookup_reads_title_and_duration_without_downloading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    stdout = '{"id": "1", "title": "Big moment \\u2728", "duration": 29.5}'
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
+
+    info = YtDlpClipLookup().lookup("FunnyClip-x")
+
+    assert info == ClipInfo(title="Big moment ✨", duration_seconds=29.5)
+    command, kwargs = calls[0]
+    assert command == [
+        "yt-dlp",
+        "--ignore-config",
+        "--skip-download",
+        "--dump-single-json",
+        "https://clips.twitch.tv/FunnyClip-x",
+    ]
+    assert kwargs["capture_output"] is True
+
+
+def test_clip_lookup_missing_program_raises() -> None:
+    with pytest.raises(DownloadError, match="not found on PATH.*uv tool install"):
+        YtDlpClipLookup(executable="definitely-not-yt-dlp").lookup("FunnyClip-x")
+
+
+@pytest.mark.usefixtures("on_path")
+def test_clip_lookup_nonzero_exit_reports_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stderr = "ERROR: [twitch:clips] FunnyClip-x: This clip is no longer available\n"
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, "", 1, stderr))
+    with pytest.raises(DownloadError, match=r"^yt-dlp failed \(exit 1\): .*no longer"):
+        YtDlpClipLookup().lookup("FunnyClip-x")
+
+
+@pytest.mark.usefixtures("on_path")
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        "",
+        "not json",
+        "[]",
+        '{"title": "x"}',
+        '{"title": "x", "duration": null}',
+        '{"title": "x", "duration": 0}',
+        '{"duration": 30}',
+    ],
+)
+def test_clip_lookup_unusable_json_raises(
+    monkeypatch: pytest.MonkeyPatch, stdout: str
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
+    with pytest.raises(DownloadError, match="no usable title and duration for clip"):
+        YtDlpClipLookup().lookup("FunnyClip-x")
