@@ -275,6 +275,41 @@ maintainer's own judgment of which moments in a video are worth cutting.
   post hit no clip. Over five VODs, 25 clips: the heuristic found 1 at top 5
   and 3 at top 30, the LLM 1 at top 30.
 
+## Amended by the V5 scope (labels from judged drafts)
+
+Over the trial week the maintainer would post 11 of 20 heuristic drafts on
+four VODs, and none of the 11 overlaps a Twitch clip. Clip labels are a weak
+stand-in for "worth posting"; the maintainer's own verdicts are the reference
+V5 measures picking against.
+
+- **A third label source: judged drafts.** The maintainer judges drafts in
+  the review page (0024). Each judgment is `post` (as cut), `fix` (with the
+  span the maintainer set) or a drop. `post` and `fix` are labels with an
+  optional note; drops are rejected spans. A `fix` label keeps the span the
+  draft had, so the seconds dragged at each end can be reported.
+- **Kept apart from clip labels**: judged labels live in
+  `data/labels/picks/<stem>.json`, chosen with `CLIPPER_LABELS_DIR` (in a
+  child process) or the labels path, so one file never mixes sources.
+- **Pooled judging.** A judged-labels file holds verdicts on drafts from any
+  detector or variant: the union of each one's top 10 on the trial VODs. A
+  candidate is judged once; a new variant adds only the candidates nobody
+  judged yet. Labels from one detector's drafts alone would give that
+  detector full marks by construction.
+- **What `eval` reports on a judged-labels file**: candidates on `post` or
+  `fix` labels, candidates on rejected spans, and **unjudged** candidates,
+  on neither. Unjudged candidates are judged before two variants are
+  compared, since today any non-hit counts as a miss. Also reported: keepers
+  cut short (a candidate ending before its label's end) and the seconds
+  dragged at each end.
+- **Unchanged**: the hit rule (`HIT_FRACTION = 0.5`), one-to-one precision,
+  and clip labels as a secondary check on the same VODs.
+- **Caveats.** Verdicts exist only near what some detector proposed (Add
+  clip reaches 2 minutes either side of a draft, 0024), so recall against
+  judged labels is relative to the pool, not to the whole VOD. One labeler,
+  a handful of VODs: results are counts per VOD, read as indicative.
+- The file format, how a candidate hits a rejected span, and the tolerance
+  for "cut short" are decided in V5 item 2.
+
 ## Related
 
 - 0013: detector choice on the CLI
