@@ -583,10 +583,11 @@ Items 8 and 9 do not depend on picking and may land earlier.
 1. ~~ADRs and scope (one docs PR): the V5 scope and list in CLAUDE.md, ADR
    0012 amendment (judged labels), ADR 0023 (boundaries), ADR 0024 (review
    page).~~ (done; #126)
-2. Judged labels: the file format (`post`, `fix` with the draft's original
+2. ~~Judged labels: the file format (`post`, `fix` with the draft's original
    span, rejected spans, notes) in `data/labels/picks/`, and `eval`
    reporting unjudged candidates, keepers cut short and seconds dragged.
-   ADR 0012 amendment.
+   ADR 0012 amendment.~~ (done; #128; verdicts `post`, `fix`, `added`, and
+   gaps at each end in place of seconds dragged)
 3. `clipper review` (ADR 0024), in PRs:
    - 3a. Server, clip list and a player on the source video over the clip
      plus 120 s either side. Decides the HTTP server (standard library or a
