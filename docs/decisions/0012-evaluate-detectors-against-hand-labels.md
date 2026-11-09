@@ -178,6 +178,55 @@ maintainer's own judgment of which moments in a video are worth cutting.
 - Labels longer than two windows stay unreachable as whole moments. Proposing
   longer clips is a detector question (item 7 or later), not a metric one.
 
+## Amended by labels from Twitch community clips
+
+- **A second label source: Twitch community clips.** Viewers clip the moments
+  they react to. The maintainer collects, by hand, each clip's link and its
+  "Watch full video" link, a VOD URL with `?t=`, into a links file, one clip
+  per line: `<clip url> <vod url>`, `#` comments. `clipper labels <links
+  file>` turns it into an ordinary labels file,
+  `<CLIPPER_LABELS_DIR>/v<id>.json` with `source` `v<id>.mp4`. Every line must
+  name the same VOD. Nothing else changes: `eval` reads the file like a
+  hand-written one.
+- **Span rule: `t - length` to `t`.** The clip's length and title come from
+  yt-dlp's clip metadata, with no download. That metadata has no VOD ID or
+  offset, so the link's `t` is the only position. Measured on 4 clips
+  (2026-11-03 and 2026-11-09) by matching each clip's frames against a
+  downloaded VOD section (4 fps, 64x36 grey, mean absolute difference, a clear
+  minimum each time): `t` was 0, 0.5, 0.75 and 3.75 s before the clip's real
+  end, never after it. So `t` marks the end to within 4 s, and a label may sit
+  up to 4 s early. The 3.75 s case was confirmed against a second, differently
+  cut section; its cause is unknown. Twitch's API calls its `vod_offset` the
+  start, which is a different number. The error is not corrected or padded:
+  a 30 s label 4 s early still overlaps its moment by 26 s, a hit needs half
+  the shorter range, and padding would lengthen labels and make them easier to
+  hit. A start before 0 is clamped to 0.
+- **Rejected ways to place a clip**: the clip's creation time minus its length
+  (18 s late on the one clip tried), and the Twitch API (a registered app and
+  a token, for a number the link already gives). Not reopened.
+- **Merge rule.** Overlapping spans, in time order, merge into one label,
+  transitively, so a chain of overlapping clips becomes one long label.
+  Touching spans stay separate, as touching labels are allowed. The note lists
+  the merged clips' titles (`Twitch clips: <title>; <title>`). A repeated clip
+  link is an error, as a likely pasting mistake. The command prints clips
+  read, labels after merging, minutes covered and the path, so a long merged
+  label shows.
+- **An existing labels file is not overwritten** without `--force`, since
+  label files are the project's hand-made data. Links files live in
+  `data/labels/links/` and are committed with the labels, like them.
+- **Caveats.**
+  - Clips are biased toward popular moments and say nothing about the rest,
+    so the labels are incomplete: precision is a lower bound and recall is
+    read first (the long-video amendment above).
+  - Audience reaction is not the same as what the maintainer would post. The
+    labels measure "did the detector find what viewers clipped", not "did it
+    find the maintainer's clips".
+  - Clips cannot be both a detector input and the labels for the same videos.
+    If a detector ever uses clips or other audience signals, it is evaluated
+    on videos whose clips it did not see.
+  - Reading clip metadata with yt-dlp falls under ADR 0020's accepted risk
+    (its amendment for clip lookups).
+
 ## Related
 
 - 0013: detector choice on the CLI

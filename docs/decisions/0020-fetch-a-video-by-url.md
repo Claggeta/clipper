@@ -172,6 +172,21 @@ the clips are good enough to use.
   candidates. yt-dlp warned on every YouTube request that no JavaScript
   runtime was found ("some formats may be missing"); downloads still worked.
 
+## Amended by labels from Twitch community clips
+
+- `clipper labels <links file>` (ADR 0012, its amendment for Twitch clips)
+  asks yt-dlp for each listed clip's metadata, its length and title, with
+  `--skip-download`. This is automated access to Twitch, so it falls under
+  the risk decision 6 and the consequences accept, not outside it.
+- It keeps to decision 2 in spirit: every clip link is chosen and pasted by
+  the maintainer, one metadata request per listed clip, and nothing is
+  listed, searched or crawled. Clipper does not look up a channel's or a
+  VOD's clips; the links file is the only input.
+- Decision 3 holds: `--ignore-config`, no cookies or logins.
+- Clip URLs stay refused by `fetch`. Clips are not downloaded by Clipper;
+  the downloads that checked the span rule were manual, in a scratch folder,
+  and deleted.
+
 ## Revisit when
 
 - Either platform's terms change, or an account receives a warning.
@@ -188,5 +203,6 @@ the clips are good enough to use.
 
 - 0003: Pin transcription dependencies (why yt-dlp is not a library here)
 - 0004: ffmpeg error reporting (the subprocess error pattern)
-- 0012: hand labels; its "Most replayed" idea also depends on YouTube's terms
+- 0012: hand labels; its "Most replayed" idea also depends on YouTube's terms,
+  and its Twitch-clips amendment reads clip metadata with yt-dlp
 - 0019: A folder per video (named by stem, which `fetch` keeps as the ID)
