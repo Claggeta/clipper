@@ -266,6 +266,14 @@ maintainer's own judgment of which moments in a video are worth cutting.
   every score 0.85 to 0.95). The maintainer would post 1 of the 5 heuristic
   drafts, and it hits no clip. Over four VODs, 19 clips: the heuristic found
   1 at top 30, the LLM none.
+- Fifth VOD, 2924046310 (ohnepixel, 4:03:00 by the transcript, `drafts` on
+  2026-11-09): 6 clips gave 6 labels of 18 to 60 s, 3.2 minutes. Heuristic:
+  recall 1 of 6 at top 5 (precision 1 of 5) and 2 of 6 at top 30 (precision
+  2 of 30). LLM, once at top 30 (707 s): 0 of 6 in its top 5, 1 of 6 at top
+  30 (precision 1 of 30). The heuristic's top-5 hit is a draft the
+  maintainer would not post as cut (no context); the 3 drafts they would
+  post hit no clip. Over five VODs, 25 clips: the heuristic found 1 at top 5
+  and 3 at top 30, the LLM 1 at top 30.
 
 ## Related
 
