@@ -79,8 +79,12 @@ and planned code:
   overwrite. Precision against clips is a lower bound. V5 amendment: judged
   drafts are the main reference, in `data/labels/picks/` apart from clip
   labels: `post`, `fix` (with the maintainer's span) or a rejected span,
-  pooled over every variant's top 10; `eval` reports unjudged candidates,
-  keepers cut short and seconds dragged. Format decided in V5 item 2.
+  pooled over every variant's top 10. Item 2 amendment: optional `verdict`
+  (`post`, `fix` with a required `draft` span, `added`) and `rejected`
+  spans in the same file, all labels judged or none; a candidate is on a
+  label, else rejected, else unjudged; `eval` reports the gap (label minus
+  candidate) at each end instead of seconds dragged, and a keeper ends
+  early or starts late past `CUT_SHORT_SECONDS = 1.0`.
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),

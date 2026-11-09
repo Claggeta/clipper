@@ -310,6 +310,69 @@ V5 measures picking against.
 - The file format, how a candidate hits a rejected span, and the tolerance
   for "cut short" are decided in V5 item 2.
 
+## Amended by the judged labels PR (V5 item 2)
+
+- **Format.** The same labels file, with optional fields, so existing files
+  load unchanged:
+
+  ```json
+  {
+    "source": "v2917872953.mp4",
+    "labels": [
+      {"start": "1:39:11", "end": "1:39:55", "verdict": "fix",
+       "draft": {"start": "1:39:11", "end": "1:39:49"}, "note": "..."},
+      {"start": "2:10:00", "end": "2:10:40", "verdict": "added"},
+      {"start": "5:24:04", "end": "5:24:49", "verdict": "post"}
+    ],
+    "rejected": [{"start": "0:12:00", "end": "0:12:45", "note": "..."}]
+  }
+  ```
+
+- **Three verdicts.** `post` is a draft as cut. `fix` is a draft whose span
+  was moved; `draft` holds the span it had, is required, and must differ from
+  the label's span. `added` is a moment no draft proposed (Add clip, 0024).
+  Only `fix` has a `draft`.
+- **Judged or not, never mixed.** A file has a verdict on every label or on
+  none. Rejected spans need verdicts, so a clip-labels file cannot gain
+  them by accident. A judged file is one with a verdict or a rejected span
+  (`LabeledVideo.judged`).
+- **Rejected spans** are ordered by start and may overlap each other (two
+  variants' drafts of one dropped moment) and the labels (the dropped half
+  of a split moment). Labels still may not overlap each other: a later
+  variant's draft on a kept moment is judged through that label.
+- **Classification.** With the same hit rule, each candidate is on a label
+  (matched or a repeat, as before), else **rejected** if it hits a rejected
+  span, else **unjudged**. A label wins over a rejected span. Files without
+  verdicts report exactly as before.
+- **Gaps, not seconds dragged.** A `fix` label's drag describes the draft
+  that was shown, so it cannot say where a changed detector's candidate
+  ends. `eval` reports, for each candidate matched to a judged label, the
+  **gap**: label start minus candidate start, and label end minus candidate
+  end (`boundary_gaps` in `core/evaluation.py`). For the run that made the
+  draft it equals the drag; after a boundary change (0023) it is the
+  before-and-after measure. `draft` stays in the file as the record of what
+  was shown.
+- **Cut short.** A keeper **ends early** when its end gap is over
+  `CUT_SHORT_SECONDS = 1.0`, a module constant beside `HIT_FRACTION`, and
+  **starts late** when its label starts more than 1 s before it. A drag on
+  a slider is good to about half a second, and the trial asked for "a couple
+  of seconds" more. "As cut" is neither.
+- **Report**, for judged files only: a Verdict column in the labels table;
+  `rejected` or `unjudged` in place of `-` in the candidates table; then
+
+  ```
+  Judged: 6 on a keeper (4 as cut, 2 end early, 0 start late), 1 repeat, 3 rejected, 1 unjudged
+  End gap (label - candidate): median +0.8 s, -0.5 to +6.2 s over 6 keepers
+  Start gap (label - candidate): median +0.0 s, -1.0 to +0.3 s over 6 keepers
+  Note: 1 unjudged candidate; judge them before comparing variants
+  ```
+
+  (illustrative numbers). Recall and precision lines are unchanged; recall
+  on a judged file is relative to the pool.
+- No new setting or option: a judged file is chosen by the labels path or
+  `CLIPPER_LABELS_DIR=data/labels/picks`. `save_labels` writes the new
+  fields, for the review page (0024). Nothing writes verdicts yet.
+
 ## Related
 
 - 0013: detector choice on the CLI

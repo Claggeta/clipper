@@ -1,6 +1,12 @@
 import pytest
 
-from clipper.core.evaluation import HIT_FRACTION, evaluate, is_hit
+from clipper.core.evaluation import (
+    CUT_SHORT_SECONDS,
+    HIT_FRACTION,
+    boundary_gaps,
+    evaluate,
+    is_hit,
+)
 from clipper.domain.models import ClipCandidate, Label, LabeledVideo
 
 
@@ -136,3 +142,94 @@ def test_nothing_at_all() -> None:
     assert result.hits == ()
     assert result.recall is None
     assert result.precision is None
+
+
+# Judged labels (ADR 0012, V5 amendment).
+
+
+def _judged(
+    labels: list[dict[str, object]], rejected: list[dict[str, object]] | None = None
+) -> LabeledVideo:
+    # Constructed judged labels, not the maintainer's verdicts.
+    return LabeledVideo.model_validate(
+        {"source": "talk.mp4", "labels": labels, "rejected": rejected or []}
+    )
+
+
+def test_cut_short_tolerance_is_one_second() -> None:
+    assert CUT_SHORT_SECONDS == 1.0
+
+
+def test_labels_without_verdicts_are_not_judged() -> None:
+    result = evaluate(_video(_l("0:00", "0:30")), [_c(0.0, 30.0), _c(100.0, 145.0)])
+
+    assert not result.judged
+    assert result.matches == ((0, 0),)
+    assert result.on_rejected == ()
+    assert result.candidates_unjudged == 0
+    assert boundary_gaps(result) == []
+
+
+def test_candidates_fall_on_a_label_a_rejected_span_or_neither() -> None:
+    labeled = _judged(
+        [{"start": "1:00", "end": "1:45", "verdict": "post"}],
+        [{"start": "0:30", "end": "1:15"}, {"start": "5:00", "end": "5:45"}],
+    )
+    # 0: on the label (and half on the first rejected span); 1: rejected;
+    # 2: on nothing.
+    candidates = [_c(60.0, 105.0), _c(300.0, 345.0), _c(600.0, 645.0)]
+
+    result = evaluate(labeled, candidates)
+
+    assert result.judged
+    assert result.matches == ((0, 0),)
+    assert result.on_rejected == (1,)
+    assert result.candidates_unjudged == 1
+
+
+def test_a_repeat_is_on_a_label_not_rejected() -> None:
+    labeled = _judged(
+        [{"start": "1:00", "end": "2:00", "verdict": "added"}],
+        [{"start": "1:30", "end": "2:15"}],
+    )
+    result = evaluate(labeled, [_c(60.0, 105.0), _c(90.0, 135.0)])
+
+    assert result.repeats == 1
+    assert result.on_rejected == ()
+    assert result.candidates_unjudged == 0
+
+
+def test_boundary_gaps_are_label_minus_candidate_in_rank_order() -> None:
+    labeled = _judged(
+        [
+            {
+                "start": "1:00",
+                "end": "1:48.5",
+                "verdict": "fix",
+                "draft": {"start": "1:00", "end": "1:45"},
+            },
+            {"start": "4:58", "end": "5:40", "verdict": "post"},
+        ]
+    )
+    # Ranked: the later moment first.
+    result = evaluate(labeled, [_c(300.0, 345.0), _c(60.0, 105.0)])
+
+    gaps = boundary_gaps(result)
+
+    assert [(g.candidate_index, g.start, g.end) for g in gaps] == [
+        (0, -2.0, -5.0),
+        (1, 0.0, 3.5),
+    ]
+    assert [(g.ends_early, g.starts_late) for g in gaps] == [
+        (False, True),
+        (True, False),
+    ]
+
+
+@pytest.mark.parametrize(("end", "early"), [("1:46", False), ("1:46.001", True)])
+def test_ends_early_only_past_the_tolerance(end: str, early: bool) -> None:
+    labeled = _judged([{"start": "1:00", "end": end, "verdict": "post"}])
+
+    [gap] = boundary_gaps(evaluate(labeled, [_c(60.0, 105.0)]))
+
+    assert gap.ends_early is early

@@ -286,17 +286,13 @@ def format_timestamp(seconds: float) -> str:
     return f"{text}.{fraction:03d}".rstrip("0") if fraction else text
 
 
-class Label(BaseModel):
-    """A hand-labeled moment worth cutting. See docs/decisions/0012.
-
-    Written as `start`/`end` timestamp strings, held as seconds.
-    """
+class Span(BaseModel):
+    """A time range in a labels file, written as `start`/`end` timestamps."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     start_seconds: float = Field(validation_alias="start")
     end_seconds: float = Field(validation_alias="end")
-    note: str | None = None
 
     @field_validator("start_seconds", "end_seconds", mode="before")
     @classmethod
@@ -304,7 +300,7 @@ class Label(BaseModel):
         return _parse_timestamp(value)
 
     @model_validator(mode="after")
-    def _end_after_start(self) -> "Label":
+    def _end_after_start(self) -> "Span":
         if self.end_seconds <= self.start_seconds:
             raise ValueError("end must be after start")
         return self
@@ -314,13 +310,59 @@ class Label(BaseModel):
         return self.end_seconds - self.start_seconds
 
 
+Verdict = Literal["post", "fix", "added"]
+
+
+class Label(Span):
+    """A hand-labeled moment worth cutting. See docs/decisions/0012.
+
+    Written as `start`/`end` timestamp strings, held as seconds. In a judged
+    file (ADR 0012, V5 amendment) every label has a verdict: `post` is a draft
+    as cut, `fix` a draft whose span was moved (`draft` keeps the old span),
+    and `added` a moment no draft proposed.
+    """
+
+    note: str | None = None
+    verdict: Verdict | None = None
+    draft: Span | None = None
+
+    @model_validator(mode="after")
+    def _draft_only_on_fix(self) -> "Label":
+        if self.verdict == "fix":
+            if self.draft is None:
+                raise ValueError('a "fix" label needs the draft\'s span in "draft"')
+            if _same_span(self.draft, self):
+                raise ValueError('a "fix" label\'s span must differ from its draft')
+        elif self.draft is not None:
+            raise ValueError('only a "fix" label has a "draft"')
+        return self
+
+
+class RejectedSpan(Span):
+    """A draft the maintainer judged and dropped (ADR 0012, V5 amendment)."""
+
+    note: str | None = None
+
+
+def _same_span(a: Span, b: Span) -> bool:
+    return round(a.start_seconds * 1000) == round(b.start_seconds * 1000) and round(
+        a.end_seconds * 1000
+    ) == round(b.end_seconds * 1000)
+
+
 class LabeledVideo(BaseModel):
-    """One video's hand-written labels, ordered and non-overlapping."""
+    """One video's labels, ordered and non-overlapping.
+
+    A judged file (ADR 0012, V5 amendment) has a verdict on every label and may
+    list rejected spans, ordered by start; they may overlap each other and the
+    labels. A file without verdicts has no rejected spans.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     source: str
     labels: tuple[Label, ...]
+    rejected: tuple[RejectedSpan, ...] = ()
 
     @model_validator(mode="after")
     def _labels_ordered(self) -> "LabeledVideo":
@@ -332,6 +374,35 @@ class LabeledVideo(BaseModel):
                 )
         return self
 
+    @model_validator(mode="after")
+    def _judged_or_not(self) -> "LabeledVideo":
+        with_verdict = [label.verdict is not None for label in self.labels]
+        if any(with_verdict) and not all(with_verdict):
+            index = with_verdict.index(False)
+            raise ValueError(
+                f"labels.{index} has no verdict, but other labels do; a labels "
+                "file has a verdict on every label or on none"
+            )
+        if self.rejected and not all(with_verdict):
+            raise ValueError("rejected spans need a verdict on every label")
+        for index in range(1, len(self.rejected)):
+            if (
+                self.rejected[index].start_seconds
+                < self.rejected[index - 1].start_seconds
+            ):
+                raise ValueError(
+                    f"rejected spans must be ordered by start: rejected.{index} "
+                    f"starts before rejected.{index - 1}"
+                )
+        return self
+
+    @property
+    def judged(self) -> bool:
+        """True for a file of judged drafts (ADR 0012, V5 amendment)."""
+        return bool(self.rejected) or any(
+            label.verdict is not None for label in self.labels
+        )
+
 
 class Evaluation(BaseModel):
     """A detector's candidates compared with one video's labels. See ADR 0012.
@@ -341,6 +412,10 @@ class Evaluation(BaseModel):
     most once: precision counts matched candidates, so a second candidate on
     an already matched label is a repeat, not a hit. Recall counts labels with
     any hit. Recall and precision are None when there is nothing to divide by.
+
+    For judged labels, `on_rejected` holds the candidates that hit no label but
+    hit a rejected span; the rest of the candidates without a hit are
+    unjudged.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -350,6 +425,26 @@ class Evaluation(BaseModel):
     candidates: tuple[ClipCandidate, ...]
     hits: tuple[tuple[int, int], ...]
     matches: tuple[tuple[int, int], ...]
+    judged: bool = False
+    on_rejected: tuple[int, ...] = ()
+
+    @model_validator(mode="after")
+    def _on_rejected_without_hits(self) -> "Evaluation":
+        hit = {candidate_index for _, candidate_index in self.hits}
+        for candidate_index in self.on_rejected:
+            if not 0 <= candidate_index < len(self.candidates):
+                raise ValueError(
+                    f"on_rejected names candidate {candidate_index}, which does "
+                    "not exist"
+                )
+            if candidate_index in hit:
+                raise ValueError(
+                    f"candidate {candidate_index} hits a label, so is not on a "
+                    "rejected span"
+                )
+        if self.on_rejected and not self.judged:
+            raise ValueError("on_rejected needs judged labels")
+        return self
 
     @model_validator(mode="after")
     def _hits_in_range(self) -> "Evaluation":
@@ -401,3 +496,10 @@ class Evaluation(BaseModel):
         if not self.candidates:
             return None
         return self.candidates_matched / len(self.candidates)
+
+    @property
+    def candidates_unjudged(self) -> int:
+        """Candidates on neither a label nor a rejected span; 0 if not judged."""
+        if not self.judged:
+            return 0
+        return len(self.candidates) - self.candidates_hit - len(self.on_rejected)

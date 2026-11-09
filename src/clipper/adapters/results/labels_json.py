@@ -10,6 +10,7 @@ from clipper.domain.models import (
     AnalysisResult,
     ClipLink,
     LabeledVideo,
+    Span,
     format_timestamp,
 )
 
@@ -41,25 +42,41 @@ def load_labels(path: Path) -> LabeledVideo:
 def save_labels(labeled: LabeledVideo, path: Path) -> None:
     """Write a labels file in the hand-written format, times as "H:MM:SS".
 
-    Overwrites `path`; the caller decides whether that is allowed.
+    Overwrites `path`; the caller decides whether that is allowed. Verdicts,
+    drafts and rejected spans are written only when present.
     """
     labels = []
     for label in labeled.labels:
-        entry = {
-            "start": format_timestamp(label.start_seconds),
-            "end": format_timestamp(label.end_seconds),
-        }
+        entry: dict[str, object] = _span(label)
+        if label.verdict is not None:
+            entry["verdict"] = label.verdict
+        if label.draft is not None:
+            entry["draft"] = _span(label.draft)
         if label.note is not None:
             entry["note"] = label.note
         labels.append(entry)
-    text = json.dumps(
-        {"source": labeled.source, "labels": labels}, indent=2, ensure_ascii=False
-    )
+    data: dict[str, object] = {"source": labeled.source, "labels": labels}
+    if labeled.rejected:
+        rejected = []
+        for span in labeled.rejected:
+            entry = _span(span)
+            if span.note is not None:
+                entry["note"] = span.note
+            rejected.append(entry)
+        data["rejected"] = rejected
+    text = json.dumps(data, indent=2, ensure_ascii=False)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text + "\n", encoding="utf-8", newline="\n")
     except OSError as exc:
         raise LabelsError(f"Cannot write labels file {path}: {exc}") from exc
+
+
+def _span(span: Span) -> dict[str, object]:
+    return {
+        "start": format_timestamp(span.start_seconds),
+        "end": format_timestamp(span.end_seconds),
+    }
 
 
 def load_links(path: Path) -> list[ClipLink]:
