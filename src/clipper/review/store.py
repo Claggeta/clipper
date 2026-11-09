@@ -97,6 +97,11 @@ def parse_trash(data: object) -> str | None:
     return _text(data, "note")
 
 
+def _first_write(clip: ManifestClip) -> dict[str, object]:
+    """On the page's first write to a clip, keep the model's title."""
+    return {"model_title": clip.title} if clip.reviewed is None else {}
+
+
 @dataclass(frozen=True)
 class SaveResult:
     """The clip after a Save, and what went wrong after its label was written.
@@ -198,7 +203,11 @@ class ReviewStore:
             self._files.save_labels(labels, self._labels_path)
             self.labels = labels
 
-            changes: dict[str, object] = {"reviewed": "saved", "title": request.title}
+            changes: dict[str, object] = {
+                "reviewed": "saved",
+                "title": request.title,
+                **_first_write(clip),
+            }
             render_error = warning = None
             if needs_render:
                 try:
@@ -297,7 +306,13 @@ class ReviewStore:
                     (self._folder / clip.file).unlink(missing_ok=True)
                 except OSError as exc:
                     raise ReviewError(f"Cannot delete {clip.file}: {exc}") from exc
-            manifest = mark_clip(self.manifest, rank, reviewed="trashed", file=None)
+            manifest = mark_clip(
+                self.manifest,
+                rank,
+                reviewed="trashed",
+                file=None,
+                **_first_write(clip),
+            )
             self._files.save_manifest(manifest, self._folder)
             self.manifest = manifest
             return self._clip(rank)

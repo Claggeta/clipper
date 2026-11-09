@@ -162,6 +162,10 @@ hook that turned the speaker's point into its opposite.
   rendered file for them: a typed title sits beside the model's hook, and an
   emptied title box clears the title and keeps the hook. `render --titles`
   still writes both together on a rendered clip, as before.
+- **The model's title is kept** (follow-up to V5 item 3d, found in manual
+  step RV8): the page's first write stores it as `model_title` (0019), so
+  Reset can restore it and "titles kept unedited" (V5 item 8b) can be
+  counted after the maintainer edits a title.
 
 ## Revisit when
 

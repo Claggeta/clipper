@@ -217,6 +217,10 @@ class ManifestClip(BaseModel):
     page's re-render (item 3d amendment) moves them, and keeps the draft's
     span in `draft_start_seconds` and `draft_end_seconds`, set together;
     `draft_span` is that span, or the clip's own when never re-rendered.
+
+    `model_title` is the title `render --titles` wrote, kept by the page's
+    first write to the clip (None if there was none); `title` may then be
+    the maintainer's.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -234,6 +238,7 @@ class ManifestClip(BaseModel):
     reviewed: Literal["saved", "trashed"] | None = None
     draft_start_seconds: float | None = None
     draft_end_seconds: float | None = None
+    model_title: str | None = None
 
     @model_validator(mode="after")
     def _file_or_error(self) -> "ManifestClip":

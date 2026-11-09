@@ -106,6 +106,44 @@ def test_a_re_render_keeps_the_draft_span_so_a_second_save_finds_its_label(
     ]
 
 
+def _titled(title: str | None) -> ManifestClip:
+    return _clip(1, 10.0, 40.0, "talk_1.mp4").model_copy(
+        update={"title": title, "hook": "A hook." if title else None}
+    )
+
+
+def test_the_first_save_keeps_the_models_title_and_later_ones_leave_it(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path, _titled("$134 to fill a tank"))
+
+    first = env.store.save(1, SaveRequest(10.0, 40.0, "Ron at the pump", None))
+    second = env.store.save(1, SaveRequest(10.0, 40.0, "Ron shocked", None))
+
+    assert first.clip.model_title == "$134 to fill a tank"
+    assert (second.clip.title, second.clip.model_title) == (
+        "Ron shocked",
+        "$134 to fill a tank",
+    )
+
+
+def test_a_first_trash_keeps_the_models_title(tmp_path: Path) -> None:
+    env = Env(tmp_path, _titled("$134 to fill a tank"))
+
+    env.store.trash(1, None)
+    clip = env.store.save(1, SaveRequest(10.0, 40.0, "Mine", None)).clip
+
+    assert (clip.title, clip.model_title) == ("Mine", "$134 to fill a tank")
+
+
+def test_no_model_title_is_kept_as_none(tmp_path: Path) -> None:
+    env = Env(tmp_path, _titled(None))
+
+    clip = env.store.save(1, SaveRequest(10.0, 40.0, "Typed", None)).clip
+
+    assert (clip.title, clip.model_title) == ("Typed", None)
+
+
 def test_a_re_render_under_the_same_name_replaces_the_file(tmp_path: Path) -> None:
     env = Env(tmp_path, _clip(1, 10.2, 39.8, "talk_000010-000040.mp4"))
 

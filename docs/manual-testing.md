@@ -2385,8 +2385,10 @@ With RV7's copy served again (same `cmd /c` line):
    it ends where the end handle was.
 2. Change only the title and Save. Pass: `Saving…`, done at once, no new
    file.
-3. Press Reset, then Save. Pass: `Saved as post; re-rendered.`; the file is
-   named for the draft's span again.
+3. Press Reset. Pass: the handles go back to the draft's span and the title
+   box to the model's title (empty if it had none); notes stay; `Unsaved`
+   shows. Press Save. Pass: `Saved as post; re-rendered.`; the file is named
+   for the draft's span again, and the heading shows the model's title.
 4. On the clip trashed in RV7, press Save. Pass: `Saved as post;
    re-rendered.`, a POST badge, and its `.mp4` back in the folder.
 5. Stop the server. In `manifest.json` the clip from step 1 has
