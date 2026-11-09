@@ -252,6 +252,14 @@ maintainer's own judgment of which moments in a video are worth cutting.
   cannot see. The nearest miss is the LLM's candidate 18, 5:38:25-5:38:49,
   which starts 1 s after label 4 ends. Over both VODs, 9 clips: the heuristic
   found 1 at top 30, the LLM none.
+- Third VOD, 2917872953 (stableronaldo, 5:03:36 by the transcript, `drafts`
+  on 2026-11-09): 5 clips gave 5 labels of 20 to 60 s, 2.7 minutes. Recall 0
+  of 5 for both detectors at top 5 and top 30 (the LLM once at top 30, 990
+  s). Yet the maintainer would post all 5 of the heuristic's drafts, and the
+  LLM's second candidate is one of them. Here the clip labels miss every
+  moment the maintainer chose: precision against clips is a lower bound, and
+  on this VOD a loose one. Over three VODs, 14 clips: the heuristic found 1
+  at top 30, the LLM none.
 
 ## Related
 

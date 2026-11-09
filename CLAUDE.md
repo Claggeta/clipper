@@ -276,6 +276,18 @@ In progress:
     not a cut or title one. Neither pick overlaps a community
     clip, so by the maintainer's judgment the top 5 had 2 worth posting
     where the clip labels count 0.
+  - 2026-11-09, VOD 2917872953 (stableronaldo, 5:04), `drafts` with the
+    heuristic: all 5 worth posting (relatable gas prices, funny, a new
+    iPhone). 4 of 5 need a couple of seconds more at the end, and the
+    maintainer rewrote all 5 titles, naming the people and the angle
+    ("Ron shocked at the gas pump", "Core boys at the pump", "Ron's got new
+    tech") where the model wrote generic ones ("$134 to fill a tank"). The
+    clip labels count 0 of 5 here too.
+  - Why clips end early: the files match their spans exactly; a candidate
+    ends at its last segment's last word (`sliding_windows`), and the next
+    speech starts 0 to 0.74 s later on 4 of 5. Drafts 1 and 3 are one
+    moment (the gas pump) split into neighbouring windows 2.5 s apart. Both
+    are the boundaries item under "Later" (V5 picking).
 - Labels from Twitch community clips (option B), done: ADR 0012 and 0020
   amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
@@ -283,10 +295,11 @@ In progress:
   5 at top 30 (precision 1 of 30). LLM (`qwen3.5:9b`): 0 of 5 at top 5
   (822 s) and at top 30. Second VOD, `v2922695332.json` (4 clips, from the
   maintainer's first trial `drafts` run): 0 of 4 for both detectors at top 5
-  and top 30; two of its clips have almost no speech. Over 9 clips the
-  heuristic found 1 at top 30, the LLM none: the strongest evidence so far
-  for a non-transcript signal (V5 picking). Small samples; more clip links
-  per VOD make the numbers worth more.
+  and top 30; two of its clips have almost no speech. Third VOD,
+  `v2917872953.json` (5 clips): 0 of 5 for both, though the maintainer would
+  post all 5 heuristic drafts. Over 14 clips the heuristic found 1 at top 30,
+  the LLM none. Clips and the maintainer's picks disagree, so clip labels are
+  a weak stand-in for "worth posting"; trial notes count more. Small samples.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -468,7 +481,8 @@ picked.
 Later, not scheduled:
 
 - Picking, a candidate for V5: clip boundaries that follow the moment (ADR
-  0014 "revisit when"); a local signal for visual moments, such as audio
+  0014 "revisit when"; trial evidence: clips end on the last word and 4 of 5
+  needed seconds more, and neighbouring windows split one moment); a local signal for visual moments, such as audio
   loudness (untried); and label files for the first niche chosen, so `eval`
   reflects real work.
 - A larger Whisper model (`small`, `medium`) on the GPU, a candidate for V5
@@ -548,7 +562,11 @@ Later, not scheduled:
   within the limits on 35 clips, but one clip keeps "Ass" in its title under
   every prompt tried, and some hooks misstate the speaker or may add details
   (ADR 0018's title prompt amendment). Next levers if the trial shows it
-  often: a rewrite request for listed words, or another model.
+  often: a rewrite request for listed words, or another model. Trial
+  (v2917872953): the maintainer rewrote all 5 titles to name the people and
+  the angle; the model sees only the clip's words and not who is on stream.
+  A lever: give the prompt the channel or known names. Needs an ADR 0018
+  amendment.
 - Candidates too short to post. A window is the whole segments inside 45 s
   (`sliding_windows`), so a window with little speech becomes a candidate
   only as long as that speech. On v2917438534 the LLM's top candidate was

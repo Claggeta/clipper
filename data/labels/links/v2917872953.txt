@@ -1,0 +1,8 @@
+# Twitch community clips from stableronaldo's stream, VOD 2917872953.
+# Collected by hand by the maintainer, 2026-11-09. Per line: the clip and its
+# "Watch full video" link (ADR 0012, Twitch clips amendment).
+https://www.twitch.tv/stableronaldo/clip/SillyAffluentEchidnaPhilosoraptor-GFg2BioDFba0yoC6?range=7d https://www.twitch.tv/videos/2917872953?t=2h15m35s
+https://www.twitch.tv/stableronaldo/clip/BreakableCarelessPidgeonBudStar-px-6E5XXTFqcIWG8?range=7d https://www.twitch.tv/videos/2917872953?t=1h19m35s
+https://www.twitch.tv/stableronaldo/clip/AlertDeadBison4Head-fYw4oiDsWzh7D99n?range=7d https://www.twitch.tv/videos/2917872953?t=4h53m51s
+https://www.twitch.tv/stableronaldo/clip/AntsyDelightfulPotatoPJSugar-_VDgRUTJ-c_ixTwH?range=7d https://www.twitch.tv/videos/2917872953?t=2h4m4s
+https://www.twitch.tv/stableronaldo/clip/IncredulousEndearingYakBudBlast-x1ZkSrgPtBhozasW?range=7d https://www.twitch.tv/videos/2917872953?t=0h24m8s
