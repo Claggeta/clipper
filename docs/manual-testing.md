@@ -25,6 +25,10 @@ Ollama server or model. Step R19 does the same for `render --titles`.
 The [Fetch](#fetch) section covers `clipper fetch`. Its tests mock yt-dlp, so
 nothing in CI downloads.
 
+The [Labels from Twitch clips](#labels-from-twitch-clips) section covers
+`clipper labels`. Its tests mock yt-dlp and pass a fake clip lookup to the
+CLI, so nothing in CI reads Twitch.
+
 ## When to run it
 
 - Before tagging a release.
@@ -49,6 +53,10 @@ nothing in CI downloads.
   work fails. Run the [Fetch](#fetch) section.
 - After any change to the `drafts` command, or to the shared analyze, render
   or fetch steps in `cli/main.py`. Run steps D8 to D10.
+- After any change to `core/labeling.py`, `YtDlpClipLookup` in
+  `adapters/download/ytdlp.py`, `save_labels` or `load_links`, or the `labels`
+  command, and after upgrading yt-dlp. Run the
+  [Labels from Twitch clips](#labels-from-twitch-clips) section.
 
 Run it in a fresh PowerShell window from the **repo root**. Several steps edit
 environment variables or `PATH` for the current session only.
@@ -2084,6 +2092,130 @@ deleted. The second run exits 0 with every clip rendered and no title lines.
 
 ```powershell
 Remove-Item Env:CLIPPER_VIDEOS_DIR, Env:CLIPPER_CACHE_DIR, Env:CLIPPER_OUTPUT_DIR, Env:CLIPPER_CLIPS_DIR, Env:COLUMNS
+Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothing
+Remove-Item -Recurse -Force $S
+```
+
+## Labels from Twitch clips
+
+Covers `clipper labels`
+([ADR 0012](decisions/0012-evaluate-detectors-against-hand-labels.md), its
+Twitch clips amendment, and
+[ADR 0020](decisions/0020-fetch-a-video-by-url.md)'s clip lookups). The tests
+mock yt-dlp, so this section checks that the real yt-dlp returns a clip's
+title and length, what the labels file looks like, and the first `eval`
+against it. Nothing is downloaded.
+
+### T0. Setup
+
+yt-dlp must be on `PATH` (D0). You need a links file for one Twitch VOD,
+written by hand: per line, a clip's URL and its "Watch full video" URL (with
+`?t=`). For T5 you also need that VOD's saved analysis, from `analyze` on the
+fetched VOD. In a fresh PowerShell window at the repo root:
+
+```powershell
+yt-dlp --version
+$LinksFile = "<a links file, e.g. data\labels\links\v2917438534.txt>"
+$Analysis  = "<that VOD's analysis JSON, e.g. data\output\v2917438534.json>"
+$S = Join-Path $env:TEMP "manual-test-clipper-labels"
+New-Item -ItemType Directory -Force $S | Out-Null
+$env:COLUMNS = "500"
+$env:CLIPPER_LABELS_DIR = "$S\labels"
+
+# Helper: runs `clipper <Arguments>`, keeps the exit code, the seconds taken
+# and the text, and prints them.
+function Invoke-Labels {
+  param([string]$Arguments)
+  $t = Measure-Command {
+    cmd /c "uv run clipper $Arguments > `"$S\last.txt`" 2>&1"
+  }
+  $script:Code = $LASTEXITCODE
+  $script:Seconds = [Math]::Round($t.TotalSeconds, 1)
+  $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  "exit $Code, $Seconds s"
+  $Text
+}
+```
+
+Pass: `yt-dlp --version` prints a version. Record it.
+
+### T1. Labels from a real links file
+
+```powershell
+Invoke-Labels "labels `"$LinksFile`""
+$LabelsFile = (Get-ChildItem "$env:CLIPPER_LABELS_DIR" -Filter "v*.json" | Select-Object -First 1).FullName
+$l = Get-Content $LabelsFile -Raw -Encoding UTF8 | ConvertFrom-Json
+$l.source
+$l.labels | Format-Table start, end, note -AutoSize -Wrap
+```
+
+Pass: exit 0. One `Clip N of M: <title> (<length> s, ends <t>)` line per clip,
+in file order, then `Clips read`, `Labels after merging`, `Minutes covered`
+and `Saved: <labels folder>\v<VOD number>.json`. The titles and lengths match
+the clips on Twitch. `source` is `v<VOD number>.mp4`, the labels are in time
+order, each ends at a `t` from the file, and overlapping clips share one
+label whose note lists their titles. Record the time, the counts and the
+minutes covered.
+
+### T2. An existing labels file needs `--force`
+
+```powershell
+$h = (Get-FileHash $LabelsFile).Hash
+Invoke-Labels "labels `"$LinksFile`""
+"unchanged: " + ((Get-FileHash $LabelsFile).Hash -eq $h)
+Invoke-Labels "labels `"$LinksFile`" --force" | Select-Object -Last 1
+"same content: " + ((Get-FileHash $LabelsFile).Hash -eq $h)
+```
+
+Pass: the first run exits 1 at once with `Error: ... already exists; pass
+--force to replace it`, no `Clip` lines, and `unchanged: True`. The run with
+`--force` exits 0, and `same content: True`, since the clips did not change.
+
+### T3. Bad links files fail before any lookup (constructed)
+
+```powershell
+$first = (Get-Content $LinksFile | Where-Object { $_ -match "^\s*https://" } | Select-Object -First 1)
+Set-Content -Path "$S\other-vod.txt" -Encoding utf8 -Value @($first, "https://clips.twitch.tv/MadeUpClip-a https://www.twitch.tv/videos/1?t=5s")
+Set-Content -Path "$S\no-t.txt" -Encoding utf8 -Value "https://clips.twitch.tv/MadeUpClip-a https://www.twitch.tv/videos/1"
+Invoke-Labels "labels `"$S\other-vod.txt`""
+Invoke-Labels "labels `"$S\no-t.txt`""
+```
+
+Pass: each exits 1 in a few seconds with one `Error:` line naming the file
+and the line: `line 2: VOD v1 differs from v<VOD number> on line 1 ...`, and
+`line 1: the VOD URL has no t= ...`. No `Clip` lines.
+
+### T4. An unavailable clip (observe and record)
+
+The clip ID is made up; if it happens to exist, pick another.
+
+```powershell
+Set-Content -Path "$S\gone.txt" -Encoding utf8 -Value "https://clips.twitch.tv/ClipperMadeUpClip-zzzzzzzz https://www.twitch.tv/videos/1?t=5s"
+Invoke-Labels "labels `"$S\gone.txt`""
+"files: " + @(Get-ChildItem "$env:CLIPPER_LABELS_DIR" -Filter "v1.json").Count
+```
+
+Pass: exit 1, `Error: yt-dlp failed (exit 1): ...` with yt-dlp's own
+`ERROR:` line, no traceback, and `files: 0`. Record the message.
+
+### T5. `eval` against the clip labels
+
+```powershell
+Invoke-Labels "eval `"$Analysis`" `"$LabelsFile`""
+$env:CLIPPER_TOP_N = "30"
+Invoke-Labels "eval `"$Analysis`" `"$LabelsFile`""
+Remove-Item Env:CLIPPER_TOP_N
+```
+
+Pass: both exit 0 and print the labels and candidates tables, recall and
+precision, with `1 video, N labels` matching T1's `Labels after merging`.
+Record recall and precision at top 5 and top 30, with the repeats. Precision
+is a lower bound: clips are not every moment worth cutting (ADR 0012).
+
+### T6. Clean up
+
+```powershell
+Remove-Item Env:CLIPPER_LABELS_DIR, Env:COLUMNS
 Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothing
 Remove-Item -Recurse -Force $S
 ```

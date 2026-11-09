@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from clipper.domain.models import (
     ClipCandidate,
+    ClipInfo,
+    ClipLink,
     ClipTitle,
     Evaluation,
     Label,
@@ -14,7 +16,9 @@ from clipper.domain.models import (
     RenderedClip,
     Segment,
     Transcript,
+    VideoSource,
     Word,
+    format_timestamp,
 )
 
 
@@ -284,6 +288,40 @@ def test_labeled_video_rejects_overlapping_labels() -> None:
 def test_labeled_video_rejects_unknown_keys() -> None:
     with pytest.raises(ValidationError, match="video"):
         LabeledVideo.model_validate({"source": "a.mp4", "labels": [], "video": "x"})
+
+
+@pytest.mark.parametrize(
+    ("seconds", "text"),
+    [
+        (0.0, "0:00:00"),
+        (50.0, "0:00:50"),
+        (16545.0, "4:35:45"),
+        (70.5, "0:01:10.5"),
+        (49.78, "0:00:49.78"),
+        (3599.9996, "1:00:00"),
+        (1.0004, "0:00:01"),
+    ],
+)
+def test_format_timestamp(seconds: float, text: str) -> None:
+    assert format_timestamp(seconds) == text
+
+
+@pytest.mark.parametrize("seconds", [0.0, 50.0, 70.5, 16545.25, 49.78])
+def test_format_timestamp_round_trips_through_label(seconds: float) -> None:
+    label = _label(format_timestamp(seconds), format_timestamp(seconds + 1))
+    assert label.start_seconds == pytest.approx(seconds)
+
+
+def test_clip_link_needs_a_positive_end() -> None:
+    vod = VideoSource(platform="twitch", video_id="v1")
+    with pytest.raises(ValidationError):
+        ClipLink(line=1, clip_id="a", vod=vod, end_seconds=0)
+
+
+@pytest.mark.parametrize("duration", [0, -1, float("inf"), float("nan")])
+def test_clip_info_needs_a_finite_positive_length(duration: float) -> None:
+    with pytest.raises(ValidationError):
+        ClipInfo(title="x", duration_seconds=duration)
 
 
 # Evaluations below are constructed, not produced by `clipper eval`.

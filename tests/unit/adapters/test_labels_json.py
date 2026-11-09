@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from clipper.adapters.results.labels_json import check_labels_match, load_labels
+from clipper.adapters.results.labels_json import (
+    check_labels_match,
+    load_labels,
+    load_links,
+    save_labels,
+)
 from clipper.domain.errors import ClipperError, LabelsError
 from clipper.domain.models import AnalysisResult, LabeledVideo, Transcript
 
@@ -113,6 +118,84 @@ def test_overlap_is_reported(tmp_path: Path) -> None:
 
     with pytest.raises(LabelsError, match="labels.2 starts before labels.1 ends"):
         load_labels(_write(tmp_path, json.dumps(data)))
+
+
+# Writing labels and reading links files, with constructed input.
+
+
+def test_saved_labels_load_back(tmp_path: Path) -> None:
+    labeled = load_labels(_write(tmp_path, _LABELS))
+    path = tmp_path / "out" / "copy.json"
+
+    save_labels(labeled, path)
+
+    assert load_labels(path) == labeled
+
+
+def test_saved_labels_use_the_hand_written_format(tmp_path: Path) -> None:
+    labeled = LabeledVideo.model_validate(
+        {
+            "source": "v1.mp4",
+            "labels": [
+                {"start": "4:35:45", "end": "4:36:45", "note": "Twitch clips: ✨"},
+                {"start": "4:40:00.5", "end": "4:41:00"},
+            ],
+        }
+    )
+    path = tmp_path / "v1.json"
+
+    save_labels(labeled, path)
+
+    raw = path.read_bytes()
+    assert b"\r\n" not in raw
+    assert raw.endswith(b"}\n")
+    assert json.loads(raw.decode("utf-8")) == {
+        "source": "v1.mp4",
+        "labels": [
+            {"start": "4:35:45", "end": "4:36:45", "note": "Twitch clips: ✨"},
+            {"start": "4:40:00.5", "end": "4:41:00"},
+        ],
+    }
+    assert "✨" in raw.decode("utf-8")
+
+
+def test_save_labels_reports_a_write_failure(tmp_path: Path) -> None:
+    blocker = tmp_path / "file"
+    blocker.write_text("not a folder", encoding="utf-8")
+    labeled = LabeledVideo(source="v1.mp4", labels=())
+    with pytest.raises(LabelsError, match="Cannot write labels file"):
+        save_labels(labeled, blocker / "v1.json")
+
+
+def test_load_links_parses_the_file(tmp_path: Path) -> None:
+    path = tmp_path / "v1.txt"
+    path.write_bytes(
+        b"\xef\xbb\xbf# saved with a BOM\r\n"
+        b"https://clips.twitch.tv/A-a https://www.twitch.tv/videos/1?t=1m5s\r\n"
+    )
+    links = load_links(path)
+    assert [(link.line, link.clip_id, link.end_seconds) for link in links] == [
+        (2, "A-a", 65)
+    ]
+
+
+def test_load_links_errors_name_the_file(tmp_path: Path) -> None:
+    path = tmp_path / "v1.txt"
+    path.write_text("https://clips.twitch.tv/A-a\n", encoding="utf-8")
+    with pytest.raises(LabelsError, match=r"v1\.txt line 1: expected a clip URL"):
+        load_links(path)
+
+
+def test_load_links_missing_file_raises(tmp_path: Path) -> None:
+    with pytest.raises(LabelsError, match="Links file not found"):
+        load_links(tmp_path / "nope.txt")
+
+
+def test_load_links_undecodable_file_raises(tmp_path: Path) -> None:
+    path = tmp_path / "v1.txt"
+    path.write_bytes(b"\xff\xfe\xfa")
+    with pytest.raises(LabelsError, match="Cannot read links file"):
+        load_links(path)
 
 
 # The source checks below use constructed input.

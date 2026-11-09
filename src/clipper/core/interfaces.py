@@ -3,6 +3,7 @@ from typing import Protocol, runtime_checkable
 
 from clipper.domain.models import (
     ClipCandidate,
+    ClipInfo,
     ClipTitle,
     MediaInfo,
     RenderedClip,
@@ -89,3 +90,14 @@ class Downloader(Protocol):
     """
 
     def download(self, source: VideoSource, folder: Path) -> Path: ...
+
+
+@runtime_checkable
+class ClipLookup(Protocol):
+    """Reads one Twitch clip's title and length, without downloading it.
+
+    `clip_id` is the clip's slug (see `clipper.core.labeling`). Raises
+    `DownloadError` on failure (see docs/decisions/0020, clip lookups).
+    """
+
+    def lookup(self, clip_id: str) -> ClipInfo: ...

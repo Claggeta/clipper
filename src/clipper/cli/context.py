@@ -5,7 +5,7 @@ from enum import StrEnum
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.detection.llm import LlmClipDetector
 from clipper.adapters.detection.ollama import OllamaClient
-from clipper.adapters.download.ytdlp import YtDlpDownloader
+from clipper.adapters.download.ytdlp import YtDlpClipLookup, YtDlpDownloader
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
@@ -16,6 +16,7 @@ from clipper.adapters.transcription.video import VideoTranscriber
 from clipper.core.config import Settings
 from clipper.core.interfaces import (
     ClipDetector,
+    ClipLookup,
     ClipRenderer,
     Downloader,
     MediaProbe,
@@ -81,6 +82,11 @@ def build_downloader(settings: Settings) -> Downloader:
     return YtDlpDownloader()
 
 
+def build_clip_lookup(settings: Settings) -> ClipLookup:
+    """Compose the real clip lookup (ADR 0012, Twitch clips amendment)."""
+    return YtDlpClipLookup()
+
+
 @dataclass(frozen=True)
 class AppContext:
     """How the commands build their adapters. See docs/decisions/0013.
@@ -97,3 +103,4 @@ class AppContext:
     probe: Callable[[], MediaProbe] = build_probe
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     downloader: Callable[[Settings], Downloader] = build_downloader
+    clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup
