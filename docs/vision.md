@@ -70,6 +70,25 @@ boundaries), audio or visual detection features, subject or face tracking for
 the crop, hosted APIs or paid services, web UI, database, user accounts, ML
 training.
 
+## V5 Scope
+Input: a video URL or local file, or a list of them; and the developer's
+judgments on drafts, made in a local review page. Output: the same folder of
+drafts, with candidates of 15 to 90 s that end where the moment ends
+([ADR 0023](decisions/0023-candidate-boundaries-follow-the-moment.md)),
+titles that know the channel and VOD title, and picking changes measured
+against the developer's own verdicts
+([ADR 0012](decisions/0012-evaluate-detectors-against-hand-labels.md), V5
+amendment). Interface: `clipper review`
+([ADR 0024](decisions/0024-review-drafts-in-a-local-browser-page.md)), a
+list of sources for `drafts`, and judged-label reporting in `eval`. Tuned on
+streamer VODs first.
+
+The review page reverses the web UI non-goal for one local, single-user
+page. Non-goals for V5: posting or uploads, analytics or platform metrics,
+hosted APIs or paid services, the movies/TV niche, tuning for other niches,
+channel watching or scheduling, audience signals as a detector input, a
+trained model, a database, user accounts.
+
 ## Success Criteria
 1. `clipper analyze talk.mp4` runs end to end on a local machine and outputs
    at most 5 candidates. Measured on a 5:14 speech video on CPU with the

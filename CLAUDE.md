@@ -76,7 +76,11 @@ and planned code:
   file>` writes `<labels dir>/v<id>.json` from hand-collected clip links and
   their "Watch full video" links; a clip spans `t - length` to `t` (`t` up to
   4 s before the real end, on 4 clips), overlaps merge, `--force` to
-  overwrite. Precision against clips is a lower bound.
+  overwrite. Precision against clips is a lower bound. V5 amendment: judged
+  drafts are the main reference, in `data/labels/picks/` apart from clip
+  labels: `post`, `fix` (with the maintainer's span) or a rejected span,
+  pooled over every variant's top 10; `eval` reports unjudged candidates,
+  keepers cut short and seconds dragged. Format decided in V5 item 2.
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
@@ -152,6 +156,22 @@ and planned code:
   `CLIPPER_LLM_MODEL` fails before any download or transcription; clip
   failures follow 0011/0018 and `Drafts: <folder>` still prints. Measured
   (criterion 5): the 5:04:01 stream cold from a file in 22:58.
+- `0023` — candidate boundaries follow the moment: candidates 15 to 90 s;
+  in shared code for every detector, windows are scored, neighbours merged,
+  the top N selected, then each end extended to the next pause in speech,
+  never into the next chosen candidate. Pause length and merge rule are set
+  from the V5 baseline's dragged ends, not guessed. Starts stay. Each change
+  is measured before and after on judged labels and not adopted if it does
+  not help. Amends 0014 decision 2.
+- `0024` — `clipper review <drafts folder>`: a local browser page on the
+  loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
+  a player on the source video, a film strip of the clip plus 120 s either
+  side with start and end handles, title and notes boxes. Save writes a
+  judged label and re-renders that clip with the folder's flags; Trash
+  deletes the file and writes a rejected span; Add clip saves a new span
+  from the current range. No URL box until the drafts chain moves to
+  `core/` (0022). The page is checked by manual steps. Amends the web UI
+  non-goal, 0011 and 0019.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -212,8 +232,28 @@ audio or visual detection features, subject or face tracking for the crop,
 hosted APIs or paid services, web UI, database, user accounts, ML training.
 
 V4 closed with item 9. GPU transcription (item 7) was measured and not adopted
-(ADR 0021). V5's scope is not decided; the candidates are under "Later" in the
-V4 list.
+(ADR 0021). V5 was scoped on 2026-11-09 (below).
+
+## V5 scope (in progress)
+
+Input: a video URL or local file, or a list of them, as in V4; and the
+maintainer's judgments on drafts, made in a review page. Output: the same
+folder of drafts, with candidates of 15 to 90 s that end where the moment
+ends, titles that know the channel and the VOD title, and picking changes
+measured against the maintainer's own verdicts. Interface: `clipper review
+<drafts folder>`, a list of sources for `drafts`, and judged-label reporting
+in `eval`.
+
+Tuned and measured on streamer VODs, the first niche. Boundary and length
+changes apply to every niche.
+
+Non-goals for V5: posting or uploads, analytics or platform metrics, hosted
+APIs or paid services, the movies/TV niche (needs a rights ADR first), tuning
+for the education or podcast niches, a URL box in the review page, channel
+watching or scheduling (ADR 0020: videos are chosen by hand), audience
+signals as a detector input, the Twitch API, a trained model, a database,
+user accounts. Face-aware cropping is a spike that ends in an ADR, and is
+built in V5 only if that ADR picks the small design.
 
 ## Maintainer's goals
 
@@ -237,6 +277,30 @@ From the alignment interview on 2026-11-02:
   product whose ML choices are measured, built with ADRs, tests and CI.
 - Strictly local and free; RTX 4070 Ti; 5 to 10 hours a week.
 - The two label files were test examples, not a sample of real work.
+
+From the V5 interview on 2026-11-09, after four trial VODs:
+
+- The costliest failures are bad picks and clips that end too early. Titles
+  and time per VOD matter less.
+- Daily use: more drafts per VOD (top 10) that the maintainer filters,
+  rather than a fixed keep rate out of 5.
+- Niches: a few accounts are planned, for streamer clips, educational
+  talks and speeches, and entertainment (podcasts, movies, TV). Streamers
+  come first.
+- 4 to 10 long videos a week. Overnight runs are fine, so time per VOD is not
+  a constraint.
+- Measured by both judged drafts (pooled labels) and keep rate per VOD.
+  About a minute per new draft for judging; no full rewatch.
+- Unattended: a queue of URLs is enough. No scheduling.
+- Off the table: hosted or paid APIs, posting. Movies/TV is out of V5.
+- Titles should name the people and the angle; take context from the
+  video's metadata.
+- A review GUI, wanted until the drafts rarely need editing: clip list,
+  player, a trim strip of the clip plus 2 minutes either side, title and
+  notes, save and delete, dark and clean.
+- Face tracking is wanted, but its form (facecam split or following the
+  person) is not decided.
+- Clip length: 15 to 90 s.
 
 ## Current state
 
@@ -266,8 +330,9 @@ In progress:
 
 - A trial week by the maintainer (agreed 2026-11-03, no code): `drafts` on 5
   to 10 real target videos, noting which drafts would be posted, fixed or
-  dropped, and writing label files for the moments worth clipping. V5 is
-  scoped from those notes and `eval` on the new labels.
+  dropped, and writing label files for the moments worth clipping. V5 was
+  scoped from the first four VODs' notes on 2026-11-09 (see "V5 scope");
+  from V5 item 4 on, judgments are made in `review` as judged labels.
   Trial notes so far:
   - 2026-11-09, VOD 2922695332 (jasontheween, 6:31), `drafts` with the
     heuristic: drafts 4 (1:39:11-1:39:49, "Why He Never Asked Her Out") and
@@ -500,19 +565,85 @@ picked.
    #112, F1 run before tagging, tag `v0.4.0` and pre-release by the
    maintainer)
 
+## V5 list
+
+Each item is one PR, and each code item states its design and waits for
+confirmation first. Measurement first, then the review page, then picking.
+Every picking change (items 5 to 7, 10b, 11, 12) is measured before and
+after on the trial VODs at top 10 against the judged labels: postable drafts
+per VOD, drops, keepers cut short, seconds dragged at start and end
+(median and max), and clip-label recall at 10 and 30 as a secondary check,
+with unjudged candidates judged first. Counts per VOD, not percentages.
+Items 8 and 9 do not depend on picking and may land earlier.
+
+1. ADRs and scope (one docs PR): the V5 scope and list in CLAUDE.md, ADR 0012
+   amendment (judged labels), ADR 0023 (boundaries), ADR 0024 (review page).
+2. Judged labels: the file format (`post`, `fix` with the draft's original
+   span, rejected spans, notes) in `data/labels/picks/`, and `eval`
+   reporting unjudged candidates, keepers cut short and seconds dragged.
+   ADR 0012 amendment.
+3. `clipper review` (ADR 0024), in PRs:
+   - 3a. Server, clip list and a player on the source video over the clip
+     plus 120 s either side. Decides the HTTP server (standard library or a
+     framework, checked against 0003) and where the code lives. Manual step.
+   - 3b. Film strip from cached ffmpeg thumbnails, with start and end
+     handles. Manual step.
+   - 3c. Save, Trash, title and notes, writing judged labels and the
+     manifest (ADR 0019 amendment). Unit tests on the endpoints; manual
+     step.
+   - 3d. Re-render one clip on Save (ADR 0011 amendment). Manual step.
+   - 3e. Add clip from the current range. Manual step.
+4. Not code, a docs PR: the baseline. Heuristic and LLM top 10 on the trial
+   VODs (`CLIPPER_TOP_N=10` in a child process, cached transcripts; ask
+   before any download), every draft judged in `review`, the first judged
+   labels committed and the measures above recorded.
+5. End extension to the next pause, up to 90 s, never into the next chosen
+   candidate; the pause length set from item 4's dragged ends. ADR 0023
+   amendment.
+6. Candidate length 15 to 90 s for both detectors (windows under 15 s not
+   scored). ADR 0023 amendment. Replaces Parked "Candidates too short to
+   post".
+7. Merge neighbouring high-scoring windows into one candidate of up to
+   90 s. ADR 0023 amendment.
+8. Title context:
+   - 8a. `fetch` saves yt-dlp's video metadata next to the video, including
+     for a reused file if yt-dlp allows it (unverified). ADR 0020
+     amendment, manual step.
+   - 8b. The title prompt gets the channel and VOD title; nothing for local
+     files. ADR 0018 amendment, manual step; trial measure: titles kept
+     unedited.
+9. `drafts` with a list of sources; one failing source does not stop the
+   rest, and the exit code is 1 at the end. ADR 0022 amendment, manual step.
+10. Audio loudness:
+    - 10a. Spike: per-second loudness with ffmpeg on two trial VODs,
+      compared with the judged keepers and the clip labels. Ends in a new
+      ADR or in nothing. Manual step.
+    - 10b. If 10a says so: loudness as a detector input, a `core/` change.
+      Measured on judged and clip labels.
+11. Defaults for `drafts`: detector (heuristic or LLM) and top N, from the
+    measures above; a finer LLM score if ties decide it (Parked). ADR 0014
+    amendment.
+12. A larger Whisper model (`small`) on the CPU, timed on the long stream
+    and measured as above. May end in nothing. ADR 0021 amendment, manual
+    step.
+13. Face-aware vertical spike: a facecam found once per video and split
+    above the gameplay, following the person, or nothing. Ends in a new ADR
+    amending 0016; built in V5 only if it picks the facecam split.
+14. Release notes and tag `v0.5.0`.
+
 Later, not scheduled:
 
-- Picking, a candidate for V5: clip boundaries that follow the moment (ADR
-  0014 "revisit when"; trial evidence: clips end on the last word and 4 of 5
-  needed seconds more, and neighbouring windows split one moment); a local
-  signal for visual moments, such as audio loudness (untried); and label
-  files for the first niche chosen, so `eval` reflects real work.
-- A larger Whisper model (`small`, `medium`) on the GPU, a candidate for V5
-  with picking, since it changes transcripts and so which moments are picked.
-  ADR 0021 has the measured GPU setup and its punctuation caveats.
+- A URL box in the review page, after item 9, once the drafts chain moves to
+  `core/` (ADR 0022 "revisit when").
+- Starts that move too, if the baseline shows starts dragged as often as ends
+  (ADR 0023).
+- Tuning for the education/speech and podcast niches, with their own judged
+  labels.
+- The movies/TV niche, after an ADR on rights.
+- Whisper `medium`, or the GPU setup in ADR 0021, if item 12 helps but is
+  too slow.
 - Campaign briefs as a detector input, once the maintainer has read some.
   Needs an ADR.
-- Subject or face tracking for the vertical crop.
 - Posting and performance data, once accounts exist.
 
 ## Parked
@@ -561,7 +692,8 @@ Later, not scheduled:
   long video, `llama3.1:8b` gave 0.8 to 403 of 1,215 windows), and neither
   put a label in its top 5 there. Options: token probabilities (whether
   Ollama returns them is unverified) or a scoring rubric in the prompt. Needs
-  an ADR 0014 amendment and `eval` results.
+  an ADR 0014 amendment and `eval` results. Part of V5 item 11 if ties
+  decide the detector choice.
 - Labels may hinge on what is seen, not said. Several `oFbD0Ot7nQ8.json`
   labels name visual moments ("Biz Hits a Long Putt"), which a
   transcript-only detector cannot see. Unverified as the cause of the LLM's
@@ -589,7 +721,7 @@ Later, not scheduled:
   the angle; the model sees only the clip's words and not who is on stream.
   Again on v2922589775: "Adapt learns about the Pirate Token".
   A lever: give the prompt the channel or known names. Needs an ADR 0018
-  amendment.
+  amendment. Scheduled as V5 item 8 (video metadata).
 - Candidates too short to post. A window is the whole segments inside 45 s
   (`sliding_windows`), so a window with little speech becomes a candidate
   only as long as that speech. On v2917438534 the LLM's top candidate was
@@ -598,7 +730,7 @@ Later, not scheduled:
   were under 15 s, three of them about 1 s, two in its top 5. Fix: a minimum candidate length or word
   count before scoring, for both detectors; the threshold is unmeasured.
   Changes which moments are picked, so it needs an ADR 0014 amendment and
-  `eval` results.
+  `eval` results. Scheduled as V5 item 6 (15 s, ADR 0023).
 - `eval` ends with "Indicative only: one labeler, ..." even when the labels
   come from Twitch clips, which many viewers made. Fix: word it by source, or
   drop "one labeler"; how `eval` would know the source is undecided (a field
