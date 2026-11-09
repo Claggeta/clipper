@@ -576,8 +576,9 @@ per VOD, drops, keepers cut short, seconds dragged at start and end
 with unjudged candidates judged first. Counts per VOD, not percentages.
 Items 8 and 9 do not depend on picking and may land earlier.
 
-1. ADRs and scope (one docs PR): the V5 scope and list in CLAUDE.md, ADR 0012
-   amendment (judged labels), ADR 0023 (boundaries), ADR 0024 (review page).
+1. ~~ADRs and scope (one docs PR): the V5 scope and list in CLAUDE.md, ADR
+   0012 amendment (judged labels), ADR 0023 (boundaries), ADR 0024 (review
+   page).~~ (done; #126)
 2. Judged labels: the file format (`post`, `fix` with the draft's original
    span, rejected spans, notes) in `data/labels/picks/`, and `eval`
    reporting unjudged candidates, keepers cut short and seconds dragged.
