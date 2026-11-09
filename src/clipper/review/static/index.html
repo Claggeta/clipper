@@ -58,9 +58,20 @@
           <div><dt>Start</dt><dd id="edit-start"></dd></div>
           <div><dt>End</dt><dd id="edit-end"></dd></div>
           <div><dt>Length</dt><dd id="edit-length"></dd></div>
-          <div id="edited" hidden><dt>&nbsp;</dt><dd class="accent">Edited</dd></div>
+          <div id="unsaved" hidden><dt>&nbsp;</dt><dd class="accent">Unsaved</dd></div>
         </dl>
         <p id="error" class="error" hidden></p>
+        <form class="judge" onsubmit="return false">
+          <label for="title-box">Title</label>
+          <input id="title-box" type="text" maxlength="200" autocomplete="off">
+          <label for="note-box">Notes</label>
+          <textarea id="note-box" rows="3"></textarea>
+          <div class="judge-actions">
+            <button type="button" id="save" class="primary">Save</button>
+            <button type="button" id="trash" class="danger">Trash</button>
+          </div>
+          <p id="judge-notice" class="judge-notice" role="status"></p>
+        </form>
       </section>
       <p id="empty" class="muted">Choose a clip.</p>
     </main>

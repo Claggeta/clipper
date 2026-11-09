@@ -10,6 +10,7 @@ from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.adapters.titles.ollama import OllamaTitleWriter
 from clipper.adapters.transcription.caching import CachingTranscriber
 from clipper.adapters.transcription.faster_whisper import FasterWhisperTranscriber
@@ -22,6 +23,7 @@ from clipper.core.interfaces import (
     Downloader,
     FrameExtractor,
     MediaProbe,
+    ReviewFiles,
     TitleWriter,
     Transcriber,
 )
@@ -77,6 +79,11 @@ def build_frames() -> FrameExtractor:
     return FfmpegFrameExtractor()
 
 
+def build_review_files() -> ReviewFiles:
+    """Compose the review page's label and manifest files (ADR 0024)."""
+    return JsonReviewFiles()
+
+
 def build_title_writer(settings: Settings) -> TitleWriter:
     """Compose the title writer, on the detector's model (ADR 0018)."""
     if not settings.llm_model:
@@ -111,6 +118,7 @@ class AppContext:
     renderer: Callable[[Settings], ClipRenderer] = build_renderer
     probe: Callable[[], MediaProbe] = build_probe
     frames: Callable[[], FrameExtractor] = build_frames
+    review_files: Callable[[], ReviewFiles] = build_review_files
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     downloader: Callable[[Settings], Downloader] = build_downloader
     clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup

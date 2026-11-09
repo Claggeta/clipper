@@ -3,7 +3,8 @@
 The server binds to the loopback address only and serves a fixed set of
 paths: the page's own files, the clips as JSON, the source video with HTTP
 range requests so the browser can seek in it, and cached still frames for
-the film strip.
+the film strip. Two POST paths save or trash a clip; they answer only the
+page itself (see `_trusted`).
 """
 
 import contextlib
@@ -20,9 +21,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
 
-from clipper.core.interfaces import FrameExtractor
-from clipper.domain.errors import FrameError, ReviewError
-from clipper.domain.models import RenderManifest
+from clipper.core.interfaces import FrameExtractor, ReviewFiles
+from clipper.domain.errors import ClipperError, FrameError, JudgingError, ReviewError
+from clipper.domain.models import LabeledVideo, ManifestClip, RenderManifest
+from clipper.review.store import (
+    BadRequest,
+    ReviewStore,
+    UnknownClip,
+    parse_save,
+    parse_trash,
+)
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -40,11 +48,18 @@ _STATIC = {
 _FRAME_PATH = re.compile(r"/frames/(\d{1,7})\.jpg")
 # Frames never change for a given video, so the browser may keep them.
 _FRAME_CACHE = "max-age=86400"
+# A judgment on one clip: /api/clips/<rank>/save or /trash.
+_ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash)")
+_MAX_BODY = 64 * 1024
 
 
 @dataclass(frozen=True)
 class ReviewSession:
-    """What one `clipper review` run serves."""
+    """What one `clipper review` run serves.
+
+    `labels` are the judged labels at `labels_path` when the run started, or
+    None if there were none yet; `files` writes them and the manifest.
+    """
 
     folder: Path
     manifest: RenderManifest
@@ -52,6 +67,9 @@ class ReviewSession:
     duration_seconds: float
     frames: FrameExtractor
     frames_dir: Path
+    labels: LabeledVideo | None
+    labels_path: Path
+    files: ReviewFiles
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -117,36 +135,52 @@ def parse_range(header: str | None, size: int) -> tuple[int, int] | None:
     return start, min(end, size - 1)
 
 
-def clips_payload(session: ReviewSession) -> dict[str, object]:
-    """The page's view of the manifest: each clip with its range, clamped."""
-    manifest = session.manifest
+def make_store(session: ReviewSession) -> ReviewStore:
+    """The run's store, starting from the session's manifest and labels."""
+    return ReviewStore(
+        session.folder,
+        session.manifest,
+        session.labels,
+        session.labels_path,
+        session.files,
+    )
+
+
+def clip_payload(
+    session: ReviewSession, store: ReviewStore, clip: ManifestClip
+) -> dict[str, object]:
+    """One clip as the page sees it: its range, clamped, and its judgment."""
+    return {
+        "rank": clip.rank,
+        "start": clip.start_seconds,
+        "end": clip.end_seconds,
+        "range_start": max(clip.start_seconds - RANGE_SECONDS, 0.0),
+        "range_end": min(clip.end_seconds + RANGE_SECONDS, session.duration_seconds),
+        "title": clip.title,
+        "hook": clip.hook,
+        "file": clip.file,
+        "error": clip.error,
+        "reviewed": clip.reviewed,
+        "judgment": store.judgment(clip),
+    }
+
+
+def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, object]:
+    """The page's view of the manifest and the judgments so far."""
+    manifest = store.manifest
     return {
         "source": manifest.source,
         "vertical": manifest.vertical,
         "captions": manifest.captions,
         "titles": manifest.titles,
         "duration": session.duration_seconds,
-        "clips": [
-            {
-                "rank": clip.rank,
-                "start": clip.start_seconds,
-                "end": clip.end_seconds,
-                "range_start": max(clip.start_seconds - RANGE_SECONDS, 0.0),
-                "range_end": min(
-                    clip.end_seconds + RANGE_SECONDS, session.duration_seconds
-                ),
-                "title": clip.title,
-                "hook": clip.hook,
-                "file": clip.file,
-                "error": clip.error,
-            }
-            for clip in manifest.clips
-        ],
+        "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
     }
 
 
 def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
     video_type = mimetypes.guess_type(session.video.name)[0] or "video/mp4"
+    store = make_store(session)
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -157,8 +191,7 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     body = (files("clipper.review") / "static" / name).read_bytes()
                     self._send(HTTPStatus.OK, content_type, body)
                 elif path == "/api/clips":
-                    body = json.dumps(clips_payload(session)).encode("utf-8")
-                    self._send(HTTPStatus.OK, "application/json", body)
+                    self._send_json(HTTPStatus.OK, clips_payload(session, store))
                 elif path == "/video":
                     self._send_video()
                 elif frame := _FRAME_PATH.fullmatch(path):
@@ -168,6 +201,73 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             except ConnectionError:
                 # The browser drops video requests whenever it seeks.
                 pass
+
+        def do_POST(self) -> None:
+            path = self.path.split("?", 1)[0]
+            action = _ACTION_PATH.fullmatch(path)
+            if action is None:
+                self._not_found()
+                return
+            if not self._trusted():
+                self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
+                return
+            rank, verb = int(action.group(1)), action.group(2)
+            try:
+                data = self._read_json()
+                if verb == "save":
+                    clip = store.save(rank, parse_save(data, session.duration_seconds))
+                else:
+                    clip = store.trash(rank, parse_trash(data))
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except UnknownClip:
+                self._send_error(HTTPStatus.NOT_FOUND, f"No clip ranked {rank}")
+            except JudgingError as exc:
+                self._send_error(HTTPStatus.CONFLICT, str(exc))
+            except (ClipperError, OSError) as exc:
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, clip_payload(session, store, clip))
+
+        def _trusted(self) -> bool:
+            """Whether a POST comes from the page itself.
+
+            Any site open in the browser can POST to the loopback address. A
+            JSON content type cannot be sent cross-site without a preflight,
+            which this server never answers; the Origin must be this page;
+            and the Host must be the loopback address, against DNS rebinding.
+            """
+            address = self.server.server_address
+            if not isinstance(address, tuple):
+                return False
+            port = address[1]
+            hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            host = self.headers.get("Host", "")
+            content_type = self.headers.get("Content-Type", "")
+            return (
+                host in hosts
+                and self.headers.get("Origin") == f"http://{host}"
+                and content_type.split(";")[0].strip() == "application/json"
+            )
+
+        def _read_json(self) -> object:
+            try:
+                length = int(self.headers.get("Content-Length", ""))
+            except ValueError as exc:
+                raise BadRequest("a Content-Length is needed") from exc
+            if not 0 <= length <= _MAX_BODY:
+                raise BadRequest(f"the body must be at most {_MAX_BODY} bytes")
+            try:
+                return json.loads(self.rfile.read(length))
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise BadRequest("the body is not valid JSON") from exc
+
+        def _send_json(self, status: HTTPStatus, data: object) -> None:
+            body = json.dumps(data).encode("utf-8")
+            self._send(status, "application/json", body)
+
+        def _send_error(self, status: HTTPStatus, message: str) -> None:
+            self._send_json(status, {"error": message})
 
         def _send(
             self,

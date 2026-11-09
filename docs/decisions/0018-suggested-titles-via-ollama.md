@@ -155,6 +155,14 @@ hook that turned the speaker's point into its opposite.
   unverified without watching the clips.
 - Manual step R19's pass criteria now check the word limits.
 
+## Amended by the review page's Save PR (V5 item 3c)
+
+- **The maintainer may change or clear a title in the review page** (0024).
+  `ManifestClip` no longer requires `title` and `hook` together, nor a
+  rendered file for them: a typed title sits beside the model's hook, and an
+  emptied title box clears the title and keeps the hook. `render --titles`
+  still writes both together on a rendered clip, as before.
+
 ## Revisit when
 
 - Titles need a different model from the detector.

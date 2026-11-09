@@ -202,6 +202,57 @@ until the drafts rarely need editing.
   cold and 0.02 s cached. A second past the end made ffmpeg exit non-zero.
   The page itself is checked by manual steps RV5 and RV6.
 
+## Amended by the Save and Trash PR (V5 item 3c)
+
+- **Judged labels** go to `<labels dir>/picks/<stem>.json` (the path in
+  0012's V5 amendment), loaded when `review` starts. A broken file, one for
+  another video, or one with labels without verdicts is `Error:`, exit 1,
+  before serving.
+- **Save** writes the clip's label: `post` if the span is unchanged to the
+  millisecond, else `fix` with the draft's span in `draft`; the notes are
+  the label's `note`. Then the manifest gets the title as typed and
+  `reviewed: "saved"` (0019, 0018 amendments). No re-render yet (3d).
+- **Trash** writes a rejected span with the notes, deletes the clip's file,
+  then marks the manifest entry `reviewed: "trashed"` with no file. Each step
+  can be repeated, so a Trash that failed part way (a file held open on
+  Windows) is retried by pressing it again. Only a plain file name in the
+  folder is deleted. The page asks for a second click within 3 s.
+- **A clip's own judgment is found by its draft span**, to the millisecond:
+  a `post` label's span, a `fix` label's `draft`, or a rejected span. Saving
+  or trashing again replaces it, so the last judgment stands.
+- **One label per moment.** A Save whose span overlaps another clip's label
+  is refused (`409`), naming that label. Merging or replacing it would
+  silently change an earlier judgment. Pooled drafts from two detectors
+  (V5 item 4) can overlap; the maintainer trims one or trashes it as a
+  duplicate.
+- **Save on a trashed clip is refused** (`409`): its file is gone, and
+  nothing re-renders it until 3d. A mistaken Trash is undone by editing the
+  labels file by hand.
+- **Endpoints**: `POST /api/clips/<rank>/save` (`{start, end, title, note}`)
+  and `/trash` (`{note}`), answering with the clip as it now stands; `400`
+  for a bad body (not an object, times outside the video or not numbers, end
+  not after start, a title over one line or 200 characters, over 64 KB),
+  `404` for no such rank, `409` as above, `500` for a write failure. Writes
+  run one at a time under a lock. `/api/clips` gives each clip's `reviewed`
+  and `judgment`, so a reload restores saved spans and notes.
+- **Only the page may write.** Any site open in the browser can POST to the
+  loopback address. A POST needs `Content-Type: application/json` (which a
+  cross-site page cannot send without a preflight this server never
+  answers), an `Origin` of the page itself, and a `Host` of `127.0.0.1` or
+  `localhost` with the port, against DNS rebinding. Anything else is `403`.
+- **Layers**: the pure logic is `core/judging.py`; files go through a
+  `ReviewFiles` Protocol (`JsonReviewFiles` wraps the existing label and
+  manifest writers), built by `AppContext.review_files`; `review/store.py`
+  holds the run's state. `review/` still imports no adapter.
+- **Checked by the assistant** (2026-11-09, on a copy of
+  `data/clips/v2917872953` with labels in a scratch folder, no browser): a
+  fix, a post and a trash written as expected, the trashed file deleted,
+  Save on it `409`, a POST with another Origin `403`; a restart restored all
+  three judgments and the typed title; `eval` with `CLIPPER_LABELS_DIR` on
+  the scratch picks folder read the file: 2 keepers (1 as cut, 1 ending
+  2.5 s early), 1 rejected, 2 unjudged. The page is checked by manual step
+  RV7.
+
 ## Related
 
 - 0011: render's failure policy

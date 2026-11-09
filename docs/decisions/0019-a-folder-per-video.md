@@ -86,6 +86,21 @@ with one entry, the constructed failure from R14 was listed with ffmpeg's
 `Permission denied` message, and a rank error left it unchanged. The v0.3
 analysis of the same video gave `captions` `segments` and `detector` `null`.
 
+## Amended by the review page's Save PR (V5 item 3c)
+
+- **`reviewed`** per clip: `"saved"`, `"trashed"` or absent, written by the
+  review page (0024). Older manifests read as absent.
+- **A trashed clip has no `file`**: Trash deleted it. It needs no `error`,
+  and keeps one it had. Every other clip still has exactly one of `file` and
+  `error`.
+- **The title** may be changed or cleared in the page (0018 amendment).
+- **Start and end are unchanged by Save** in this item: the file still
+  covers the draft's span until a re-render (V5 item 3d). The saved span is
+  in the judged label.
+- The page replaces `manifest.json` whole, as `render` does. A later
+  `render` or `drafts` run on the folder still replaces it and loses these
+  fields (decision 3); the judged labels are separate files.
+
 ## Revisit when
 
 - The maintainer wants a run's earlier clips kept in the manifest.

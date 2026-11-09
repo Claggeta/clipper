@@ -1,12 +1,16 @@
-// The review page (ADR 0024). Items 3a and 3b: list the clips, play the
-// source video anywhere, and trim with a film strip and two handles. Edits
-// live in the page until Save arrives (3c).
+// The review page (ADR 0024). List the clips, play the source video
+// anywhere, trim with a film strip and two handles (3b), and Save or Trash
+// each clip with its title and notes (3c).
 "use strict";
 
 const player = document.getElementById("player");
 const list = document.getElementById("clips");
 const strip = document.getElementById("strip");
 const tiles = document.getElementById("tiles");
+const titleBox = document.getElementById("title-box");
+const noteBox = document.getElementById("note-box");
+const saveButton = document.getElementById("save");
+const trashButton = document.getElementById("trash");
 
 // Seconds per frame in the strip, from zoomed in to zoomed out. Fixed
 // steps keep frames on a grid, so views share cached frames.
@@ -17,10 +21,14 @@ const MIN_SPAN = 0.5;
 // Lengths outside this are shown in the warning colour (ADR 0023).
 const MIN_LENGTH = 15;
 const MAX_LENGTH = 90;
+// How long Trash waits for its confirming second click, in milliseconds.
+const CONFIRM_MS = 3000;
 
 let duration = 0;
 let current = null;
+const buttons = new Map(); // rank -> the clip's button in the list
 const edits = new Map(); // rank -> {start, end}, kept while the page is open
+let trashArmed = null; // the timer while Trash waits for its second click
 let span = null; // the chosen clip's edited {start, end}
 const view = { start: 0, step: 5, count: 10 };
 let preview = null; // {end, settling} while Preview span plays
@@ -157,8 +165,58 @@ function drawTimes() {
   const lengthCell = document.getElementById("edit-length");
   lengthCell.textContent = `${length.toFixed(1)} s`;
   lengthCell.classList.toggle("warn", length < MIN_LENGTH || length > MAX_LENGTH);
-  const changed = span.start !== current.start || span.end !== current.end;
-  document.getElementById("edited").hidden = !changed;
+  drawUnsaved();
+}
+
+// What is on disk for a clip: its label's span, else the draft's; its
+// manifest title; its judgment's note.
+function savedState(clip) {
+  const judged = clip.judgment && clip.judgment.start !== undefined;
+  return {
+    start: judged ? clip.judgment.start : clip.start,
+    end: judged ? clip.judgment.end : clip.end,
+    title: clip.title || "",
+    note: (clip.judgment && clip.judgment.note) || "",
+  };
+}
+
+// Compared to the hundredth of a second the handles keep.
+function sameTime(a, b) {
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+function drawUnsaved() {
+  if (!current) {
+    return;
+  }
+  const saved = savedState(current);
+  const changed =
+    !sameTime(span.start, saved.start) ||
+    !sameTime(span.end, saved.end) ||
+    titleBox.value.trim() !== saved.title ||
+    noteBox.value.trim() !== saved.note;
+  document.getElementById("unsaved").hidden = !changed;
+}
+
+function badgeText(clip) {
+  if (clip.reviewed === "trashed") {
+    return "Trashed";
+  }
+  if (clip.judgment && clip.judgment.verdict === "fix") {
+    return "Fix";
+  }
+  if (clip.judgment && clip.judgment.verdict === "post") {
+    return "Post";
+  }
+  return "";
+}
+
+function drawBadge(clip) {
+  const badge = buttons.get(clip.rank).querySelector(".badge");
+  badge.textContent = badgeText(clip);
+  badge.dataset.state = badgeText(clip).toLowerCase();
+  const name = buttons.get(clip.rank).querySelector(".name");
+  name.textContent = clip.title || (clip.error ? "Render failed" : `Clip ${clip.rank}`);
 }
 
 // --- Choosing a clip ---
@@ -169,13 +227,23 @@ function select(clip, button) {
     other.setAttribute("aria-current", String(other === button));
   }
   if (!edits.has(clip.rank)) {
-    edits.set(clip.rank, { start: clip.start, end: clip.end });
+    const saved = savedState(clip);
+    edits.set(clip.rank, { start: saved.start, end: saved.end });
   }
   span = edits.get(clip.rank);
   preview = null;
+  disarmTrash();
+  notice("");
+  judgeNotice(
+    clip.reviewed === "trashed"
+      ? "Trashed. Saving it again needs a re-render, which is not built yet."
+      : "",
+  );
   document.getElementById("empty").hidden = true;
   document.getElementById("details").hidden = false;
-  text("title", clip.title || `Clip ${clip.rank}`);
+  titleBox.value = clip.title || "";
+  noteBox.value = (clip.judgment && clip.judgment.note) || "";
+  drawJudged(clip);
   text("hook", clip.hook || "");
   text("clip-span", `${fmt(clip.start)} - ${fmt(clip.end)}`);
   const error = document.getElementById("error");
@@ -290,6 +358,93 @@ document.getElementById("reset").addEventListener("click", () => {
   fit();
 });
 
+// --- Save and Trash ---
+
+function judgeNotice(message, failed = false) {
+  const line = document.getElementById("judge-notice");
+  line.textContent = message;
+  line.classList.toggle("error", failed);
+}
+
+function drawJudged(clip) {
+  const trashed = clip.reviewed === "trashed";
+  saveButton.disabled = trashed;
+  trashButton.disabled = trashed;
+  titleBox.disabled = trashed;
+  noteBox.disabled = trashed;
+  text("title", clip.title || `Clip ${clip.rank}`);
+}
+
+async function post(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `The server answered ${response.status}`);
+  }
+  return data;
+}
+
+// The server's reply is the clip as it now stands.
+function judged(clip, reply) {
+  Object.assign(clip, reply);
+  drawBadge(clip);
+  if (clip === current) {
+    drawJudged(clip);
+    drawUnsaved();
+  }
+}
+
+saveButton.addEventListener("click", async () => {
+  const clip = current;
+  disarmTrash();
+  try {
+    const reply = await post(`/api/clips/${clip.rank}/save`, {
+      start: span.start,
+      end: span.end,
+      title: titleBox.value,
+      note: noteBox.value,
+    });
+    judged(clip, reply);
+    judgeNotice(`Saved as ${reply.judgment.verdict}.`);
+  } catch (error) {
+    judgeNotice(error.message, true);
+  }
+});
+
+function disarmTrash() {
+  clearTimeout(trashArmed);
+  trashArmed = null;
+  trashButton.textContent = "Trash";
+  trashButton.classList.remove("armed");
+}
+
+trashButton.addEventListener("click", async () => {
+  if (trashArmed === null) {
+    trashButton.textContent = "Confirm trash";
+    trashButton.classList.add("armed");
+    trashArmed = setTimeout(disarmTrash, CONFIRM_MS);
+    return;
+  }
+  disarmTrash();
+  const clip = current;
+  try {
+    const reply = await post(`/api/clips/${clip.rank}/trash`, {
+      note: noteBox.value,
+    });
+    judged(clip, reply);
+    judgeNotice("Trashed; the clip's file is deleted.");
+  } catch (error) {
+    judgeNotice(error.message, true);
+  }
+});
+
+titleBox.addEventListener("input", drawUnsaved);
+noteBox.addEventListener("input", drawUnsaved);
+
 // --- Preview span: play from the start handle, pause at the end handle ---
 
 document.getElementById("preview").addEventListener("click", () => {
@@ -373,10 +528,14 @@ async function load() {
     const clipSpan = document.createElement("span");
     clipSpan.className = "span";
     clipSpan.textContent = `${fmt(clip.start)} - ${fmt(clip.end)}`;
-    button.append(rank, name, clipSpan);
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    button.append(rank, name, badge, clipSpan);
     button.addEventListener("click", () => select(clip, button));
     item.append(button);
     list.append(item);
+    buttons.set(clip.rank, button);
+    drawBadge(clip);
   }
 }
 
