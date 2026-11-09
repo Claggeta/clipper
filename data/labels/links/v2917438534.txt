@@ -1,0 +1,8 @@
+# Twitch community clips from lacy's stream of 2 Nov 2026, VOD 2917438534.
+# Collected by hand by the maintainer, 2026-11-09. Per line: the clip and its
+# "Watch full video" link (ADR 0012, Twitch clips amendment).
+https://www.twitch.tv/lacy/clip/KawaiiVastPicklesRalpherZ-yOH6KOcJnUa3nZjJ?range=7d https://www.twitch.tv/videos/2917438534?t=4h16m23s
+https://www.twitch.tv/lacy/clip/TentativeMotionlessOrcaCmonBruh-xxvJQmrstWucfDCo?range=7d https://www.twitch.tv/videos/2917438534?t=1h44m34s
+https://www.twitch.tv/lacy/clip/BlueTangibleWatercressGivePLZ-zxxfrASGyFXR_MmH?range=7d https://www.twitch.tv/videos/2917438534?t=2h1m48s
+https://www.twitch.tv/lacy/clip/SpeedySaltyOctopusBIRB-dWz7sl6TjVuuXJzL?range=7d https://www.twitch.tv/videos/2917438534?t=5h6m0s
+https://www.twitch.tv/lacy/clip/LuckyZanyFinchFeelsBadMan-ZDiryoKNR-uPvExY?range=7d https://www.twitch.tv/videos/2917438534?t=4h38m6s

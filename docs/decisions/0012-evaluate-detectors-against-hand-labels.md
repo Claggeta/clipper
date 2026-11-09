@@ -226,6 +226,16 @@ maintainer's own judgment of which moments in a video are worth cutting.
     on videos whose clips it did not see.
   - Reading clip metadata with yt-dlp falls under ADR 0020's accepted risk
     (its amendment for clip lookups).
+- **First real run** (2026-11-09, yt-dlp 2026.10.26, manual steps T0 to T6,
+  run by the assistant in a child process): 5 clips the maintainer collected
+  from VOD 2917438534 (lacy, 2 Nov 2026, 5:15:42) were looked up in 4.5 s and
+  gave 5 labels of 24 to 32 s, none merged, 2.4 minutes in all. `eval` with
+  the heuristic on `v2917438534.json`: recall 0 of 5 and precision 0 of 5 at
+  top 5; recall 1 of 5 and precision 1 of 30 at top 30 (candidate 16 on
+  label 2, no repeats). The top candidate, 4:38:02-4:38:38, overlaps label 4
+  (4:37:36-4:38:06) by 4 s, short of the 15 s a hit needs; shifting the label
+  by the up-to-4 s error would not reach it either. Five clips are a small
+  sample, and the transcript was cached from an earlier run.
 
 ## Related
 
