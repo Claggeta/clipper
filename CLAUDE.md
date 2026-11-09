@@ -594,9 +594,11 @@ Items 8 and 9 do not depend on picking and may land earlier.
    ADR 0012 amendment.~~ (done; #128; verdicts `post`, `fix`, `added`, and
    gaps at each end in place of seconds dragged)
 3. `clipper review` (ADR 0024), in PRs:
-   - 3a. Server, clip list and a player on the source video over the clip
+   - 3a. ~~Server, clip list and a player on the source video over the clip
      plus 120 s either side. Decides the HTTP server (standard library or a
-     framework, checked against 0003) and where the code lives. Manual step.
+     framework, checked against 0003) and where the code lives. Manual
+     step.~~ (done; #130; standard library, `src/clipper/review/`, manual
+     steps RV0 to RV4; RV2 and RV3 run, RV1 in a browser not yet)
    - 3b. Film strip from cached ffmpeg thumbnails, with start and end
      handles. Manual step.
    - 3c. Save, Trash, title and notes, writing judged labels and the
