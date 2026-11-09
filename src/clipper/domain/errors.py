@@ -27,7 +27,11 @@ class ClipRenderError(ClipperError):
 
 
 class ManifestError(ClipperError):
-    """Raised when a render manifest cannot be written."""
+    """Raised when a render manifest cannot be loaded or written."""
+
+
+class ReviewError(ClipperError):
+    """Raised when the review page cannot be served."""
 
 
 class LabelsError(ClipperError):

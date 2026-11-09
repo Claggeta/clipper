@@ -18,7 +18,11 @@ from clipper.adapters.results.labels_json import (
     load_links,
     save_labels,
 )
-from clipper.adapters.results.manifest_json import save_manifest
+from clipper.adapters.results.manifest_json import (
+    check_manifest_source,
+    load_manifest,
+    save_manifest,
+)
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
@@ -28,7 +32,12 @@ from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.sources import parse_video_url, video_path
-from clipper.domain.errors import ClipperError, ClipRenderError, LabelsError
+from clipper.domain.errors import (
+    ClipperError,
+    ClipRenderError,
+    LabelsError,
+    ReviewError,
+)
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
@@ -39,6 +48,7 @@ from clipper.domain.models import (
     Transcript,
     VideoSource,
 )
+from clipper.review.server import DEFAULT_PORT, ReviewSession
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
@@ -694,3 +704,64 @@ def labels(
     console.print(f"Labels after merging: {len(labeled.labels)}")
     console.print(f"Minutes covered: {minutes:.1f}")
     console.print(f"Saved: {escape(str(target))}", soft_wrap=True)
+
+
+@app.command()
+def review(
+    ctx: typer.Context,
+    folder: Annotated[
+        Path, typer.Argument(help="A folder of drafts with its manifest.json.")
+    ],
+    video: Annotated[
+        Path | None,
+        typer.Option(
+            "--video",
+            help="The source video. Default: <videos dir>/<manifest source>.",
+            show_default=False,
+        ),
+    ] = None,
+    port: Annotated[
+        int, typer.Option("--port", help="Port on 127.0.0.1 to serve the page on.")
+    ] = DEFAULT_PORT,
+    open_browser: Annotated[
+        bool, typer.Option("--open/--no-open", help="Open the page in a browser.")
+    ] = True,
+) -> None:
+    """Review a folder of drafts in a local browser page (docs/decisions/0024).
+
+    The page plays the source video around each clip. It is served on the
+    loopback address only, until Ctrl+C.
+    """
+    settings = Settings()
+    build = _context(ctx)
+    try:
+        manifest = load_manifest(folder)
+        if video is None:
+            video = settings.videos_dir / manifest.source
+        if not video.is_file():
+            raise ReviewError(
+                f"Video not found: {video}; pass --video with the source video"
+            )
+        check_manifest_source(manifest, video)
+        info = build.probe().probe(video)
+        if not info.has_video:
+            raise ReviewError(f"{video} has no video stream to show")
+        session = ReviewSession(
+            folder=folder,
+            manifest=manifest,
+            video=video,
+            duration_seconds=info.duration_seconds,
+        )
+        build.serve(
+            session,
+            port,
+            open_browser,
+            lambda url: console.print(
+                f"Review: {url} ({_count(len(manifest.clips), 'clip')}; "
+                "Ctrl+C to stop)",
+                soft_wrap=True,
+            ),
+        )
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc

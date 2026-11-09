@@ -24,6 +24,8 @@ from clipper.core.interfaces import (
     Transcriber,
 )
 from clipper.domain.errors import DetectionError, TitleError
+from clipper.review.server import ReviewSession
+from clipper.review.server import serve as serve_review
 
 
 class DetectorName(StrEnum):
@@ -104,3 +106,8 @@ class AppContext:
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     downloader: Callable[[Settings], Downloader] = build_downloader
     clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup
+    # Serves the review page until Ctrl+C (ADR 0024); tests pass a stub so
+    # `review` does not block.
+    serve: Callable[[ReviewSession, int, bool, Callable[[str], None]], None] = (
+        serve_review
+    )
