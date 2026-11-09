@@ -1,14 +1,17 @@
 """The local review page for a folder of drafts. See docs/decisions/0024.
 
 The server binds to the loopback address only and serves a fixed set of
-paths: the page's own files, the clips as JSON, and the source video with
-HTTP range requests so the browser can seek in it.
+paths: the page's own files, the clips as JSON, the source video with HTTP
+range requests so the browser can seek in it, and cached still frames for
+the film strip.
 """
 
 import contextlib
 import json
 import mimetypes
 import os
+import re
+import threading
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,7 +20,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
 
-from clipper.domain.errors import ReviewError
+from clipper.core.interfaces import FrameExtractor
+from clipper.domain.errors import FrameError, ReviewError
 from clipper.domain.models import RenderManifest
 
 HOST = "127.0.0.1"
@@ -32,6 +36,10 @@ _STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
+# A film strip frame, at a whole second: /frames/<second>.jpg.
+_FRAME_PATH = re.compile(r"/frames/(\d{1,7})\.jpg")
+# Frames never change for a given video, so the browser may keep them.
+_FRAME_CACHE = "max-age=86400"
 
 
 @dataclass(frozen=True)
@@ -42,6 +50,37 @@ class ReviewSession:
     manifest: RenderManifest
     video: Path
     duration_seconds: float
+    frames: FrameExtractor
+    frames_dir: Path
+
+
+def frames_folder(cache_dir: Path, video: Path) -> Path:
+    """Where one video's film strip frames are cached: by name and size."""
+    return cache_dir / "frames" / f"{video.stem}-{video.stat().st_size}"
+
+
+def cached_frame(session: ReviewSession, second: int) -> Path:
+    """The frame at `second`, made once and then read from the cache.
+
+    The extractor writes to a name unique to the thread, then the file is
+    renamed into place, so two requests for one frame never half-write it.
+    On Windows the rename fails while another request reads the frame; the
+    frame is there, so that is not an error.
+    """
+    path = session.frames_dir / f"{second}.jpg"
+    if path.is_file():
+        return path
+    temp = path.with_name(f"{second}.{threading.get_ident()}.part.jpg")
+    try:
+        session.frames.extract(session.video, float(second), temp)
+        try:
+            os.replace(temp, path)
+        except PermissionError:
+            if not path.is_file():
+                raise
+    finally:
+        temp.unlink(missing_ok=True)
+    return path
 
 
 class UnsatisfiableRange(Exception):
@@ -122,19 +161,42 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     self._send(HTTPStatus.OK, "application/json", body)
                 elif path == "/video":
                     self._send_video()
+                elif frame := _FRAME_PATH.fullmatch(path):
+                    self._send_frame(int(frame.group(1)))
                 else:
-                    self._send(HTTPStatus.NOT_FOUND, "text/plain", b"Not found")
+                    self._not_found()
             except ConnectionError:
                 # The browser drops video requests whenever it seeks.
                 pass
 
-        def _send(self, status: HTTPStatus, content_type: str, body: bytes) -> None:
+        def _send(
+            self,
+            status: HTTPStatus,
+            content_type: str,
+            body: bytes,
+            cache: str = "no-store",
+        ) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", cache)
             self.end_headers()
             self.wfile.write(body)
+
+        def _not_found(self) -> None:
+            self._send(HTTPStatus.NOT_FOUND, "text/plain", b"Not found")
+
+        def _send_frame(self, second: int) -> None:
+            if second >= session.duration_seconds:
+                self._not_found()
+                return
+            try:
+                body = cached_frame(session, second).read_bytes()
+            except (FrameError, OSError) as exc:
+                message = str(exc).encode("utf-8")
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, "text/plain", message)
+                return
+            self._send(HTTPStatus.OK, "image/jpeg", body, cache=_FRAME_CACHE)
 
         def _send_video(self) -> None:
             size = session.video.stat().st_size

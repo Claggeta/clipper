@@ -2224,10 +2224,11 @@ Remove-Item -Recurse -Force $S
 
 Covers `clipper review`
 ([ADR 0024](decisions/0024-review-drafts-in-a-local-browser-page.md), item 3a
-amendment). The tests run the server on a free port with a small file, and no
-browser. This section checks the page in a real browser on a real drafts
-folder, seeking in a multi-GB VOD, and the errors before the server starts.
-Nothing is written.
+amendment). The tests run the server on a free port with a small file, a fake
+frame extractor, and no browser. This section checks the page in a real
+browser on a real drafts folder, seeking in a multi-GB VOD, the film strip
+and handles, and the errors before the server starts. Only film strip frames
+are written, under `data\cache\frames\` (film strip amendment).
 
 ### RV0. Setup
 
@@ -2290,9 +2291,52 @@ data\clips\manifest.json`. Stop RV1's server with Ctrl+C.
 ### RV4. An AV1 source (observe and record)
 
 YouTube gave AV1 for `oFbD0Ot7nQ8.mp4` (ADR 0020). If a drafts folder exists
-for an AV1 source, repeat RV1 on it and record whether the browser plays and
-seeks it. Making one needs `drafts` or `render` on that video; its transcript
-is cached.
+for an AV1 source, repeat RV1 and RV5 on it and record whether the browser
+plays and seeks it, and how long its first strip takes. Making one needs
+`drafts` or `render` on that video; its transcript is cached.
+
+### RV5. The film strip
+
+```powershell
+uv run clipper review $Folder
+```
+
+Click a clip. Pass: under the step buttons a row of frames appears, each
+labelled with its time, covering the clip plus about 2 minutes either side;
+the scale reads `<n> s per frame`. The clip's span is outlined in yellow and
+the rest dimmed; a white line follows the playhead. The first strip of a clip
+fills in within a few seconds (record the time); choosing the clip again, or
+reloading the page, shows it at once. Zoom in and Zoom out change the scale
+(1, 2, 5, 10, 15, 30, 60 s per frame) around the same centre; ‹ and › move by
+half a strip; Fit clip returns to the first view. Clicking a frame seeks the
+player there. In a second terminal, `(Get-ChildItem
+data\cache\frames\*\*.part.jpg).Count` is 0.
+
+Recorded by the assistant (2026-11-09, `v2917872953`, 17.7 GB H.264, no
+browser): one frame takes about 220 ms with ffmpeg; 20 frames fetched 6 at a
+time from the server took 1.34 s cold and 0.02 s cached; a second past the
+end is `404`.
+
+### RV6. Handles, Set start/end, Preview and Reset
+
+With RV5's page open, on one clip:
+
+1. Drag the start handle left. The player shows the frame under it, and
+   Start and Length update; `Edited` appears. Drag it past the strip's left
+   edge: the strip moves with it.
+2. Drag the end handle right past the clip's end by a few seconds. It cannot
+   cross the start handle.
+3. Seek with the step buttons, press Set end, then Set start somewhere
+   earlier. The handles move there; a time off the strip recentres it. Set
+   start after the end shows `The start must be before the end.`
+4. Press Preview span. It plays from the start handle and pauses at the end
+   handle, within a frame. Press it again and seek during playback: it plays
+   on past the end (seeking cancels the preview).
+5. A length under 15 s or over 90 s shows in red.
+6. Choose another clip and come back: the edit is kept. Reset returns to the
+   draft's span. Reloading the page drops edits (Save is item 3c).
+
+Ctrl+C stops the server.
 
 ## Record your run
 

@@ -48,7 +48,7 @@ from clipper.domain.models import (
     Transcript,
     VideoSource,
 )
-from clipper.review.server import DEFAULT_PORT, ReviewSession
+from clipper.review.server import DEFAULT_PORT, ReviewSession, frames_folder
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
@@ -729,8 +729,9 @@ def review(
 ) -> None:
     """Review a folder of drafts in a local browser page (docs/decisions/0024).
 
-    The page plays the source video around each clip. It is served on the
-    loopback address only, until Ctrl+C.
+    The page plays the source video, with a film strip of frames cached
+    under the cache dir. It is served on the loopback address only, until
+    Ctrl+C.
     """
     settings = Settings()
     build = _context(ctx)
@@ -751,6 +752,8 @@ def review(
             manifest=manifest,
             video=video,
             duration_seconds=info.duration_seconds,
+            frames=build.frames(),
+            frames_dir=frames_folder(settings.cache_dir, video),
         )
         build.serve(
             session,

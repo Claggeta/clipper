@@ -12,6 +12,9 @@
 
 * { box-sizing: border-box; }
 
+/* Elements styled with a display value still hide when marked hidden. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -112,15 +115,25 @@ video {
   border-radius: 8px;
 }
 
-.steps {
+.steps,
+.strip-bar,
+.trim-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
   gap: 6px;
   margin-top: 10px;
 }
 
-.steps button {
+.steps { justify-content: center; }
+
+.strip-bar { margin-top: 16px; }
+
+.strip-bar .muted { margin-left: auto; font-size: 12px; }
+
+.steps button,
+.strip-bar button,
+.trim-actions button {
   min-width: 60px;
   padding: 6px 10px;
   border: 1px solid var(--line);
@@ -132,7 +145,118 @@ video {
   cursor: pointer;
 }
 
-.steps button:hover { border-color: var(--accent); }
+.steps button:hover,
+.strip-bar button:hover,
+.trim-actions button:hover { border-color: var(--accent); }
+
+.trim-actions .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #111;
+  font-weight: 600;
+}
+
+/* The film strip: frames, then the dimmed outside, the span, the playhead
+   and the two handles on top. Only the handles take the pointer, so a
+   click anywhere else reaches the frames and seeks. */
+.strip {
+  position: relative;
+  height: 72px;
+  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #000;
+  user-select: none;
+  touch-action: none;
+}
+
+.tiles {
+  display: flex;
+  height: 100%;
+  cursor: pointer;
+}
+
+.tile {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid #000;
+  background: var(--raised);
+}
+
+.tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tile span {
+  position: absolute;
+  left: 3px;
+  bottom: 2px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.6);
+  color: var(--text);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dim,
+.selection,
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.dim { background: rgb(0 0 0 / 0.6); }
+
+.dim.before { left: 0; }
+
+.dim.after { right: 0; }
+
+.selection {
+  border-top: 3px solid var(--accent);
+  border-bottom: 3px solid var(--accent);
+}
+
+.playhead {
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 3px #000;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  margin-left: -7px;
+  border-radius: 3px;
+  background: var(--accent);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.handle::after {
+  content: "";
+  position: absolute;
+  top: 26px;
+  bottom: 26px;
+  left: 6px;
+  width: 2px;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.warn { color: var(--error); }
+
+.accent { color: var(--accent); }
 
 .details h2 { margin: 16px 0 4px; font-size: 18px; }
 
