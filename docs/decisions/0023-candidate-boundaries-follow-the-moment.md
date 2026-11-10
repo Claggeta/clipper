@@ -86,6 +86,30 @@ The maintainer wants clip length to follow the moment, not a fixed window
 - (-) Transcript gaps miss moments where speech carries on over the action
   (talking while the food is tried). Those need audio or visual signals.
 
+## Amended by the V5 baseline (item 4)
+
+Heuristic and LLM (`qwen3.5:9b`) top 10 on four trial VODs, every draft
+judged in the review page, labels in `data/labels/picks/`. The gaps are
+label minus candidate, from `eval` (0012). Ohnepixel (v2924046310) is left
+out: its video started at 64 s, the player ran 64 s off while it was
+judged, and its labels were moved by -64 s (0024 start offset amendment),
+so most of its labels no longer sit on the drafts' own spans.
+
+On the other three VODs, 31 keepers (13 heuristic, 18 LLM):
+
+- **Ends.** 12 of 31 end early: the maintainer moved the end 2.4, 6.4, 8.1,
+  10.9, 15.8, 17.0, 17.2, 18.2, 24.5, 29.2, 29.7 and 36.7 s later (median
+  17.1 s). 17 are as cut or within 1 s. 2 end over 1 s earlier (-13.2 and
+  -22.5 s), both from a whole clip moved earlier, not a trimmed end.
+- **Starts.** 3 of 31 start earlier, by 8.3, 13.2 and 29.5 s; the last two
+  are the same two whole-clip moves. No keeper starts later.
+- **What this sets.** The extensions are far longer than the gap to the next
+  speech after the last word (0 to 0.74 s on the first trial's drafts), so a
+  pause of under a second would barely move an end. Item 5 chooses the pause
+  length by trying lengths against these 12 ends, read from the
+  transcripts, and records the choice in its own amendment. Decision 5
+  stands: starts are dragged on 3 keepers against 12 ends, so starts stay.
+
 ## Revisit when
 
 - The baseline shows starts dragged as often as ends: extend starts too.

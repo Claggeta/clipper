@@ -1,0 +1,141 @@
+{
+  "source": "v2917872953.mp4",
+  "labels": [
+    {
+      "start": "0:06:17.26",
+      "end": "0:06:57.69",
+      "verdict": "post",
+      "note": "Introductory clip back from a break. People would be interested in seeing what he says coming back."
+    },
+    {
+      "start": "0:12:00.03",
+      "end": "0:12:44.43",
+      "verdict": "post",
+      "note": "OK clip"
+    },
+    {
+      "start": "0:32:46.1",
+      "end": "0:33:29.84",
+      "verdict": "post",
+      "note": "Ron is talking about popular new technology. Interesting to the viewer. Funny ending."
+    },
+    {
+      "start": "0:54:15.97",
+      "end": "0:54:58.17",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:54:15.97",
+        "end": "0:54:58.91"
+      },
+      "note": "Funny banter clip between Ron and Jason"
+    },
+    {
+      "start": "1:28:32.06",
+      "end": "1:29:30.53",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:28:32.06",
+        "end": "1:29:14.77"
+      },
+      "note": "Interesting food clip"
+    },
+    {
+      "start": "1:36:00.14",
+      "end": "1:36:43.66",
+      "verdict": "post",
+      "note": "OK clip. Interesting food."
+    },
+    {
+      "start": "1:49:00.91",
+      "end": "1:49:44.27",
+      "verdict": "post",
+      "note": "Interesting food. OK clip"
+    },
+    {
+      "start": "2:29:16",
+      "end": "2:30:28.32",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:29:16",
+        "end": "2:29:59.14"
+      },
+      "note": "Funny clip"
+    },
+    {
+      "start": "2:39:14.86",
+      "end": "2:40:10.58",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:39:14.86",
+        "end": "2:39:40.9"
+      },
+      "note": "Funny clip talking about another popular creator."
+    },
+    {
+      "start": "3:22:15.63",
+      "end": "3:22:57.87",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:22:15.63",
+        "end": "3:22:58.45"
+      },
+      "note": "Interesting and relatable clip."
+    },
+    {
+      "start": "3:23:00.95",
+      "end": "3:23:46.34",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:23:00.95",
+        "end": "3:23:43.96"
+      },
+      "note": "Funny moment between Ron and Jason"
+    },
+    {
+      "start": "3:49:00.17",
+      "end": "3:50:00.83",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:49:00.17",
+        "end": "3:49:43.79"
+      },
+      "note": "Scenic background. Interesting conversation."
+    },
+    {
+      "start": "4:00:01.3",
+      "end": "4:00:42.1",
+      "verdict": "post",
+      "note": "Semi-funny clip"
+    },
+    {
+      "start": "4:38:50.57",
+      "end": "4:39:27.59",
+      "verdict": "post",
+      "note": "Funny clip with Kai Cenat"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:03:43.25",
+      "end": "0:03:57.21"
+    },
+    {
+      "start": "0:31:46.53",
+      "end": "0:32:28.52"
+    },
+    {
+      "start": "1:06:30.63",
+      "end": "1:07:14.81",
+      "note": "Not enough context"
+    },
+    {
+      "start": "3:33:45.04",
+      "end": "3:34:29.06",
+      "note": "Nothing really happened"
+    },
+    {
+      "start": "4:14:35.08",
+      "end": "4:14:53.99"
+    }
+  ]
+}

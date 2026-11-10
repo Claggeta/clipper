@@ -1,0 +1,126 @@
+{
+  "source": "v2922695332.mp4",
+  "labels": [
+    {
+      "start": "0:19:01.25",
+      "end": "0:19:45.45",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:19:01.25",
+        "end": "0:19:34.58"
+      },
+      "note": "The start grabs the viewer's attention. Jason carries on with the bit."
+    },
+    {
+      "start": "0:30:06.68",
+      "end": "0:30:47.32",
+      "verdict": "post",
+      "note": "Funny clip"
+    },
+    {
+      "start": "0:42:38.41",
+      "end": "0:43:50.34",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:42:38.41",
+        "end": "0:43:13.65"
+      },
+      "note": "Funny Clip"
+    },
+    {
+      "start": "1:39:02.92",
+      "end": "1:39:56.43",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:39:11.23",
+        "end": "1:39:48.34"
+      },
+      "note": "Relatable story with a lesson."
+    },
+    {
+      "start": "1:45:36.38",
+      "end": "1:46:11.79",
+      "verdict": "post"
+    },
+    {
+      "start": "1:50:28.05",
+      "end": "1:50:59.94",
+      "verdict": "post",
+      "note": "OK clip"
+    },
+    {
+      "start": "3:20:54.01",
+      "end": "3:21:30.61",
+      "verdict": "post"
+    },
+    {
+      "start": "3:43:49.91",
+      "end": "3:44:57.73",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:43:49.91",
+        "end": "3:44:33.27"
+      }
+    },
+    {
+      "start": "5:16:02.46",
+      "end": "5:16:31.42",
+      "verdict": "fix",
+      "draft": {
+        "start": "5:16:02.46",
+        "end": "5:16:14.25"
+      },
+      "note": "Funny moment"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:12:36.33",
+      "end": "0:13:13.96",
+      "note": "Nothing happened"
+    },
+    {
+      "start": "1:07:05.21",
+      "end": "1:07:48.83"
+    },
+    {
+      "start": "1:22:54.49",
+      "end": "1:23:30.04",
+      "note": "Doesn't make sense"
+    },
+    {
+      "start": "1:23:07.08",
+      "end": "1:23:44.34"
+    },
+    {
+      "start": "1:38:06.2",
+      "end": "1:38:49.02"
+    },
+    {
+      "start": "3:38:20.31",
+      "end": "3:39:03.7"
+    },
+    {
+      "start": "3:55:25.89",
+      "end": "3:56:04.35",
+      "note": "Not entertaining enough"
+    },
+    {
+      "start": "5:24:04.66",
+      "end": "5:24:48.64"
+    },
+    {
+      "start": "5:47:05.05",
+      "end": "5:47:48.43"
+    },
+    {
+      "start": "5:48:06.63",
+      "end": "5:48:48.07"
+    },
+    {
+      "start": "6:05:15.61",
+      "end": "6:05:16.29",
+      "note": "Too short. Nothing happened."
+    }
+  ]
+}

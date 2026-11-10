@@ -1,0 +1,151 @@
+{
+  "source": "v2924046310.mp4",
+  "labels": [
+    {
+      "start": "0:19:06.43",
+      "end": "0:20:21.23",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:19:42.96",
+        "end": "0:20:26.32"
+      },
+      "note": "OK clip. Relatable to students."
+    },
+    {
+      "start": "0:58:24.55",
+      "end": "1:00:12.36",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:59:28.55",
+        "end": "1:00:12.25"
+      },
+      "note": "Funny clip"
+    },
+    {
+      "start": "1:22:54.15",
+      "end": "1:23:34.36",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:23:58.15",
+        "end": "1:24:41.9"
+      },
+      "note": "Interesting. OK clip."
+    },
+    {
+      "start": "2:02:53.59",
+      "end": "2:03:53.87",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:03:57.59",
+        "end": "2:04:41.59"
+      },
+      "note": "Interesting food. OK clip"
+    },
+    {
+      "start": "2:15:00.19",
+      "end": "2:15:30.82",
+      "verdict": "post",
+      "note": "Funny/interesting clip."
+    },
+    {
+      "start": "2:51:56.51",
+      "end": "2:53:03.63",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:52:57.59",
+        "end": "2:53:40.28"
+      },
+      "note": "Funny Clip"
+    },
+    {
+      "start": "2:55:39.81",
+      "end": "2:56:16.78",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:56:43.81",
+        "end": "2:57:10.07"
+      },
+      "note": "Interesting food. OK Clip"
+    },
+    {
+      "start": "3:18:15.87",
+      "end": "3:18:52.93",
+      "verdict": "post",
+      "note": "OK clip"
+    },
+    {
+      "start": "3:32:09.03",
+      "end": "3:33:53.89",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:33:13.03",
+        "end": "3:33:51.91"
+      },
+      "note": "Funny clip. Interesting food."
+    },
+    {
+      "start": "3:39:33.175",
+      "end": "3:40:49.3",
+      "verdict": "added",
+      "note": "Interesting food. OK Clip"
+    },
+    {
+      "start": "3:42:42.34",
+      "end": "3:43:42.36",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:42:57.93",
+        "end": "3:43:40.19"
+      },
+      "note": "Interesting food. OK Clip."
+    },
+    {
+      "start": "3:44:20.717",
+      "end": "3:45:56.26",
+      "verdict": "added",
+      "note": "Interesting Food"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:06:25.81",
+      "end": "0:07:05.83"
+    },
+    {
+      "start": "0:15:39.45",
+      "end": "0:16:23.45"
+    },
+    {
+      "start": "0:16:38.61",
+      "end": "0:17:20"
+    },
+    {
+      "start": "0:54:40.63",
+      "end": "0:55:22.76"
+    },
+    {
+      "start": "1:15:53.98",
+      "end": "1:16:29.6"
+    },
+    {
+      "start": "1:22:12.42",
+      "end": "1:22:33.04"
+    },
+    {
+      "start": "2:34:09.4",
+      "end": "2:34:52.94"
+    },
+    {
+      "start": "2:39:38.88",
+      "end": "2:40:21.17"
+    },
+    {
+      "start": "3:40:55.01",
+      "end": "3:41:38.01"
+    },
+    {
+      "start": "4:00:24",
+      "end": "4:01:07.7"
+    }
+  ]
+}

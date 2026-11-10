@@ -177,7 +177,10 @@ and planned code:
   never into the next chosen candidate. Pause length and merge rule are set
   from the V5 baseline's dragged ends, not guessed. Starts stay. Each change
   is measured before and after on judged labels and not adopted if it does
-  not help. Amends 0014 decision 2.
+  not help. Amends 0014 decision 2. Baseline amendment (V5 item 4): on
+  three VODs 12 of 31 keepers end early, moved 2.4 to 36.7 s later (median
+  17.1 s), and 3 start earlier; item 5 sets the pause length from those 12
+  ends, and starts stay.
 - `0024` — `clipper review <drafts folder>`: a local browser page on the
   loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
   a player on the source video, a film strip of the clip plus 120 s either
@@ -446,6 +449,37 @@ In progress:
   chat replay on any, no viewer history after a stream, no Twitch VOD chat
   via yt-dlp. Viewer counts need live monitoring, which ADR 0020 rules out.
 
+V5 baseline (item 4, 2026-11-10), the reference for items 5 to 7, 10b, 11
+and 12. Heuristic and LLM (`qwen3.5:9b`) top 10 on the four trial VODs,
+drafts in `data/baseline/<detector>/`, every draft judged in `review`,
+labels pooled in `data/labels/picks/` (committed). `eval` at top 10 against
+them; "keepers" are drafts on a `post` or `fix` label, "cut short" are
+keepers whose label ends over 1 s later or starts over 1 s earlier.
+
+| VOD | Detector | Keepers (as cut) | Cut short | Rejected | Unjudged | End gap median (max) |
+|---|---|---|---|---|---|---|
+| v2922695332 (jasontheween) | heuristic | 3 (2) | 1 end, 1 start | 7 | 0 | +0.0 s (+8.1) |
+| | LLM | 6 (2) | 4 end | 4 | 0 | +14.0 s (+36.7) |
+| v2917872953 (stableronaldo) | heuristic | 8 (4) | 4 end | 2 | 0 | +1.2 s (+29.7) |
+| | LLM | 7 (6) | 1 end | 3 | 0 | +0.0 s (+15.8) |
+| v2922589775 (adapt) | heuristic | 2 (0) | 1 end, 1 start | 8 | 0 | -8.1 s (+6.4) |
+| | LLM | 5 (3) | 1 end, 1 start | 5 | 0 | +0.0 s (+18.2) |
+
+- Over the three VODs: heuristic 13 keepers, LLM 18, of 30 drafts each.
+  Pooled labels: 9, 14 and 7 keepers, and 11, 5 and 13 rejected spans.
+- Clip labels (Twitch community clips): 0 hits at top 10 and top 30 for
+  both detectors on these three VODs.
+- Time per VOD with cached transcripts: heuristic about 2 to 3 min, LLM 15
+  to 17.4 min, each rendering 10 vertical, captioned, titled drafts.
+- v2924046310 (ohnepixel), apart: the downloaded file started at 64 s, so
+  the page's player ran 64 s off while it was judged; the labels were moved
+  by -64 s to the footage watched, and most no longer sit on the drafts'
+  spans. Heuristic 3 keepers, 1 rejected, 6 unjudged; LLM 6 keepers, 4
+  unjudged. 12 labels (2 `added`), 10 rejected spans. Clip labels: heuristic
+  2 of 6 at top 10 and 30, LLM 1 of 6. Re-judge its unjudged drafts on the
+  remuxed file before counting it.
+- v2917438534 (its clip labels only) was left out of the baseline.
+
 V3 results, for reference:
 
 - Item 7, the LLM detector: `--detector llm` via Ollama, with thinking off
@@ -662,10 +696,12 @@ Items 8 and 9 do not depend on picking and may land earlier.
 
    Item 3 is done: whole-VOD player #132, film strip #133, Save/Trash #135,
    re-render #137, model title #139, Add clip #140.
-4. Not code, a docs PR: the baseline. Heuristic and LLM top 10 on the trial
+4. ~~Not code, a docs PR: the baseline. Heuristic and LLM top 10 on the trial
    VODs (`CLIPPER_TOP_N=10` in a child process, cached transcripts; ask
    before any download), every draft judged in `review`, the first judged
-   labels committed and the measures above recorded.
+   labels committed and the measures above recorded.~~ (done; results under
+   "V5 baseline" in "Current state"; ADR 0023 amendment; the `eval` draft
+   span fix #144 and the review start offset fix #143 came out of it)
 5. End extension to the next pause, up to 90 s, never into the next chosen
    candidate; the pause length set from item 4's dragged ends. ADR 0023
    amendment.
