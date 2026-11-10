@@ -59,6 +59,36 @@ _VIDEO_AND_AUDIO = """{
 }
 """
 
+# Real output (ffmpeg 9.0.2) for a Twitch VOD that yt-dlp saved as a
+# fragmented MP4 whose timestamps start at 64 s (V5 item 4).
+_STARTS_LATE = """{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_type": "audio",
+            "disposition": {
+                "attached_pic": 0
+            }
+        },
+        {
+            "codec_type": "video",
+            "disposition": {
+                "attached_pic": 0
+            }
+        }
+    ],
+    "format": {
+        "start_time": "64.000333",
+        "duration": "14644.065667"
+    }
+}
+"""
+
 # Real failure on a text file named bad.mp4: exit 1, bare "{" on stdout.
 _BAD_STDOUT = "{\n\n"
 _BAD_STDERR = (
@@ -132,6 +162,44 @@ def test_video_and_audio_fixture(media: Path, monkeypatch: pytest.MonkeyPatch) -
 
     assert info.duration_seconds == 314.816145
     assert info.has_video is True
+    # No start_time in the output: the file starts at 0.
+    assert info.start_seconds == 0.0
+
+
+def test_start_time_is_read(media: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_run(monkeypatch, _STARTS_LATE)
+
+    info = FfprobeMediaProbe().probe(media)
+
+    assert info.start_seconds == 64.000333
+    assert info.duration_seconds == 14644.065667
+
+
+def _with_start(start: object) -> str:
+    return json.dumps(
+        {
+            "streams": [_stream("video")],
+            "format": {"duration": "5.0", "start_time": start},
+        }
+    )
+
+
+@pytest.mark.parametrize("start", ["N/A", "abc", "nan"])
+def test_unusable_start_time_raises(
+    start: object, media: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_run(monkeypatch, _with_start(start))
+
+    with pytest.raises(MediaProbeError, match="No usable start time"):
+        FfprobeMediaProbe().probe(media)
+
+
+def test_null_start_time_means_zero(
+    media: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_run(monkeypatch, _with_start(None))
+
+    assert FfprobeMediaProbe().probe(media).start_seconds == 0.0
 
 
 def test_command_is_exact(media: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -146,7 +214,8 @@ def test_command_is_exact(media: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             "-v",
             "error",
             "-show_entries",
-            "format=duration:stream=codec_type:stream_disposition=attached_pic",
+            "format=duration,start_time:stream=codec_type"
+            ":stream_disposition=attached_pic",
             "-of",
             "json",
             str(media),

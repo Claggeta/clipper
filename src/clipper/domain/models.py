@@ -125,12 +125,18 @@ class AnalysisResult(BaseModel):
 
 
 class MediaInfo(BaseModel):
-    """Facts about a media file, as reported by a probe."""
+    """Facts about a media file, as reported by a probe.
+
+    `start_seconds` is the file's first timestamp, usually 0. A browser's
+    player counts from it while ffmpeg counts from the file's start, so the
+    review page needs it to be 0 (ADR 0024, start offset amendment).
+    """
 
     model_config = ConfigDict(frozen=True)
 
     duration_seconds: float = Field(gt=0, allow_inf_nan=False)
     has_video: bool
+    start_seconds: float = Field(default=0.0, allow_inf_nan=False)
 
 
 class RenderedClip(BaseModel):

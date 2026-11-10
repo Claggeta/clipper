@@ -49,6 +49,17 @@ matches.
 - (−) The stderr-formatting and `which` logic is shared with the extractor
   and renderer (V2 item 2), so the probe reuses it rather than adding a copy.
 
+## Amended by the start offset fix (V5 item 4)
+
+- **The probe also reads the file's start time** (`format=start_time`) into
+  `MediaInfo.start_seconds`, 0 when ffprobe gives none, and a
+  `MediaProbeError` ("No usable start time") when it gives something that
+  is not a number. Structural, from the JSON, as before.
+- Only `review` uses it (0024 start offset amendment): a browser's player
+  counts from the first timestamp, while ffmpeg-based steps count from the
+  file's start and agree with each other. Seen on one Twitch VOD that
+  started at 64 s (real ffprobe output in the tests).
+
 ## Revisit when
 
 - A mismatch between JSON and video gets past the checks in practice. Then

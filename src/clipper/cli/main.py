@@ -49,7 +49,12 @@ from clipper.domain.models import (
     Transcript,
     VideoSource,
 )
-from clipper.review.server import DEFAULT_PORT, ReviewSession, frames_folder
+from clipper.review.server import (
+    DEFAULT_PORT,
+    MAX_START_SECONDS,
+    ReviewSession,
+    frames_folder,
+)
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
@@ -750,6 +755,14 @@ def review(
         info = build.probe().probe(video)
         if not info.has_video:
             raise ReviewError(f"{video} has no video stream to show")
+        if abs(info.start_seconds) > MAX_START_SECONDS:
+            raise ReviewError(
+                f"{video} starts at {info.start_seconds:.1f} s, not 0, so the "
+                "page's player would not match the transcript; remux it: "
+                f'ffmpeg -i "{video}" -map 0:v:0 -map 0:a:0 -c copy '
+                f'-movflags +faststart "{video.with_suffix(".remuxed.mp4")}", '
+                "then put it in place of the original"
+            )
         files = build.review_files()
         labels_path = judged_labels_path(settings.labels_dir, manifest.source)
         labels = files.load_labels(labels_path)

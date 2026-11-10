@@ -42,6 +42,11 @@ HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 # How much of the video either side of a clip the page shows (ADR 0024).
 RANGE_SECONDS = 120.0
+# The latest first timestamp a video may have. The browser's player counts
+# from it and ffmpeg from the file's start, so beyond this the page's times
+# would not be the transcript's (ADR 0024, start offset amendment). A
+# Twitch download started at 64 s; normal files start at 0.
+MAX_START_SECONDS = 0.1
 _CHUNK = 1024 * 1024
 
 # Path -> (file in static/, content type). Nothing else is served from disk.
