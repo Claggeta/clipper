@@ -707,9 +707,11 @@ Items 8 and 9 do not depend on picking and may land earlier.
    labels committed and the measures above recorded.~~ (done; results under
    "V5 baseline" in "Current state"; ADR 0023 amendment; the `eval` draft
    span fix #144 and the review start offset fix #143 came out of it)
-5. End extension to the next pause, up to 90 s, never into the next chosen
+5. ~~End extension to the next pause, up to 90 s, never into the next chosen
    candidate; the pause length set from item 4's dragged ends. ADR 0023
-   amendment.
+   amendment.~~ (done; #146; pause 1.5 s, heuristic only: early ends 6 to
+   1, ends over 5 s long 1 to 4; the LLM's stayed 6 early and went 1 to 7
+   over, so not adopted there)
 6. Candidate length 15 to 90 s for both detectors (windows under 15 s not
    scored). ADR 0023 amendment. Replaces Parked "Candidates too short to
    post".
