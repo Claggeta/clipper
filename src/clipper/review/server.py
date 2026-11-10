@@ -21,7 +21,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
 
-from clipper.core.interfaces import ClipRenderer, FrameExtractor, ReviewFiles
+from clipper.core.interfaces import (
+    ClipRenderer,
+    FaceTracker,
+    FrameExtractor,
+    ReviewFiles,
+)
 from clipper.domain.errors import ClipperError, FrameError, JudgingError, ReviewError
 from clipper.domain.models import (
     LabeledVideo,
@@ -60,6 +65,8 @@ _STATIC = {
 # frames by URL, never shows one VOD's frame in another's strip: every run
 # is served from the same address.
 _FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7})\.jpg")
+# A rendered draft listed in the manifest: /clips/<file name> (ADR 0025).
+_CLIP_PATH = re.compile(r"/clips/([^/\\]+\.mp4)")
 # Frames never change for a given video, so the browser may keep them.
 _FRAME_CACHE = "max-age=86400"
 # A judgment on one clip: /api/clips/<rank>/save or /trash; or a new clip.
@@ -75,7 +82,8 @@ class ReviewSession:
     `labels` are the judged labels at `labels_path` when the run started, or
     None if there were none yet; `files` writes them and the manifest.
     `renderer` re-renders a saved clip, with captions from `transcript`
-    (None when the folder has no captions).
+    (None when the folder has no captions); a `face` re-render uses
+    `face_tracker` and `frame_size`, the video's width and height (ADR 0025).
     """
 
     folder: Path
@@ -89,6 +97,8 @@ class ReviewSession:
     files: ReviewFiles
     renderer: ClipRenderer
     transcript: Transcript | None
+    face_tracker: FaceTracker | None = None
+    frame_size: tuple[int, int] | None = None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -167,7 +177,13 @@ def make_store(session: ReviewSession) -> ReviewStore:
         session.labels,
         session.labels_path,
         session.files,
-        RenderInputs(session.video, session.renderer, session.transcript),
+        RenderInputs(
+            session.video,
+            session.renderer,
+            session.transcript,
+            session.face_tracker,
+            session.frame_size,
+        ),
     )
 
 
@@ -178,7 +194,8 @@ def clip_payload(
 
     `start` and `end` are what the file covers; `draft_start` and `draft_end`
     are the detector's span, the same until a re-render. `model_title` is
-    the model's title, kept once the page has written the clip.
+    the model's title, kept once the page has written the clip. `variants`
+    are the rendered styles and `style` the clip's own, its first (ADR 0025).
     """
     draft_start, draft_end = clip.draft_span
     return {
@@ -194,6 +211,8 @@ def clip_payload(
         "title": clip.title,
         "hook": clip.hook,
         "file": clip.file,
+        "variants": [{"style": v.style, "file": v.file} for v in clip.variants],
+        "style": clip.variants[0].style if clip.variants else None,
         "error": clip.error,
         "reviewed": clip.reviewed,
         "judgment": store.judgment(clip),
@@ -214,6 +233,13 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
     }
 
 
+def _listed_files(store: ReviewStore) -> set[str]:
+    """The draft files the manifest lists, which are all the page may fetch."""
+    names = {clip.file for clip in store.manifest.clips if clip.file is not None}
+    names |= {v.file for clip in store.manifest.clips for v in clip.variants}
+    return names
+
+
 def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
     video_type = mimetypes.guess_type(session.video.name)[0] or "video/mp4"
     store = make_store(session)
@@ -229,7 +255,11 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 elif path == "/api/clips":
                     self._send_json(HTTPStatus.OK, clips_payload(session, store))
                 elif path == "/video":
-                    self._send_video()
+                    self._send_file(session.video, video_type)
+                elif (draft := _CLIP_PATH.fullmatch(path)) and draft.group(
+                    1
+                ) in _listed_files(store):
+                    self._send_file(session.folder / draft.group(1), "video/mp4")
                 elif (frame := _FRAME_PATH.fullmatch(path)) and frame.group(
                     1
                 ) == frames_key(session):
@@ -352,8 +382,13 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 return
             self._send(HTTPStatus.OK, "image/jpeg", body, cache=_FRAME_CACHE)
 
-        def _send_video(self) -> None:
-            size = session.video.stat().st_size
+        def _send_file(self, path: Path, content_type: str) -> None:
+            """Send a video file, or the byte range the player asked for."""
+            try:
+                size = path.stat().st_size
+            except OSError:
+                self._not_found()
+                return
             try:
                 byte_range = parse_range(self.headers.get("Range"), size)
             except UnsatisfiableRange:
@@ -369,11 +404,13 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
             else:
                 self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", video_type)
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(length))
             self.send_header("Accept-Ranges", "bytes")
+            # A re-render can write new content under the same name.
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            with session.video.open("rb") as source:
+            with path.open("rb") as source:
                 source.seek(start)
                 remaining = length
                 while remaining > 0:

@@ -2532,6 +2532,36 @@ With RV7's copy served again (same `cmd /c` line):
 
 Then delete `data\clips\rv7-copy` and `data\rv7-labels`.
 
+### RV10. Draft player and style switch
+
+Covers the style switch ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)).
+Make drafts in both styles into a scratch folder and serve them with
+scratch labels, so nothing touches your real judgments:
+
+```powershell
+cmd /c "set CLIPPER_TOP_N=2&& set CLIPPER_CLIPS_DIR=data\clips\rv10&& set CLIPPER_OUTPUT_DIR=data\rv10-output&& uv run clipper drafts --no-titles data\videos\<a fetched video>.mp4"
+cmd /c "set CLIPPER_LABELS_DIR=data\rv10-labels&& uv run clipper review data\clips\rv10\<its id>"
+```
+
+1. Choose clip 1. Pass: a vertical draft plays beside the strip, with `Fit`
+   and `Face` buttons, `Fit` pressed.
+2. Press `Face`. Pass: the draft switches to the face crop; `Unsaved` shows.
+3. Save without moving a handle. Pass: `Saved as post, Face kept.`, no
+   rendering; the folder keeps only that clip's `.face.mp4`; the buttons are
+   gone (one style left). Reload: the face draft still shows.
+4. Choose clip 2, keep `Fit`, move the end handle 5 s, Save. Pass:
+   `Rendering…`, then `Saved as fix, Fit kept; re-rendered.`; only the new
+   fit `.mp4` is left for that clip.
+5. On an unsaved clip with both styles, press `Face`, move a handle, Save.
+   Pass: it re-renders in the face style (a few seconds more for faces);
+   only the new `.face.mp4` is left.
+6. Trash a clip that still has both styles. Pass: both of its files are
+   gone.
+7. Stop the server. `data\rv10-labels\picks\<id>.json` has `"style"` on each
+   saved label (`face`, `fit`, `face`).
+
+Then delete `data\clips\rv10`, `data\rv10-output` and `data\rv10-labels`.
+
 ## Record your run
 
 | Field | Value |

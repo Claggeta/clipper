@@ -218,6 +218,12 @@ Measured on 13c's two clips:
   frame the wrong one; `fit` stays there to pick.
 - (-) Facecam layouts get no good `face` crop until the split is built.
 
+## Amended by the style switch (V5 item 13e)
+
+Picking happens in the review page (0024, style switch amendment): Save
+keeps one style, deletes the other and records `style` on the judged
+label, so the picks over time show which style wins on which videos.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

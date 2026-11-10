@@ -371,14 +371,16 @@ def _with_face(rank: int, start: float, end: float, file: str) -> ManifestClip:
     return _clip(rank, start, end, file).model_copy(update={"variants": variants})
 
 
-def test_a_re_render_drops_the_other_styles(tmp_path: Path) -> None:
+def test_a_re_render_keeps_the_clips_style_and_drops_the_others(
+    tmp_path: Path,
+) -> None:
     clip = _with_face(1, 10.0, 40.0, "talk_1.mp4")
     env = Env(tmp_path, clip)
     (env.folder / "talk_1.face.mp4").write_bytes(b"face")
 
     saved = env.save(1, 9.0, 42.0)
 
-    assert saved.variants == ()
+    assert saved.variants == (ClipVariant(style="fit", file="talk_000009-000042.mp4"),)
     assert sorted(p.name for p in env.folder.iterdir()) == [
         "manifest.json",
         "talk_000009-000042.mp4",
@@ -424,5 +426,150 @@ def test_an_odd_style_file_name_is_not_deleted(tmp_path: Path) -> None:
 
     saved = env.store.save(1, SaveRequest(9.0, 42.0, None, None))
 
-    assert saved.warning == "Not deleting '../elsewhere.mp4': not a file name"
-    assert saved.clip.variants == ()
+    assert saved.warning == (
+        "Re-rendered; not deleting '../elsewhere.mp4': not a file name"
+    )
+    assert [v.style for v in saved.clip.variants] == ["fit"]
+
+
+class FakeFaceTracker:
+    """One face at the frame's centre, or none."""
+
+    def __init__(self, faces: bool = True) -> None:
+        self._faces = faces
+
+    def track(self, video_path: Path, start_seconds: float, end_seconds: float):  # type: ignore[no-untyped-def]
+        from clipper.domain.models import FaceBox, FaceSample, FaceTrack
+
+        face = FaceBox(x=0.45, y=0.2, w=0.1, h=0.3, score=0.9)
+        return FaceTrack(
+            source=video_path.name,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            samples_per_second=5.0,
+            samples=(
+                FaceSample(seconds=start_seconds, faces=(face,) if self._faces else ()),
+            ),
+        )
+
+
+def _styled_env(tmp_path: Path, tracker: FakeFaceTracker | None = None) -> Env:
+    env = Env(tmp_path, _with_face(1, 10.0, 40.0, "talk_1.mp4"))
+    (env.folder / "talk_1.face.mp4").write_bytes(b"face")
+    env.store._render = RenderInputs(  # noqa: SLF001
+        tmp_path / "talk.mp4",
+        env.renderer,
+        TRANSCRIPT,
+        tracker or FakeFaceTracker(),
+        (1920, 1080),
+    )
+    return env
+
+
+def test_keeping_a_style_without_a_re_render_drops_the_other(
+    tmp_path: Path,
+) -> None:
+    env = _styled_env(tmp_path)
+
+    result = env.store.save(1, SaveRequest(10.0, 40.0, None, None, "face"))
+
+    assert result.clip.file == "talk_1.face.mp4"
+    assert result.clip.variants == (ClipVariant(style="face", file="talk_1.face.mp4"),)
+    assert env.renderer.calls == []
+    assert sorted(p.name for p in env.folder.iterdir()) == [
+        "manifest.json",
+        "talk_1.face.mp4",
+    ]
+    [label] = load_labels(env.labels_path).labels
+    assert (label.verdict, label.style) == ("post", "face")
+
+
+def test_a_save_with_no_style_keeps_the_clips_own(tmp_path: Path) -> None:
+    env = _styled_env(tmp_path)
+
+    result = env.store.save(1, SaveRequest(10.0, 40.0, None, None))
+
+    assert result.clip.file == "talk_1.mp4"
+    assert [v.style for v in result.clip.variants] == ["fit"]
+    assert not (env.folder / "talk_1.face.mp4").exists()
+
+
+def test_a_re_render_in_the_face_style_crops_on_the_face(tmp_path: Path) -> None:
+    env = _styled_env(tmp_path)
+
+    result = env.store.save(1, SaveRequest(9.0, 42.0, None, None, "face"))
+
+    assert result.render_error is None
+    assert result.clip.file == "talk_000009-000042.face.mp4"
+    [crop] = env.renderer.crops
+    assert crop is not None and crop.width == 608
+    assert sorted(p.name for p in env.folder.iterdir()) == [
+        "manifest.json",
+        "talk_000009-000042.face.mp4",
+    ]
+
+
+def test_a_face_re_render_without_a_face_keeps_the_old_files(
+    tmp_path: Path,
+) -> None:
+    env = _styled_env(tmp_path, FakeFaceTracker(faces=False))
+
+    result = env.store.save(1, SaveRequest(9.0, 42.0, None, None, "face"))
+
+    assert result.render_error == "No face in the new span to frame in the face style"
+    assert result.clip.file == "talk_1.mp4"
+    assert (env.folder / "talk_1.face.mp4").exists()
+
+
+def test_a_face_re_render_needs_the_tracker(tmp_path: Path) -> None:
+    env = Env(tmp_path, _with_face(1, 10.0, 40.0, "talk_1.mp4"))
+
+    result = env.store.save(1, SaveRequest(9.0, 42.0, None, None, "face"))
+
+    assert result.render_error == (
+        "A face re-render needs the face tracker and frame size"
+    )
+
+
+def test_a_style_the_clip_lacks_is_refused(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    with pytest.raises(JudgingError, match="no face draft"):
+        env.store.save(1, SaveRequest(10.0, 40.0, None, None, "face"))
+    assert not env.labels_path.exists()
+
+
+@pytest.mark.parametrize("style", ["wide", 3, ""])
+def test_a_bad_style_in_the_body_is_refused(style: object) -> None:
+    from clipper.review.store import BadRequest, parse_save
+
+    body = {"start": 1.0, "end": 20.0, "style": style}
+    with pytest.raises(BadRequest, match="the style must be one of fit, face"):
+        parse_save(body, 100.0)
+
+
+def test_a_style_in_the_body_is_read() -> None:
+    from clipper.review.store import parse_save
+
+    assert parse_save({"start": 1.0, "end": 20.0, "style": "face"}, 100.0).style == (
+        "face"
+    )
+    assert parse_save({"start": 1.0, "end": 20.0}, 100.0).style is None
+
+
+def test_trash_logs_an_odd_style_file_name_and_still_trashes(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    clip = _clip(1, 10.0, 40.0, "talk_1.mp4").model_copy(
+        update={
+            "variants": (
+                ClipVariant(style="fit", file="talk_1.mp4"),
+                ClipVariant(style="face", file="../elsewhere.mp4"),
+            )
+        }
+    )
+    env = Env(tmp_path, clip)
+
+    trashed = env.store.trash(1, None)
+
+    assert trashed is not None and trashed.reviewed == "trashed"
+    assert "Not deleting '../elsewhere.mp4': not a file name" in caplog.text

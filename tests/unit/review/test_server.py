@@ -364,6 +364,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "start": 60.0,
         "end": 105.0,
         "note": "good",
+        "style": None,
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -527,6 +528,7 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "start": 200.0,
         "end": 230.0,
         "note": "good",
+        "style": None,
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
@@ -762,3 +764,42 @@ def test_a_busy_port_is_a_review_error(tmp_path: Path) -> None:
         with pytest.raises(ReviewError, match=f"Cannot listen on 127.0.0.1:{port}"):
             make_server(session, port)
     assert issubclass(ReviewError, ClipperError)
+
+
+def test_a_listed_draft_is_served_and_nothing_else(base_url: str) -> None:
+    status, headers, body = _get(base_url + "/clips/talk_1.mp4?v=2")
+    assert (status, body) == (200, b"clip")
+    assert headers["Content-Type"] == "video/mp4"
+    assert headers["Cache-Control"] == "no-store"
+    status, _, body = _get(base_url + "/clips/talk_2.mp4", {"Range": "bytes=1-2"})
+    assert (status, body) == (206, b"li")
+    assert _get(base_url + "/clips/other.mp4")[0] == 404
+    assert _get(base_url + "/clips/..%2Fmanifest.json")[0] == 404
+
+
+def test_a_listed_draft_missing_on_disk_is_not_found(
+    base_url: str, tmp_path: Path
+) -> None:
+    (tmp_path / "clips" / "talk" / "talk_2.mp4").unlink()
+    assert _get(base_url + "/clips/talk_2.mp4")[0] == 404
+
+
+def test_the_payload_lists_each_clips_styles(tmp_path: Path) -> None:
+    from clipper.domain.models import ClipVariant
+    from clipper.review.server import clip_payload
+
+    session = _session(tmp_path)
+    store = make_store(session)
+    variants = (
+        ClipVariant(style="fit", file="talk_1.mp4"),
+        ClipVariant(style="face", file="talk_1.face.mp4"),
+    )
+    clip = MANIFEST.clips[0].model_copy(update={"variants": variants})
+    payload = clip_payload(session, store, clip)
+    assert payload["style"] == "fit"
+    assert payload["variants"] == [
+        {"style": "fit", "file": "talk_1.mp4"},
+        {"style": "face", "file": "talk_1.face.mp4"},
+    ]
+    plain = clip_payload(session, store, MANIFEST.clips[1])
+    assert (plain["style"], plain["variants"]) == (None, [])

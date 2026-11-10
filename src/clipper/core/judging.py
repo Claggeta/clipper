@@ -104,9 +104,11 @@ def save_judgment(
     start: float,
     end: float,
     note: str | None,
+    style: str | None = None,
 ) -> LabeledVideo:
     """The labels with `clip` saved as `post` (span unchanged) or `fix`, or
-    as `added` for a clip added in the page, whatever its span.
+    as `added` for a clip added in the page, whatever its span. `style` is the
+    vertical style kept, if the clip had styles (ADR 0025).
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
     if the span overlaps another label: one label per moment.
@@ -120,6 +122,8 @@ def save_judgment(
                 "this span, or trash it as a duplicate"
             )
     fields: dict[str, object] = {**_times(start, end), "note": note}
+    if style is not None:
+        fields["style"] = style
     if clip.added:
         fields["verdict"] = "added"
     elif same_span(clip.draft_span, (start, end)):

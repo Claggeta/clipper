@@ -394,6 +394,13 @@ names it.
   overlap only. A `post` label equals its draft, so the rule changes nothing
   for it.
 
+## Amended by the style switch (ADR 0025, V5 item 13e)
+
+- A judged label may carry `style`, `fit` or `face`: the vertical style the
+  maintainer kept for the clip in the review page. Absent on labels from
+  clips without styles and on older files. `eval` does not read it; it is
+  there to count which style wins.
+
 ## Related
 
 - 0013: detector choice on the CLI

@@ -116,6 +116,9 @@ analysis of the same video gave `captions` `segments` and `detector` `null`.
   clip `variants`, a list of `{style, file}`; `file` is the first variant's.
   Older manifests read as empty. The review page's re-render and Trash clear
   `variants` until the style switch (13e).
+- **Style switch amendment (V5 13e)**: a Save in the page keeps one style;
+  `file` is its draft and `variants` holds it alone. Trash still clears
+  them.
 - The page replaces `manifest.json` whole, as `render` does. A later
   `render` or `drafts` run on the folder still replaces it and loses these
   fields (decision 3); the judged labels are separate files.

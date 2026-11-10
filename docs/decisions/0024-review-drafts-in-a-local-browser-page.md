@@ -360,6 +360,26 @@ until the drafts rarely need editing.
 - Refusing rather than correcting the offset in the page, because how
   browsers treat a non-zero start was not verified beyond this one file.
 
+## Amended by the style switch (ADR 0025, V5 item 13e)
+
+- **Draft player and style switch**: the page shows the clip's rendered
+  draft beside the trim strip, served at `/clips/<file>` for names the
+  manifest lists only (404 otherwise), with byte ranges and `no-store`. A
+  clip with styles gets a button per style; the pick shows as unsaved.
+- **Save keeps one style**: the body may carry `style` (`fit` or `face`; any
+  other value is 400, a style the clip lacks is 409). No style keeps the
+  clip's own, its first variant. Without a re-render, `file` becomes that
+  style's draft; with one, the new span is rendered in it, a `face`
+  re-render tracking faces in the review process (`AppContext.face_tracker`
+  and the probed frame size); no face in the new span is a render error and
+  the old files stay. Either way the clip's other files are deleted and its
+  `variants` hold the kept style alone. The judged label records `style`.
+- Checked through the API on 13d's two podcast drafts: keeping `face` on an
+  unchanged span switched `file` and deleted the fit file; a moved span kept
+  as `face` re-rendered with face tracking in 18 s. The page script parses
+  (esprima); the page itself is checked by manual step RV10, since the
+  browser extension was not connected.
+
 ## Related
 
 - 0011: render's failure policy
