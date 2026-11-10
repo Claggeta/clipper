@@ -87,7 +87,9 @@ and planned code:
   spans in the same file, all labels judged or none; a candidate is on a
   label, else rejected, else unjudged; `eval` reports the gap (label minus
   candidate) at each end instead of seconds dragged, and a keeper ends
-  early or starts late past `CUT_SHORT_SECONDS = 1.0`.
+  early or starts late past `CUT_SHORT_SECONDS = 1.0`. Draft span
+  amendment: a candidate also hits a `fix` label whose `draft` is its exact
+  span, however far the fix moved it.
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),

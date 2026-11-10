@@ -1,7 +1,13 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from clipper.domain.models import ClipCandidate, Evaluation, LabeledVideo, Span
+from clipper.domain.models import (
+    ClipCandidate,
+    Evaluation,
+    Label,
+    LabeledVideo,
+    Span,
+)
 
 # A first guess, not tuned on real labels (ADR 0012). A constant rather than a
 # setting, so it is not fitted to one video before a long one is labeled.
@@ -30,18 +36,32 @@ def is_hit(candidate: ClipCandidate, label: Span) -> bool:
     return overlap > 0 and overlap >= HIT_FRACTION * shorter
 
 
+def is_draft_of(candidate: ClipCandidate, label: Label) -> bool:
+    """True if the candidate's span is the `fix` label's draft, to the ms.
+
+    The maintainer judged that draft, however far the fix moved it (ADR 0012,
+    draft span amendment).
+    """
+    return label.draft is not None and (
+        _to_ms(candidate.start_seconds),
+        _to_ms(candidate.end_seconds),
+    ) == (_to_ms(label.draft.start_seconds), _to_ms(label.draft.end_seconds))
+
+
 def evaluate(labeled: LabeledVideo, candidates: Sequence[ClipCandidate]) -> Evaluation:
     """Compare a detector's candidates with a video's labels. See ADR 0012.
 
-    Candidates are matched in rank order: each claims the earliest label it
-    hits that no higher-ranked candidate has claimed. With judged labels, a
-    candidate that hits no label but hits a rejected span is `on_rejected`.
+    A candidate hits a label it overlaps enough, or a `fix` label whose draft
+    it is. Candidates are matched in rank order: each claims the earliest
+    label it hits that no higher-ranked candidate has claimed. With judged
+    labels, a candidate that hits no label but hits a rejected span is
+    `on_rejected`.
     """
     hits = tuple(
         (label_index, candidate_index)
         for label_index, label in enumerate(labeled.labels)
         for candidate_index, candidate in enumerate(candidates)
-        if is_hit(candidate, label)
+        if is_hit(candidate, label) or is_draft_of(candidate, label)
     )
     claimed: set[int] = set()
     matches: list[tuple[int, int]] = []
