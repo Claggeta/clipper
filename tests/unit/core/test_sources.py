@@ -3,13 +3,14 @@ from pathlib import Path
 import pytest
 
 from clipper.core.sources import (
+    parse_source_list,
     parse_video_url,
     video_info_path,
     video_path,
     video_url,
 )
-from clipper.domain.errors import DownloadError
-from clipper.domain.models import VideoSource
+from clipper.domain.errors import DownloadError, SourceListError
+from clipper.domain.models import QueuedSource, VideoSource
 
 # The IDs below are constructed; no real video is implied.
 _YT = VideoSource(platform="youtube", video_id="abcDEF123_-")
@@ -92,3 +93,29 @@ def test_video_path_is_named_by_id() -> None:
 def test_video_info_sits_beside_the_video() -> None:
     assert video_info_path(_YT, Path("v")) == Path("v/abcDEF123_-.info.json")
     assert video_info_path(_TW, Path("v")) == Path("v/v1234567890.info.json")
+
+
+def test_a_source_list_skips_comments_and_reads_about_text() -> None:
+    text = (
+        "# Lacy pool\n"
+        "https://www.twitch.tv/videos/1 | Lacy (he/him)\n"
+        "\n"
+        "  data/videos/talk.mp4  \n"
+        "https://youtu.be/abcDEF123_- |\n"
+    )
+    assert parse_source_list(text) == [
+        QueuedSource(
+            source="https://www.twitch.tv/videos/1", about="Lacy (he/him)", line=2
+        ),
+        QueuedSource(source="data/videos/talk.mp4", line=4),
+        QueuedSource(source="https://youtu.be/abcDEF123_-", line=5),
+    ]
+
+
+def test_an_empty_list_has_no_sources() -> None:
+    assert parse_source_list("# nothing yet\n\n") == []
+
+
+def test_about_text_without_a_source_is_refused() -> None:
+    with pytest.raises(SourceListError, match="Line 2: no source before the about"):
+        parse_source_list("a.mp4\n | Lacy\n")

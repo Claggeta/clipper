@@ -60,3 +60,7 @@ class DownloadError(ClipperError):
 
 class FaceError(ClipperError):
     """Raised when faces cannot be found in a video."""
+
+
+class SourceListError(ClipperError):
+    """Raised when a `drafts --list` file cannot be used."""

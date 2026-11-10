@@ -2,8 +2,8 @@ import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from clipper.domain.errors import DownloadError
-from clipper.domain.models import VideoSource
+from clipper.domain.errors import DownloadError, SourceListError
+from clipper.domain.models import QueuedSource, VideoSource
 
 # Hosts `fetch` reads single videos from (ADR 0020). Anything else is refused.
 _YOUTUBE_HOSTS = frozenset({"youtube.com", "www.youtube.com", "m.youtube.com"})
@@ -80,3 +80,27 @@ def _youtube(candidate: str, url: str) -> VideoSource:
     if not _YOUTUBE_ID.fullmatch(candidate):
         raise DownloadError(f"Not a YouTube video ID in URL: {url}")
     return VideoSource(platform="youtube", video_id=candidate)
+
+
+# Separates a list line's source from its own --about text (ADR 0022).
+ABOUT_SEPARATOR = "|"
+
+
+def parse_source_list(text: str) -> list[QueuedSource]:
+    """The sources in a `drafts --list` file, in order (ADR 0022, list amendment).
+
+    One source per line; blank lines and lines starting with `#` are skipped.
+    A line may give its own `--about` text after `ABOUT_SEPARATOR`. Raises
+    `SourceListError` for a line with text after the separator but no source.
+    """
+    queued: list[QueuedSource] = []
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        source, _, about = line.partition(ABOUT_SEPARATOR)
+        source, about = source.strip(), about.strip()
+        if not source:
+            raise SourceListError(f"Line {number}: no source before the about text")
+        queued.append(QueuedSource(source=source, about=about or None, line=number))
+    return queued

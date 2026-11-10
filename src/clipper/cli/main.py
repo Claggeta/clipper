@@ -39,12 +39,18 @@ from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths, variant_file_name
 from clipper.core.pipeline import AnalysisPipeline
-from clipper.core.sources import parse_video_url, video_info_path, video_path
+from clipper.core.sources import (
+    parse_source_list,
+    parse_video_url,
+    video_info_path,
+    video_path,
+)
 from clipper.domain.errors import (
     ClipperError,
     ClipRenderError,
     LabelsError,
     ReviewError,
+    SourceListError,
     TitleError,
 )
 from clipper.domain.models import (
@@ -54,6 +60,7 @@ from clipper.domain.models import (
     Evaluation,
     ManifestClip,
     MediaInfo,
+    QueuedSource,
     RenderManifest,
     Transcript,
     VideoInfo,
@@ -454,7 +461,9 @@ def render(
         about=about,
         styles=(style,) if vertical else (),
     )
-    if _cut_clips(settings, build, video, result, result_json, plan, writer, flags):
+    if _cut_clips(
+        settings, build, video, result, result_json, plan, writer, flags
+    ).failed:
         raise typer.Exit(code=1)
 
 
@@ -491,6 +500,12 @@ class _RenderPlan(NamedTuple):
     folder: Path
     paths: list[Path]
     media: MediaInfo
+
+
+class _CutResult(NamedTuple):
+    failed: bool
+    rendered: int
+    total: int
 
 
 class _RenderFlags(NamedTuple):
@@ -589,11 +604,11 @@ def _cut_clips(
     plan: _RenderPlan,
     writer: TitleWriter | None,
     flags: _RenderFlags,
-) -> bool:
+) -> "_CutResult":
     """Render every planned clip, then write the manifest (ADRs 0011, 0019).
 
-    Returns True if any clip failed. A manifest that cannot be written is
-    `Error:` and exit 1.
+    Returns whether any clip failed and how many rendered. A manifest that
+    cannot be written is `Error:` and exit 1.
     """
     ranks, selected, folder, paths, media = plan
     captions, vertical, titles, about, styles = flags
@@ -756,16 +771,28 @@ def _cut_clips(
         console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
     console.print(f"Manifest: {escape(str(written))}", soft_wrap=True)
-    return bool(failures)
+    return _CutResult(bool(failures), rendered, len(selected))
 
 
 @app.command()
 def drafts(
     ctx: typer.Context,
-    source: Annotated[
-        str,
-        typer.Argument(help="A YouTube video or Twitch VOD URL, or a video file."),
-    ],
+    sources: Annotated[
+        list[str] | None,
+        typer.Argument(
+            help="YouTube video or Twitch VOD URLs, or video files, one or more.",
+            show_default=False,
+        ),
+    ] = None,
+    list_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--list",
+            help="A file of sources, one per line; '#' starts a comment, and "
+            "text after '|' is that source's --about.",
+            show_default=False,
+        ),
+    ] = None,
     vertical: Annotated[
         bool,
         typer.Option(
@@ -798,12 +825,14 @@ def drafts(
     detector: DetectorOption = DetectorName.HEURISTIC,
     about: AboutOption = None,
 ) -> None:
-    """Turn SOURCE into a folder of clip drafts: fetch, analyze, then render.
+    """Turn each SOURCE into a folder of clip drafts: fetch, analyze, render.
 
-    SOURCE starting with http:// or https:// is fetched as `fetch` does (see
+    A SOURCE starting with http:// or https:// is fetched as `fetch` does (see
     docs/decisions/0020); anything else is a local video file. Every
     candidate is rendered, by default vertical in both styles, captioned and
-    titled (see docs/decisions/0022 and 0025).
+    titled (see docs/decisions/0022 and 0025). Several sources, or a --list
+    file, run one after another; every source is checked before the first
+    starts, and one that fails does not stop the rest (ADR 0022).
     """
     logging.basicConfig(
         level=logging.INFO if verbose else logging.WARNING,
@@ -814,36 +843,167 @@ def drafts(
     try:
         # Everything that can fail on input or settings fails before a
         # download or a transcription starts (ADR 0022).
-        about = _check_about(about, titles)
         styles = _drafts_styles(style, vertical)
-        url = source.lower().startswith(("http://", "https://"))
-        fetched = parse_video_url(source) if url else None
-        video = Path(source)
-        if fetched is None and not video.is_file():
-            raise ClipperError(f"Input file not found: {video}")
+        about = _check_about(about, titles)
+        queue = _queue(sources or [], list_file, about)
+        checked = _check_queue(queue, titles)
         writer = build.title_writer(settings) if titles else None
-        if fetched is not None:
-            video = _fetch_video(settings, build, fetched)
-        result, result_json = _analyze_video(settings, build, video, detector)
-        plan = _plan_render(settings, build, video, result, None)
-        _check_frame_size(styles, plan.media, video)
     except ClipperError as exc:
-        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        for line in str(exc).splitlines():
+            console.print(f"[red]Error:[/red] {escape(line)}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
 
     flags = _RenderFlags(
         captions=captions,
         vertical=vertical,
         titles=titles,
-        about=about,
         styles=styles,
     )
-    failed = _cut_clips(
-        settings, build, video, result, result_json, plan, writer, flags
-    )
-    console.print(f"Drafts: {escape(str(plan.folder))}", soft_wrap=True)
-    if failed:
+    if len(checked) == 1:
+        item = checked[0]
+        try:
+            folder, cut = _draft_one(settings, build, item, detector, writer, flags)
+        except ClipperError as exc:
+            console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+            raise typer.Exit(code=1) from exc
+        console.print(f"Drafts: {escape(str(folder))}", soft_wrap=True)
+        if cut.failed:
+            raise typer.Exit(code=1)
+        return
+
+    outcomes: list[tuple[str, str, str, bool]] = []
+    for number, item in enumerate(checked, start=1):
+        console.print(
+            f"[bold]Source {number} of {len(checked)}:[/bold] {escape(item.source)}",
+            soft_wrap=True,
+        )
+        try:
+            folder, cut = _draft_one(settings, build, item, detector, writer, flags)
+        except ClipperError as exc:
+            console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+            outcomes.append((item.source, str(exc), "-", True))
+            continue
+        except typer.Exit:
+            # The manifest could not be written; the message is printed.
+            outcomes.append((item.source, "manifest not written", "-", True))
+            continue
+        console.print(f"Drafts: {escape(str(folder))}", soft_wrap=True)
+        outcomes.append(
+            (item.source, str(folder), f"{cut.rendered} of {cut.total}", cut.failed)
+        )
+    _report_queue(outcomes)
+    if any(failed for *_, failed in outcomes):
         raise typer.Exit(code=1)
+
+
+class _Checked(NamedTuple):
+    """A source that passed the checks: a URL to fetch, or a file."""
+
+    source: str
+    fetched: VideoSource | None
+    video: Path
+    about: str | None
+
+
+def _queue(
+    sources: list[str], list_file: Path | None, about: str | None
+) -> list[QueuedSource]:
+    """The sources in order, the command line's first, each once.
+
+    A list line's own about text wins over --about (ADR 0022, list amendment).
+    """
+    queued = [QueuedSource(source=s, about=about) for s in sources if s.strip()]
+    if list_file is not None:
+        try:
+            text = list_file.read_text(encoding="utf-8-sig")
+        except OSError as exc:
+            raise SourceListError(f"Cannot read the list {list_file}: {exc}") from exc
+        for item in parse_source_list(text):
+            queued.append(
+                item if item.about else item.model_copy(update={"about": about})
+            )
+    if not queued:
+        raise SourceListError("Give a source, or a --list file with sources")
+    unique: dict[str, QueuedSource] = {}
+    for item in queued:
+        unique.setdefault(item.source, item)
+    return list(unique.values())
+
+
+def _check_queue(queue: list[QueuedSource], titles: bool) -> list[_Checked]:
+    """Check every source before any starts; raise one error naming each bad
+    one, by its list line when it has one."""
+    checked: list[_Checked] = []
+    problems: list[str] = []
+    if not titles and any(item.about for item in queue):
+        # Only list lines can carry about text here: --about itself was
+        # refused without titles. A prepared list still runs (ADR 0022).
+        console.print(
+            "[yellow]Note:[/yellow] titles are off; the list's about text is not used",
+            soft_wrap=True,
+        )
+    for item in queue:
+        try:
+            about = _check_about(item.about, titles) if titles else None
+            url = item.source.lower().startswith(("http://", "https://"))
+            fetched = parse_video_url(item.source) if url else None
+            video = Path(item.source)
+            if fetched is None and not video.is_file():
+                raise ClipperError(f"Input file not found: {video}")
+        except ClipperError as exc:
+            where = f"Line {item.line}: " if item.line is not None else ""
+            if len(queue) > 1 and item.line is None:
+                where = f"{item.source}: "
+            problems.append(f"{where}{exc}")
+            continue
+        checked.append(_Checked(item.source, fetched, video, about))
+    if problems:
+        raise SourceListError("\n".join(problems))
+    return checked
+
+
+def _draft_one(
+    settings: Settings,
+    build: AppContext,
+    item: _Checked,
+    detector: DetectorName,
+    writer: TitleWriter | None,
+    flags: _RenderFlags,
+) -> tuple[Path, _CutResult]:
+    """Fetch, analyze and render one checked source; its drafts folder and
+    how the clips went. Raises `ClipperError` before cutting."""
+    video = item.video
+    if item.fetched is not None:
+        video = _fetch_video(settings, build, item.fetched)
+    result, result_json = _analyze_video(settings, build, video, detector)
+    plan = _plan_render(settings, build, video, result, None)
+    _check_frame_size(flags.styles, plan.media, video)
+    cut = _cut_clips(
+        settings,
+        build,
+        video,
+        result,
+        result_json,
+        plan,
+        writer,
+        flags._replace(about=item.about),
+    )
+    return plan.folder, cut
+
+
+def _report_queue(outcomes: list[tuple[str, str, str, bool]]) -> None:
+    """The run's sources, each with its drafts folder or its error."""
+    table = Table(title="Drafts")
+    table.add_column("#", justify="right")
+    table.add_column("Source")
+    table.add_column("Folder or error")
+    table.add_column("Clips", justify="right")
+    for number, (source, where, clips, failed) in enumerate(outcomes, start=1):
+        shown = (
+            f"[red]{escape(where)}[/red]" if failed and clips == "-" else escape(where)
+        )
+        table.add_row(str(number), escape(source), shown, clips)
+    console.print(table)
 
 
 @app.command("eval")

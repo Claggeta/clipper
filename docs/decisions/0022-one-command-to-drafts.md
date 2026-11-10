@@ -116,6 +116,33 @@ order across them, gets its own record.
   renders landscape with no styles. `--style` with `--no-vertical` fails
   before any download.
 
+## Amended by a list of sources (V5 item 9)
+
+- **Several sources**: `drafts <source> <source> ...`, or `--list <file>`
+  with one source per line (`parse_source_list` in `core/sources.py`);
+  blank lines and lines starting with `#` are skipped, and text after `|`
+  is that line's own `--about`, which wins over the command line's. Command
+  line sources come first; a source given twice runs once.
+- **Every source is checked before any starts**: the URL rules, that files
+  exist, and each about text. Every bad one is printed as `Error: Line N:
+  ...` (or `<source>: ...` from the command line) and nothing runs, exit 1.
+  `--about` on the command line without titles is still an error (0018);
+  a list line's about text is set aside with a note, so a prepared list
+  still runs with `--no-titles`.
+- **One source at a time**, in order, each fetched, analyzed and rendered as
+  before, with `Source N of M:` first; the title writer is built once. A
+  source that fails (download, transcription, detection, the frame size, a
+  manifest that cannot be written) is recorded and the run goes on. A
+  summary table ends the run: each source, its drafts folder or error, and
+  its clips rendered; exit 1 if any source failed or had a failed clip.
+- One source behaves exactly as before: no header and no table.
+- Not resumable: a stopped run starts again from the top, with fetched
+  videos and transcripts reused. Sources run one after another, since
+  transcription and Ollama would contend.
+- Checked by hand: a list with a playlist line failed in 0.5 s naming line 3
+  only; two local sources (heuristic, top 1, `fit`, no titles) ran in 26 s
+  with the table.
+
 ## Revisit when
 
 - A second front end (a scheduler, a watch folder, a UI) needs the same

@@ -2187,6 +2187,36 @@ again. With yt-dlp off `PATH` it exits 0 with `Already fetched:` and
 `Warning: no video info saved: 'yt-dlp' not found on PATH ...`, and no
 `.info.json` is written. Record the two files' channel and title.
 
+### D12. `drafts` on a list of sources
+
+Covers [ADR 0022](decisions/0022-one-command-to-drafts.md)'s list
+amendment. Uses D1's and D2's fetched videos, so nothing is downloaded
+except in step 3.
+
+```powershell
+@"
+# D12 queue
+$YouTubeFile | Some name
+https://www.youtube.com/playlist?list=PLclipperManualTest
+$TwitchFile
+"@ | Set-Content "$S\queue.txt" -Encoding UTF8
+Invoke-Fetch "drafts --list `"$S\queue.txt`" --no-titles --style fit"
+(Get-Content "$S\queue.txt") -notmatch "playlist" | Set-Content "$S\queue.txt" -Encoding UTF8
+Invoke-Fetch "drafts --list `"$S\queue.txt`" --no-titles --style fit"
+Invoke-Fetch "drafts `"$TwitchUrl`" https://www.youtube.com/watch?v=zzzzzzzzzz1 --no-titles --style fit"
+```
+
+Pass:
+
+1. The first run exits 1 at once with `Error: Line 3: Playlist URLs are not
+   fetched ...`, the note that the list's about text is not used, and no
+   `Source` line.
+2. The second exits 0: `Source 1 of 2: ...` and `Source 2 of 2: ...`, each
+   with its `Drafts:` line, then a `Drafts` table with both folders and
+   their clip counts.
+3. The third exits 1: the Twitch VOD renders, the unavailable YouTube ID
+   fails with yt-dlp's message, and the table shows that source's error.
+
 ### D11. Clean up
 
 ```powershell
