@@ -436,6 +436,13 @@ In progress:
     in five VODs' top 5 is a draft the maintainer would not post as cut.
     Two of the three keepers need more at the end: the boundaries item
     again.
+  - 2026-11-10, YouTube 5pk8HLcAAT0 (a business podcast, about 2:13),
+    `drafts` with the LLM, judged in `review` (labels in
+    `data/labels/picks/5pk8HLcAAT0.json`): 9 of 10 kept, 1 rejected, the 9 to be
+    posted as Shorts by hand. 8 keepers are `fix`: 7 ends moved
+    later by 6.0 to 39.3 s (the LLM has no end extension, ADR 0023 item 5)
+    and 2 starts earlier by 2.5 and 5.0 s. The podcast niche, so outside
+    the V5 streamer comparisons.
 - Labels from Twitch community clips (option B), done: ADR 0012 and 0020
   amendments #116, `clipper labels` #117, manual steps T0 to T6, and the
   first labels, `data/labels/v2917438534.json` from 5 clips (links in
