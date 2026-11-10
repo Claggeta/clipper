@@ -15,6 +15,7 @@ from clipper.domain.models import (
     MediaInfo,
     RenderManifest,
     Transcript,
+    VideoInfo,
     VideoSource,
 )
 
@@ -67,6 +68,16 @@ class FakeDownloader:
         return path
 
 
+class FakeVideoInfo:
+    def lookup(self, source: VideoSource) -> VideoInfo:
+        return VideoInfo(
+            platform=source.platform,
+            video_id=source.video_id,
+            title="A video",
+            channel="A channel",
+        )
+
+
 class FakeProbe:
     def probe(self, media_path: Path) -> MediaInfo:
         return MediaInfo(duration_seconds=100.0, has_video=True)
@@ -109,6 +120,7 @@ class Env:
             probe=FakeProbe,
             title_writer=title_writer,
             downloader=lambda s: FakeDownloader(self.log, self.download_error),
+            video_info=lambda s: FakeVideoInfo(),
         )
         if real_title_writer:
             context = AppContext(
@@ -117,6 +129,7 @@ class Env:
                 renderer=context.renderer,
                 probe=context.probe,
                 downloader=context.downloader,
+                video_info=context.video_info,
             )
         return context
 

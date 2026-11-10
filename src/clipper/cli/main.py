@@ -23,6 +23,7 @@ from clipper.adapters.results.manifest_json import (
     load_manifest,
     save_manifest,
 )
+from clipper.adapters.results.video_info_json import save_video_info
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
@@ -32,7 +33,7 @@ from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths
 from clipper.core.pipeline import AnalysisPipeline
-from clipper.core.sources import parse_video_url, video_path
+from clipper.core.sources import parse_video_url, video_info_path, video_path
 from clipper.domain.errors import (
     ClipperError,
     ClipRenderError,
@@ -309,13 +310,35 @@ def _fetch_video(settings: Settings, build: AppContext, source: VideoSource) -> 
 
     Returns the video's path. Raises `ClipperError` if the download fails.
     """
-    existing = video_path(source, settings.videos_dir)
-    if existing.is_file():
-        console.print(f"Already fetched: {escape(str(existing))}", soft_wrap=True)
-        return existing
-    saved = build.downloader(settings).download(source, settings.videos_dir)
-    console.print(f"Saved: {escape(str(saved))}", soft_wrap=True)
-    return saved
+    video = video_path(source, settings.videos_dir)
+    if video.is_file():
+        console.print(f"Already fetched: {escape(str(video))}", soft_wrap=True)
+    else:
+        video = build.downloader(settings).download(source, settings.videos_dir)
+        console.print(f"Saved: {escape(str(video))}", soft_wrap=True)
+    _save_video_info(settings, build, source)
+    return video
+
+
+def _save_video_info(
+    settings: Settings, build: AppContext, source: VideoSource
+) -> None:
+    """Save the video's metadata beside it, once (ADR 0020, video info).
+
+    A failure is a warning: the video is there, and only titles use the info.
+    """
+    path = video_info_path(source, settings.videos_dir)
+    if path.is_file():
+        return
+    try:
+        save_video_info(build.video_info(settings).lookup(source), path)
+    except ClipperError as exc:
+        console.print(
+            f"[yellow]Warning:[/yellow] no video info saved: {escape(str(exc))}",
+            soft_wrap=True,
+        )
+        return
+    console.print(f"Video info: {escape(str(path))}", soft_wrap=True)
 
 
 @app.command()

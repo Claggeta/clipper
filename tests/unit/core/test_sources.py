@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from clipper.core.sources import parse_video_url, video_path, video_url
+from clipper.core.sources import (
+    parse_video_url,
+    video_info_path,
+    video_path,
+    video_url,
+)
 from clipper.domain.errors import DownloadError
 from clipper.domain.models import VideoSource
 
@@ -82,3 +87,8 @@ def test_video_url_is_plain() -> None:
 def test_video_path_is_named_by_id() -> None:
     assert video_path(_YT, Path("data/videos")) == Path("data/videos/abcDEF123_-.mp4")
     assert video_path(_TW, Path("v")) == Path("v/v1234567890.mp4")
+
+
+def test_video_info_sits_beside_the_video() -> None:
+    assert video_info_path(_YT, Path("v")) == Path("v/abcDEF123_-.info.json")
+    assert video_info_path(_TW, Path("v")) == Path("v/v1234567890.info.json")

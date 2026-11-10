@@ -161,6 +161,24 @@ class VideoSource(BaseModel):
     video_id: str = Field(min_length=1)
 
 
+class VideoInfo(BaseModel):
+    """A fetched video's metadata, saved beside it. See docs/decisions/0020.
+
+    `channel` is yt-dlp's uploader: a Twitch login or a YouTube channel name.
+    `upload_date` is yt-dlp's `YYYYMMDD`. Twitch VODs have no description.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    platform: Literal["youtube", "twitch"]
+    video_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    channel: str = Field(min_length=1)
+    upload_date: str | None = None
+    duration_seconds: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    description: str = ""
+
+
 class ClipLink(BaseModel):
     """One line of a links file: a Twitch clip and its VOD link's `t`.
 
