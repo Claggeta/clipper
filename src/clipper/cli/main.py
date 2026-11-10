@@ -37,7 +37,7 @@ from clipper.core.framing import plan_face_crop
 from clipper.core.interfaces import TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
-from clipper.core.naming import clip_folder, plan_clip_paths
+from clipper.core.naming import clip_folder, plan_clip_paths, variant_file_name
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.sources import parse_video_url, video_info_path, video_path
 from clipper.domain.errors import (
@@ -50,6 +50,7 @@ from clipper.domain.errors import (
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
+    ClipVariant,
     Evaluation,
     ManifestClip,
     MediaInfo,
@@ -440,17 +441,18 @@ def render(
         result = load_analysis_result(result_json)
         check_source_matches(result, video)
         plan = _plan_render(settings, build, video, result, rank)
-        if face and (plan.media.width is None or plan.media.height is None):
-            raise ClipRenderError(
-                f"Cannot tell the frame size of {video}, which --style face needs"
-            )
+        _check_frame_size((style,) if face else (), plan.media, video)
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
     flags = _RenderFlags(
-        captions=captions, vertical=vertical, titles=titles, about=about, face=face
+        captions=captions,
+        vertical=vertical,
+        titles=titles,
+        about=about,
+        styles=(style,) if vertical else (),
     )
     if _cut_clips(settings, build, video, result, result_json, plan, writer, flags):
         raise typer.Exit(code=1)
@@ -496,7 +498,33 @@ class _RenderFlags(NamedTuple):
     vertical: bool
     titles: bool
     about: str | None = None
-    face: bool = False
+    # The vertical styles to render, in order; empty for a landscape run.
+    styles: tuple[VerticalStyle, ...] = ()
+
+
+def _drafts_styles(
+    chosen: list[VerticalStyle] | None, vertical: bool
+) -> tuple[VerticalStyle, ...]:
+    """The styles `drafts` renders, in order without repeats (ADR 0025).
+
+    Fit and face by default; none without --vertical, where --style is an error.
+    """
+    if not vertical:
+        if chosen:
+            raise ClipRenderError("--style needs --vertical")
+        return ()
+    picked = chosen or [VerticalStyle.FIT, VerticalStyle.FACE]
+    return tuple(dict.fromkeys(picked))
+
+
+def _check_frame_size(
+    styles: tuple[VerticalStyle, ...], media: MediaInfo, video: Path
+) -> None:
+    """The face style needs the frame size; fail before cutting without it."""
+    if VerticalStyle.FACE in styles and (media.width is None or media.height is None):
+        raise ClipRenderError(
+            f"Cannot tell the frame size of {video}, which --style face needs"
+        )
 
 
 def _check_about(about: str | None, titles: bool) -> str | None:
@@ -568,9 +596,10 @@ def _cut_clips(
     `Error:` and exit 1.
     """
     ranks, selected, folder, paths, media = plan
-    captions, vertical, titles, about, face = flags
+    captions, vertical, titles, about, styles = flags
     renderer = build.renderer(settings)
-    tracker = build.face_tracker(settings) if face else None
+    face_only = styles == (VerticalStyle.FACE,)
+    tracker = build.face_tracker(settings) if VerticalStyle.FACE in styles else None
     video_info = _title_context(video) if writer else None
     failures: list[str] = []
     entries: list[ManifestClip] = []
@@ -586,26 +615,31 @@ def _cut_clips(
         span = f"{_fmt(candidate.start_seconds)}-{_fmt(candidate.end_seconds)}"
         crop = None
         if tracker is not None:
-            # Faces come before the title, so a clip with none costs no title
-            # request (ADR 0025).
+            # Faces come before the title, so a face-only clip with none costs
+            # no title request (ADR 0025). With `fit` too, the clip still
+            # renders in `fit`.
             try:
                 track = tracker.track(
                     video, candidate.start_seconds, candidate.end_seconds
                 )
             except ClipperError as exc:
-                failures.append(f"#{number} {span}: {escape(str(exc))}")
-                entries.append(ManifestClip(**entry, error=str(exc)))
-                continue
-            assert media.width is not None and media.height is not None
-            crop = plan_face_crop(track, media.width, media.height)
-            if crop is None:
-                console.print(
-                    f"[yellow]Note:[/yellow] #{number} {span} has no face in range; "
-                    "not rendered in the face style",
-                    soft_wrap=True,
-                )
-                entries.append(ManifestClip(**entry, error="no face found"))
-                continue
+                if face_only:
+                    failures.append(f"#{number} {span}: {escape(str(exc))}")
+                    entries.append(ManifestClip(**entry, error=str(exc)))
+                    continue
+                failures.append(f"#{number} {span} (face): {escape(str(exc))}")
+            else:
+                assert media.width is not None and media.height is not None
+                crop = plan_face_crop(track, media.width, media.height)
+                if crop is None:
+                    console.print(
+                        f"[yellow]Note:[/yellow] #{number} {span} has no face in "
+                        "range; not rendered in the face style",
+                        soft_wrap=True,
+                    )
+                    if face_only:
+                        entries.append(ManifestClip(**entry, error="no face found"))
+                        continue
         built = (
             build_ass(result.transcript, candidate, vertical=vertical)
             if captions
@@ -633,19 +667,54 @@ def _cut_clips(
             )
         try:
             # The title comes first, so a clip whose title fails is not cut
-            # (ADR 0018).
+            # (ADR 0018). One title serves every style.
             title = writer.write(text, video_info, about) if writer and text else None
-            clip = renderer.render(
-                video,
-                candidate,
-                path,
-                captions=ass or None,
-                vertical=vertical,
-                crop=crop,
-            )
         except ClipperError as exc:
             failures.append(f"#{number} {span}: {escape(str(exc))}")
             entries.append(ManifestClip(**entry, error=str(exc)))
+            continue
+        # A landscape run renders once, with no style and no variants.
+        wanted: list[VerticalStyle | None] = (
+            [s for s in styles if s is not VerticalStyle.FACE or crop is not None]
+            if styles
+            else [None]
+        )
+        variants: list[ClipVariant] = []
+        files: list[str] = []
+        error = ""
+        for style in wanted:
+            name = variant_file_name(path.name, (style or VerticalStyle.FIT).value)
+            try:
+                clip = renderer.render(
+                    video,
+                    candidate,
+                    path.with_name(name),
+                    captions=ass or None,
+                    vertical=vertical,
+                    crop=crop if style is VerticalStyle.FACE else None,
+                )
+            except ClipperError as exc:
+                label = f" ({style.value})" if style and len(wanted) > 1 else ""
+                failures.append(f"#{number} {span}{label}: {escape(str(exc))}")
+                error = str(exc)
+                break
+            files.append(name)
+            if style is not None:
+                variants.append(ClipVariant(style=style.value, file=name))
+            shown = (
+                ("vertical", vertical),
+                ("face", style is VerticalStyle.FACE),
+                ("captions", ass),
+                ("titles", title),
+            )
+            tags = [t for t, on in shown if on]
+            suffix = f" ({', '.join(tags)})" if tags else ""
+            console.print(
+                f"Rendered #{number} {span} {escape(str(clip.path))}{suffix}",
+                soft_wrap=True,
+            )
+        if not files:
+            entries.append(ManifestClip(**entry, error=error))
             continue
         rendered += 1
         burned = None
@@ -654,23 +723,12 @@ def _cut_clips(
         entries.append(
             ManifestClip(
                 **entry,
-                file=path.name,
+                file=files[0],
                 captions=burned,
                 title=title.title if title else None,
                 hook=title.hook if title else None,
+                variants=tuple(variants),
             )
-        )
-        shown = (
-            ("vertical", vertical),
-            ("face", crop),
-            ("captions", ass),
-            ("titles", title),
-        )
-        tags = [t for t, on in shown if on]
-        suffix = f" ({', '.join(tags)})" if tags else ""
-        console.print(
-            f"Rendered #{number} {span} {escape(str(clip.path))}{suffix}",
-            soft_wrap=True,
         )
         if title:
             console.print(f"  Title: {escape(title.title)}", soft_wrap=True)
@@ -690,6 +748,7 @@ def _cut_clips(
         captions=captions,
         titles=titles,
         clips=tuple(entries),
+        styles=tuple(s.value for s in styles),
     )
     try:
         written = save_manifest(manifest, folder)
@@ -726,6 +785,15 @@ def drafts(
             "(CLIPPER_LLM_MODEL), written to the manifest.",
         ),
     ] = True,
+    style: Annotated[
+        list[VerticalStyle] | None,
+        typer.Option(
+            "--style",
+            help="A vertical style to render; repeat for several. Default: fit "
+            "and face, so each clip comes in both to pick from.",
+            show_default=False,
+        ),
+    ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     detector: DetectorOption = DetectorName.HEURISTIC,
     about: AboutOption = None,
@@ -734,8 +802,8 @@ def drafts(
 
     SOURCE starting with http:// or https:// is fetched as `fetch` does (see
     docs/decisions/0020); anything else is a local video file. Every
-    candidate is rendered, by default vertical, captioned and titled (see
-    docs/decisions/0022).
+    candidate is rendered, by default vertical in both styles, captioned and
+    titled (see docs/decisions/0022 and 0025).
     """
     logging.basicConfig(
         level=logging.INFO if verbose else logging.WARNING,
@@ -747,6 +815,7 @@ def drafts(
         # Everything that can fail on input or settings fails before a
         # download or a transcription starts (ADR 0022).
         about = _check_about(about, titles)
+        styles = _drafts_styles(style, vertical)
         url = source.lower().startswith(("http://", "https://"))
         fetched = parse_video_url(source) if url else None
         video = Path(source)
@@ -757,12 +826,17 @@ def drafts(
             video = _fetch_video(settings, build, fetched)
         result, result_json = _analyze_video(settings, build, video, detector)
         plan = _plan_render(settings, build, video, result, None)
+        _check_frame_size(styles, plan.media, video)
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
 
     flags = _RenderFlags(
-        captions=captions, vertical=vertical, titles=titles, about=about
+        captions=captions,
+        vertical=vertical,
+        titles=titles,
+        about=about,
+        styles=styles,
     )
     failed = _cut_clips(
         settings, build, video, result, result_json, plan, writer, flags

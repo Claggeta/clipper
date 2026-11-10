@@ -111,6 +111,11 @@ analysis of the same video gave `captions` `segments` and `detector` `null`.
   `added: true`, a rank after every clip so far, score 0 and the reason
   `added in review`; its draft span fields hold its last saved span. Trash
   removes its entry. Older manifests read as `added: false`.
+- **Styles amendment (ADR 0025, V5 item 13d)**: the run records `styles`,
+  the vertical styles rendered in order (empty for a landscape run), and each
+  clip `variants`, a list of `{style, file}`; `file` is the first variant's.
+  Older manifests read as empty. The review page's re-render and Trash clear
+  `variants` until the style switch (13e).
 - The page replaces `manifest.json` whole, as `render` does. A later
   `render` or `drafts` run on the folder still replaces it and loses these
   fields (decision 3); the judged labels are separate files.

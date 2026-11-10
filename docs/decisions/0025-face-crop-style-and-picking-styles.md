@@ -170,6 +170,29 @@ Measured on 13c's two clips:
   apply. Speaker detection is a later item; until then `fit` is the pick for
   such clips (13d renders both).
 
+## Amended by several styles in `drafts` (V5 item 13d)
+
+- **`drafts --style`** is repeatable and defaults to `fit` and `face`;
+  repeats are dropped and the order kept. `--style` with `--no-vertical` is
+  `Error:` before any download. `render` keeps one `--style`.
+- **File names**: `fit` keeps the clip's name (0008); another style's file is
+  `<stem>.<style>.mp4` beside it (`variant_file_name` in `core/naming.py`),
+  so `render --style face` now writes `.face.mp4` too.
+- **One clip, several renders**: faces are tracked once, the title is written
+  once and the captions built once; then each style renders in order. A clip
+  with no face, or whose face tracking fails, still renders in `fit`: the
+  first is a note, the second a failure (exit 1). A failed `fit` render ends
+  the clip (an `error`, no files); a failed `face` render after it is a
+  failure (exit 1) and the clip keeps its `fit` file.
+- **Manifest** (0019): `variants` per clip and `styles` per run.
+- **The review page** shows `file`, the `fit` one. Until 13e, a re-render or
+  Trash there clears the clip's `variants` and deletes its other style files,
+  since they no longer match the span; a style file that cannot be deleted is
+  logged and does not stop the Trash.
+- Checked by hand: `drafts` on 5pk8HLcAAT0 with the heuristic, top 2 and
+  `--about`: both clips in both styles with one title each, in 67 s with the
+  transcript cached.
+
 ## Alternatives considered
 
 - **A zoom that sizes the crop to the face** (the face a fixed share of the

@@ -24,6 +24,15 @@ def clip_file_name(video: Path, candidate: ClipCandidate) -> str:
     return f"{video.stem}_{_hhmmss(start)}-{_hhmmss(end)}.mp4"
 
 
+def variant_file_name(name: str, style: str) -> str:
+    """A style's file name: the clip's own for `fit`, `<stem>.<style>.mp4`
+    otherwise, so the files sit side by side (ADR 0025)."""
+    if style == "fit":
+        return name
+    path = Path(name)
+    return f"{path.stem}.{style}{path.suffix}"
+
+
 def clip_folder(video: Path, clips_dir: Path) -> Path:
     """The folder for one video's clips, `<clips dir>/<stem>`. See ADR 0019."""
     return clips_dir / video.stem

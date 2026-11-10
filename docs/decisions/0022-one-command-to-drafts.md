@@ -109,6 +109,13 @@ order across them, gets its own record.
   clip failed its title in 10.8 s, and `--no-titles` rendered all 5 in
   26.6 s.
 
+## Amended by several styles (ADR 0025, V5 item 13d)
+
+- `drafts` renders each clip in both vertical styles by default, `fit` and
+  `face`, to pick from; `--style` (repeatable) chooses, and `--no-vertical`
+  renders landscape with no styles. `--style` with `--no-vertical` fails
+  before any download.
+
 ## Revisit when
 
 - A second front end (a scheduler, a watch folder, a UI) needs the same

@@ -295,6 +295,21 @@ class ClipTitle(BaseModel):
         return value
 
 
+VerticalStyleName = Literal["fit", "face"]
+
+
+class ClipVariant(BaseModel):
+    """One rendered style of a clip: the style and its file name in the folder.
+
+    See docs/decisions/0025 (several styles amendment).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    style: VerticalStyleName
+    file: str = Field(min_length=1)
+
+
 class ManifestClip(BaseModel):
     """One selected clip in a render manifest. See docs/decisions/0019.
 
@@ -321,6 +336,10 @@ class ManifestClip(BaseModel):
     `added` marks a clip the maintainer added in the review page (item 3e
     amendment), ranked after the drafts, with score 0 and the reason
     "added in review". Its draft span is its last saved span.
+
+    `variants` lists each vertical style rendered for the clip, in the run's
+    order (ADR 0025); `file` is the first of them. Empty for a landscape run,
+    an older manifest, or after the review page re-rendered or trashed it.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -340,6 +359,13 @@ class ManifestClip(BaseModel):
     draft_end_seconds: float | None = None
     model_title: str | None = None
     added: bool = False
+    variants: tuple[ClipVariant, ...] = ()
+
+    @model_validator(mode="after")
+    def _variants_have_the_file(self) -> "ManifestClip":
+        if self.variants and self.file != self.variants[0].file:
+            raise ValueError("file must be the first variant's file")
+        return self
 
     @model_validator(mode="after")
     def _file_or_error(self) -> "ManifestClip":
@@ -371,6 +397,8 @@ class RenderManifest(BaseModel):
 
     `vertical`, `captions` and `titles` are the flags the run was given.
     `analysis` is the result JSON path as given on the command line.
+    `styles` are the vertical styles rendered, in order (ADR 0025); empty for
+    a landscape run or an older manifest.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -382,6 +410,7 @@ class RenderManifest(BaseModel):
     captions: bool
     titles: bool
     clips: tuple[ManifestClip, ...]
+    styles: tuple[VerticalStyleName, ...] = ()
 
 
 def _parse_timestamp(value: object) -> float:
