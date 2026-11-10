@@ -470,6 +470,22 @@ In progress:
   the heuristic found 1 at top 5 and 3 at top 30, the LLM 1 at top 30. Clips
   and the maintainer's picks disagree, so clip labels are a weak stand-in
   for "worth posting"; trial notes count more. Small samples.
+- Campaign briefs read (2026-11-10), two so far. Neither asks for a
+  detector input; both ask for work at the edit and post stage.
+  - Lacy (a pool campaign, paid by share of views): clips from Lacy's
+    Twitch, YouTube and other accounts, Lacy the main focus, Lacy's name in
+    the caption or on-screen text and `#Lacy`, no logos, not negative, no
+    reposting; YouTube Shorts is allowed. Nothing Clipper lacks beyond
+    `--about "Lacy"` for titles (V5 8c); the rest is checked in review and
+    at upload.
+  - The Iced Coffee Hour (Clip Strategy; the Greg LaVecchia episode,
+    5pk8HLcAAT0): cut from the campaign's own files, not a download; English
+    captions with names and numbers checked and the key word highlighted;
+    an on-screen hook over the first seconds; original B-roll edited in;
+    tags per platform. Dropped by the maintainer: B-roll is beyond Clipper
+    (stock or generated footage clashes with the no-paid-services
+    non-goal), and the hook and caption fixes would be manual too. The
+    judged labels from its drafts stay (#151).
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -791,6 +807,8 @@ Later, not scheduled:
   too slow.
 - Campaign briefs as a detector input, once the maintainer has read some.
   Needs an ADR.
+  Two read on 2026-11-10 (see "Campaign briefs read"); neither asks
+  for one. One asked for an on-screen hook, a possible small render item.
 - Posting and performance data, once accounts exist.
 
 ## Parked
