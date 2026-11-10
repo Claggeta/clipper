@@ -2292,8 +2292,8 @@ data\clips\manifest.json`. Stop RV1's server with Ctrl+C.
 
 If a video whose timestamps do not start at 0 is at hand (check with
 `ffprobe -v error -show_entries format=start_time -of csv=p=0 <video>`; the
-original of v2924046310, kept as `v2924046310.fragmented.mp4`, starts at
-64 s), copy it under the name its drafts folder expects, in a scratch
+original download of v2924046310 started at 64 s, but it was replaced by
+its remux and deleted), copy it under the name its drafts folder expects, in a scratch
 folder, and pass it with `--video`. Pass: exit 1, `Error: ... starts at
 64.0 s, not 0, so the page's player would not match the transcript; remux
 it: ffmpeg ...`.
