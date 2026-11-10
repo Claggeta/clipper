@@ -251,6 +251,20 @@ class VideoInfo(BaseModel):
     description: str = ""
 
 
+class QueuedSource(BaseModel):
+    """One source for `drafts`: a URL or file, with its own `--about` text.
+
+    `line` is its line in a `--list` file, or None for one given on the
+    command line. See docs/decisions/0022 (list amendment).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str = Field(min_length=1)
+    about: str | None = None
+    line: int | None = Field(default=None, ge=1)
+
+
 class ClipLink(BaseModel):
     """One line of a links file: a Twitch clip and its VOD link's `t`.
 

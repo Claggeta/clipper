@@ -181,7 +181,11 @@ and planned code:
   `cli/main.py`). Vertical, captions and titles on by default, each with a
   `--no-` switch; no `--rank`. A refused URL, missing file or empty
   `CLIPPER_LLM_MODEL` fails before any download or transcription; clip
-  failures follow 0011/0018 and `Drafts: <folder>` still prints. Measured
+  failures follow 0011/0018 and `Drafts: <folder>` still prints. List
+  amendment (V5 9): several sources or `--list` (one per line, `#`
+  comments, `| about` per line), all checked first, run in order, a
+  failed source does not stop the rest, a summary table, exit 1 if any
+  failed. Measured
   (criterion 5): the 5:04:01 stream cold from a file in 22:58.
 - `0023` — candidate boundaries follow the moment: candidates 15 to 90 s;
   in shared code for every detector, windows are scored, neighbours merged,

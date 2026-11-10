@@ -64,14 +64,19 @@ class StubDetector:
 
 
 class FakeDownloader:
-    def __init__(self, log: Recorder, error: str | None = None) -> None:
+    """Downloads every video, or fails for `fail_on` IDs or with `error`."""
+
+    def __init__(
+        self, log: Recorder, error: str | None = None, fail_on: tuple[str, ...] = ()
+    ) -> None:
         self._log = log
         self._error = error
+        self._fail_on = fail_on
 
     def download(self, source: VideoSource, folder: Path) -> Path:
         self._log.stages.append(f"download {source.video_id}")
-        if self._error:
-            raise DownloadError(self._error)
+        if self._error or source.video_id in self._fail_on:
+            raise DownloadError(self._error or f"{source.video_id} is unavailable")
         folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{source.video_id}.mp4"
         path.write_bytes(b"fake video")
@@ -137,6 +142,7 @@ class Env:
         self.title_writers_built = 0
         self.transcribe_error: str | None = None
         self.download_error: str | None = None
+        self.download_fail_on: tuple[str, ...] = ()
         self.tracker = FakeFaceTracker()
         for name in ("output", "clips", "videos", "cache"):
             monkeypatch.setenv(f"CLIPPER_{name.upper()}_DIR", str(tmp_path / name))
@@ -160,7 +166,9 @@ class Env:
             renderer=lambda s: self.renderer,
             probe=FakeProbe,
             title_writer=title_writer,
-            downloader=lambda s: FakeDownloader(self.log, self.download_error),
+            downloader=lambda s: FakeDownloader(
+                self.log, self.download_error, self.download_fail_on
+            ),
             video_info=lambda s: FakeVideoInfo(),
             face_tracker=lambda s: self.tracker,
         )
@@ -416,3 +424,117 @@ def test_a_fit_render_failure_skips_the_face_style(env: Env) -> None:
     first = env.manifest("talk").clips[0]
     assert (first.file, first.variants) == (None, ())
     assert first.error is not None
+
+
+_URL2 = "https://www.youtube.com/watch?v=zzzZZZ999_-"
+
+
+def test_several_sources_run_in_order_with_a_summary(env: Env) -> None:
+    FakeTitleWriter.abouts = []
+    result = env.run(_URL, str(env.video), "--about", "Ron")
+    assert result.exit_code == 0, result.output
+    assert env.log.stages == [
+        "title writer",
+        "download abcDEF123_-",
+        "transcribe abcDEF123_-.mp4",
+        "transcribe talk.mp4",
+    ]
+    assert env.title_writers_built == 1
+    assert "Source 1 of 2: " + _URL in result.output
+    assert "Source 2 of 2: " + str(env.video) in result.output
+    assert set(FakeTitleWriter.abouts) == {"Ron"}
+    summary = result.output[result.output.index("Folder or error") :]
+    assert summary.count("2 of 2") == 2
+    assert env.manifest("abcDEF123_-").clips
+    assert env.manifest("talk").clips
+
+
+def test_a_failing_source_does_not_stop_the_rest(env: Env) -> None:
+    env.download_fail_on = ("abcDEF123_-",)
+    result = env.run(_URL, _URL2)
+    assert result.exit_code == 1
+    assert "Error: abcDEF123_- is unavailable" in result.output
+    assert env.log.stages[-1] == "transcribe zzzZZZ999_-.mp4"
+    assert env.manifest("zzzZZZ999_-").clips
+
+
+def test_a_list_file_gives_sources_and_their_own_about(
+    env: Env, tmp_path: Path
+) -> None:
+    FakeTitleWriter.abouts = []
+    listing = tmp_path / "sources.txt"
+    listing.write_text(
+        f"# queue\n{_URL} | Lacy (he/him)\n{env.video}\n{_URL}\n", encoding="utf-8"
+    )
+    result = env.run("--list", str(listing), "--about", "Ron")
+    assert result.exit_code == 0, result.output
+    # The repeated URL runs once.
+    assert env.log.stages.count("download abcDEF123_-") == 1
+    assert "Source 2 of 2" in result.output
+    assert FakeTitleWriter.abouts == ["Lacy (he/him)"] * 2 + ["Ron"] * 2
+
+
+def test_every_bad_source_is_named_before_anything_runs(
+    env: Env, tmp_path: Path
+) -> None:
+    listing = tmp_path / "sources.txt"
+    listing.write_text(
+        f"{_URL}\nhttps://www.youtube.com/playlist?list=PLx\nmissing.mp4\n",
+        encoding="utf-8",
+    )
+    result = env.run("--list", str(listing))
+    assert result.exit_code == 1
+    assert "Error: Line 2: Playlist URLs are not fetched" in result.output
+    assert "Error: Line 3: Input file not found: missing.mp4" in result.output
+    assert env.log.stages == []
+
+
+def test_a_bad_source_on_the_command_line_is_named(env: Env) -> None:
+    result = env.run(_URL, "missing.mp4")
+    assert result.exit_code == 1
+    assert "Error: missing.mp4: Input file not found: missing.mp4" in result.output
+    assert env.log.stages == []
+
+
+def test_drafts_needs_a_source(env: Env, tmp_path: Path) -> None:
+    result = env.run()
+    assert result.exit_code == 1
+    assert "Error: Give a source, or a --list file with sources" in result.output
+    empty = tmp_path / "empty.txt"
+    empty.write_text("# nothing\n", encoding="utf-8")
+    assert "Give a source" in env.run("--list", str(empty)).output
+
+
+def test_an_unreadable_list_is_an_error(env: Env, tmp_path: Path) -> None:
+    result = env.run("--list", str(tmp_path / "none.txt"))
+    assert result.exit_code == 1
+    assert "Error: Cannot read the list" in result.output
+
+
+def test_a_manifest_that_cannot_be_written_fails_that_source(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clipper.domain.errors import ManifestError
+
+    calls: list[Path] = []
+
+    def save(manifest: RenderManifest, folder: Path) -> Path:
+        calls.append(folder)
+        raise ManifestError(f"Cannot write manifest {folder}")
+
+    monkeypatch.setattr("clipper.cli.main.save_manifest", save)
+    result = env.run(_URL, _URL2)
+    assert result.exit_code == 1
+    assert len(calls) == 2
+    assert "manifest not written" in result.output
+
+
+def test_without_titles_a_lists_about_text_is_set_aside(
+    env: Env, tmp_path: Path
+) -> None:
+    listing = tmp_path / "sources.txt"
+    listing.write_text(f"{env.video} | Lacy (he/him)\n", encoding="utf-8")
+    result = env.run("--list", str(listing), "--no-titles")
+    assert result.exit_code == 0, result.output
+    assert "Note: titles are off; the list's about text is not used" in result.output
+    assert env.title_writers_built == 0

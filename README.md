@@ -188,6 +188,11 @@ vertical, captioned clip, and a suggested title and hook for each in the
 manifest. Each clip comes in two styles to pick from: `<name>.mp4` fits the
 whole frame, and `<name>.face.mp4` crops on the largest face (a clip with no
 face gets only the first). `--style fit` or `--style face` renders one.
+Give several sources, or `--list sources.txt` (one per line, `#` for
+comments, and `| <about text>` after a source for its own `--about`), to
+queue them: every source is checked first, then they run one after another,
+a failed one does not stop the rest, and a table at the end lists each
+folder or error.
 `--no-vertical`, `--no-captions` and `--no-titles` turn those off;
 use `--no-titles` when Ollama is not running. `--about` works as for
 `render`. `--detector` and `-v` work as for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
