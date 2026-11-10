@@ -110,8 +110,56 @@ On the other three VODs, 31 keepers (13 heuristic, 18 LLM):
   transcripts, and records the choice in its own amendment. Decision 5
   stands: starts are dragged on 3 keepers against 12 ends, so starts stay.
 
+## Amended by item 5: end extension, heuristic only
+
+`extend_ends` in `adapters/detection/windows.py` runs after `select_top`.
+Each chosen candidate's end moves word by word from its last word (a
+segment's span where it has no words) and stops at the first word followed
+by a gap of at least `PAUSE_SECONDS = 1.5`, or at the transcript's end. It
+never goes past `MAX_CANDIDATE_SECONDS = 90.0` from the start, nor past the
+start of a later chosen candidate. Starts do not change.
+
+**The pause length.** Simulated on the 12 dragged ends above: at 1.5 s the
+heuristic's early ends go from 6 to 1, at 1.0 s to 2, with the same 4 ends
+over 5 s past the maintainer's in both. 1.5 s was chosen.
+
+**Measured** with `eval` at top 10 against the judged labels on
+v2922695332, v2917872953 and v2922589775, the same LLM replies for before
+and after. "Early" is a keeper whose label ends over 1 s later; "over" is one
+whose label ends over 5 s earlier.
+
+| Detector | Keepers | Early | Over by >5 s | Over by |
+|---|---|---|---|---|
+| heuristic, before | 13 | 6 | 1 | 22.5 s |
+| heuristic, after | 12 | 1 | 4 | 15.7, 17.0, 17.3, 36.9 s |
+| LLM, before | 18 | 6 | 1 | 13.2 s |
+| LLM, after | 18 | 6 | 7 | 10.8 to 49.5 s |
+
+- The heuristic's lost keeper is the adapt draft at 1:59:19, which was on
+  its `fix` label only by its exact draft span (0012); with a new end it is
+  unjudged, not rejected. The 22.5 s and 13.2 s overs are whole clips the
+  maintainer moved earlier, not dragged ends.
+- The LLM's early ends stay early (3.0 to 36.7 s short after): its drafts
+  already end where speech stops, and the moment goes on in silence. On
+  stableronaldo four of its keepers run 37 to 49 s long, and three
+  candidates reach 90 s.
+- Clip-label recall at 10 and 30: 0 for both detectors on all three VODs,
+  before and after.
+- The heuristic's median candidate grows from about 42 to about 55 s; the
+  LLM's 1 to 19 s candidates stay that short (decision 1, item 6).
+
+**Decision.** Adopted for the heuristic, which fixes the costliest failure
+(clips that end too early) at the price of three long ends that are trimmed
+in the review page. Not adopted for the LLM, which it does not help
+(decision 6). This amends decision 2: end extension is shared code that a
+detector opts into, not a step every detector runs. Decision 7 holds:
+`extend_ends` is a pure function of the transcript and the chosen
+candidates.
+
 ## Revisit when
 
+- The LLM is chosen as the `drafts` default (V5 item 11), or its early ends
+  are fixed another way: measure end extension on it again.
 - The baseline shows starts dragged as often as ends: extend starts too.
 - Transcript pauses end clips in the wrong place often: try audio silence.
 - A niche other than streamers is tuned, if its moments need another range.

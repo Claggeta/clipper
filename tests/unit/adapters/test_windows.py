@@ -1,10 +1,13 @@
 from clipper.adapters.detection.windows import (
+    MAX_CANDIDATE_SECONDS,
+    PAUSE_SECONDS,
     STEP_SECONDS,
     WINDOW_SECONDS,
+    extend_ends,
     select_top,
     sliding_windows,
 )
-from clipper.domain.models import ClipCandidate, Segment, Transcript
+from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
 
 # All fixtures here are constructed.
 
@@ -94,3 +97,68 @@ def test_select_returns_fewer_when_there_are_fewer() -> None:
     only = _c(0, 10, 0.5)
     assert select_top([only], 5) == [only]
     assert select_top([], 5) == []
+
+
+def _worded(*spans: tuple[float, float]) -> Segment:
+    words = tuple(Word(start_seconds=a, end_seconds=b, text="w") for a, b in spans)
+    return Segment(
+        start_seconds=spans[0][0], end_seconds=spans[-1][1], text="w", words=words
+    )
+
+
+def test_pause_and_maximum_match_adr_0023() -> None:
+    assert (PAUSE_SECONDS, MAX_CANDIDATE_SECONDS) == (1.5, 90.0)
+
+
+def test_end_moves_to_the_first_pause_after_it() -> None:
+    transcript = _transcript(
+        _worded((0.0, 5.0), (5.0, 10.0)),
+        _worded((10.5, 12.0), (13.0, 14.0)),
+        _worded((15.6, 17.0)),
+    )
+
+    # Gaps of 0.5 s and 1.0 s carry on; the 1.6 s gap after 14 s is a pause.
+    assert extend_ends([_c(0, 10, 0.5)], transcript)[0].end_seconds == 14.0
+
+
+def test_a_gap_of_exactly_the_pause_stops_the_end() -> None:
+    transcript = _transcript(_worded((0.0, 10.0)), _worded((11.5, 12.0)))
+    assert extend_ends([_c(0, 10, 0.5)], transcript)[0].end_seconds == 10.0
+
+
+def test_end_runs_to_the_transcript_end_without_a_pause() -> None:
+    transcript = _transcript(_worded((0.0, 10.0), (10.2, 20.0)), _worded((20.5, 30.0)))
+    assert extend_ends([_c(0, 10, 0.5)], transcript)[0].end_seconds == 30.0
+
+
+def test_segments_without_words_are_the_fallback() -> None:
+    transcript = _transcript(_seg(0, 10), _seg(11, 20), _seg(25, 30))
+    assert extend_ends([_c(0, 10, 0.5)], transcript)[0].end_seconds == 20.0
+
+
+def test_end_never_passes_the_maximum_from_the_start() -> None:
+    transcript = _transcript(*[_seg(i * 10.0, i * 10.0 + 10) for i in range(12)])
+
+    # 80-90 ends at 90 s, the cap; 90-100 would pass it.
+    assert extend_ends([_c(0, 40, 0.5)], transcript)[0].end_seconds == 90.0
+
+
+def test_end_never_runs_into_a_later_chosen_candidate() -> None:
+    transcript = _transcript(*[_seg(i * 10.0, i * 10.0 + 10) for i in range(10)])
+    first, later = _c(0, 20, 0.5), _c(55, 60, 0.9)
+
+    # The ranks keep their order; 40-50 is the last segment ending by 55 s.
+    assert extend_ends([later, first], transcript) == [
+        _c(55, 100, 0.9),
+        _c(0, 50, 0.5),
+    ]
+
+
+def test_an_end_already_at_a_pause_and_the_start_stay() -> None:
+    candidate = _c(3, 10, 0.5)
+    transcript = _transcript(_seg(3, 10), _seg(20, 30))
+    assert extend_ends([candidate], transcript) == [candidate]
+
+
+def test_extend_ends_with_nothing_chosen() -> None:
+    assert extend_ends([], _transcript(_seg(0, 10))) == []
