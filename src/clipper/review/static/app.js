@@ -29,6 +29,9 @@ const CONFIRM_MS = 3000;
 const RANGE_SECONDS = 120;
 
 let duration = 0;
+// Names this video in frame URLs, so the browser's cache of frames never
+// mixes VODs (every run is served from the same address).
+let framesKey = "";
 let current = null;
 // Keyed by `clip.key`: the rank, or `new-<n>` for a clip added in the page,
 // which keeps its key once Save gives it a rank.
@@ -135,7 +138,7 @@ function drawStrip() {
     tile.className = "tile";
     if (second < duration) {
       const image = document.createElement("img");
-      image.src = `/frames/${second}.jpg`;
+      image.src = `/frames/${framesKey}/${second}.jpg`;
       image.alt = "";
       image.addEventListener("error", () => image.remove());
       const label = document.createElement("span");
@@ -652,6 +655,7 @@ async function load() {
   const response = await fetch("/api/clips");
   const data = await response.json();
   duration = data.duration;
+  framesKey = encodeURIComponent(data.frames_key);
   text("source", data.source);
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {

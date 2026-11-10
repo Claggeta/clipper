@@ -215,7 +215,9 @@ and planned code:
   Item 3e amendment: "Add clip here" from the playhead; Save writes an
   `added` label (not `post`), renders it and appends a manifest entry
   (`added: true`, ranked last, score 0); Trash removes an added clip
-  outright, with no rejected span; manual step RV9.
+  outright, with no rejected span; manual step RV9. Frame URL fix: frames
+  are `/frames/<stem>-<size>/<second>.jpg`, since the browser cached
+  frames by URL and showed one VOD's frames in another's strip.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

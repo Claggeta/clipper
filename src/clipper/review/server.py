@@ -50,8 +50,11 @@ _STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
-# A film strip frame, at a whole second: /frames/<second>.jpg.
-_FRAME_PATH = re.compile(r"/frames/(\d{1,7})\.jpg")
+# A film strip frame, at a whole second: /frames/<video key>/<second>.jpg.
+# The key names the video (its cache folder), so the browser, which keeps
+# frames by URL, never shows one VOD's frame in another's strip: every run
+# is served from the same address.
+_FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7})\.jpg")
 # Frames never change for a given video, so the browser may keep them.
 _FRAME_CACHE = "max-age=86400"
 # A judgment on one clip: /api/clips/<rank>/save or /trash; or a new clip.
@@ -86,6 +89,11 @@ class ReviewSession:
 def frames_folder(cache_dir: Path, video: Path) -> Path:
     """Where one video's film strip frames are cached: by name and size."""
     return cache_dir / "frames" / f"{video.stem}-{video.stat().st_size}"
+
+
+def frames_key(session: ReviewSession) -> str:
+    """The video's part of a frame URL: its cache folder's name."""
+    return session.frames_dir.name
 
 
 def cached_frame(session: ReviewSession, second: int) -> Path:
@@ -196,6 +204,7 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "captions": manifest.captions,
         "titles": manifest.titles,
         "duration": session.duration_seconds,
+        "frames_key": frames_key(session),
         "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
     }
 
@@ -216,8 +225,10 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     self._send_json(HTTPStatus.OK, clips_payload(session, store))
                 elif path == "/video":
                     self._send_video()
-                elif frame := _FRAME_PATH.fullmatch(path):
-                    self._send_frame(int(frame.group(1)))
+                elif (frame := _FRAME_PATH.fullmatch(path)) and frame.group(
+                    1
+                ) == frames_key(session):
+                    self._send_frame(int(frame.group(2)))
                 else:
                     self._not_found()
             except ConnectionError:
