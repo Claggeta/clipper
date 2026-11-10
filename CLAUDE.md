@@ -810,8 +810,10 @@ Items 8 and 9 do not depend on picking and may land earlier.
      Measured in 8b: 24 of 39 titles name the person with written names,
      12 with video info alone. ADR 0018 amendment, manual step.~~ (done;
      #156; 22 of 39 with `--about`; manual step R19b)
-9. `drafts` with a list of sources; one failing source does not stop the
-   rest, and the exit code is 1 at the end. ADR 0022 amendment, manual step.
+9. ~~`drafts` with a list of sources; one failing source does not stop the
+   rest, and the exit code is 1 at the end. ADR 0022 amendment, manual step.~~
+   (done; #169; several sources or `--list`, `| about` per line, all
+   checked first, a summary table; manual step D12)
 10. Audio loudness:
     - 10a. Spike: per-second loudness with ffmpeg on two trial VODs,
       compared with the judged keepers and the clip labels. Ends in a new
