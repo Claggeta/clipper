@@ -831,8 +831,9 @@ Items 8 and 9 do not depend on picking and may land earlier.
       face, dead zone, easing, a jump at a camera cut. Manual step.~~ (done;
       #162; `render --vertical --style face`, manual step R20; Save in the
       review page re-renders in `fit` until 13d/13e)
-    - 13d. Several styles in `drafts` (`fit` and `face`) and variants in
-      the manifest (ADR 0019 amendment).
+    - 13d. ~~Several styles in `drafts` (`fit` and `face`) and variants in
+      the manifest (ADR 0019 amendment).~~ (done; #165; locked framing fix
+      #164 first, after the maintainer found 13c choppy)
     - 13e. A style switch in the review page; Save keeps the chosen style
       and records it (ADR 0024 amendment). Manual step.
 14. Release notes and tag `v0.5.0`.
