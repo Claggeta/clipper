@@ -820,9 +820,10 @@ Items 8 and 9 do not depend on picking and may land earlier.
      Measured in 8b: 24 of 39 titles name the person with written names,
      12 with video info alone. ADR 0018 amendment, manual step.~~ (done;
      #156; 22 of 39 with `--about`; manual step R19b)
-   - 8d. No guessed pronouns in titles: the prompt takes he/she only from
+   - 8d. ~~No guessed pronouns in titles: the prompt takes he/she only from
      pronouns stated in `--about`. ADR 0018 amendment; measured on the
-     drafts folders' titled clips.
+     drafts folders' titled clips.~~ (done; #173; Lacy as she/her 4 to 2
+     of 10, 0 with pronouns stated; manual step R19b extended)
 9. ~~`drafts` with a list of sources; one failing source does not stop the
    rest, and the exit code is 1 at the end. ADR 0022 amendment, manual step.~~
    (done; #169; several sources or `--list`, `| about` per line, all
