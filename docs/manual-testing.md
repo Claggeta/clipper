@@ -1144,7 +1144,10 @@ Invoke-Titles $Vod $Json "--rank 1 --about `"<the name>`"" @{ CLIPPER_CLIPS_DIR 
 ```
 
 Pass: the first run exits 0 with a title per clip, and most of them use the
-name you gave rather than the login. The second exits 1 with `Error: --about
+name you gave rather than the login. To check pronouns, run the first line
+again with `--about "<the name> (<their pronouns>)"`: no title or hook uses
+other pronouns for them. Without pronouns, he or she may still appear
+(ADR 0018, pronouns amendment). The second exits 1 with `Error: --about
 is for titles; use it with titles on` and writes no folder. Record the three
 titles next to R19a's.
 

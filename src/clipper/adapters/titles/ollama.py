@@ -23,7 +23,12 @@ SYSTEM_PROMPT = (
     "stream the channel is the streamer, who is usually the one speaking: "
     "when the clip is about them or what they do, name them in the title, as "
     'in "Sam stunned by the hotel bill". Use a name if one is given, not a '
-    'username, and never write "streamer" in place of the name. The title '
+    'username, and never write "streamer" in place of the name. Pronouns: '
+    "the transcript does not tell you anyone's gender, so do not use he, she, "
+    "him, her, his, hers, himself or herself for anyone. Repeat the name "
+    'instead, or rephrase so no pronoun is needed, as in "Sam stunned by the '
+    'bill" and "Sam cannot believe the price". The only exception is a person '
+    "whose pronouns the About line states. The title "
     "and hook are about this clip, so do not copy the video's title. Reply "
     'with JSON only: "title" and "hook", each one line.'
 )

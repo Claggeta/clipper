@@ -148,6 +148,10 @@ and planned code:
   `--about` amendment (V5 8c): `--about "<text>"` on `render` and
   `drafts` puts an `About:` line first, one line, up to 300 characters,
   titles on, not saved; 22 of 39 titles name the person.
+  Pronouns amendment (V5 8d): no he/she unless `--about` states them
+  ("Lacy (he/him)"), repeat the name instead; no check on the reply. On 85
+  clips: Lacy as she/her 4 to 2 of 10 (0 with pronouns stated), any
+  gendered pronoun 55 to 45, keepers' titles naming the person 14 to 23 of 30.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
@@ -816,6 +820,9 @@ Items 8 and 9 do not depend on picking and may land earlier.
      Measured in 8b: 24 of 39 titles name the person with written names,
      12 with video info alone. ADR 0018 amendment, manual step.~~ (done;
      #156; 22 of 39 with `--about`; manual step R19b)
+   - 8d. No guessed pronouns in titles: the prompt takes he/she only from
+     pronouns stated in `--about`. ADR 0018 amendment; measured on the
+     drafts folders' titled clips.
 9. ~~`drafts` with a list of sources; one failing source does not stop the
    rest, and the exit code is 1 at the end. ADR 0022 amendment, manual step.~~
    (done; #169; several sources or `--list`, `| about` per line, all
