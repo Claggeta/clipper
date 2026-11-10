@@ -156,6 +156,39 @@ detector opts into, not a step every detector runs. Decision 7 holds:
 `extend_ends` is a pure function of the transcript and the chosen
 candidates.
 
+## Amended by item 6: no window under 15 s
+
+`sliding_windows` drops a window whose span, first segment's start to last
+segment's end, is under `MIN_CANDIDATE_SECONDS = 15.0`, so neither detector
+scores it (decision 1, unchanged). It is a parameter with that default, like
+the window and step. The 90 s cap was already in place (item 5). Of 1,209 to
+1,295 windows per trial VOD, 20 to 91 are under 15 s.
+
+**Measured** as in item 5, before (with item 5) and after, the same LLM
+replies. The three candidates that entered the LLM's top 10 were judged in
+the review page first.
+
+| Detector | Keepers | Rejected | Unjudged | Under 15 s in top 10 |
+|---|---|---|---|---|
+| heuristic, before and after | 12 | 17 | 1 | 0 |
+| LLM, before | 18 | 12 | 0 | 3 (0.7, 11.8, 14.0 s) |
+| LLM, after | 18 | 12 | 0 | 0 (shortest 19 s) |
+
+- The heuristic had nothing under 26 s in its top 10, and its results do
+  not change.
+- The LLM loses a keeper on jasontheween (5:16:02, 11.8 s of speech, which
+  the maintainer extended to about 29 s: the moment goes on in silence) and
+  two rejects (0.7 s and 14.0 s). Of the three that enter, two were
+  rejected and one posted as is.
+- Clip-label recall at 10 and 30: 0 for both detectors, before and after.
+
+**Decision.** Adopted: the same keepers and rejects, no draft under the
+maintainer's 15 s, and fewer windows for the LLM to score. The lost keeper
+is the known cost: a moment that is mostly silence, which a transcript
+detector does not see either way (the loudness spike, V5 item 10a, may).
+Padding short candidates to 15 s was not tried; it changes their spans,
+which would all need judging again.
+
 ## Revisit when
 
 - The LLM is chosen as the `drafts` default (V5 item 11), or its early ends

@@ -5,8 +5,10 @@ from clipper.domain.models import ClipCandidate, Segment, Transcript
 # Shared by every detector that scores the same windows (ADR 0014).
 WINDOW_SECONDS = 45.0
 STEP_SECONDS = 15.0
-# Candidate bounds (ADR 0023): an end moves to the next pause of at least
+# Candidate bounds (ADR 0023): windows under MIN_CANDIDATE_SECONDS are not
+# scored (item 6 amendment); an end moves to the next pause of at least
 # PAUSE_SECONDS, set from the V5 baseline's dragged ends (item 5 amendment).
+MIN_CANDIDATE_SECONDS = 15.0
 MAX_CANDIDATE_SECONDS = 90.0
 PAUSE_SECONDS = 1.5
 
@@ -15,11 +17,13 @@ def sliding_windows(
     transcript: Transcript,
     window_seconds: float = WINDOW_SECONDS,
     step_seconds: float = STEP_SECONDS,
+    min_seconds: float = MIN_CANDIDATE_SECONDS,
 ) -> list[tuple[Segment, ...]]:
     """Whole-segment windows, stepped from the first segment's start.
 
-    A segment longer than the window is in no window. Identical segment sets
-    from adjacent steps are kept once.
+    A segment longer than the window is in no window, and a window spanning
+    less than `min_seconds` is dropped. Identical segment sets from adjacent
+    steps are kept once.
     """
     segments = transcript.segments
     if not segments:
@@ -33,7 +37,7 @@ def sliding_windows(
             for s in segments
             if s.start_seconds >= start and s.end_seconds <= start + window_seconds
         )
-        if inside:
+        if inside and inside[-1].end_seconds - inside[0].start_seconds >= min_seconds:
             windows.append(inside)
         start += step_seconds
     # Identical segment sets from adjacent steps are the same window.

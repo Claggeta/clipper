@@ -1,5 +1,6 @@
 from clipper.adapters.detection.windows import (
     MAX_CANDIDATE_SECONDS,
+    MIN_CANDIDATE_SECONDS,
     PAUSE_SECONDS,
     STEP_SECONDS,
     WINDOW_SECONDS,
@@ -47,7 +48,9 @@ def test_windows_hold_whole_segments_only() -> None:
 def test_segment_longer_than_the_window_is_in_no_window() -> None:
     long = _seg(10.0, 60.0)
 
-    windows = sliding_windows(_transcript(_seg(0.0, 10.0), long, _seg(60.0, 70.0)))
+    windows = sliding_windows(
+        _transcript(_seg(0.0, 10.0), long, _seg(60.0, 70.0)), min_seconds=0.0
+    )
 
     assert windows
     assert all(long not in w for w in windows)
@@ -57,15 +60,32 @@ def test_identical_windows_from_adjacent_steps_are_kept_once() -> None:
     first, second = _seg(0.0, 10.0), _seg(100.0, 110.0)
 
     # Steps from 75 s and 90 s both hold only the second segment.
-    assert sliding_windows(_transcript(first, second)) == [(first,), (second,)]
+    assert sliding_windows(_transcript(first, second), min_seconds=0.0) == [
+        (first,),
+        (second,),
+    ]
 
 
 def test_windows_start_one_step_apart() -> None:
     segments = [_seg(i * 5.0, i * 5.0 + 5) for i in range(20)]
 
-    windows = sliding_windows(_transcript(*segments), 10.0, 20.0)
+    windows = sliding_windows(_transcript(*segments), 10.0, 20.0, min_seconds=0.0)
 
     assert [w[0].start_seconds for w in windows] == [0.0, 20.0, 40.0, 60.0, 80.0]
+
+
+def test_window_shorter_than_the_minimum_is_dropped() -> None:
+    short, long = _seg(0.0, 14.9), _seg(100.0, 115.0)
+
+    # Each step holds one segment; 14.9 s is under 15 s, 15 s is not.
+    assert sliding_windows(_transcript(short, long)) == [(long,)]
+
+
+def test_minimum_is_measured_over_the_whole_window() -> None:
+    first, second = _seg(0.0, 5.0), _seg(12.0, 16.0)
+
+    # Two segments with a gap between them span 16 s.
+    assert sliding_windows(_transcript(first, second)) == [(first, second)]
 
 
 def test_select_ranks_by_score() -> None:
@@ -106,8 +126,9 @@ def _worded(*spans: tuple[float, float]) -> Segment:
     )
 
 
-def test_pause_and_maximum_match_adr_0023() -> None:
-    assert (PAUSE_SECONDS, MAX_CANDIDATE_SECONDS) == (1.5, 90.0)
+def test_bounds_and_pause_match_adr_0023() -> None:
+    assert (MIN_CANDIDATE_SECONDS, MAX_CANDIDATE_SECONDS) == (15.0, 90.0)
+    assert PAUSE_SECONDS == 1.5
 
 
 def test_end_moves_to_the_first_pause_after_it() -> None:
