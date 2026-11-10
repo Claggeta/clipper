@@ -92,7 +92,8 @@ AboutOption = Annotated[
     typer.Option(
         "--about",
         help="Who and what the video is about, for titles: the names the model "
-        'should use, one line. Example: "Ron (stableronaldo)".',
+        "should use, and their pronouns if titles may use them, one line. "
+        'Example: "Lacy (he/him)".',
         show_default=False,
     ),
 ]

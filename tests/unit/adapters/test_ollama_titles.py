@@ -113,3 +113,8 @@ def test_the_about_text_comes_first() -> None:
 def test_the_prompt_prefers_the_about_names() -> None:
     assert "About line, written by the user" in SYSTEM_PROMPT
     assert "use its names over the channel's" in SYSTEM_PROMPT
+
+
+def test_the_prompt_takes_pronouns_only_from_the_about_line() -> None:
+    assert "do not use he, she" in SYSTEM_PROMPT
+    assert "whose pronouns the About line states" in SYSTEM_PROMPT

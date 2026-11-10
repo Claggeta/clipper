@@ -249,11 +249,54 @@ the info file alone and 24 when the names were put in the channel line
 
 **Decision.** Adopted.
 
+## Amended by pronouns (V5 item 8d)
+
+The model guessed he or she from names and context, and got Lacy (he/him)
+wrong in 4 of 10 titles and hooks (`Lacy reveals her hand is not broken`).
+
+- **The prompt** says the transcript does not give anyone's gender, so no
+  he, she, him, her, his, hers, himself or herself for anyone: repeat the
+  name or rephrase, as in "Sam cannot believe the price". The exception is
+  a person whose pronouns the About line states, as in `--about "Lacy
+  (he/him)"`. The `--about` help gives that example.
+- **No check on the reply.** A rule that fails or retries a clip on "he"
+  would also catch quoted speech, and this ADR has no retry or fallback.
+
+**Measured** on every titled clip in the drafts folders (85 clips, 11
+videos), titled again from each clip's words with `qwen3.5:9b`, with each
+video's info file and an About line of names where one was used in 8c
+("Jason (jasontheween)", "Ron (stableronaldo)", "Adapt", the Greg line,
+"Lacy"). "Named" counts titles naming the person on the 55 clips of the 7
+videos with a known name (30 of them reviewed keepers).
+
+| Prompt | Lacy's About | Any gendered pronoun | Lacy as she/her | Named (keepers) |
+|---|---|---|---|---|
+| before | "Lacy" | 55 of 85 | 4 of 10 | 33 of 55 (14 of 30) |
+| first wording ("do not guess anyone's gender ... use they only when nothing else fits") | "Lacy" | 44 of 85 | 3 of 10 | 37 of 55 (17 of 30) |
+| first wording | "Lacy (he/him)" | 8 of 10 | 0 of 10 | 7 of 10 |
+| adopted wording | "Lacy" | 45 of 85 | 2 of 10 | 43 of 55 (23 of 30) |
+| adopted wording | "Lacy (he/him)" | 6 of 10 | 0 of 10 | 8 of 10 |
+
+- The rule alone does not stop the model using pronouns: 45 of 85 still
+  do, some of them for people other than the streamer, or quoted. It does
+  make titles name the person more often. Longest title 57 characters,
+  hook 87, within 0018's limits.
+- Stated pronouns are what fix misgendering: 0 of 10 with `(he/him)`
+  under either wording.
+- Meaning errors remain, and repeating names adds one kind: "Lacy calls
+  after Lacy dead-ass left", where the one who left was someone else.
+
+**Decision.** Adopted, with stated pronouns in `--about` as the way to
+get them right. Without them he or she may still appear; titles stay
+drafts checked in the review page.
+
 ## Revisit when
 
 - Titles need a different model from the detector.
 - The maintainer wants the hook on screen.
 - Titles run past the asked length often enough to matter: add a cap.
+- Guessed pronouns still reach posted titles with pronouns in `--about`:
+  add a check on the reply.
 - Swear words or changed meaning in titles show up often in real use: add a
   rewrite request for listed words, or try another model.
 

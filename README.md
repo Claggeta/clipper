@@ -131,7 +131,9 @@ This renders every candidate. Options:
   The model sees what is said in the clip and, for a fetched video, its channel
   and title (from the `<id>.info.json` that `fetch` saves). `--about "<text>"`
   adds names the model should use, such as `--about "Ron (stableronaldo)"`;
-  metadata names the channel, not the people. A clip with no speech in range
+  metadata names the channel, not the people. Titles do not guess he or she:
+  without pronouns in `--about` the model is told to repeat the name, and with
+  them (`--about "Lacy (he/him)"`) it may use those. A clip with no speech in range
   gets no title, with a note. If the title fails (Ollama not running, model not
   pulled, a bad reply), that clip is not rendered and counts as a failure.
 
