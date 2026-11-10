@@ -56,3 +56,7 @@ class TitleError(ClipperError):
 
 class DownloadError(ClipperError):
     """Raised when a URL is not fetched or a video cannot be downloaded."""
+
+
+class FaceError(ClipperError):
+    """Raised when faces cannot be found in a video."""

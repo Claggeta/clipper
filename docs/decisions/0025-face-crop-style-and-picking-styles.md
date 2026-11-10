@@ -77,6 +77,32 @@ height of the next. "Holds still" is the largest face's centre moving under
    `drafts` and the manifest; the style switch in the review page. Each code
    PR states its design and waits for confirmation.
 
+## Amended by face tracking (V5 item 13b)
+
+- **The model is kept in the package**, not downloaded:
+  `src/clipper/adapters/media/models/face_detection_yunet_2023mar.onnx`
+  (232 KB, SHA-256 as in decision 3, checked by a unit test) with its licence
+  beside it as `LICENSE-yunet`. No download code, no network on first use,
+  and it works offline. This replaces decision 3's download. The model's
+  licence is MIT (Shiqi Yu), not Apache-2.0 as the context said.
+- **`FaceTracker.track(video, start, end) -> FaceTrack`** in `core/`, with
+  `FaceBox` (fractions of the frame), `FaceSample`, `FaceTrack` and
+  `FaceError` in `domain/`.
+- **`OpenCvFaceTracker`** (`adapters/media/faces.py`): ffmpeg pipes raw
+  frames at 5 a second, scaled to 1280x720, straight into YuNet (score at
+  least 0.8); nothing is written to disk. The 2023mar model has a fixed
+  input size, which the fixed frame size meets; opencv_zoo's newer 2026may
+  export has dynamic dims for OpenCV 5's engine, and was not measured. A
+  source that is not 16:9 is squashed to fit. OpenCV's log level is set to
+  errors, since OpenCV 5 warns on every model load.
+- **`CachingFaceTracker`** keeps one JSON per span at `<cache
+  dir>/faces/<stem>-<size>/yunet2023mar-5fps-1280x720-<start ms>-<end
+  ms>.json`. On the podcast clip 11:30 to 12:30: 299 samples, a face in
+  each, 5.9 s, then 0.0 s from the cache.
+- **`AppContext.face_tracker`** builds it; nothing calls it until 13c.
+- An integration test loads the bundled model in the installed OpenCV and
+  runs it on a blank frame (no face), on every push.
+
 ## Alternatives considered
 
 - **A zoom that sizes the crop to the face** (the face a fixed share of the
