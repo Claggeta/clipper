@@ -188,7 +188,8 @@ and planned code:
   opt-in. Item 6 amendment: `sliding_windows` drops windows under
   `MIN_CANDIDATE_SECONDS = 15.0` for both detectors; the heuristic is
   unchanged, the LLM keeps 18 keepers and 12 rejects with no draft under
-  15 s, losing one mostly silent keeper.
+  15 s, losing one mostly silent keeper. Item 7 amendment: decision 4
+  (merging) withdrawn; neighbours stay separate clips.
 - `0024` — `clipper review <drafts folder>`: a local browser page on the
   loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
   a player on the source video, a film strip of the clip plus 120 s either
@@ -719,8 +720,10 @@ Items 8 and 9 do not depend on picking and may land earlier.
    scored). ADR 0023 amendment. Replaces Parked "Candidates too short to
    post".~~ (done; #148; heuristic unchanged, LLM 18 keepers and 12 rejects
    either way, none under 15 s, one mostly silent keeper lost)
-7. Merge neighbouring high-scoring windows into one candidate of up to
-   90 s. ADR 0023 amendment.
+7. ~~Merge neighbouring high-scoring windows into one candidate of up to
+   90 s. ADR 0023 amendment.~~ (dropped, not built; ADR 0023 item 7
+   amendment: of five neighbouring pairs in the top 10s, none would gain,
+   and the gas pump pair was judged as two postable clips)
 8. Title context:
    - 8a. `fetch` saves yt-dlp's video metadata next to the video, including
      for a reused file if yt-dlp allows it (unverified). ADR 0020

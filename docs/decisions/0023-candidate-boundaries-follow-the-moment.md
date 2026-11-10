@@ -189,8 +189,40 @@ detector does not see either way (the loudness spike, V5 item 10a, may).
 Padding short candidates to 15 s was not tried; it changes their spans,
 which would all need judging again.
 
+## Amended by item 7: no merging
+
+Decision 4 is withdrawn; neighbouring windows stay separate candidates.
+Decision 2's steps are now: windows made and scored, the top N selected,
+and, for the heuristic, ends extended (item 5).
+
+**Evidence.** In each detector's top 10 on the three judged VODs (with
+items 5 and 6), five pairs of candidates are under 15 s apart. Merging
+would have helped none of them:
+
+| VOD | Detector | Pair | Gap | Verdicts | Merged |
+|---|---|---|---|---|---|
+| stableronaldo | heuristic | 3:22:15, 3:23:01 | 0.4 s | both `fix`, kept as two clips | one clip lost |
+| jasontheween | heuristic | 5:47:05, 5:48:06 | 3.9 s | both rejected | a longer reject |
+| jasontheween | heuristic | 1:38:06, 1:39:11 | 14.0 s | rejected, `fix` | about 56 s of the reject added |
+| adapt | LLM | 0:43:58, 0:44:47 | 6.0 s | `fix`, rejected | 26 s past the keeper's end |
+| adapt | LLM | 4:46:37, 4:47:13 | 2.8 s | `post`, rejected | a rejected tail added |
+
+- The 0.4 s pair is the gas pump split that motivated decision 4 (trial,
+  2026-11-09), and the maintainer judged it as two postable clips.
+- Most neighbours are a keeper beside a reject. A score band would not
+  separate them: on the LLM a 0.90 reject sits beside a 0.95 keeper.
+- End extension (item 5) already runs a heuristic end up to the next chosen
+  candidate's start, which covers most of what merging was for.
+- The maintainer prefers two postable clips to one longer one; a pool
+  campaign pays on volume as well as quality.
+
+Five pairs is a small sample. Where two halves are one moment, the review
+page joins them: drag one clip's end over the other, Save, Trash the other.
+
 ## Revisit when
 
+- Judged drafts often join two neighbouring clips in the review page:
+  reconsider merging, with the rule set from those joins.
 - The LLM is chosen as the `drafts` default (V5 item 11), or its early ends
   are fixed another way: measure end extension on it again.
 - The baseline shows starts dragged as often as ends: extend starts too.
