@@ -819,8 +819,10 @@ Items 8 and 9 do not depend on picking and may land earlier.
       model downloaded once with its SHA-256. ADR 0003 check for
       `opencv-python-headless` 5.0.x and `numpy`.~~ (done; #160; the model
       is kept in the package, MIT licence; ADR 0025 and 0003 amendments)
-    - 13c. The `face` style in `render`: a full-height crop on the largest
-      face, dead zone, easing, a jump at a camera cut. Manual step.
+    - 13c. ~~The `face` style in `render`: a full-height crop on the largest
+      face, dead zone, easing, a jump at a camera cut. Manual step.~~ (done;
+      #162; `render --vertical --style face`, manual step R20; Save in the
+      review page re-renders in `fit` until 13d/13e)
     - 13d. Several styles in `drafts` (`fit` and `face`) and variants in
       the manifest (ADR 0019 amendment).
     - 13e. A style switch in the review page; Save keeps the chosen style
