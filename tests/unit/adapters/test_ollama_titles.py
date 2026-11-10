@@ -93,3 +93,23 @@ def test_the_video_info_comes_before_the_clip_text() -> None:
 def test_the_prompt_says_how_to_use_the_video_info() -> None:
     assert "name them in the title" in SYSTEM_PROMPT
     assert "do not copy the video's title" in SYSTEM_PROMPT
+
+
+def test_the_about_text_comes_first() -> None:
+    generator = FakeGenerator()
+    video = VideoInfo(
+        platform="twitch", video_id="v1", title="Stream", channel="streamer"
+    )
+    writer = OllamaTitleWriter(generator)
+    writer.write("what was said", video, "Ron (streamer)")
+    writer.write("what was said", None, "Ron")
+    assert generator.calls[0][1] == (
+        "About: Ron (streamer)\nChannel: streamer\nVideo title: Stream\n\n"
+        "Transcript:\nwhat was said"
+    )
+    assert generator.calls[1][1] == "About: Ron\n\nTranscript:\nwhat was said"
+
+
+def test_the_prompt_prefers_the_about_names() -> None:
+    assert "About line, written by the user" in SYSTEM_PROMPT
+    assert "use its names over the channel's" in SYSTEM_PROMPT

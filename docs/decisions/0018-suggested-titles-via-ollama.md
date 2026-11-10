@@ -216,6 +216,39 @@ titles name them in 10 of 39.
 better still; that is a separate item (a text option on `drafts` and
 `render`), not part of this one.
 
+## Amended by `--about` (V5 item 8c)
+
+- **`--about "<text>"`** on `render` and `drafts`: who and what the video is
+  about, written by the user, such as "Ron (stableronaldo)" or a campaign
+  brief's "Greg LaVecchia, founder of Bloom Nutrition, with hosts Graham
+  Stephan and Jack Selby". It is stripped, must be one line, non-empty and
+  at most 300 characters, and needs titles on (`render --titles`, `drafts`
+  without `--no-titles`); otherwise `Error:` and exit 1, before any download
+  or cut. It works for local files without an info file too.
+- **To the model**: `TitleWriter.write(text, video=None, about=None)`; the
+  message starts with `About: <text>`, then the channel and video title if
+  known, then the transcript. The prompt says the About line is written by
+  the user and names the people, so its names come before the channel's.
+- **Not saved**: the text is passed on each run and written to neither the
+  manifest nor a file. A list of sources (V5 item 9) may carry it per
+  source.
+
+**Measured** as in the title context amendment, on the 39 reviewed keepers
+with each VOD's info file and an About line per video ("Jason
+(jasontheween)", "Ron (stableronaldo)", "Adapt", and the Greg line above):
+titles naming the person 22 of 39 (18 of 30 on streams), against 12 with
+the info file alone and 24 when the names were put in the channel line
+(8b's simulation). The maintainer's titles name them in 10 of 39.
+
+- Adapt is still never named; the titles of Adapt's keepers describe the
+  moment ("Enemy UAV Works Perfectly").
+- Meaning errors remain: a name read from the transcript ("Stabler"), a
+  name put on the wrong person ("Ron reacts to Jason swallowing a
+  Cheeto"), one clip turned into a reference to ending it all, and a swear
+  word kept. Titles stay drafts edited in the review page.
+
+**Decision.** Adopted.
+
 ## Revisit when
 
 - Titles need a different model from the detector.

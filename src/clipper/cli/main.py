@@ -43,6 +43,7 @@ from clipper.domain.errors import (
     ClipRenderError,
     LabelsError,
     ReviewError,
+    TitleError,
 )
 from clipper.domain.models import (
     AnalysisResult,
@@ -66,6 +67,17 @@ app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
 
 
+# Hand-written names for titles (ADR 0018, about amendment).
+_ABOUT_LIMIT = 300
+AboutOption = Annotated[
+    str | None,
+    typer.Option(
+        "--about",
+        help="Who and what the video is about, for titles: the names the model "
+        'should use, one line. Example: "Ron (stableronaldo)".',
+        show_default=False,
+    ),
+]
 DetectorOption = Annotated[
     DetectorName, typer.Option("--detector", help="Detector that picks the clips.")
 ]
@@ -398,11 +410,13 @@ def render(
             "(CLIPPER_LLM_MODEL), written to the manifest.",
         ),
     ] = False,
+    about: AboutOption = None,
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""
     settings = Settings()
     build = _context(ctx)
     try:
+        about = _check_about(about, titles)
         result = load_analysis_result(result_json)
         check_source_matches(result, video)
         plan = _plan_render(settings, build, video, result, rank)
@@ -411,7 +425,9 @@ def render(
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
-    flags = _RenderFlags(captions=captions, vertical=vertical, titles=titles)
+    flags = _RenderFlags(
+        captions=captions, vertical=vertical, titles=titles, about=about
+    )
     if _cut_clips(settings, build, video, result, result_json, plan, writer, flags):
         raise typer.Exit(code=1)
 
@@ -454,6 +470,25 @@ class _RenderFlags(NamedTuple):
     captions: bool
     vertical: bool
     titles: bool
+    about: str | None = None
+
+
+def _check_about(about: str | None, titles: bool) -> str | None:
+    """The `--about` text, stripped, or None. Raises `TitleError` if unusable."""
+    if about is None:
+        return None
+    about = about.strip()
+    if not titles:
+        raise TitleError("--about is for titles; use it with titles on")
+    if not about:
+        raise TitleError("--about is empty")
+    if "\n" in about or "\r" in about:
+        raise TitleError("--about must be one line")
+    if len(about) > _ABOUT_LIMIT:
+        raise TitleError(
+            f"--about is {len(about)} characters; keep it to {_ABOUT_LIMIT}"
+        )
+    return about
 
 
 def _plan_render(
@@ -506,7 +541,7 @@ def _cut_clips(
     `Error:` and exit 1.
     """
     ranks, selected, folder, paths = plan
-    captions, vertical, titles = flags
+    captions, vertical, titles, about = flags
     renderer = build.renderer(settings)
     video_info = _title_context(video) if writer else None
     failures: list[str] = []
@@ -549,7 +584,7 @@ def _cut_clips(
         try:
             # The title comes first, so a clip whose title fails is not cut
             # (ADR 0018).
-            title = writer.write(text, video_info) if writer and text else None
+            title = writer.write(text, video_info, about) if writer and text else None
             clip = renderer.render(
                 video, candidate, path, captions=ass or None, vertical=vertical
             )
@@ -633,6 +668,7 @@ def drafts(
     ] = True,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     detector: DetectorOption = DetectorName.HEURISTIC,
+    about: AboutOption = None,
 ) -> None:
     """Turn SOURCE into a folder of clip drafts: fetch, analyze, then render.
 
@@ -650,6 +686,7 @@ def drafts(
     try:
         # Everything that can fail on input or settings fails before a
         # download or a transcription starts (ADR 0022).
+        about = _check_about(about, titles)
         url = source.lower().startswith(("http://", "https://"))
         fetched = parse_video_url(source) if url else None
         video = Path(source)
@@ -664,7 +701,9 @@ def drafts(
         console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
 
-    flags = _RenderFlags(captions=captions, vertical=vertical, titles=titles)
+    flags = _RenderFlags(
+        captions=captions, vertical=vertical, titles=titles, about=about
+    )
     failed = _cut_clips(
         settings, build, video, result, result_json, plan, writer, flags
     )

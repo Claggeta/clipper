@@ -140,6 +140,9 @@ and planned code:
   video, the prompt gets the channel and video title and is told to name the
   streamer; titles naming the person on 39 keepers: 1 before, 12 with video
   info, 24 with names written by hand (a separate item).
+  `--about` amendment (V5 8c): `--about "<text>"` on `render` and
+  `drafts` puts an `About:` line first, one line, up to 300 characters,
+  titles on, not saved; 22 of 39 titles name the person.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no

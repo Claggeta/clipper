@@ -123,7 +123,10 @@ This renders every candidate. Options:
   through [Ollama](https://ollama.com), the same server and model as
   `--detector llm` (`CLIPPER_LLM_MODEL`, default `qwen3.5:9b`). They are
   printed under each clip and written to the manifest, not drawn on the video.
-  The model only sees what is said in the clip. A clip with no speech in range
+  The model sees what is said in the clip and, for a fetched video, its channel
+  and title (from the `<id>.info.json` that `fetch` saves). `--about "<text>"`
+  adds names the model should use, such as `--about "Ron (stableronaldo)"`;
+  metadata names the channel, not the people. A clip with no speech in range
   gets no title, with a note. If the title fails (Ollama not running, model not
   pulled, a bad reply), that clip is not rendered and counts as a failure.
 
@@ -179,8 +182,8 @@ uv run clipper drafts path\to\video.mp4
 with `Drafts: <clips dir>/<video name>`: a folder with every candidate as a
 vertical, captioned clip, and a suggested title and hook for each in the
 manifest. `--no-vertical`, `--no-captions` and `--no-titles` turn those off;
-use `--no-titles` when Ollama is not running. `--detector` and `-v` work as
-for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
+use `--no-titles` when Ollama is not running. `--about` works as for
+`render`. `--detector` and `-v` work as for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
 it before anything is downloaded or transcribed. If one clip fails, the rest
 still render and it exits 1. A URL is subject to the same terms warning as
 `fetch`. See [ADR 0022](docs/decisions/0022-one-command-to-drafts.md).
