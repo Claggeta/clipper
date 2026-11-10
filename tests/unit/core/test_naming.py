@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from clipper.core.naming import clip_file_name, clip_folder, plan_clip_paths
+from clipper.core.naming import (
+    clip_file_name,
+    clip_folder,
+    plan_clip_paths,
+    variant_file_name,
+)
 from clipper.domain.errors import ClipperError, ClipRenderError
 from clipper.domain.models import ClipCandidate
 
@@ -74,3 +79,12 @@ def test_folder_is_the_video_stem_under_the_clips_dir() -> None:
 
 def test_folder_keeps_dots_before_the_extension() -> None:
     assert clip_folder(Path("my.talk.mkv"), Path("c")) == Path("c/my.talk")
+
+
+def test_a_styles_file_sits_beside_the_fit_one() -> None:
+    assert variant_file_name("talk_000010-000040.mp4", "fit") == (
+        "talk_000010-000040.mp4"
+    )
+    assert variant_file_name("talk_000010-000040.mp4", "face") == (
+        "talk_000010-000040.face.mp4"
+    )

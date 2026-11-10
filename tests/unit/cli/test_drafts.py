@@ -8,11 +8,21 @@ from clipper.adapters.transcription.fake import FakeTranscriber
 from clipper.cli.context import AppContext, DetectorName
 from clipper.cli.main import app
 from clipper.core.config import Settings
-from clipper.domain.errors import DownloadError, TranscriptionError
+from clipper.domain.errors import (
+    ClipRenderError,
+    DownloadError,
+    FaceError,
+    TranscriptionError,
+)
 from clipper.domain.models import (
     ClipCandidate,
     ClipTitle,
+    CropPath,
+    FaceBox,
+    FaceSample,
+    FaceTrack,
     MediaInfo,
+    RenderedClip,
     RenderManifest,
     Transcript,
     VideoInfo,
@@ -80,7 +90,32 @@ class FakeVideoInfo:
 
 class FakeProbe:
     def probe(self, media_path: Path) -> MediaInfo:
-        return MediaInfo(duration_seconds=100.0, has_video=True)
+        return MediaInfo(
+            duration_seconds=100.0, has_video=True, width=1920, height=1080
+        )
+
+
+class FakeFaceTracker:
+    """A face at the frame's centre in every span; `faces=False` finds none."""
+
+    def __init__(self, faces: bool = True, fail: bool = False) -> None:
+        self._faces = faces
+        self._fail = fail
+
+    def track(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FaceTrack:
+        if self._fail:
+            raise FaceError("ffmpeg failed (exit 1): [bad] frames")
+        face = FaceBox(x=0.45, y=0.2, w=0.1, h=0.3, score=0.9)
+        faces = (face,) if self._faces else ()
+        return FaceTrack(
+            source=video_path.name,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            samples_per_second=5.0,
+            samples=(FaceSample(seconds=start_seconds, faces=faces),),
+        )
 
 
 class FakeTitleWriter:
@@ -102,6 +137,7 @@ class Env:
         self.title_writers_built = 0
         self.transcribe_error: str | None = None
         self.download_error: str | None = None
+        self.tracker = FakeFaceTracker()
         for name in ("output", "clips", "videos", "cache"):
             monkeypatch.setenv(f"CLIPPER_{name.upper()}_DIR", str(tmp_path / name))
         self.monkeypatch = monkeypatch
@@ -126,6 +162,7 @@ class Env:
             title_writer=title_writer,
             downloader=lambda s: FakeDownloader(self.log, self.download_error),
             video_info=lambda s: FakeVideoInfo(),
+            face_tracker=lambda s: self.tracker,
         )
         if real_title_writer:
             context = AppContext(
@@ -135,6 +172,7 @@ class Env:
                 probe=context.probe,
                 downloader=context.downloader,
                 video_info=context.video_info,
+                face_tracker=context.face_tracker,
             )
         return context
 
@@ -157,9 +195,17 @@ def test_a_file_becomes_vertical_captioned_titled_drafts(env: Env) -> None:
     result = env.run(str(env.video))
     assert result.exit_code == 0, result.output
     assert env.log.stages == ["title writer", "transcribe talk.mp4"]
-    assert env.renderer.vertical == [True, True]
+    # Each clip in both styles by default: fit, then face (ADR 0025).
+    assert env.renderer.vertical == [True, True, True, True]
+    assert [c is not None for c in env.renderer.crops] == [False, True, False, True]
     assert all(c is not None for c in env.renderer.captions)
     manifest = env.manifest("talk")
+    assert manifest.styles == ("fit", "face")
+    first = manifest.clips[0]
+    assert [(v.style, v.file) for v in first.variants] == [
+        ("fit", first.file),
+        ("face", first.file.removesuffix(".mp4") + ".face.mp4"),  # type: ignore[union-attr]
+    ]
     assert (manifest.vertical, manifest.captions, manifest.titles) == (
         True,
         True,
@@ -287,3 +333,86 @@ def test_about_without_titles_fails_before_any_download(env: Env) -> None:
     assert result.exit_code == 1
     assert "Error: --about is for titles; use it with titles on" in result.output
     assert env.log.stages == []
+
+
+def test_one_style_can_be_chosen(env: Env) -> None:
+    result = env.run(str(env.video), "--style", "fit")
+    assert result.exit_code == 0, result.output
+    assert env.renderer.crops == [None, None]
+    manifest = env.manifest("talk")
+    assert manifest.styles == ("fit",)
+    assert [len(c.variants) for c in manifest.clips] == [1, 1]
+
+
+def test_no_vertical_renders_landscape_without_styles(env: Env) -> None:
+    result = env.run(str(env.video), "--no-vertical")
+    assert result.exit_code == 0, result.output
+    assert env.renderer.vertical == [False, False]
+    manifest = env.manifest("talk")
+    assert manifest.styles == ()
+    assert all(c.variants == () and c.file for c in manifest.clips)
+
+
+def test_a_style_without_vertical_fails_before_any_download(env: Env) -> None:
+    result = env.run(_URL, "--no-vertical", "--style", "face")
+    assert result.exit_code == 1
+    assert "Error: --style needs --vertical" in result.output
+    assert env.log.stages == []
+
+
+class FaceFailingRenderer(FakeClipRenderer):
+    """Renders `fit` but fails every face crop."""
+
+    def render(
+        self,
+        video_path: Path,
+        candidate: ClipCandidate,
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        vertical: bool = False,
+        crop: CropPath | None = None,
+    ) -> RenderedClip:
+        if crop is not None:
+            raise ClipRenderError("[face] crop failed")
+        return super().render(
+            video_path, candidate, output_path, captions, vertical=vertical
+        )
+
+
+def test_a_clip_with_no_face_still_renders_in_fit(env: Env) -> None:
+    env.tracker = FakeFaceTracker(faces=False)
+    result = env.run(str(env.video))
+    assert result.exit_code == 0, result.output
+    assert "has no face in range; not rendered in the face style" in result.output
+    manifest = env.manifest("talk")
+    assert [[v.style for v in c.variants] for c in manifest.clips] == [["fit"]] * 2
+
+
+def test_a_face_tracking_failure_keeps_fit_and_exits_1(env: Env) -> None:
+    env.tracker = FakeFaceTracker(fail=True)
+    result = env.run(str(env.video))
+    assert result.exit_code == 1
+    assert "(face): ffmpeg failed (exit 1): [bad] frames" in result.output
+    manifest = env.manifest("talk")
+    assert all(c.file and c.error is None for c in manifest.clips)
+
+
+def test_a_face_render_failure_keeps_the_fit_file_and_exits_1(env: Env) -> None:
+    env.renderer = FaceFailingRenderer()
+    result = env.run(str(env.video))
+    assert result.exit_code == 1
+    assert "(face): [face] crop failed" in result.output
+    clip = env.manifest("talk").clips[0]
+    assert [v.style for v in clip.variants] == ["fit"]
+    assert clip.file == clip.variants[0].file
+
+
+def test_a_fit_render_failure_skips_the_face_style(env: Env) -> None:
+    env.renderer = FakeClipRenderer(fail_on=[_CANDIDATES[0]])
+    result = env.run(str(env.video))
+    assert result.exit_code == 1
+    assert len(env.renderer.calls) == 3
+    first = env.manifest("talk").clips[0]
+    assert (first.file, first.variants) == (None, ())
+    assert first.error is not None

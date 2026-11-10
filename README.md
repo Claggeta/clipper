@@ -185,7 +185,10 @@ uv run clipper drafts path\to\video.mp4
 `drafts` runs `fetch` (for a URL), `analyze` and `render` in one go and ends
 with `Drafts: <clips dir>/<video name>`: a folder with every candidate as a
 vertical, captioned clip, and a suggested title and hook for each in the
-manifest. `--no-vertical`, `--no-captions` and `--no-titles` turn those off;
+manifest. Each clip comes in two styles to pick from: `<name>.mp4` fits the
+whole frame, and `<name>.face.mp4` crops on the largest face (a clip with no
+face gets only the first). `--style fit` or `--style face` renders one.
+`--no-vertical`, `--no-captions` and `--no-titles` turn those off;
 use `--no-titles` when Ollama is not running. `--about` works as for
 `render`. `--detector` and `-v` work as for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
 it before anything is downloaded or transcribed. If one clip fails, the rest

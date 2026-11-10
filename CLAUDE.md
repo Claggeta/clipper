@@ -268,6 +268,10 @@ and planned code:
   re-locked only after 2 s outside, holds of 2 s or more, close similar
   faces framed as a pair; 65 to 7 moves on a podcast clip, 52 to 3 on
   IRL. The listener-framed two-shot needs speaker detection (Later).
+  Several styles amendment (13d): `drafts --style` (repeatable, default
+  fit and face), the face file `<stem>.face.mp4` beside the fit one, one
+  title per clip, manifest `styles` and per-clip `variants` (0019, 0022);
+  a clip without a face still renders in fit.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

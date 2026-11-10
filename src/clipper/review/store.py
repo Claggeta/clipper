@@ -6,6 +6,7 @@ requests on several threads; a Save that re-renders holds it for the render.
 See docs/decisions/0024 (item 3c and 3d amendments).
 """
 
+import logging
 import math
 import os
 import threading
@@ -34,6 +35,8 @@ from clipper.domain.models import (
     RenderManifest,
     Transcript,
 )
+
+logger = logging.getLogger(__name__)
 
 MAX_TITLE = 200
 # The reason listed for a clip added in the page (ADR 0019, 3e amendment).
@@ -250,6 +253,9 @@ class ReviewStore:
                     changes["error"] = render_error
             else:
                 warning = self._delete_old(clip, name)
+                # The other styles no longer match the span (ADR 0025).
+                warning = self._delete_variants(clip) or warning
+                changes["variants"] = ()
         if clip.added:
             # An added clip's own label is found by its last saved span.
             changes["draft_start_seconds"] = request.start
@@ -342,6 +348,9 @@ class ReviewStore:
             self._files.save_labels(labels, self._labels_path)
             self.labels = labels
             self._delete_file(clip)
+            # A style file left behind does not stop the trash (ADR 0025).
+            if warning := self._delete_variants(clip):
+                logger.warning("%s", warning)
             if clip.added:
                 manifest = drop_clip(self.manifest, rank)
             else:
@@ -350,11 +359,25 @@ class ReviewStore:
                     rank,
                     reviewed="trashed",
                     file=None,
+                    variants=(),
                     **_first_write(clip),
                 )
             self._files.save_manifest(manifest, self._folder)
             self.manifest = manifest
             return None if clip.added else self._clip(rank)
+
+    def _delete_variants(self, clip: ManifestClip) -> str | None:
+        """Delete the clip's other style files (ADR 0025); a message if not."""
+        for variant in clip.variants:
+            if variant.file == clip.file:
+                continue
+            if Path(variant.file).name != variant.file:
+                return f"Not deleting {variant.file!r}: not a file name"
+            try:
+                (self._folder / variant.file).unlink(missing_ok=True)
+            except OSError as exc:
+                return f"The {variant.style} file {variant.file} was not deleted: {exc}"
+        return None
 
     def _delete_file(self, clip: ManifestClip) -> None:
         if clip.file is None:

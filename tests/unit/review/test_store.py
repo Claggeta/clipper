@@ -8,6 +8,7 @@ from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.domain.errors import JudgingError, ReviewError
 from clipper.domain.models import (
     ClipCandidate,
+    ClipVariant,
     ManifestClip,
     RenderManifest,
     Segment,
@@ -359,3 +360,69 @@ def test_a_render_that_cannot_be_moved_into_place_keeps_the_old_file(
         "manifest.json",
         "talk_1.mp4",
     ]
+
+
+def _with_face(rank: int, start: float, end: float, file: str) -> ManifestClip:
+    face = file.removesuffix(".mp4") + ".face.mp4"
+    variants = (
+        ClipVariant(style="fit", file=file),
+        ClipVariant(style="face", file=face),
+    )
+    return _clip(rank, start, end, file).model_copy(update={"variants": variants})
+
+
+def test_a_re_render_drops_the_other_styles(tmp_path: Path) -> None:
+    clip = _with_face(1, 10.0, 40.0, "talk_1.mp4")
+    env = Env(tmp_path, clip)
+    (env.folder / "talk_1.face.mp4").write_bytes(b"face")
+
+    saved = env.save(1, 9.0, 42.0)
+
+    assert saved.variants == ()
+    assert sorted(p.name for p in env.folder.iterdir()) == [
+        "manifest.json",
+        "talk_000009-000042.mp4",
+    ]
+
+
+def test_trash_deletes_every_style(tmp_path: Path) -> None:
+    clip = _with_face(1, 10.0, 40.0, "talk_1.mp4")
+    env = Env(tmp_path, clip)
+    (env.folder / "talk_1.face.mp4").write_bytes(b"face")
+
+    trashed = env.store.trash(1, None)
+
+    assert trashed is not None
+    assert (trashed.file, trashed.variants) == (None, ())
+    assert sorted(p.name for p in env.folder.iterdir()) == ["manifest.json"]
+
+
+def test_a_style_file_that_cannot_be_deleted_does_not_stop_trash(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    clip = _with_face(1, 10.0, 40.0, "talk_1.mp4")
+    env = Env(tmp_path, clip)
+    # A folder where the face file should be cannot be unlinked.
+    (env.folder / "talk_1.face.mp4").mkdir()
+
+    trashed = env.store.trash(1, None)
+
+    assert trashed is not None and trashed.reviewed == "trashed"
+    assert "face file talk_1.face.mp4 was not deleted" in caplog.text
+
+
+def test_an_odd_style_file_name_is_not_deleted(tmp_path: Path) -> None:
+    clip = _clip(1, 10.0, 40.0, "talk_1.mp4").model_copy(
+        update={
+            "variants": (
+                ClipVariant(style="fit", file="talk_1.mp4"),
+                ClipVariant(style="face", file="../elsewhere.mp4"),
+            )
+        }
+    )
+    env = Env(tmp_path, clip)
+
+    saved = env.store.save(1, SaveRequest(9.0, 42.0, None, None))
+
+    assert saved.warning == "Not deleting '../elsewhere.mp4': not a file name"
+    assert saved.clip.variants == ()

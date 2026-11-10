@@ -776,3 +776,23 @@ def test_a_face_tracking_failure_fails_that_clip(env: Env) -> None:
         result.output
     )
     assert env.manifest().clips[0].error == "ffmpeg failed (exit 1): [bad] frames"
+
+
+def test_the_face_style_alone_is_its_own_variant(env: Env) -> None:
+    _use_faces(env, FakeFaceTracker())
+    result = env.run("--vertical", "--style", "face", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    manifest = env.manifest()
+    assert manifest.styles == ("face",)
+    clip = manifest.clips[0]
+    assert clip.file == "talk_000010-000020.face.mp4"
+    assert [(v.style, v.file) for v in clip.variants] == [("face", clip.file)]
+
+
+def test_a_landscape_render_has_no_styles(env: Env) -> None:
+    result = env.run("--rank", "1")
+    assert result.exit_code == 0, result.output
+    manifest = env.manifest()
+    assert manifest.styles == ()
+    assert manifest.clips[0].variants == ()
+    assert manifest.clips[0].file == "talk_000010-000020.mp4"

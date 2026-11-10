@@ -2115,11 +2115,14 @@ Invoke-Item "$S\drafts.png"
 ```
 
 Pass: exit 0. The output shows the fetch (`Saved:`), the candidates table,
-`Saved: <output folder>\<id>.json`, one `Rendered #N ... (vertical,
-captions, titles)` line with a title and hook per clip, `Manifest: ...`, and
-last `Drafts: <clips folder>\<id>`. The manifest has `vertical`, `captions`
-and `titles` true, `analysis` is that JSON, and every clip has a `file`, a
-`title` and a `hook`. The clip is H.264 1080x1920 and the frame shows the
+`Saved: <output folder>\<id>.json`, two `Rendered #N ...` lines per clip,
+`(vertical, captions, titles)` and `(vertical, face, captions, titles)`,
+then its title and hook, `Manifest: ...`, and last `Drafts: <clips
+folder>\<id>`. The folder holds `<name>.mp4` and `<name>.face.mp4` per
+clip (only the first if a note says the clip has no face). The manifest has
+`vertical`, `captions` and `titles` true and `styles` fit and face,
+`analysis` is that JSON, and every clip has a `file`, a `title`, a `hook`
+and its `variants`. The clip is H.264 1080x1920 and the frame shows the
 fitted picture on a blurred fill. Record the time.
 
 ### D9. `drafts` on a long stream, timed (criterion 5)

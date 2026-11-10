@@ -666,3 +666,16 @@ def test_clip_title_is_immutable() -> None:
     title = ClipTitle(title="t", hook="h")
     with pytest.raises(ValidationError):
         title.title = "u"  # type: ignore[misc]
+
+
+def test_a_clips_file_is_its_first_variant() -> None:
+    from clipper.domain.models import ClipVariant, ManifestClip
+
+    base = {"rank": 1, "start_seconds": 0, "end_seconds": 30, "score": 0.5}
+    fit = ClipVariant(style="fit", file="a.mp4")
+    face = ClipVariant(style="face", file="a.face.mp4")
+    clip = ManifestClip(**base, reasons=("x",), file="a.mp4", variants=(fit, face))
+    assert clip.variants == (fit, face)
+    with pytest.raises(ValueError, match="first variant"):
+        ManifestClip(**base, reasons=("x",), file="a.face.mp4", variants=(fit, face))
+    assert ManifestClip(**base, reasons=("x",), file="a.mp4").variants == ()
