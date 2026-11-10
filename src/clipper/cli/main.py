@@ -48,6 +48,7 @@ from clipper.core.sources import (
 from clipper.domain.errors import (
     ClipperError,
     ClipRenderError,
+    DetectionError,
     LabelsError,
     ReviewError,
     SourceListError,
@@ -822,7 +823,16 @@ def drafts(
         ),
     ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
-    detector: DetectorOption = DetectorName.HEURISTIC,
+    detector: DetectorOption = DetectorName.LLM,
+    top: Annotated[
+        int,
+        typer.Option(
+            "--top",
+            min=1,
+            help="How many clips to draft per source. CLIPPER_TOP_N does not "
+            "apply here.",
+        ),
+    ] = 10,
     about: AboutOption = None,
 ) -> None:
     """Turn each SOURCE into a folder of clip drafts: fetch, analyze, render.
@@ -832,17 +842,22 @@ def drafts(
     candidate is rendered, by default vertical in both styles, captioned and
     titled (see docs/decisions/0022 and 0025). Several sources, or a --list
     file, run one after another; every source is checked before the first
-    starts, and one that fails does not stop the rest (ADR 0022).
+    starts, and one that fails does not stop the rest (ADR 0022). The LLM
+    detector picks the top 10 by default (ADR 0014, item 11 amendment).
     """
     logging.basicConfig(
         level=logging.INFO if verbose else logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
     )
-    settings = Settings()
+    settings = Settings().model_copy(update={"top_n": top})
     build = _context(ctx)
     try:
         # Everything that can fail on input or settings fails before a
         # download or a transcription starts (ADR 0022).
+        if detector is DetectorName.LLM and not settings.llm_model:
+            raise DetectionError(
+                "Set CLIPPER_LLM_MODEL to an Ollama model name to use --detector llm"
+            )
         styles = _drafts_styles(style, vertical)
         about = _check_about(about, titles)
         queue = _queue(sources or [], list_file, about)

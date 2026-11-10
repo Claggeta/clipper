@@ -110,6 +110,10 @@ and planned code:
   `qwen3.5:9b`, chosen from manual steps L1 to L5; `heuristic` stays the
   default detector. Breaking score ties by the heuristic was measured and not
   adopted.
+  Drafts defaults amendment (V5 11): `drafts` uses the LLM and `--top N`
+  (default 10, `CLIPPER_TOP_N` not used); `analyze` and `eval` keep the
+  heuristic and top 5. Judged keepers at top 10 on three VODs: LLM 18,
+  heuristic 12, half or more in ranks 6 to 10; LLM ends early more often.
 - `0015` — determinism is a property of the heuristic detector. Amends vision
   criterion 2.
 - `0016` — `render --vertical`: 1080x1920, the whole frame fitted to the
@@ -187,6 +191,8 @@ and planned code:
   failed source does not stop the rest, a summary table, exit 1 if any
   failed. Measured
   (criterion 5): the 5:04:01 stream cold from a file in 22:58.
+  Defaults amendment (V5 11): LLM detector, top 10, `--top N`; an empty
+  model fails before download with titles off too (0014).
 - `0023` — candidate boundaries follow the moment: candidates 15 to 90 s;
   in shared code for every detector, windows are scored, neighbours merged,
   the top N selected, then each end extended to the next pause in speech,
