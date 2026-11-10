@@ -838,8 +838,12 @@ Items 8 and 9 do not depend on picking and may land earlier.
     - 13d. ~~Several styles in `drafts` (`fit` and `face`) and variants in
       the manifest (ADR 0019 amendment).~~ (done; #165; locked framing fix
       #164 first, after the maintainer found 13c choppy)
-    - 13e. A style switch in the review page; Save keeps the chosen style
-      and records it (ADR 0024 amendment). Manual step.
+    - 13e. ~~A style switch in the review page; Save keeps the chosen style
+      and records it (ADR 0024 amendment). Manual step.~~ (done; #167;
+      manual step RV10, not yet run; checked through the API)
+
+    Item 13 is done: ADR 0025 #159, face tracking #160, face style #162,
+    locked framing #164, both styles in `drafts` #165, style switch #167.
 14. Release notes and tag `v0.5.0`.
 
 Later, not scheduled:
