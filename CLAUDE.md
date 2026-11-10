@@ -255,6 +255,10 @@ and planned code:
   stands for the speaker; the facecam split is later. Spike: faces in 89
   to 99% of keeper frames on five videos; one subject dominates on 50%
   (IRL) to 98% (webcam). Amends 0016, 0019, 0024 and the V5 scope.
+  Face tracking amendment (13b): `FaceTracker` in `core/`,
+  `OpenCvFaceTracker` piping 1280x720 frames from ffmpeg, cached per
+  span under `<cache dir>/faces/`; the model is kept in the package
+  (MIT licence beside it), not downloaded.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -560,6 +564,8 @@ See `docs/decisions/0003-pin-transcription-dependencies.md`.
 
 - `huggingface-hub<1.0` — Hub 2.3.0 changed its API and dependency graph,
   pulling in httpx2 and httpcore2 in place of httpx.
+- `opencv-python-headless>=5.0.0.93,<6` — not a pin, but 4.x would pull
+  `numpy` down from 2.5.4 (ADR 0003, face tracking amendment).
 - `av==17.0.0` — faster-whisper 1.2.1 calls
   `av.open(..., metadata_errors="ignore")`, which av 19.0.2 rejects. This was
   the actual cause of the first real-run failure.

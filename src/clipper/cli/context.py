@@ -10,6 +10,11 @@ from clipper.adapters.download.ytdlp import (
     YtDlpDownloader,
     YtDlpVideoInfoLookup,
 )
+from clipper.adapters.media.faces import (
+    TRACKER_NAME,
+    CachingFaceTracker,
+    OpenCvFaceTracker,
+)
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
@@ -25,6 +30,7 @@ from clipper.core.interfaces import (
     ClipLookup,
     ClipRenderer,
     Downloader,
+    FaceTracker,
     FrameExtractor,
     MediaProbe,
     ReviewFiles,
@@ -79,6 +85,13 @@ def build_probe() -> MediaProbe:
     return FfprobeMediaProbe()
 
 
+def build_face_tracker(settings: Settings) -> FaceTracker:
+    """Compose the face tracker, cached per span under the cache dir (ADR 0025)."""
+    return CachingFaceTracker(
+        OpenCvFaceTracker(), settings.cache_dir / "faces", TRACKER_NAME
+    )
+
+
 def build_frames() -> FrameExtractor:
     """Compose the frame extractor for the review page's film strip."""
     return FfmpegFrameExtractor()
@@ -128,6 +141,7 @@ class AppContext:
     renderer: Callable[[Settings], ClipRenderer] = build_renderer
     probe: Callable[[], MediaProbe] = build_probe
     frames: Callable[[], FrameExtractor] = build_frames
+    face_tracker: Callable[[Settings], FaceTracker] = build_face_tracker
     review_files: Callable[[], ReviewFiles] = build_review_files
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     downloader: Callable[[Settings], Downloader] = build_downloader

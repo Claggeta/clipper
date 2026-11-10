@@ -5,6 +5,7 @@ from clipper.domain.models import (
     ClipCandidate,
     ClipInfo,
     ClipTitle,
+    FaceTrack,
     LabeledVideo,
     MediaInfo,
     RenderedClip,
@@ -144,3 +145,15 @@ class VideoInfoLookup(Protocol):
     """
 
     def lookup(self, source: VideoSource) -> VideoInfo: ...
+
+
+@runtime_checkable
+class FaceTracker(Protocol):
+    """Finds faces across one span of a video, a few samples a second.
+
+    Raises `FaceError` on failure (see docs/decisions/0025).
+    """
+
+    def track(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FaceTrack: ...

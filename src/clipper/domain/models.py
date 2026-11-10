@@ -124,6 +124,53 @@ class AnalysisResult(BaseModel):
     detector: str | None = None
 
 
+class FaceBox(BaseModel):
+    """One face found in a frame, as fractions of the frame's width and height.
+
+    `x` and `y` are the top-left corner and may fall just outside 0 to 1 for a
+    face at the edge. `score` is the detector's confidence. See
+    docs/decisions/0025.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
+    w: float = Field(gt=0, allow_inf_nan=False)
+    h: float = Field(gt=0, allow_inf_nan=False)
+    score: float = Field(ge=0, le=1)
+
+
+class FaceSample(BaseModel):
+    """The faces found in one frame, `seconds` into the video."""
+
+    model_config = ConfigDict(frozen=True)
+
+    seconds: float = Field(ge=0)
+    faces: tuple[FaceBox, ...] = ()
+
+
+class FaceTrack(BaseModel):
+    """Faces sampled across one span of a video, in time order.
+
+    `source` is the video's file name. See docs/decisions/0025.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str = Field(min_length=1)
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    samples_per_second: float = Field(gt=0)
+    samples: tuple[FaceSample, ...]
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> "FaceTrack":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("end_seconds must be greater than start_seconds")
+        return self
+
+
 class MediaInfo(BaseModel):
     """Facts about a media file, as reported by a probe.
 

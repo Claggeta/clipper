@@ -55,11 +55,20 @@ Pin both packages:
   itself, so they may look unnecessary to a future reader. This ADR is
   the answer to that.
 
+## Amended by face tracking (ADR 0025, V5 item 13b)
+
+- `opencv-python-headless>=5.0.0.93,<6` is added. 4.12 caps `numpy` below
+  2.3 and would pull it from 2.5.4 down to 2.2.6 under faster-whisper's
+  stack; 5.0.0.93 resolves with `numpy` 2.5.4, and found the same faces as
+  4.12 on the spike's frames. The headless build avoids GUI libraries.
+  `av` and `huggingface-hub` are unchanged.
+
 ## Revisit when
 - A faster-whisper release declares huggingface-hub>=1.0 in its own
   project metadata.
 - The av `metadata_errors` incompatibility is fixed upstream, allowing av
   to float again.
+- OpenCV 6 is released, or a `numpy` upgrade is refused by OpenCV 5.
 
 ## Related
 - 0002: Use faster-whisper for transcription
