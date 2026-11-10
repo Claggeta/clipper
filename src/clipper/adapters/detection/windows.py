@@ -5,6 +5,10 @@ from clipper.domain.models import ClipCandidate, Segment, Transcript
 # Shared by every detector that scores the same windows (ADR 0014).
 WINDOW_SECONDS = 45.0
 STEP_SECONDS = 15.0
+# Candidate bounds (ADR 0023): an end moves to the next pause of at least
+# PAUSE_SECONDS, set from the V5 baseline's dragged ends (item 5 amendment).
+MAX_CANDIDATE_SECONDS = 90.0
+PAUSE_SECONDS = 1.5
 
 
 def sliding_windows(
@@ -54,3 +58,47 @@ def select_top(candidates: Iterable[ClipCandidate], top_n: int) -> list[ClipCand
 
 def _overlaps(a: ClipCandidate, b: ClipCandidate) -> bool:
     return a.start_seconds < b.end_seconds and b.start_seconds < a.end_seconds
+
+
+def extend_ends(
+    chosen: list[ClipCandidate],
+    transcript: Transcript,
+    pause_seconds: float = PAUSE_SECONDS,
+    max_seconds: float = MAX_CANDIDATE_SECONDS,
+) -> list[ClipCandidate]:
+    """Move each chosen candidate's end to the next pause in speech, in order.
+
+    The end moves word by word, or segment by segment where a segment has no
+    words, until the gap to the next is at least `pause_seconds`. It never
+    goes past `max_seconds` from the start nor into a later chosen candidate.
+    Starts do not change.
+    """
+    units = _speech_units(transcript)
+    starts = [c.start_seconds for c in chosen]
+    extended: list[ClipCandidate] = []
+    for candidate in chosen:
+        limit = min(
+            [s for s in starts if s >= candidate.end_seconds],
+            default=candidate.start_seconds + max_seconds,
+        )
+        limit = min(limit, candidate.start_seconds + max_seconds)
+        end = candidate.end_seconds
+        for start, unit_end in units:
+            if unit_end <= end:
+                continue
+            if start - end >= pause_seconds or unit_end > limit:
+                break
+            end = unit_end
+        extended.append(candidate.model_copy(update={"end_seconds": end}))
+    return extended
+
+
+def _speech_units(transcript: Transcript) -> list[tuple[float, float]]:
+    """Word spans, or the segment's span for a segment without words."""
+    units: list[tuple[float, float]] = []
+    for segment in transcript.segments:
+        if segment.words:
+            units.extend((w.start_seconds, w.end_seconds) for w in segment.words)
+        else:
+            units.append((segment.start_seconds, segment.end_seconds))
+    return units

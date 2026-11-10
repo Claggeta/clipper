@@ -52,7 +52,8 @@ _SCHEMA = WindowScore.model_json_schema()
 class LlmClipDetector:
     """Scores every sliding window with a local LLM. See docs/decisions/0014.
 
-    Re-ranks the heuristic's windows; it does not choose boundaries. Any failure
+    Re-ranks the heuristic's windows; it does not choose boundaries, and its
+    ends are not extended (ADR 0023, item 5 amendment). Any failure
     raises `DetectionError`; it never falls back to another detector.
     """
 

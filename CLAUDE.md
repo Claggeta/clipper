@@ -180,7 +180,12 @@ and planned code:
   not help. Amends 0014 decision 2. Baseline amendment (V5 item 4): on
   three VODs 12 of 31 keepers end early, moved 2.4 to 36.7 s later (median
   17.1 s), and 3 start earlier; item 5 sets the pause length from those 12
-  ends, and starts stay.
+  ends, and starts stay. Item 5 amendment: `extend_ends` moves an end to the
+  next gap of `PAUSE_SECONDS = 1.5`, up to `MAX_CANDIDATE_SECONDS = 90.0`
+  and never past a later chosen candidate's start; adopted for the
+  heuristic only (early ends 6 to 1, ends over 5 s long 1 to 4), not the
+  LLM (6 early either way, 1 to 7 over), so decision 2's shared steps are
+  opt-in.
 - `0024` — `clipper review <drafts folder>`: a local browser page on the
   loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
   a player on the source video, a film strip of the clip plus 120 s either

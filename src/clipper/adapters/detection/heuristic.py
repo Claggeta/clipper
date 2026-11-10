@@ -2,6 +2,7 @@ from clipper.adapters.detection.signals import DEFAULT_SIGNALS, WeightedSignal
 from clipper.adapters.detection.windows import (
     STEP_SECONDS,
     WINDOW_SECONDS,
+    extend_ends,
     select_top,
     sliding_windows,
 )
@@ -9,7 +10,10 @@ from clipper.domain.models import ClipCandidate, Segment, Transcript
 
 
 class HeuristicClipDetector:
-    """Scores sliding windows of a transcript using simple text signals."""
+    """Scores sliding windows of a transcript using simple text signals.
+
+    Each chosen window's end extends to the next pause (ADR 0023).
+    """
 
     def __init__(
         self,
@@ -29,7 +33,7 @@ class HeuristicClipDetector:
         windows = sliding_windows(transcript, self._window, self._step)
         scored = [c for w in windows if (c := self._score(w)) is not None]
         scored = [c for c in scored if c.score > self._min_score]
-        return select_top(scored, self._top_n)
+        return extend_ends(select_top(scored, self._top_n), transcript)
 
     def _score(self, window: tuple[Segment, ...]) -> ClipCandidate | None:
         total = 0.0

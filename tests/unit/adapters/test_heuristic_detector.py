@@ -47,3 +47,17 @@ def test_works_with_fake_transcriber_output() -> None:
 
     transcript = FakeTranscriber().transcribe(Path("x.mp4"))
     assert HeuristicClipDetector().detect(transcript)
+
+
+def test_end_extends_to_the_next_pause() -> None:
+    # 5 s segments with no gaps, then a 2 s pause after 60 s.
+    segments = [
+        Segment(start_seconds=i * 5.0, end_seconds=i * 5.0 + 5, text="Why? Wow!")
+        for i in range(12)
+    ]
+    segments.append(Segment(start_seconds=62.0, end_seconds=65.0, text="Calm."))
+
+    result = HeuristicClipDetector(top_n=1).detect(Transcript(segments=tuple(segments)))
+
+    # The best window starts at 0 s; its end moves from 45 s to the pause at 60 s.
+    assert [(c.start_seconds, c.end_seconds) for c in result] == [(0.0, 60.0)]
