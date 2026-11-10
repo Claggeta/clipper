@@ -745,9 +745,16 @@ Items 8 and 9 do not depend on picking and may land earlier.
      amendment, manual step.~~ (done; #152; `<id>.info.json` from a
      `--skip-download` request, so reused files too; manual step D10a,
      run in part: Twitch gives the login, YouTube the channel name)
-   - 8b. The title prompt gets the channel and VOD title; nothing for local
+   - 8b. ~~The title prompt gets the channel and VOD title; nothing for local
      files. ADR 0018 amendment, manual step; trial measure: titles kept
-     unedited.
+     unedited.~~ (done; #154; titles naming the person on 39 reviewed
+     keepers: 1 before, 12 with video info, 24 with names by hand; manual
+     step R19a)
+   - 8c. `--about "<text>"` on `drafts` and `render`: names and context
+     written by hand (a campaign brief's people, "Ron (stableronaldo)"),
+     sent to the title prompt with the video info, for local files too.
+     Measured in 8b: 24 of 39 titles name the person with written names,
+     12 with video info alone. ADR 0018 amendment, manual step.
 9. `drafts` with a list of sources; one failing source does not stop the
    rest, and the exit code is 1 at the end. ADR 0022 amendment, manual step.
 10. Audio loudness:
