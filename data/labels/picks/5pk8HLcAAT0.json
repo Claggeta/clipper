@@ -1,0 +1,96 @@
+{
+  "source": "5pk8HLcAAT0.mp4",
+  "labels": [
+    {
+      "start": "0:00:00",
+      "end": "0:00:55.25",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:00:00",
+        "end": "0:00:43.66"
+      },
+      "note": "Good video intro clip. Attention Grabbing"
+    },
+    {
+      "start": "0:01:00.54",
+      "end": "0:01:44.78",
+      "verdict": "post",
+      "note": "Good clip. Answers the question."
+    },
+    {
+      "start": "0:07:00.5",
+      "end": "0:07:56",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:07:00.5",
+        "end": "0:07:44.26"
+      },
+      "note": "Interesting insight. Kind of funny"
+    },
+    {
+      "start": "0:08:46",
+      "end": "0:09:28.7",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:08:46",
+        "end": "0:09:28.72"
+      },
+      "note": "Inspirational clip."
+    },
+    {
+      "start": "0:10:31.74",
+      "end": "0:11:20.26",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:10:31.74",
+        "end": "0:11:14.3"
+      },
+      "note": "Good clip. Inspirational"
+    },
+    {
+      "start": "0:11:30.34",
+      "end": "0:12:30.18",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:11:30.34",
+        "end": "0:12:14.68"
+      },
+      "note": "Viewers are interested in how much money others are making. It is cool to see someone making so much in a single day."
+    },
+    {
+      "start": "0:40:10.46",
+      "end": "0:41:17.01",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:40:15.42",
+        "end": "0:40:57.66"
+      },
+      "note": "Interesting fact."
+    },
+    {
+      "start": "0:44:28.44",
+      "end": "0:45:53",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:44:30.9",
+        "end": "0:45:13.7"
+      }
+    },
+    {
+      "start": "1:08:17.16",
+      "end": "1:09:13.35",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:08:17.16",
+        "end": "1:08:59.84"
+      },
+      "note": "Inspirational and instructive. Good Clip"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:12:16.62",
+      "end": "0:12:58.96"
+    }
+  ]
+}
