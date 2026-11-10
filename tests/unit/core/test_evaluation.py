@@ -5,6 +5,7 @@ from clipper.core.evaluation import (
     HIT_FRACTION,
     boundary_gaps,
     evaluate,
+    is_draft_of,
     is_hit,
 )
 from clipper.domain.models import ClipCandidate, Label, LabeledVideo
@@ -224,6 +225,50 @@ def test_boundary_gaps_are_label_minus_candidate_in_rank_order() -> None:
         (False, True),
         (True, False),
     ]
+
+
+def test_a_draft_fixed_far_away_is_on_its_label() -> None:
+    # Shaped like a real fix (v2922589775): the label overlaps its draft by
+    # 13 s of 35 s, under half, but the maintainer judged that draft.
+    labeled = _judged(
+        [
+            {
+                "start": "1:58:50.16",
+                "end": "1:59:32.44",
+                "verdict": "fix",
+                "draft": {"start": "1:59:19.69", "end": "1:59:54.96"},
+            }
+        ]
+    )
+    draft = _c(7159.69, 7194.96)
+    assert not is_hit(draft, labeled.labels[0])
+
+    result = evaluate(labeled, [draft])
+
+    assert result.matches == ((0, 0),)
+    assert result.candidates_unjudged == 0
+    [gap] = boundary_gaps(result)
+    assert (gap.start, gap.end) == (-29.53, -22.52)
+
+
+def test_only_the_exact_draft_span_counts() -> None:
+    labeled = _judged(
+        [
+            {
+                "start": "10:00",
+                "end": "10:45",
+                "verdict": "fix",
+                "draft": {"start": "1:00", "end": "1:45"},
+            }
+        ]
+    )
+    label = labeled.labels[0]
+
+    assert is_draft_of(_c(60.0, 105.0), label)
+    assert is_draft_of(_c(60.0004, 105.0), label)
+    assert not is_draft_of(_c(60.001, 105.0), label)
+    assert not is_draft_of(_c(600.0, 645.0), _l("10:00", "10:45"))
+    assert evaluate(labeled, [_c(60.001, 105.0)]).matches == ()
 
 
 @pytest.mark.parametrize(("end", "early"), [("1:46", False), ("1:46.001", True)])

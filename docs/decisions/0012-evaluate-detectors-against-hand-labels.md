@@ -373,6 +373,27 @@ V5 measures picking against.
   `CLIPPER_LABELS_DIR=data/labels/picks`. `save_labels` writes the new
   fields, for the review page (0024). Nothing writes verdicts yet.
 
+## Amended by the draft span fix (V5 item 4)
+
+The baseline's first `eval` runs counted a judged draft as unjudged. On
+v2922589775 the maintainer fixed heuristic draft 8 (1:59:19-1:59:54) to
+1:58:50-1:59:32. The two overlap by 13 s of the shorter 35 s, under
+`HIT_FRACTION`, so the draft hit no label, although the label's `draft`
+names it.
+
+- A candidate also **hits** a `fix` label when its span equals the label's
+  `draft` to the millisecond (`is_draft_of` in `core/evaluation.py`), the
+  same match the review page uses to find a clip's own judgment (0024).
+  Matching in rank order, repeats, recall and the gaps are unchanged; the
+  gap is then the whole move, here -29.5 s at the start and -22.5 s at the
+  end.
+- Only the exact span counts. A later detector's candidate near the draft
+  still has to meet `HIT_FRACTION`, since the maintainer judged the draft,
+  not what lies near it.
+- `post` labels and rejected spans carry no draft, so they still match by
+  overlap only. A `post` label equals its draft, so the rule changes nothing
+  for it.
+
 ## Related
 
 - 0013: detector choice on the CLI
