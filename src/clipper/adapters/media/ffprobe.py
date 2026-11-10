@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class FfprobeMediaProbe:
-    """Reads duration and video presence using the ffprobe command line tool.
+    """Reads duration, start time and video presence using the ffprobe command
+    line tool.
 
     Reports structurally from ffprobe's JSON output and never matches stderr
     text. See docs/decisions/0009.
@@ -29,7 +30,8 @@ class FfprobeMediaProbe:
             "-v",
             "error",
             "-show_entries",
-            "format=duration:stream=codec_type:stream_disposition=attached_pic",
+            "format=duration,start_time:stream=codec_type"
+            ":stream_disposition=attached_pic",
             "-of",
             "json",
             str(media_path),
@@ -60,13 +62,28 @@ class FfprobeMediaProbe:
 
         raw_duration = fmt.get("duration")
         try:
-            return MediaInfo(
-                duration_seconds=float(raw_duration),  # type: ignore[arg-type]
+            duration = float(raw_duration)  # type: ignore[arg-type]
+            info = MediaInfo(
+                duration_seconds=duration,
                 has_video=any(_is_video(s) for s in streams),
             )
         except (TypeError, ValueError, ValidationError) as exc:
             raise MediaProbeError(
                 f"No usable duration for {media_path} (got {raw_duration!r})"
+            ) from exc
+        # Absent when ffprobe cannot tell; then the file is taken to start at 0.
+        raw_start = fmt.get("start_time")
+        if raw_start is None:
+            return info
+        try:
+            return MediaInfo(
+                duration_seconds=info.duration_seconds,
+                has_video=info.has_video,
+                start_seconds=float(raw_start),
+            )
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise MediaProbeError(
+                f"No usable start time for {media_path} (got {raw_start!r})"
             ) from exc
 
 

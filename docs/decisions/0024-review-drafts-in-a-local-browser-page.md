@@ -338,6 +338,28 @@ until the drafts rarely need editing.
   per video and correct; only the browser's mixed them. The player and the
   saved times were never affected.
 
+## Amended by the start offset fix (V5 item 4, while judging)
+
+- **`review` refuses a video whose first timestamp is past 0.1 s**
+  (`MAX_START_SECONDS`), with `Error:` naming the start and the lossless
+  ffmpeg remux that fixes it (`-map 0:v:0 -map 0:a:0 -c copy -movflags
+  +faststart`). The start comes from the probe (0009 amendment).
+- **Why**: yt-dlp saved one Twitch VOD (v2924046310) as a fragmented MP4
+  whose timestamps start at 64 s. ffmpeg counts from the file's start, so
+  its transcript, renders and frames agreed; the browser's player counted
+  from 64 s, so the page showed footage 64 s before each draft and saved
+  times 64 s late. Found from the maintainer's trims (three ends moved
+  +64.1 to +66.2 s) and notes, which matched the speech 64 s earlier.
+  Fragmented without an index, it also loaded and seeked slowly.
+- **Repair of that VOD**: the remux above (45 s; same frame at 2:00:00 in
+  both files), and every label and rejected span in its judged labels
+  moved by -64 s, keeping verdicts, notes and `draft` spans; the original
+  file and labels are kept outside the repo. Its drafts the maintainer did
+  not trim were judged on the minute before them, so they count as
+  unjudged in `eval`.
+- Refusing rather than correcting the offset in the page, because how
+  browsers treat a non-zero start was not verified beyond this one file.
+
 ## Related
 
 - 0011: render's failure policy

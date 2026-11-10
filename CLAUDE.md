@@ -61,7 +61,8 @@ and planned code:
   run if two candidates get the same name.
 - `0009` — `render` reads the saved `AnalysisResult` JSON, checks the source
   name, and uses a `MediaProbe` (`ffprobe`, JSON output) for duration and
-  video-stream checks. No stderr matching for these.
+  video-stream checks. No stderr matching for these. Start offset
+  amendment: the probe also reads the file's start time, for `review`.
 - `0010` — captions are burned in from segment-level text via a pure SRT
   builder. Word-level captions are out of scope.
 - `0011` — `render` is a separate command (`--rank`, `--captions`). If one clip
@@ -217,7 +218,11 @@ and planned code:
   (`added: true`, ranked last, score 0); Trash removes an added clip
   outright, with no rejected span; manual step RV9. Frame URL fix: frames
   are `/frames/<stem>-<size>/<second>.jpg`, since the browser cached
-  frames by URL and showed one VOD's frames in another's strip.
+  frames by URL and showed one VOD's frames in another's strip. Start
+  offset fix: `review` refuses a video whose first timestamp is past
+  0.1 s and names the lossless remux; a Twitch VOD started at 64 s and the
+  browser's player ran 64 s behind the transcript (its judged labels were
+  moved by -64 s).
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -709,6 +714,17 @@ Later, not scheduled:
 - Posting and performance data, once accounts exist.
 
 ## Parked
+
+- `fetch` can save a fragmented MP4 whose timestamps do not start at 0:
+  yt-dlp saved Twitch VOD v2924046310 that way (no index up front, start
+  64 s), while four other Twitch VODs came out as standard MP4s starting at
+  0; why is unverified. ffmpeg-based steps agree on such a file, but the
+  review page refuses it (ADR 0024 start offset amendment) and a browser
+  loads it slowly. Fix: remux after download (`-c copy -movflags
+  +faststart`, timestamps from 0), a lossless step of under a minute; an
+  ADR 0020 amendment. Its Twitch clip labels
+  (`data/labels/v2924046310.json`) may also be 64 s off, if Twitch counts
+  that VOD from 0 and the download began 64 s in; unverified.
 
 - `pyproject.toml` says `version = "0.2.0"`, but `v0.4.0` is tagged (seen
   in V5 item 3a). Fix with the `v0.5.0` release notes (V5 item 14).

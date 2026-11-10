@@ -263,6 +263,27 @@ def test_unusable_judged_labels_stop_before_serving(
     assert env.calls == []
 
 
+def test_a_video_that_starts_late_is_refused_with_the_fix(env: Env) -> None:
+    env.probe = FakeProbe(
+        MediaInfo(duration_seconds=600.0, has_video=True, start_seconds=64.0003)
+    )
+
+    result = env.run()
+
+    assert result.exit_code == 1
+    assert "starts at 64.0 s, not 0" in result.output
+    assert "-movflags +faststart" in result.output
+    assert env.calls == []
+
+
+def test_a_tiny_start_offset_is_allowed(env: Env) -> None:
+    env.probe = FakeProbe(
+        MediaInfo(duration_seconds=600.0, has_video=True, start_seconds=0.05)
+    )
+
+    assert env.run().exit_code == 0
+
+
 def test_a_missing_analysis_stops_before_serving(env: Env) -> None:
     env.analysis.unlink()
 
