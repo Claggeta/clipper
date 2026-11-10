@@ -260,10 +260,14 @@ and planned code:
   `OpenCvFaceTracker` piping 1280x720 frames from ffmpeg, cached per
   span under `<cache dir>/faces/`; the model is kept in the package
   (MIT licence beside it), not downloaded. Face style amendment (13c):
-  `render --vertical --style face`; `plan_face_crop` in `core/framing.py`
-  (dead zone 0.15, ease 0.25, cut jump 0.30); the renderer takes a
+  `render --vertical --style face`; `plan_face_crop` in `core/framing.py`;
+  the renderer takes a
   `CropPath` and moves a named crop with `sendcmd`; a clip with no face
   is a note, not a failure; the probe reads width and height (0009).
+  Locked framing amendment: one position per shot (cut jump 0.30),
+  re-locked only after 2 s outside, holds of 2 s or more, close similar
+  faces framed as a pair; 65 to 7 moves on a podcast clip, 52 to 3 on
+  IRL. The listener-framed two-shot needs speaker detection (Later).
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -845,6 +849,11 @@ Later, not scheduled:
   Two read on 2026-11-10 (see "Campaign briefs read"); neither asks
   for one. One asked for an on-screen hook, a possible small render item.
 - Posting and performance data, once accounts exist.
+- Speaker detection for the face style (ADR 0025, locked framing
+  amendment): the largest face is sometimes the listener (a podcast
+  two-shot with the speaker side-on); mouth movement at 5 samples a
+  second did not tell them apart. Needs an audio-visual model; after
+  13e's picks show how often `face` loses to `fit` for it.
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
   first, and stack it above the gameplay. After V5 item 13e's picks show
   how often facecam clips are posted.

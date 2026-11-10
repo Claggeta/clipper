@@ -1167,9 +1167,11 @@ Get-ChildItem "$S\clips-r20" -Recurse -Filter *.mp4 | ForEach-Object { ffprobe -
 ```
 
 Pass: the first two runs exit 0 with `(vertical, face, captions)` and a
-1080x1920 file. Watch both: on the podcast the speaker stays framed, the
-window holds while they sit still and moves at once at a camera cut; on the
-IRL clip it follows one person and may cut others out. Captions sit on the
+1080x1920 file. Watch both: the window holds still within a shot and
+moves only as a cut, mostly at the video's own camera cuts, never as a
+pan; brief movement is ignored, so a speaker leaning out for a moment is
+partly cut off. On the IRL clip it locks on one person and may cut others
+out. Captions sit on the
 cropped frame. The third run is faster, its faces read from the cache. The
 fourth exits 1 with `Error: --style face needs --vertical`. Record the
 times and anything framed badly.
