@@ -60,6 +60,13 @@ matches.
   file's start and agree with each other. Seen on one Twitch VOD that
   started at 64 s (real ffprobe output in the tests).
 
+## Amended by the face style (ADR 0025, V5 item 13c)
+
+- The probe also reads the first video stream's `width` and `height`
+  (`stream=codec_type,width,height`), into `MediaInfo.width` and
+  `MediaInfo.height`, None when missing or not a positive integer. The face
+  crop needs them to size its window. Still structural, from the JSON.
+
 ## Revisit when
 
 - A mismatch between JSON and video gets past the checks in practice. Then

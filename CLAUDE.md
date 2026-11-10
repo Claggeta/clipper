@@ -63,6 +63,7 @@ and planned code:
   name, and uses a `MediaProbe` (`ffprobe`, JSON output) for duration and
   video-stream checks. No stderr matching for these. Start offset
   amendment: the probe also reads the file's start time, for `review`.
+  Face style amendment: and the video's width and height (0025).
 - `0010` — captions are burned in from segment-level text via a pure SRT
   builder. Word-level captions are out of scope.
 - `0011` — `render` is a separate command (`--rank`, `--captions`). If one clip
@@ -258,7 +259,11 @@ and planned code:
   Face tracking amendment (13b): `FaceTracker` in `core/`,
   `OpenCvFaceTracker` piping 1280x720 frames from ffmpeg, cached per
   span under `<cache dir>/faces/`; the model is kept in the package
-  (MIT licence beside it), not downloaded.
+  (MIT licence beside it), not downloaded. Face style amendment (13c):
+  `render --vertical --style face`; `plan_face_crop` in `core/framing.py`
+  (dead zone 0.15, ease 0.25, cut jump 0.30); the renderer takes a
+  `CropPath` and moves a named crop with `sendcmd`; a clip with no face
+  is a note, not a failure; the probe reads width and height (0009).
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

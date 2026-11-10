@@ -118,7 +118,11 @@ This renders every candidate. Options:
 - `--vertical` makes a 1080x1920 (9:16) clip for short-form platforms: the
   whole frame, scaled to fit the width, centred on a blurred copy of itself.
   Nothing is cut off. Black bars built into the source stay in the picture.
-  Captions are drawn on the vertical frame.
+  Captions are drawn on the vertical frame. `--style face` crops a
+  full-height 9:16 window that follows the largest face instead (faces
+  found with OpenCV, cached under the cache dir); a clip with no face is
+  skipped with a note. It suits podcasts and webcam streams; on groups it
+  cuts people out.
 - `--titles` suggests a title and a hook line per clip with a local model
   through [Ollama](https://ollama.com), the same server and model as
   `--detector llm` (`CLIPPER_LLM_MODEL`, default `qwen3.5:9b`). They are

@@ -7,11 +7,20 @@ from typer.testing import CliRunner, Result
 from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.cli.context import AppContext
 from clipper.cli.main import app
-from clipper.domain.errors import ClipRenderError, MediaProbeError, TitleError
+from clipper.domain.errors import (
+    ClipRenderError,
+    FaceError,
+    MediaProbeError,
+    TitleError,
+)
 from clipper.domain.models import (
     AnalysisResult,
     ClipCandidate,
     ClipTitle,
+    CropPath,
+    FaceBox,
+    FaceSample,
+    FaceTrack,
     ManifestClip,
     MediaInfo,
     RenderManifest,
@@ -53,6 +62,7 @@ class RaisingRenderer:
         captions: str | None = None,
         *,
         vertical: bool = False,
+        crop: object = None,
     ):
         raise ClipRenderError("[aist#0:0/pcm_s16le] [/bogus] bad")
 
@@ -669,3 +679,100 @@ def test_an_unusable_about_fails_before_cutting(
     assert result.exit_code == 1
     assert f"Error: {message}" in result.output
     assert not env.folder.exists()
+
+
+class FakeFaceTracker:
+    """A face at the frame's centre, except in spans starting at `no_face`."""
+
+    def __init__(self, no_face: tuple[float, ...] = (), fail: bool = False) -> None:
+        self.spans: list[tuple[float, float]] = []
+        self._no_face = no_face
+        self._fail = fail
+
+    def track(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FaceTrack:
+        self.spans.append((start_seconds, end_seconds))
+        if self._fail:
+            raise FaceError("ffmpeg failed (exit 1): [bad] frames")
+        face = FaceBox(x=0.45, y=0.2, w=0.1, h=0.3, score=0.9)
+        faces = () if start_seconds in self._no_face else (face,)
+        return FaceTrack(
+            source=video_path.name,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            samples_per_second=5.0,
+            samples=(FaceSample(seconds=start_seconds, faces=faces),),
+        )
+
+
+_SIZED = MediaInfo(duration_seconds=100.0, has_video=True, width=1920, height=1080)
+
+
+def _use_faces(env: Env, tracker: FakeFaceTracker, info: MediaInfo = _SIZED) -> None:
+    env.use_probe(FakeProbe(info))
+    env.context = dataclasses.replace(env.context, face_tracker=lambda s: tracker)
+
+
+def test_the_face_style_renders_a_crop_on_the_face(env: Env) -> None:
+    tracker = FakeFaceTracker()
+    _use_faces(env, tracker)
+    result = env.run("--vertical", "--style", "face", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert tracker.spans == [(10.0, 20.0)]
+    assert env.renderer.crops == [
+        CropPath(width=608, height=1080, points=((0.0, 656),))
+    ]
+    assert env.renderer.vertical == [True]
+    assert " (vertical, face)" in result.output
+
+
+def test_fit_is_the_default_style(env: Env) -> None:
+    _use_faces(env, FakeFaceTracker())
+    result = env.run("--vertical", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert env.renderer.crops == [None]
+
+
+def test_the_face_style_needs_vertical(env: Env) -> None:
+    _use_faces(env, FakeFaceTracker())
+    result = env.run("--style", "face")
+    assert result.exit_code == 1
+    assert "Error: --style face needs --vertical" in result.output
+    assert not env.folder.exists()
+
+
+def test_the_face_style_needs_the_frame_size(env: Env) -> None:
+    _use_faces(
+        env, FakeFaceTracker(), MediaInfo(duration_seconds=100.0, has_video=True)
+    )
+    result = env.run("--vertical", "--style", "face")
+    assert result.exit_code == 1
+    assert "Error: Cannot tell the frame size of" in result.output
+    assert not env.folder.exists()
+
+
+def test_a_clip_with_no_face_gets_a_note_and_no_title(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    _use_faces(env, FakeFaceTracker(no_face=(10.0,)))
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run(
+        "--vertical", "--style", "face", "--titles", "--rank", "1", "--rank", "2"
+    )
+    assert result.exit_code == 0, result.output
+    assert "Note: #1 0:00:10-0:00:20 has no face in range" in result.output
+    assert writer.texts == ["second ione/i"]
+    first, second = env.manifest().clips
+    assert (first.file, first.error) == (None, "no face found")
+    assert second.file is not None
+
+
+def test_a_face_tracking_failure_fails_that_clip(env: Env) -> None:
+    _use_faces(env, FakeFaceTracker(fail=True))
+    result = env.run("--vertical", "--style", "face", "--rank", "1")
+    assert result.exit_code == 1
+    assert "Failed: #1 0:00:10-0:00:20: ffmpeg failed (exit 1): [bad] frames" in (
+        result.output
+    )
+    assert env.manifest().clips[0].error == "ffmpeg failed (exit 1): [bad] frames"

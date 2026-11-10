@@ -4,7 +4,7 @@ from pathlib import Path
 
 from clipper.adapters.media._process import format_failure, run_tool
 from clipper.domain.errors import ClipRenderError
-from clipper.domain.models import ClipCandidate, RenderedClip
+from clipper.domain.models import ClipCandidate, CropPath, RenderedClip
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,25 @@ _VERTICAL_FILTER = (
     "[blurred][fitted]overlay=(W-w)/2:(H-h)/2,setsar=1"
 )
 
+# ADR 0025. The face style's moving crop: `sendcmd` reads the window's left
+# edge over time from a bare filename in ffmpeg's working directory, as the
+# captions do, and moves the named crop; then the window is scaled to
+# 1080x1920.
+_CROP_NAME = "crop.cmd"
+
+
+def _face_filter(crop: CropPath) -> str:
+    left = crop.points[0][1]
+    return (
+        f"sendcmd=f={_CROP_NAME},crop@face={crop.width}:{crop.height}:{left}:0,"
+        "scale=1080:1920,setsar=1"
+    )
+
+
+def _crop_commands(crop: CropPath) -> str:
+    """One `sendcmd` line per point: from that time, the crop's left edge."""
+    return "".join(f"{_seconds(t)} crop@face x {left};\n" for t, left in crop.points)
+
 
 def _seconds(value: float) -> str:
     """Fixed-point milliseconds, never scientific notation."""
@@ -56,6 +75,7 @@ class FfmpegClipRenderer:
         captions: str | None = None,
         *,
         vertical: bool = False,
+        crop: CropPath | None = None,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -65,21 +85,28 @@ class FfmpegClipRenderer:
             )
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        # Make the vertical frame first, so captions are laid out on it.
-        filters = [_VERTICAL_FILTER] if vertical else []
-        if not captions:
-            self._cut(
-                video_path,
-                candidate,
-                output_path,
-                video_filter=",".join(filters) or None,
-            )
+        # Make the vertical frame first, so captions are laid out on it. A
+        # crop path is the face style, in place of the fit (ADR 0025).
+        filters: list[str] = []
+        # UTF-8 with no BOM and LF line endings, whatever the platform.
+        files: dict[str, bytes] = {}
+        if crop is not None:
+            filters.append(_face_filter(crop))
+            files[_CROP_NAME] = _crop_commands(crop).encode("utf-8")
+        elif vertical:
+            filters.append(_VERTICAL_FILTER)
+        if captions:
+            filters.append(_SUBTITLES_FILTER)
+            files[_CAPTIONS_NAME] = captions.encode("utf-8")
+        video_filter = ",".join(filters) or None
+        if not files:
+            self._cut(video_path, candidate, output_path, video_filter=video_filter)
         else:
             with tempfile.TemporaryDirectory(
-                prefix="clipper-captions-", ignore_cleanup_errors=True
+                prefix="clipper-render-", ignore_cleanup_errors=True
             ) as folder:
-                # UTF-8 with no BOM and LF line endings, whatever the platform.
-                (Path(folder) / _CAPTIONS_NAME).write_bytes(captions.encode("utf-8"))
+                for name, data in files.items():
+                    (Path(folder) / name).write_bytes(data)
                 # ffmpeg runs in `folder`, so the other paths must not depend on
                 # the caller's working directory.
                 self._cut(
@@ -87,7 +114,7 @@ class FfmpegClipRenderer:
                     candidate,
                     output_path.resolve(),
                     cwd=Path(folder),
-                    video_filter=",".join([*filters, _SUBTITLES_FILTER]),
+                    video_filter=video_filter,
                 )
         return RenderedClip(candidate=candidate, path=output_path)
 

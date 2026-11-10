@@ -6,7 +6,7 @@ import pytest
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.core.interfaces import ClipRenderer
 from clipper.domain.errors import ClipRenderError
-from clipper.domain.models import ClipCandidate
+from clipper.domain.models import ClipCandidate, CropPath
 
 _CANDIDATE = ClipCandidate(
     start_seconds=32.5, end_seconds=73.25, score=0.5, reasons=("pace",)
@@ -338,3 +338,59 @@ def test_captions_temp_dir_is_removed_after_failure(
         )
 
     assert not run.cwds[0].exists()
+
+
+_CROP = CropPath(width=608, height=1080, points=((0.0, 656), (1.2, 700)))
+_FACE = "sendcmd=f=crop.cmd,crop@face=608:1080:656:0,scale=1080:1920,setsar=1"
+
+
+class _CropRun:
+    """Records each ffmpeg call and the crop commands in its working directory."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.commands: list[list[str]] = []
+        self.files: list[dict[str, bytes]] = []
+
+        def fake_run(
+            command: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            cwd = kwargs["cwd"]
+            assert isinstance(cwd, Path)
+            self.commands.append(command)
+            self.files.append({p.name: p.read_bytes() for p in cwd.iterdir()})
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+
+def test_a_crop_path_moves_a_named_crop_in_place_of_the_fit(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _CropRun(monkeypatch)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", vertical=True, crop=_CROP
+    )
+
+    command = run.commands[0]
+    assert command[command.index("-vf") + 1] == _FACE
+    assert run.files[0] == {
+        "crop.cmd": b"0.000 crop@face x 656;\n1.200 crop@face x 700;\n"
+    }
+
+
+def test_a_crop_path_with_captions_crops_before_subtitles(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _CropRun(monkeypatch)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", captions=_ASS, vertical=True, crop=_CROP
+    )
+
+    command = run.commands[0]
+    assert command[command.index("-vf") + 1] == (
+        _FACE + ",subtitles=clip.ass:charenc=UTF-8"
+    )
+    assert sorted(run.files[0]) == ["clip.ass", "crop.cmd"]

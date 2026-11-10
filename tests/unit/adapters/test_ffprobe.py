@@ -214,7 +214,7 @@ def test_command_is_exact(media: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             "-v",
             "error",
             "-show_entries",
-            "format=duration,start_time:stream=codec_type"
+            "format=duration,start_time:stream=codec_type,width,height"
             ":stream_disposition=attached_pic",
             "-of",
             "json",
@@ -338,3 +338,65 @@ def test_extra_keys_are_ignored(media: Path, monkeypatch: pytest.MonkeyPatch) ->
     _patch_run(monkeypatch, json.dumps(payload))
 
     assert FfprobeMediaProbe().probe(media).duration_seconds == 2.5
+
+
+# Real ffprobe output (ffmpeg 9.0.2, gyan build, Windows 11) for the command
+# above on a fetched Twitch VOD (v2917872953.mp4), audio stream first.
+_WITH_SIZE = """{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_type": "audio",
+            "disposition": {
+                "attached_pic": 0
+            }
+        },
+        {
+            "codec_type": "video",
+            "width": 1920,
+            "height": 1080,
+            "disposition": {
+                "attached_pic": 0
+            }
+        }
+    ],
+    "format": {
+        "start_time": "0.000000",
+        "duration": "18463.858000"
+    }
+}"""
+
+
+def test_the_video_streams_size_is_read(
+    media: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_run(monkeypatch, _WITH_SIZE)
+
+    info = FfprobeMediaProbe().probe(media)
+
+    assert (info.width, info.height) == (1920, 1080)
+    assert info.start_seconds == 0.0
+
+
+def test_no_size_in_the_output_means_none(
+    media: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_run(monkeypatch, _VIDEO_ONLY)
+    info = FfprobeMediaProbe().probe(media)
+    assert (info.width, info.height) == (None, None)
+
+
+@pytest.mark.parametrize("width", [0, "1920", True, None])
+def test_an_unusable_size_means_none(
+    media: Path, monkeypatch: pytest.MonkeyPatch, width: object
+) -> None:
+    data = json.loads(_WITH_SIZE)
+    data["streams"][1]["width"] = width
+    _patch_run(monkeypatch, json.dumps(data))
+    info = FfprobeMediaProbe().probe(media)
+    assert (info.width, info.height) == (None, None)
