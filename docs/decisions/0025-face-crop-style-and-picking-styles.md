@@ -103,6 +103,39 @@ height of the next. "Holds still" is the largest face's centre moving under
 - An integration test loads the bundled model in the installed OpenCV and
   runs it on a blank frame (no face), on every push.
 
+## Amended by the face style in `render` (V5 item 13c)
+
+- **`render --vertical --style face`**; `--style` is `fit` by default, so
+  `--vertical` alone is unchanged. `--style face` without `--vertical`, or
+  on a file whose frame size the probe cannot tell, is `Error:` and exit 1
+  before cutting.
+- **`plan_face_crop(track, width, height) -> CropPath | None`** in
+  `core/framing.py`, pure: a window `min(round(h * 9 / 16), w)` wide,
+  rounded down to even, following the largest face (by height). It holds
+  while the face is within `DEAD_ZONE = 0.15` of the window's width of its
+  centre, moves `EASE = 0.25` of the way per sample, jumps when the face
+  moves more than `CUT_JUMP = 0.30` of the frame's width between samples
+  (also across samples without a face), holds where there is no face, and
+  stays inside the frame. Points are kept only where the window moves.
+- **`ClipRenderer.render(..., crop=None)`** takes the `CropPath` (window
+  size and left edges over time, from 0) in place of the fit filter:
+  `sendcmd=f=crop.cmd,crop@face=W:H:X:0,scale=1080:1920,setsar=1`, then
+  captions. `crop.cmd` is written next to `clip.ass` in the render's
+  temporary folder, so no path reaches the filter's escaping rules (0010).
+  The times count from the clip's start, which is what ffmpeg's filters see
+  with `-ss` before `-i`.
+- **Faces before the title**: a clip whose span has no face gets `Note: ...
+  has no face in range; not rendered in the face style`, no file and
+  `error: "no face found"` in the manifest, and no title request; it does not
+  count toward exit 1. A face tracking failure is that clip's failure.
+- **The manifest does not yet say which style** a clip was rendered in, so
+  the review page's Save re-renders in `fit` (13d and 13e add variants and
+  the style switch).
+- Checked by hand: 5pk8HLcAAT0 rank 3 (44 s, faces tracked and rendered
+  with captions in 11 s) framed each speaker and followed the camera cuts;
+  v2917872953 rank 1 (43 s, 18 s) followed the people in the car, with one
+  frame at the pump mostly an arm. Both 1080x1920 H.264.
+
 ## Alternatives considered
 
 - **A zoom that sizes the crop to the face** (the face a fixed share of the

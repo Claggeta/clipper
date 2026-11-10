@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class FfprobeMediaProbe:
-    """Reads duration, start time and video presence using the ffprobe command
-    line tool.
+    """Reads duration, start time, video presence and frame size using the
+    ffprobe command line tool.
 
     Reports structurally from ffprobe's JSON output and never matches stderr
     text. See docs/decisions/0009.
@@ -30,7 +30,7 @@ class FfprobeMediaProbe:
             "-v",
             "error",
             "-show_entries",
-            "format=duration,start_time:stream=codec_type"
+            "format=duration,start_time:stream=codec_type,width,height"
             ":stream_disposition=attached_pic",
             "-of",
             "json",
@@ -61,11 +61,15 @@ class FfprobeMediaProbe:
             raise MediaProbeError(f"Unexpected ffprobe output for {media_path}")
 
         raw_duration = fmt.get("duration")
+        video = next((s for s in streams if _is_video(s)), None)
+        width, height = _size(video)
         try:
             duration = float(raw_duration)  # type: ignore[arg-type]
             info = MediaInfo(
                 duration_seconds=duration,
-                has_video=any(_is_video(s) for s in streams),
+                has_video=video is not None,
+                width=width,
+                height=height,
             )
         except (TypeError, ValueError, ValidationError) as exc:
             raise MediaProbeError(
@@ -76,15 +80,22 @@ class FfprobeMediaProbe:
         if raw_start is None:
             return info
         try:
-            return MediaInfo(
-                duration_seconds=info.duration_seconds,
-                has_video=info.has_video,
-                start_seconds=float(raw_start),
-            )
+            # Built again, not copied, so the start time is validated too.
+            return MediaInfo(**{**info.model_dump(), "start_seconds": float(raw_start)})
         except (TypeError, ValueError, ValidationError) as exc:
             raise MediaProbeError(
                 f"No usable start time for {media_path} (got {raw_start!r})"
             ) from exc
+
+
+def _size(stream: object) -> tuple[int | None, int | None]:
+    """A video stream's width and height, or None for a missing or bad value."""
+    if not isinstance(stream, dict):
+        return None, None
+    sizes = [stream.get(key) for key in ("width", "height")]
+    if all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in sizes):
+        return sizes[0], sizes[1]
+    return None, None
 
 
 def _is_video(stream: object) -> bool:

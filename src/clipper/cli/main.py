@@ -1,5 +1,6 @@
 import logging
 import statistics
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, NamedTuple
 
@@ -32,6 +33,7 @@ from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
 from clipper.core.evaluation import boundary_gaps, evaluate
+from clipper.core.framing import plan_face_crop
 from clipper.core.interfaces import TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
@@ -65,6 +67,13 @@ from clipper.review.server import (
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
 console = Console()
+
+
+class VerticalStyle(StrEnum):
+    """Vertical styles selectable with --style (ADR 0025)."""
+
+    FIT = "fit"
+    FACE = "face"
 
 
 # Hand-written names for titles (ADR 0018, about amendment).
@@ -402,6 +411,14 @@ def render(
             help="Fit the whole frame into 9:16 at 1080x1920, on a blurred fill.",
         ),
     ] = False,
+    style: Annotated[
+        VerticalStyle,
+        typer.Option(
+            "--style",
+            help="With --vertical: fit (the whole frame on a blurred fill) or "
+            "face (a full-height crop that follows the largest face).",
+        ),
+    ] = VerticalStyle.FIT,
     titles: Annotated[
         bool,
         typer.Option(
@@ -417,16 +434,23 @@ def render(
     build = _context(ctx)
     try:
         about = _check_about(about, titles)
+        face = style is VerticalStyle.FACE
+        if face and not vertical:
+            raise ClipRenderError("--style face needs --vertical")
         result = load_analysis_result(result_json)
         check_source_matches(result, video)
         plan = _plan_render(settings, build, video, result, rank)
+        if face and (plan.media.width is None or plan.media.height is None):
+            raise ClipRenderError(
+                f"Cannot tell the frame size of {video}, which --style face needs"
+            )
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
         raise typer.Exit(code=1) from exc
 
     flags = _RenderFlags(
-        captions=captions, vertical=vertical, titles=titles, about=about
+        captions=captions, vertical=vertical, titles=titles, about=about, face=face
     )
     if _cut_clips(settings, build, video, result, result_json, plan, writer, flags):
         raise typer.Exit(code=1)
@@ -464,6 +488,7 @@ class _RenderPlan(NamedTuple):
     selected: list[ClipCandidate]
     folder: Path
     paths: list[Path]
+    media: MediaInfo
 
 
 class _RenderFlags(NamedTuple):
@@ -471,6 +496,7 @@ class _RenderFlags(NamedTuple):
     vertical: bool
     titles: bool
     about: str | None = None
+    face: bool = False
 
 
 def _check_about(about: str | None, titles: bool) -> str | None:
@@ -501,10 +527,11 @@ def _plan_render(
     """The checks before cutting (ADR 0011). Raises `ClipperError`."""
     ranks = _select_ranks(result, rank)
     selected = [result.candidates[r - 1] for r in ranks]
-    _check_media(selected, build.probe().probe(video))
+    media = build.probe().probe(video)
+    _check_media(selected, media)
     folder = clip_folder(video, settings.clips_dir)
     paths = plan_clip_paths(video, selected, folder)
-    return _RenderPlan(ranks, selected, folder, paths)
+    return _RenderPlan(ranks, selected, folder, paths, media)
 
 
 def _title_context(video: Path) -> VideoInfo | None:
@@ -540,9 +567,10 @@ def _cut_clips(
     Returns True if any clip failed. A manifest that cannot be written is
     `Error:` and exit 1.
     """
-    ranks, selected, folder, paths = plan
-    captions, vertical, titles, about = flags
+    ranks, selected, folder, paths, media = plan
+    captions, vertical, titles, about, face = flags
     renderer = build.renderer(settings)
+    tracker = build.face_tracker(settings) if face else None
     video_info = _title_context(video) if writer else None
     failures: list[str] = []
     entries: list[ManifestClip] = []
@@ -556,6 +584,28 @@ def _cut_clips(
             "reasons": candidate.reasons,
         }
         span = f"{_fmt(candidate.start_seconds)}-{_fmt(candidate.end_seconds)}"
+        crop = None
+        if tracker is not None:
+            # Faces come before the title, so a clip with none costs no title
+            # request (ADR 0025).
+            try:
+                track = tracker.track(
+                    video, candidate.start_seconds, candidate.end_seconds
+                )
+            except ClipperError as exc:
+                failures.append(f"#{number} {span}: {escape(str(exc))}")
+                entries.append(ManifestClip(**entry, error=str(exc)))
+                continue
+            assert media.width is not None and media.height is not None
+            crop = plan_face_crop(track, media.width, media.height)
+            if crop is None:
+                console.print(
+                    f"[yellow]Note:[/yellow] #{number} {span} has no face in range; "
+                    "not rendered in the face style",
+                    soft_wrap=True,
+                )
+                entries.append(ManifestClip(**entry, error="no face found"))
+                continue
         built = (
             build_ass(result.transcript, candidate, vertical=vertical)
             if captions
@@ -586,7 +636,12 @@ def _cut_clips(
             # (ADR 0018).
             title = writer.write(text, video_info, about) if writer and text else None
             clip = renderer.render(
-                video, candidate, path, captions=ass or None, vertical=vertical
+                video,
+                candidate,
+                path,
+                captions=ass or None,
+                vertical=vertical,
+                crop=crop,
             )
         except ClipperError as exc:
             failures.append(f"#{number} {span}: {escape(str(exc))}")
@@ -605,7 +660,12 @@ def _cut_clips(
                 hook=title.hook if title else None,
             )
         )
-        shown = (("vertical", vertical), ("captions", ass), ("titles", title))
+        shown = (
+            ("vertical", vertical),
+            ("face", crop),
+            ("captions", ass),
+            ("titles", title),
+        )
         tags = [t for t, on in shown if on]
         suffix = f" ({', '.join(tags)})" if tags else ""
         console.print(

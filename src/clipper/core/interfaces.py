@@ -5,6 +5,7 @@ from clipper.domain.models import (
     ClipCandidate,
     ClipInfo,
     ClipTitle,
+    CropPath,
     FaceTrack,
     LabeledVideo,
     MediaInfo,
@@ -86,6 +87,8 @@ class ClipRenderer(Protocol):
 
     `vertical` fits the whole frame into 9:16 at 1080x1920 over a blurred copy
     of itself, before any captions are drawn (see docs/decisions/0016).
+    `crop` is the face style instead: a full-height window that moves over
+    time, scaled to 1080x1920 (see docs/decisions/0025).
     """
 
     def render(
@@ -96,6 +99,7 @@ class ClipRenderer(Protocol):
         captions: str | None = None,
         *,
         vertical: bool = False,
+        crop: CropPath | None = None,
     ) -> RenderedClip: ...
 
 

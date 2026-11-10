@@ -1148,6 +1148,32 @@ name you gave rather than the login. The second exits 1 with `Error: --about
 is for titles; use it with titles on` and writes no folder. Record the three
 titles next to R19a's.
 
+### R20. `--vertical --style face`: a crop that follows the face
+
+Covers the face style ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)).
+The tests fake the face tracker and the renderer's ffmpeg call, so nothing
+in CI runs the real crop. Use a podcast or webcam clip and an IRL clip with
+several people, each with an analysis JSON, and R19's `Invoke-Titles`
+helper.
+
+```powershell
+$Pod = "data\videos\<a podcast or webcam video>.mp4"; $PodJson = "data\output\<its id>.json"
+$Irl = "data\videos\<an IRL stream>.mp4";            $IrlJson = "data\output\<its id>.json"
+Invoke-Titles $Pod $PodJson "--rank 1 --vertical --style face --captions" @{ CLIPPER_CLIPS_DIR = "$S\clips-r20" }
+Invoke-Titles $Irl $IrlJson "--rank 1 --vertical --style face --captions" @{ CLIPPER_CLIPS_DIR = "$S\clips-r20" }
+Invoke-Titles $Pod $PodJson "--rank 1 --vertical --style face --captions" @{ CLIPPER_CLIPS_DIR = "$S\clips-r20" }
+Invoke-Titles $Pod $PodJson "--rank 1 --style face" @{ CLIPPER_CLIPS_DIR = "$S\clips-r20" }
+Get-ChildItem "$S\clips-r20" -Recurse -Filter *.mp4 | ForEach-Object { ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 $_.FullName }
+```
+
+Pass: the first two runs exit 0 with `(vertical, face, captions)` and a
+1080x1920 file. Watch both: on the podcast the speaker stays framed, the
+window holds while they sit still and moves at once at a camera cut; on the
+IRL clip it follows one person and may cut others out. Captions sit on the
+cropped frame. The third run is faster, its faces read from the cache. The
+fourth exits 1 with `Error: --style face needs --vertical`. Record the
+times and anything framed badly.
+
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),

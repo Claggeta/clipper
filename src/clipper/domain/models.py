@@ -177,6 +177,8 @@ class MediaInfo(BaseModel):
     `start_seconds` is the file's first timestamp, usually 0. A browser's
     player counts from it while ffmpeg counts from the file's start, so the
     review page needs it to be 0 (ADR 0024, start offset amendment).
+    `width` and `height` are the first video stream's, in pixels, or None
+    when the probe cannot tell; the face crop needs them (ADR 0025).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -184,6 +186,29 @@ class MediaInfo(BaseModel):
     duration_seconds: float = Field(gt=0, allow_inf_nan=False)
     has_video: bool
     start_seconds: float = Field(default=0.0, allow_inf_nan=False)
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+
+
+class CropPath(BaseModel):
+    """A full-height crop that moves across the frame, for the face style.
+
+    `width` and `height` are the window's size in source pixels. Each point is
+    a time in seconds from the clip's start and the window's left edge in
+    source pixels from then on; the first is at 0. See docs/decisions/0025.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    points: tuple[tuple[float, int], ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _starts_at_zero(self) -> "CropPath":
+        if self.points[0][0] != 0:
+            raise ValueError("the first point must be at 0 seconds")
+        return self
 
 
 class RenderedClip(BaseModel):

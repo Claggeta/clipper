@@ -107,6 +107,13 @@ burned-in subtitle lost both ends. Nothing had been released with it.
   dead space), and a partial zoom to about 1:1 (keeps more than the crop but
   still cuts the edges). The maintainer chose the blurred fill.
 
+## Amended by the face style (ADR 0025)
+
+- `--style fit|face` selects the vertical style; `fit` is this ADR's (the
+  fit fix) and stays the default. `face` is a moving full-height crop on the
+  largest face, decided in ADR 0025. Decision 3 holds for both: one
+  re-encode, the vertical frame first, then captions.
+
 ## Revisit when
 
 - Real clips lose their subject often enough to matter. That is the case for
