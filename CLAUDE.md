@@ -736,9 +736,11 @@ Items 8 and 9 do not depend on picking and may land earlier.
    amendment: of five neighbouring pairs in the top 10s, none would gain,
    and the gas pump pair was judged as two postable clips)
 8. Title context:
-   - 8a. `fetch` saves yt-dlp's video metadata next to the video, including
+   - 8a. ~~`fetch` saves yt-dlp's video metadata next to the video, including
      for a reused file if yt-dlp allows it (unverified). ADR 0020
-     amendment, manual step.
+     amendment, manual step.~~ (done; #152; `<id>.info.json` from a
+     `--skip-download` request, so reused files too; manual step D10a,
+     run in part: Twitch gives the login, YouTube the channel name)
    - 8b. The title prompt gets the channel and VOD title; nothing for local
      files. ADR 0018 amendment, manual step; trial measure: titles kept
      unedited.
