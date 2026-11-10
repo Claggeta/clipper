@@ -248,6 +248,13 @@ and planned code:
   0.1 s and names the lossless remux; a Twitch VOD started at 64 s and the
   browser's player ran 64 s behind the transcript (its judged labels were
   moved by -64 s).
+- `0025` — vertical styles: `fit` (0016, the default) and `face`, a
+  full-height crop on the largest face, faces found once per clip by
+  OpenCV YuNet (5 samples a second, cached); `drafts` renders both and the
+  review page picks one per clip, recorded with the label. Largest face
+  stands for the speaker; the facecam split is later. Spike: faces in 89
+  to 99% of keeper frames on five videos; one subject dominates on 50%
+  (IRL) to 98% (webcam). Amends 0016, 0019, 0024 and the V5 scope.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -328,8 +335,9 @@ APIs or paid services, the movies/TV niche (needs a rights ADR first), tuning
 for the education or podcast niches, a URL box in the review page, channel
 watching or scheduling (ADR 0020: videos are chosen by hand), audience
 signals as a detector input, the Twitch API, a trained model, a database,
-user accounts. Face-aware cropping is a spike that ends in an ADR, and is
-built in V5 only if that ADR picks the small design.
+user accounts. Face-aware cropping was a spike that ended in ADR 0025: a
+`face` crop style and picking a style per clip are built in V5; the
+facecam split comes later.
 
 ## Maintainer's goals
 
@@ -789,9 +797,22 @@ Items 8 and 9 do not depend on picking and may land earlier.
 12. A larger Whisper model (`small`) on the CPU, timed on the long stream
     and measured as above. May end in nothing. ADR 0021 amendment, manual
     step.
-13. Face-aware vertical spike: a facecam found once per video and split
+13. ~~Face-aware vertical spike: a facecam found once per video and split
     above the gameplay, following the person, or nothing. Ends in a new ADR
-    amending 0016; built in V5 only if it picks the facecam split.
+    amending 0016; built in V5 only if it picks the facecam split.~~ (done;
+    ADR 0025: a `face` crop on the largest face, and picking a style per
+    clip, built in V5 as below; the facecam split later)
+    - 13a. ADR 0025 and the V5 scope (one docs PR).
+    - 13b. Face tracking: a `FaceTracker` Protocol, an OpenCV YuNet
+      adapter, 5 samples a second, cached under `<cache dir>/faces/`, the
+      model downloaded once with its SHA-256. ADR 0003 check for
+      `opencv-python-headless` 5.0.x and `numpy`.
+    - 13c. The `face` style in `render`: a full-height crop on the largest
+      face, dead zone, easing, a jump at a camera cut. Manual step.
+    - 13d. Several styles in `drafts` (`fit` and `face`) and variants in
+      the manifest (ADR 0019 amendment).
+    - 13e. A style switch in the review page; Save keeps the chosen style
+      and records it (ADR 0024 amendment). Manual step.
 14. Release notes and tag `v0.5.0`.
 
 Later, not scheduled:
@@ -810,6 +831,9 @@ Later, not scheduled:
   Two read on 2026-11-10 (see "Campaign briefs read"); neither asks
   for one. One asked for an on-screen hook, a possible small render item.
 - Posting and performance data, once accounts exist.
+- The facecam split (ADR 0025): find a fixed facecam box per clip, measured
+  first, and stack it above the gameplay. After V5 item 13e's picks show
+  how often facecam clips are posted.
 
 ## Parked
 
