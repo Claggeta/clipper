@@ -808,11 +808,12 @@ Items 8 and 9 do not depend on picking and may land earlier.
     amending 0016; built in V5 only if it picks the facecam split.~~ (done;
     ADR 0025: a `face` crop on the largest face, and picking a style per
     clip, built in V5 as below; the facecam split later)
-    - 13a. ADR 0025 and the V5 scope (one docs PR).
-    - 13b. Face tracking: a `FaceTracker` Protocol, an OpenCV YuNet
+    - 13a. ~~ADR 0025 and the V5 scope (one docs PR).~~ (done; #159)
+    - 13b. ~~Face tracking: a `FaceTracker` Protocol, an OpenCV YuNet
       adapter, 5 samples a second, cached under `<cache dir>/faces/`, the
       model downloaded once with its SHA-256. ADR 0003 check for
-      `opencv-python-headless` 5.0.x and `numpy`.
+      `opencv-python-headless` 5.0.x and `numpy`.~~ (done; #160; the model
+      is kept in the package, MIT licence; ADR 0025 and 0003 amendments)
     - 13c. The `face` style in `render`: a full-height crop on the largest
       face, dead zone, easing, a jump at a camera cut. Manual step.
     - 13d. Several styles in `drafts` (`fit` and `face`) and variants in
