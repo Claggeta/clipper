@@ -136,6 +136,10 @@ and planned code:
   swears under every prompt tried, and meaning errors remain; not handled in
   code. Review amendment (V5 3c): the review page may change or clear a
   title alone, so title and hook are no longer required together.
+  Title context amendment (V5 8b): with `<stem>.info.json` beside the
+  video, the prompt gets the channel and video title and is told to name the
+  streamer; titles naming the person on 39 keepers: 1 before, 12 with video
+  info, 24 with names written by hand (a separate item).
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no

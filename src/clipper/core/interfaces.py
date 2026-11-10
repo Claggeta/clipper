@@ -103,11 +103,12 @@ class TitleWriter(Protocol):
     """Suggests a title and hook for one clip from its spoken text.
 
     `text` is what is said inside the clip (see `clipper.core.captions`), never
-    empty. Raises `TitleError` on failure; there is no fallback text (see
+    empty. `video` is the source's metadata, if it was fetched (V5 item 8b).
+    Raises `TitleError` on failure; there is no fallback text (see
     docs/decisions/0018).
     """
 
-    def write(self, text: str) -> ClipTitle: ...
+    def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle: ...
 
 
 @runtime_checkable
