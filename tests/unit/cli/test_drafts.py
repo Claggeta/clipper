@@ -84,7 +84,7 @@ class FakeProbe:
 
 
 class FakeTitleWriter:
-    def write(self, text: str) -> ClipTitle:
+    def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
         return ClipTitle(title=f"T {text[:10]}", hook=f"H {text[:10]}")
 
 

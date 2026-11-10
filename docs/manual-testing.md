@@ -1106,6 +1106,32 @@ The empty `CLIPPER_LLM_MODEL` error (`Error: Set CLIPPER_LLM_MODEL ... to use
 --titles`, before cutting) is not checked here: Windows does not keep an empty
 environment variable (see L2). The CLI unit tests cover it.
 
+### R19a. Titles with the video's info
+
+Covers the title context amendment to
+[ADR 0018](decisions/0018-suggested-titles-via-ollama.md): with a
+`<id>.info.json` beside the video (written by `fetch`, step D10a), the title
+prompt gets the channel and the video's title. Use a fetched Twitch VOD that
+has its info file and an analysis JSON, and R19's helpers.
+
+```powershell
+$Vod  = "data\videos\<a fetched Twitch VOD>.mp4"
+$Json = "data\output\<the same id>.json"
+$Info = $Vod -replace '\.mp4$', '.info.json'
+Get-Content $Info -Encoding UTF8
+Invoke-Titles $Vod $Json "--titles --rank 1 --rank 2 --rank 3" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19a-with" }
+Rename-Item $Info "$Info.off"
+try {
+  Invoke-Titles $Vod $Json "--titles --rank 1 --rank 2 --rank 3" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19a-without" }
+} finally { Rename-Item "$Info.off" $Info }
+```
+
+Pass: the first run prints `Title context: <the channel>` before the first
+clip, the second does not, and both exit 0 with a title per clip. Record the
+three titles from each run; with the info, some name the streamer (often by
+the login, such as "Stable Ronaldo"). The info file is back in place
+afterwards.
+
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),

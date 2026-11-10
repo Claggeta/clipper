@@ -17,6 +17,7 @@ from clipper.domain.models import (
     RenderManifest,
     Segment,
     Transcript,
+    VideoInfo,
     Word,
 )
 
@@ -61,10 +62,12 @@ class FakeTitleWriter:
 
     def __init__(self, fail_on: tuple[str, ...] = ()) -> None:
         self.texts: list[str] = []
+        self.videos: list[VideoInfo | None] = []
         self._fail_on = fail_on
 
-    def write(self, text: str) -> ClipTitle:
+    def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
         self.texts.append(text)
+        self.videos.append(video)
         if text in self._fail_on:
             raise TitleError("Model reply is not a valid title: [bad]")
         return ClipTitle(title=f"Title: {text}", hook=f"Hook: {text}")
@@ -512,7 +515,7 @@ def test_titles_with_other_flags_are_shown_together(env: Env) -> None:
 
 def test_title_text_is_not_parsed_as_markup(env: Env) -> None:
     class Bracketed:
-        def write(self, text: str) -> ClipTitle:
+        def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
             return ClipTitle(title="[bold]x[/bold]", hook="[red]y")
 
     env.save(transcript=_SPEECH)
@@ -580,3 +583,43 @@ def test_titles_with_an_empty_model_fail_before_cutting(env: Env) -> None:
     assert isinstance(env.renderer, FakeClipRenderer)
     assert env.renderer.calls == []
     assert (env.folder / "manifest.json").read_bytes() == before
+
+
+_INFO = VideoInfo(
+    platform="twitch", video_id="v1", title="Stream title", channel="streamer"
+)
+
+
+def test_titles_get_the_video_info_beside_the_video(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    (env.video.parent / "talk.info.json").write_text(
+        _INFO.model_dump_json(), encoding="utf-8"
+    )
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1", "--rank", "2")
+    assert result.exit_code == 0, result.output
+    assert writer.videos == [_INFO, _INFO]
+    assert "Title context: streamer" in result.output
+
+
+def test_titles_without_video_info_get_none(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert writer.videos == [None]
+    assert "Title context" not in result.output
+
+
+def test_a_bad_video_info_file_is_a_warning(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    (env.video.parent / "talk.info.json").write_text("{", encoding="utf-8")
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert writer.videos == [None]
+    assert "Warning: titles without video info: Cannot read video info" in result.output
+    assert env.manifest().clips[0].title == "Title: hello there"

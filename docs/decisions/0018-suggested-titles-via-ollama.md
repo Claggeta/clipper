@@ -167,6 +167,55 @@ hook that turned the speaker's point into its opposite.
   Reset can restore it and "titles kept unedited" (V5 item 8b) can be
   counted after the maintainer edits a title.
 
+## Amended by title context (V5 item 8b)
+
+- **What the model sees.** `render --titles`, and `drafts`, read
+  `<stem>.info.json` from beside the video (written by `fetch`, ADR 0020
+  video info amendment). With it, the message starts with `Channel: ...` and
+  `Video title: ...`, then `Transcript:` and the clip's words. The
+  description is not sent: on YouTube it opens with sponsor links, and Twitch
+  VODs have none. No file, as for a local video, means the message is the
+  clip's words, as before. An unreadable file is a printed warning and
+  titles without it. `Title context: <channel>` is printed when it is used.
+- **`TitleWriter.write(text, video=None)`** takes the `VideoInfo`; the review
+  page does not write titles, so it is unchanged.
+- **The prompt** says the channel on a stream is the streamer, who is usually
+  speaking; to name them when the clip is about them, with the example "Sam
+  stunned by the hotel bill"; to use a name rather than a username when one
+  is given, never "streamer"; and not to copy the video's title.
+
+**Measured** on the 39 reviewed keepers of the three trial VODs (both
+detectors' baseline drafts) and the podcast (5pk8HLcAAT0), titled again from
+each keeper's words with `qwen3.5:9b`. Counted: titles that name the
+streamer, or for the podcast Greg, Bloom or the show. The maintainer's own
+titles name them in 10 of 39.
+
+| Prompt | Context | Titles naming the person |
+|---|---|---|
+| before | none | 1 of 39 |
+| first wording ("name the people and the angle where the transcript fits") | video info | 2 of 39 |
+| first wording | names written by hand, e.g. "Ron (streamer stableronaldo)" | 4 of 39 |
+| adopted wording | none | 2 of 39 |
+| adopted wording | video info | 12 of 39 |
+| adopted wording | names written by hand | 24 of 39 |
+
+- With video info alone, the name comes from the login ("Stable Ronaldo",
+  "Stableronaldo"), and Adapt is never named. Written names give "Ron
+  shocked by $134 gas price" and "Greg LaVecchia on Why Wanting More Is
+  Good". An earlier run whose example was the maintainer's own rewrite ("Ron
+  shocked at the gas pump") gave the same counts within one.
+- Meaning errors remain, as before: a wrong name ("Rod admits he faked his
+  absence"), one clip turned into a suicide reference under one wording, a
+  swear word kept. Titles stay drafts the maintainer edits in the review
+  page.
+- Matches with the maintainer's exact title fall (7 to 5 with video info),
+  since most of those were generic titles the model wrote and the
+  maintainer kept.
+
+**Decision.** Adopted with the second wording. Names written by hand do
+better still; that is a separate item (a text option on `drafts` and
+`render`), not part of this one.
+
 ## Revisit when
 
 - Titles need a different model from the detector.

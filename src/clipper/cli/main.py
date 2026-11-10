@@ -23,7 +23,11 @@ from clipper.adapters.results.manifest_json import (
     load_manifest,
     save_manifest,
 )
-from clipper.adapters.results.video_info_json import save_video_info
+from clipper.adapters.results.video_info_json import (
+    load_video_info,
+    save_video_info,
+    video_info_beside,
+)
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.config import Settings
@@ -48,6 +52,7 @@ from clipper.domain.models import (
     MediaInfo,
     RenderManifest,
     Transcript,
+    VideoInfo,
     VideoSource,
 )
 from clipper.review.server import (
@@ -467,6 +472,24 @@ def _plan_render(
     return _RenderPlan(ranks, selected, folder, paths)
 
 
+def _title_context(video: Path) -> VideoInfo | None:
+    """The source's saved metadata for titles, if any (ADR 0018, 8b).
+
+    No file means titles from the clip's words alone; a bad file is a warning.
+    """
+    try:
+        info = load_video_info(video_info_beside(video))
+    except ClipperError as exc:
+        console.print(
+            f"[yellow]Warning:[/yellow] titles without video info: {escape(str(exc))}",
+            soft_wrap=True,
+        )
+        return None
+    if info is not None:
+        console.print(f"Title context: {escape(info.channel)}", soft_wrap=True)
+    return info
+
+
 def _cut_clips(
     settings: Settings,
     build: AppContext,
@@ -485,6 +508,7 @@ def _cut_clips(
     ranks, selected, folder, paths = plan
     captions, vertical, titles = flags
     renderer = build.renderer(settings)
+    video_info = _title_context(video) if writer else None
     failures: list[str] = []
     entries: list[ManifestClip] = []
     rendered = 0
@@ -525,7 +549,7 @@ def _cut_clips(
         try:
             # The title comes first, so a clip whose title fails is not cut
             # (ADR 0018).
-            title = writer.write(text) if writer and text else None
+            title = writer.write(text, video_info) if writer and text else None
             clip = renderer.render(
                 video, candidate, path, captions=ass or None, vertical=vertical
             )
