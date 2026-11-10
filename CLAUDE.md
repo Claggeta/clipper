@@ -826,9 +826,11 @@ Items 8 and 9 do not depend on picking and may land earlier.
       ADR or in nothing. Manual step.
     - 10b. If 10a says so: loudness as a detector input, a `core/` change.
       Measured on judged and clip labels.
-11. Defaults for `drafts`: detector (heuristic or LLM) and top N, from the
+11. ~~Defaults for `drafts`: detector (heuristic or LLM) and top N, from the
     measures above; a finer LLM score if ties decide it (Parked). ADR 0014
-    amendment.
+    amendment.~~ (done; #171; LLM and `--top 10` for `drafts` only, 18 to
+    12 keepers at top 10; ties did not decide it, so the finer score stays
+    Parked)
 12. A larger Whisper model (`small`) on the CPU, timed on the long stream
     and measured as above. May end in nothing. ADR 0021 amendment, manual
     step.
