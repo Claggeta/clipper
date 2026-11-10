@@ -139,6 +139,7 @@ class Env:
         self.log = Recorder()
         self.renderer = FakeClipRenderer()
         self.detector_names: list[DetectorName] = []
+        self.top_ns: list[int] = []
         self.title_writers_built = 0
         self.transcribe_error: str | None = None
         self.download_error: str | None = None
@@ -153,6 +154,7 @@ class Env:
     def context(self, real_title_writer: bool = False) -> AppContext:
         def detector(settings: Settings, name: DetectorName) -> StubDetector:
             self.detector_names.append(name)
+            self.top_ns.append(settings.top_n)
             return StubDetector()
 
         def title_writer(settings: Settings) -> FakeTitleWriter:
@@ -268,12 +270,29 @@ def test_each_default_can_be_turned_off(env: Env) -> None:
     assert [c.title for c in manifest.clips] == [None, None]
 
 
-def test_the_detector_option_is_passed_through(env: Env) -> None:
+def test_the_llm_picks_the_top_10_by_default(env: Env) -> None:
+    # CLIPPER_TOP_N is for analyze and eval (ADR 0014, item 11 amendment).
+    env.monkeypatch.setenv("CLIPPER_TOP_N", "5")
     env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "some-model:tag")
-    result = env.run(str(env.video), "--detector", "llm", "--no-titles")
+    result = env.run(str(env.video), "--no-titles")
     assert result.exit_code == 0, result.output
     assert env.detector_names == [DetectorName.LLM]
+    assert env.top_ns == [10]
     assert env.manifest("talk").detector == "llm:some-model:tag"
+
+
+def test_the_detector_and_top_options_are_passed_through(env: Env) -> None:
+    result = env.run(str(env.video), "--detector", "heuristic", "--top", "3")
+    assert result.exit_code == 0, result.output
+    assert env.detector_names == [DetectorName.HEURISTIC]
+    assert env.top_ns == [3]
+    assert env.manifest("talk").detector == "heuristic"
+
+
+def test_top_must_be_at_least_1(env: Env) -> None:
+    result = env.run(str(env.video), "--top", "0")
+    assert result.exit_code == 2
+    assert env.log.stages == []
 
 
 def test_an_empty_model_fails_before_downloading(env: Env) -> None:
@@ -283,6 +302,24 @@ def test_an_empty_model_fails_before_downloading(env: Env) -> None:
     assert "Error: Set CLIPPER_LLM_MODEL" in result.output
     assert env.log.stages == []
     assert not (env.tmp / "output").exists()
+
+
+def test_an_empty_model_fails_before_downloading_without_titles(env: Env) -> None:
+    # The LLM is the default detector, so it needs the model with titles off.
+    env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
+    result = env.run(_URL, "--no-titles")
+    assert result.exit_code == 1
+    assert "Error: Set CLIPPER_LLM_MODEL to an Ollama model name to use " in (
+        result.output
+    )
+    assert env.log.stages == []
+    assert not (env.tmp / "output").exists()
+
+
+def test_the_heuristic_needs_no_model(env: Env) -> None:
+    env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
+    result = env.run(str(env.video), "--no-titles", "--detector", "heuristic")
+    assert result.exit_code == 0, result.output
 
 
 def test_a_refused_url_runs_nothing(env: Env) -> None:

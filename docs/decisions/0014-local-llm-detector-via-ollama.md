@@ -215,6 +215,61 @@ Ollama 0.40.13, RTX 4070 Ti 12 GB, `qwen3.5:9b` and `llama3.1:8b`, both
   temperature 0 and seed 0, though its scores did not. That meets 0015's
   "revisit when" for that model; it is not the default.
 
+## Amended by the `drafts` defaults (V5 item 11)
+
+`drafts` uses the LLM detector and drafts the top 10 by default. `analyze`
+and `eval` keep `heuristic` and `CLIPPER_TOP_N` (default 5). This replaces
+7c's "heuristic stays the default detector" for `drafts` only.
+
+**Evidence.** The V5 judged labels (0012) on the three judged streamer
+VODs at top 10, heuristic with ADR 0023 items 5 and 6, LLM (`qwen3.5:9b`)
+from the baseline drafts. K is a keeper (on a `post` or `fix` label), r a
+draft on a rejected span, `.` unjudged:
+
+| VOD | Heuristic, ranks 1 to 10 | LLM, ranks 1 to 10 |
+|---|---|---|
+| v2922695332 (jasontheween) | `rrrKrrrrKK` (3) | `KKrKrrKKrK` (6) |
+| v2917872953 (stableronaldo) | `KKKKKKrKrK` (8) | `KKrKrKrKKK` (7) |
+| v2922589775 (adapt) | `rKrrrrr.rr` (1) | `KrKrrKKrrK` (5) |
+| Total | 12: 6 in ranks 1 to 5, 6 in 6 to 10 | 18: 8 in ranks 1 to 5, 10 in 6 to 10 |
+
+- **Detector.** The LLM has more keepers on two VODs and one fewer on the
+  third. Two LLM-only runs agree: 9 of 10 kept on a podcast (5pk8HLcAAT0)
+  and 10 of 10 on a Lacy video (XwH_o5xboKA), with no heuristic run to
+  compare.
+- **Top N.** Ranks 6 to 10 hold as many keepers as ranks 1 to 5 or more,
+  for both detectors, as the maintainer asked in the V5 interview. Ranks 11
+  and up are unjudged, so nothing supports more than 10, and each draft
+  costs about a minute to judge.
+- **Ties.** All of the LLM's top 10 score 0.95 or 0.9, so inside a band the
+  order is earliest start (decision 4). Ties do not decide the detector, so
+  the finer score stays parked.
+
+**Decision.**
+
+- `drafts --detector` defaults to `llm`; `--detector heuristic` stays.
+- `drafts --top N`, default 10, at least 1, sets the detector's top N for
+  that run. `CLIPPER_TOP_N` does not apply to `drafts`; its default stays 5,
+  so V1's `analyze` output does not change.
+- With the LLM detector, an empty `CLIPPER_LLM_MODEL` fails before any
+  download, with titles off too (0022). The `heuristic` needs no model.
+
+**Tradeoffs.**
+
+- About 15 to 17 minutes per VOD against 2 to 3, with cached transcripts.
+  Overnight runs make that acceptable (V5 interview).
+- The LLM's keepers end early more often (6 against 1 at top 10); end
+  extension did not help it (0023 item 5), so those ends are moved in the
+  review page.
+- Ollama must be running by default, as titles already need. A stopped
+  Ollama fails a source after its download and transcription, as titles
+  do today; checking it up front is not part of this change.
+- `drafts` and `analyze` pick different moments by default.
+
+**Revisit when** the heuristic gains a signal the LLM lacks (loudness, V5
+item 10), a finer LLM score lands, or a larger Whisper model (item 12)
+changes either detector's keepers.
+
 ## Related
 
 - 0012: evaluation

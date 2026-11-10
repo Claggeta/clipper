@@ -59,7 +59,8 @@ by [Ollama](https://ollama.com) to score each window. `llm` needs Ollama
 running with the model pulled (`ollama pull qwen3.5:9b`, or set
 `CLIPPER_LLM_MODEL` to another model), and it is recorded with its model, e.g.
 `llm:qwen3.5:9b`. It is not yet better than the heuristic at picking the top
-five on a long video, so `heuristic` stays the default; see
+five on a long video, so `heuristic` stays the default here (`drafts`
+defaults to `llm`); see
 [ADR 0014](docs/decisions/0014-local-llm-detector-via-ollama.md) and the
 manual-test steps.
 
@@ -195,7 +196,11 @@ a failed one does not stop the rest, and a table at the end lists each
 folder or error.
 `--no-vertical`, `--no-captions` and `--no-titles` turn those off;
 use `--no-titles` when Ollama is not running. `--about` works as for
-`render`. `--detector` and `-v` work as for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
+`render`. `drafts` picks with the `llm` detector and drafts the top 10
+by default (see [ADR 0014](docs/decisions/0014-local-llm-detector-via-ollama.md));
+`--detector heuristic` is faster and needs no Ollama with `--no-titles`,
+and `--top N` sets how many (`CLIPPER_TOP_N` does not apply). `-v` works
+as for `analyze`. A bad URL, a missing file or an empty `CLIPPER_LLM_MODEL` stops
 it before anything is downloaded or transcribed. If one clip fails, the rest
 still render and it exits 1. A URL is subject to the same terms warning as
 `fetch`. See [ADR 0022](docs/decisions/0022-one-command-to-drafts.md).

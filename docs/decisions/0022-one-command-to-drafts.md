@@ -143,12 +143,17 @@ order across them, gets its own record.
   only; two local sources (heuristic, top 1, `fit`, no titles) ran in 26 s
   with the table.
 
+## Amended by the defaults (V5 item 11)
+
+`drafts` uses the LLM detector and the top 10 by default, with `--top N`
+in place of `CLIPPER_TOP_N`; an empty `CLIPPER_LLM_MODEL` fails before any
+download with titles off too. See ADR 0014, item 11 amendment.
+
 ## Revisit when
 
 - A second front end (a scheduler, a watch folder, a UI) needs the same
   chain: move it to `core/`.
-- The maintainer wants a subset of candidates or a different `--top-n` per
-  run.
+- The maintainer wants a subset of candidates per run.
 - Fetching or rendering needs to resume a half-finished run.
 
 ## Related

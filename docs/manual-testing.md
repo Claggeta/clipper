@@ -2146,13 +2146,15 @@ Record the video's length and the total time.
 ### D10. Ollama unreachable: titles fail, `--no-titles` renders
 
 `CLIPPER_LLM_URL` points at a port nothing listens on, which is what a
-stopped Ollama looks like to Clipper. The analysis is cached from D8.
+stopped Ollama looks like to Clipper. The transcript is cached from D8.
+The heuristic picks, since the default LLM detector needs Ollama too
+(ADR 0014, item 11 amendment).
 
 ```powershell
 $env:CLIPPER_LLM_URL = "http://127.0.0.1:1"
-Invoke-Fetch "drafts `"$DraftsUrl`"" | Select-Object -Last 8
+Invoke-Fetch "drafts `"$DraftsUrl`" --detector heuristic" | Select-Object -Last 8
 "clips: " + @(Get-ChildItem "$env:CLIPPER_CLIPS_DIR\$id" -Filter "*.mp4").Count
-Invoke-Fetch "drafts `"$DraftsUrl`" --no-titles" | Select-Object -Last 4
+Invoke-Fetch "drafts `"$DraftsUrl`" --detector heuristic --no-titles" | Select-Object -Last 4
 Remove-Item Env:CLIPPER_LLM_URL
 ```
 
@@ -2200,10 +2202,10 @@ $YouTubeFile | Some name
 https://www.youtube.com/playlist?list=PLclipperManualTest
 $TwitchFile
 "@ | Set-Content "$S\queue.txt" -Encoding UTF8
-Invoke-Fetch "drafts --list `"$S\queue.txt`" --no-titles --style fit"
+Invoke-Fetch "drafts --list `"$S\queue.txt`" --no-titles --style fit --detector heuristic"
 (Get-Content "$S\queue.txt") -notmatch "playlist" | Set-Content "$S\queue.txt" -Encoding UTF8
-Invoke-Fetch "drafts --list `"$S\queue.txt`" --no-titles --style fit"
-Invoke-Fetch "drafts `"$TwitchUrl`" https://www.youtube.com/watch?v=zzzzzzzzzz1 --no-titles --style fit"
+Invoke-Fetch "drafts --list `"$S\queue.txt`" --no-titles --style fit --detector heuristic"
+Invoke-Fetch "drafts `"$TwitchUrl`" https://www.youtube.com/watch?v=zzzzzzzzzz1 --no-titles --style fit --detector heuristic"
 ```
 
 Pass:
@@ -2569,7 +2571,7 @@ Make drafts in both styles into a scratch folder and serve them with
 scratch labels, so nothing touches your real judgments:
 
 ```powershell
-cmd /c "set CLIPPER_TOP_N=2&& set CLIPPER_CLIPS_DIR=data\clips\rv10&& set CLIPPER_OUTPUT_DIR=data\rv10-output&& uv run clipper drafts --no-titles data\videos\<a fetched video>.mp4"
+cmd /c "set CLIPPER_CLIPS_DIR=data\clips\rv10&& set CLIPPER_OUTPUT_DIR=data\rv10-output&& uv run clipper drafts --no-titles --detector heuristic --top 2 data\videos\<a fetched video>.mp4"
 cmd /c "set CLIPPER_LABELS_DIR=data\rv10-labels&& uv run clipper review data\clips\rv10\<its id>"
 ```
 
