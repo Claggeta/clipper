@@ -2311,7 +2311,10 @@ fills in within a few seconds (record the time); choosing the clip again, or
 reloading the page, shows it at once. Zoom in and Zoom out change the scale
 (1, 2, 5, 10, 15, 30, 60 s per frame) around the same centre; ‹ and › move by
 half a strip; Fit clip returns to the first view. Clicking a frame seeks the
-player there. In a second terminal, `(Get-ChildItem
+player there. Stop the server, start `review` on another VOD's folder in
+the same browser, and choose a clip: every frame in the strip is from that
+VOD, matching the player when you click it (frames are cached by URL, and
+each run uses the same address). In a second terminal, `(Get-ChildItem
 data\cache\frames\*\*.part.jpg).Count` is 0.
 
 Recorded by the assistant (2026-11-09, `v2917872953`, 17.7 GB H.264, no

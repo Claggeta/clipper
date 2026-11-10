@@ -161,6 +161,8 @@ def test_payload_clamps_each_range_to_the_video(tmp_path: Path) -> None:
         False,
     )
     assert payload["duration"] == 600.0
+    # Frame URLs name the video, by its cache folder (see _FRAME_PATH).
+    assert payload["frames_key"] == "talk-1024"
     clips = payload["clips"]
     assert isinstance(clips, list)
     assert [(c["range_start"], c["range_end"]) for c in clips] == [
@@ -282,7 +284,7 @@ def test_query_strings_are_ignored(base_url: str) -> None:
 def test_serves_a_frame_and_lets_the_browser_keep_it(
     base_url: str, frames: FakeFrames, tmp_path: Path
 ) -> None:
-    status, headers, body = _get(base_url + "/frames/12.jpg")
+    status, headers, body = _get(base_url + "/frames/talk-1024/12.jpg")
 
     assert status == 200
     assert headers["Content-Type"] == "image/jpeg"
@@ -292,8 +294,8 @@ def test_serves_a_frame_and_lets_the_browser_keep_it(
 
 
 def test_a_second_request_reads_the_cache(base_url: str, frames: FakeFrames) -> None:
-    _get(base_url + "/frames/30.jpg")
-    status, _, body = _get(base_url + "/frames/30.jpg")
+    _get(base_url + "/frames/talk-1024/30.jpg")
+    status, _, body = _get(base_url + "/frames/talk-1024/30.jpg")
 
     assert (status, body) == (200, b"frame 30")
     assert len(frames.calls) == 1
@@ -301,8 +303,12 @@ def test_a_second_request_reads_the_cache(base_url: str, frames: FakeFrames) -> 
 
 @pytest.mark.parametrize(
     "path",
-    ["/frames/600.jpg", "/frames/-1.jpg", "/frames/1.5.jpg", "/frames/abc.jpg",
-     "/frames/12.png", "/frames/12345678.jpg", "/frames/"],
+    ["/frames/talk-1024/600.jpg", "/frames/talk-1024/-1.jpg",
+     "/frames/talk-1024/1.5.jpg", "/frames/talk-1024/abc.jpg",
+     "/frames/talk-1024/12.png", "/frames/talk-1024/12345678.jpg",
+     "/frames/talk-1024/", "/frames/12.jpg",
+     # Another video's frame: the browser must not get one for this video.
+     "/frames/other-999/12.jpg", "/frames/talk-1024/x/12.jpg"],
 )  # fmt: skip
 def test_frames_outside_the_video_or_badly_named_are_not_found(
     base_url: str, frames: FakeFrames, path: str
@@ -659,7 +665,7 @@ def test_a_write_failure_is_a_server_error(base_url: str, tmp_path: Path) -> Non
 def test_a_frame_failure_is_a_server_error(base_url: str, frames: FakeFrames) -> None:
     frames.error = True
 
-    status, _, body = _get(base_url + "/frames/12.jpg")
+    status, _, body = _get(base_url + "/frames/talk-1024/12.jpg")
 
     assert status == 500
     assert b"bad frame" in body

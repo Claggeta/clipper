@@ -326,6 +326,18 @@ until the drafts rarely need editing.
   and the entry, with no rejected span. The page is checked by manual step
   RV9.
 
+## Amended by the frame URL fix (V5 item 4, while judging)
+
+- **Frame URLs name the video**: `/frames/<key>/<second>.jpg`, where the
+  key is the video's cache folder name (`<stem>-<size in bytes>`), sent as
+  `frames_key` in `/api/clips`. Any other key is `404`.
+- **Why**: every `review` run is served from the same address, and the
+  browser keeps frames by URL for a day (film strip amendment), so the
+  strip for one VOD showed frames cached from another (jasontheween and
+  stableronaldo frames in ohnepixel's strip). The server's own cache was
+  per video and correct; only the browser's mixed them. The player and the
+  saved times were never affected.
+
 ## Related
 
 - 0011: render's failure policy
