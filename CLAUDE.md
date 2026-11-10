@@ -715,9 +715,10 @@ Items 8 and 9 do not depend on picking and may land earlier.
    amendment.~~ (done; #146; pause 1.5 s, heuristic only: early ends 6 to
    1, ends over 5 s long 1 to 4; the LLM's stayed 6 early and went 1 to 7
    over, so not adopted there)
-6. Candidate length 15 to 90 s for both detectors (windows under 15 s not
+6. ~~Candidate length 15 to 90 s for both detectors (windows under 15 s not
    scored). ADR 0023 amendment. Replaces Parked "Candidates too short to
-   post".
+   post".~~ (done; #148; heuristic unchanged, LLM 18 keepers and 12 rejects
+   either way, none under 15 s, one mostly silent keeper lost)
 7. Merge neighbouring high-scoring windows into one candidate of up to
    90 s. ADR 0023 amendment.
 8. Title context:
@@ -851,15 +852,6 @@ Later, not scheduled:
   Again on v2922589775: "Adapt learns about the Pirate Token".
   A lever: give the prompt the channel or known names. Needs an ADR 0018
   amendment. Scheduled as V5 item 8 (video metadata).
-- Candidates too short to post. A window is the whole segments inside 45 s
-  (`sliding_windows`), so a window with little speech becomes a candidate
-  only as long as that speech. On v2917438534 the LLM's top candidate was
-  2:37:54-2:37:55, the one word "Strongest" (0.5 s), scored 1.00, and two
-  more top-30 candidates were 9 s. On v2922695332, 8 of the LLM's top 30
-  were under 15 s, three of them about 1 s, two in its top 5. Fix: a minimum candidate length or word
-  count before scoring, for both detectors; the threshold is unmeasured.
-  Changes which moments are picked, so it needs an ADR 0014 amendment and
-  `eval` results. Scheduled as V5 item 6 (15 s, ADR 0023).
 - `eval` ends with "Indicative only: one labeler, ..." even when the labels
   come from Twitch clips, which many viewers made. Fix: word it by source, or
   drop "one labeler"; how `eval` would know the source is undecided (a field
