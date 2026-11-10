@@ -477,12 +477,14 @@ class Label(Span):
     Written as `start`/`end` timestamp strings, held as seconds. In a judged
     file (ADR 0012, V5 amendment) every label has a verdict: `post` is a draft
     as cut, `fix` a draft whose span was moved (`draft` keeps the old span),
-    and `added` a moment no draft proposed.
+    and `added` a moment no draft proposed. `style` is the vertical style the
+    maintainer kept for the clip, when there were styles (ADR 0025).
     """
 
     note: str | None = None
     verdict: Verdict | None = None
     draft: Span | None = None
+    style: VerticalStyleName | None = None
 
     @model_validator(mode="after")
     def _draft_only_on_fix(self) -> "Label":

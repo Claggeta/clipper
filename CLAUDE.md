@@ -271,7 +271,11 @@ and planned code:
   Several styles amendment (13d): `drafts --style` (repeatable, default
   fit and face), the face file `<stem>.face.mp4` beside the fit one, one
   title per clip, manifest `styles` and per-clip `variants` (0019, 0022);
-  a clip without a face still renders in fit.
+  a clip without a face still renders in fit. Style switch amendment
+  (13e): the review page plays the draft (`/clips/<file>`, listed names
+  only) with a button per style; Save keeps one style, re-rendering in it
+  if the span moved (face tracking in `review`), deletes the other, and
+  records `style` on the judged label (0012, 0019, 0024).
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

@@ -12,6 +12,9 @@ const titleBox = document.getElementById("title-box");
 const noteBox = document.getElementById("note-box");
 const saveButton = document.getElementById("save");
 const trashButton = document.getElementById("trash");
+const draft = document.getElementById("draft");
+const draftView = document.getElementById("draft-view");
+const styleBox = document.getElementById("styles");
 
 // Seconds per frame in the strip, from zoomed in to zoomed out. Fixed
 // steps keep frames on a grid, so views share cached frames.
@@ -37,6 +40,8 @@ let current = null;
 // which keeps its key once Save gives it a rank.
 const buttons = new Map(); // key -> the clip's button in the list
 const edits = new Map(); // key -> {start, end}, kept while the page is open
+const chosen = new Map(); // key -> the style picked and not yet saved
+const versions = new Map(); // key -> bumped after a Save, so the draft reloads
 let trashArmed = null; // the timer while Trash waits for its second click
 let busy = false; // while a Save is waiting on the server (a re-render)
 let span = null; // the chosen clip's edited {start, end}
@@ -202,6 +207,7 @@ function drawUnsaved() {
   const saved = savedState(current);
   const changed =
     current.isNew ||
+    chosenStyle(current) !== (current.style || null) ||
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
     titleBox.value.trim() !== saved.title ||
@@ -261,6 +267,55 @@ function drawClipInfo(clip) {
   error.textContent = failed ? `Render failed: ${clip.error}` : "";
 }
 
+// --- The rendered draft and its styles (ADR 0025) ---
+
+const STYLE_NAMES = { fit: "Fit", face: "Face" };
+
+// The rendered files to show: each style, or the one file of a clip without
+// styles, or none (a new, failed or trashed clip).
+function draftsOf(clip) {
+  if (clip.variants && clip.variants.length) {
+    return clip.variants;
+  }
+  return clip.file ? [{ style: null, file: clip.file }] : [];
+}
+
+// The style Save keeps: the one picked, else the clip's own.
+function chosenStyle(clip) {
+  return chosen.has(clip.key) ? chosen.get(clip.key) : (clip.style || null);
+}
+
+function drawDraft(clip) {
+  const options = draftsOf(clip);
+  draftView.hidden = options.length === 0;
+  styleBox.replaceChildren();
+  if (!options.length) {
+    draft.removeAttribute("src");
+    draft.load();
+    return;
+  }
+  const style = chosenStyle(clip);
+  const shown = options.find((option) => option.style === style) || options[0];
+  if (options.length > 1) {
+    for (const option of options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = STYLE_NAMES[option.style] || option.style;
+      button.setAttribute("aria-pressed", String(option === shown));
+      button.addEventListener("click", () => {
+        chosen.set(clip.key, option.style);
+        drawDraft(clip);
+        drawUnsaved();
+      });
+      styleBox.append(button);
+    }
+  }
+  const src = `/clips/${encodeURIComponent(shown.file)}?v=${versions.get(clip.key) || 0}`;
+  if (draft.getAttribute("src") !== src) {
+    draft.setAttribute("src", src);
+  }
+}
+
 // --- Choosing a clip ---
 
 function select(clip, button) {
@@ -285,6 +340,7 @@ function select(clip, button) {
   noteBox.value = (clip.judgment && clip.judgment.note) || "";
   drawJudged(clip);
   drawClipInfo(clip);
+  drawDraft(clip);
   player.currentTime = span.start;
   fit();
 }
@@ -428,7 +484,8 @@ function savedMessage(reply, rendered) {
     return [reply.warning, true];
   }
   const how = rendered ? "; re-rendered" : "";
-  return [`Saved as ${reply.judgment.verdict}${how}.`, false];
+  const style = reply.style ? `, ${STYLE_NAMES[reply.style] || reply.style} kept` : "";
+  return [`Saved as ${reply.judgment.verdict}${style}${how}.`, false];
 }
 
 async function post(path, body) {
@@ -447,10 +504,13 @@ async function post(path, body) {
 // The server's reply is the clip as it now stands.
 function judged(clip, reply) {
   Object.assign(clip, reply);
+  chosen.delete(clip.key);
+  versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
     drawJudged(clip);
     drawClipInfo(clip);
+    drawDraft(clip);
     drawUnsaved();
   }
 }
@@ -470,6 +530,7 @@ saveButton.addEventListener("click", async () => {
       end: span.end,
       title: titleBox.value,
       note: noteBox.value,
+      style: chosenStyle(clip),
     });
     clip.isNew = false;
     judged(clip, reply);
@@ -516,7 +577,7 @@ trashButton.addEventListener("click", async () => {
       return;
     }
     judged(clip, reply);
-    judgeNotice("Trashed; the clip's file is deleted.");
+    judgeNotice("Trashed; the clip's files are deleted.");
   } catch (error) {
     judgeNotice(error.message, true);
   }

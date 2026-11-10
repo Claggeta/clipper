@@ -1011,6 +1011,10 @@ def review(
             files=files,
             renderer=build.renderer(settings),
             transcript=transcript,
+            face_tracker=build.face_tracker(settings),
+            frame_size=(info.width, info.height)
+            if info.width is not None and info.height is not None
+            else None,
         )
         build.serve(
             session,

@@ -385,3 +385,35 @@ video {
   .layout { grid-template-columns: 1fr; height: auto; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+/* The rendered draft and its styles (ADR 0025). */
+.draft-view {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 12px 0;
+}
+
+.draft-view video {
+  width: auto;
+  height: 320px;
+  aspect-ratio: 9 / 16;
+  border-radius: 6px;
+}
+
+.draft-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.style-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.style-buttons button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}

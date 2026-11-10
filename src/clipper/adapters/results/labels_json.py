@@ -43,7 +43,7 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
     """Write a labels file in the hand-written format, times as "H:MM:SS".
 
     Overwrites `path`; the caller decides whether that is allowed. Verdicts,
-    drafts and rejected spans are written only when present.
+    drafts, styles and rejected spans are written only when present.
     """
     labels = []
     for label in labeled.labels:
@@ -52,6 +52,8 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
             entry["verdict"] = label.verdict
         if label.draft is not None:
             entry["draft"] = _span(label.draft)
+        if label.style is not None:
+            entry["style"] = label.style
         if label.note is not None:
             entry["note"] = label.note
         labels.append(entry)
