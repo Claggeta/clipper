@@ -185,7 +185,10 @@ and planned code:
   and never past a later chosen candidate's start; adopted for the
   heuristic only (early ends 6 to 1, ends over 5 s long 1 to 4), not the
   LLM (6 early either way, 1 to 7 over), so decision 2's shared steps are
-  opt-in.
+  opt-in. Item 6 amendment: `sliding_windows` drops windows under
+  `MIN_CANDIDATE_SECONDS = 15.0` for both detectors; the heuristic is
+  unchanged, the LLM keeps 18 keepers and 12 rejects with no draft under
+  15 s, losing one mostly silent keeper.
 - `0024` — `clipper review <drafts folder>`: a local browser page on the
   loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
   a player on the source video, a film strip of the clip plus 120 s either

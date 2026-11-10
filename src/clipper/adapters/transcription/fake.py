@@ -26,5 +26,10 @@ _SAMPLE_TRANSCRIPT = Transcript(
             end_seconds=13.5,
             text="Honestly, it came down to one thing.",
         ),
+        Segment(
+            start_seconds=13.5,
+            end_seconds=18.0,
+            text="The people I worked with every day.",
+        ),
     )
 )

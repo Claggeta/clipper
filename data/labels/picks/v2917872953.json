@@ -52,6 +52,12 @@
       "note": "Interesting food. OK clip"
     },
     {
+      "start": "1:51:59.58",
+      "end": "1:52:29.16",
+      "verdict": "post",
+      "note": "Funny clip. Interesting Food."
+    },
+    {
       "start": "2:29:16",
       "end": "2:30:28.32",
       "verdict": "fix",

@@ -73,14 +73,15 @@ def test_sends_the_system_prompt_and_the_score_schema() -> None:
 def test_ranks_by_model_score_without_overlap() -> None:
     result = LlmClipDetector(FakeGenerator(), top_n=2).detect(_transcript())
 
-    # The latest start scores highest: the tail window s11 (110-120). The
-    # windows from s8 and s9 reach 120 and overlap it; s6 (60-100) does not.
+    # The latest start scores highest. The tail window s11 (110-120) is under
+    # 15 s and not scored (ADR 0023), so s9 (90-120) wins; s8 and s6 overlap
+    # it, and s5 (50-90) does not.
     assert [(c.start_seconds, c.end_seconds) for c in result] == [
-        (110.0, 120.0),
-        (60.0, 100.0),
+        (90.0, 120.0),
+        (50.0, 90.0),
     ]
-    assert [c.score for c in result] == [0.11, 0.06]
-    assert result[0].reasons == ("window from s11",)
+    assert [c.score for c in result] == [0.09, 0.05]
+    assert result[0].reasons == ("window from s9",)
 
 
 def test_reason_is_stripped() -> None:

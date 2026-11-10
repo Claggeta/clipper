@@ -392,7 +392,7 @@ def test_real_heuristic_runs_end_to_end(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # No detector patch: the heuristic runs on the fake transcriber's sample
-    # (0-13.5 s), which fits in one window, so it yields one candidate.
+    # (0-18 s), which fits in one window, so it yields one candidate.
     analysis = tmp_path / "show.json"
     analysis.write_text(
         AnalysisResult(
