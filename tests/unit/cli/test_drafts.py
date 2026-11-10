@@ -84,7 +84,12 @@ class FakeProbe:
 
 
 class FakeTitleWriter:
-    def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
+    abouts: list[str | None] = []
+
+    def write(
+        self, text: str, video: VideoInfo | None = None, about: str | None = None
+    ) -> ClipTitle:
+        FakeTitleWriter.abouts.append(about)
         return ClipTitle(title=f"T {text[:10]}", hook=f"H {text[:10]}")
 
 
@@ -267,3 +272,18 @@ def test_one_failed_clip_still_lists_the_folder_and_exits_1(env: Env) -> None:
     assert "Drafts: " in result.output
     clips = env.manifest("talk").clips
     assert [c.error is None for c in clips] == [True, False]
+
+
+def test_the_about_text_reaches_the_titles(env: Env) -> None:
+    FakeTitleWriter.abouts = []
+    result = env.run(str(env.video), "--about", "Greg LaVecchia")
+    assert result.exit_code == 0, result.output
+    assert FakeTitleWriter.abouts
+    assert set(FakeTitleWriter.abouts) == {"Greg LaVecchia"}
+
+
+def test_about_without_titles_fails_before_any_download(env: Env) -> None:
+    result = env.run(_URL, "--no-titles", "--about", "Greg LaVecchia")
+    assert result.exit_code == 1
+    assert "Error: --about is for titles; use it with titles on" in result.output
+    assert env.log.stages == []

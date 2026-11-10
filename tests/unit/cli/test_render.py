@@ -63,11 +63,15 @@ class FakeTitleWriter:
     def __init__(self, fail_on: tuple[str, ...] = ()) -> None:
         self.texts: list[str] = []
         self.videos: list[VideoInfo | None] = []
+        self.abouts: list[str | None] = []
         self._fail_on = fail_on
 
-    def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
+    def write(
+        self, text: str, video: VideoInfo | None = None, about: str | None = None
+    ) -> ClipTitle:
         self.texts.append(text)
         self.videos.append(video)
+        self.abouts.append(about)
         if text in self._fail_on:
             raise TitleError("Model reply is not a valid title: [bad]")
         return ClipTitle(title=f"Title: {text}", hook=f"Hook: {text}")
@@ -515,7 +519,9 @@ def test_titles_with_other_flags_are_shown_together(env: Env) -> None:
 
 def test_title_text_is_not_parsed_as_markup(env: Env) -> None:
     class Bracketed:
-        def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
+        def write(
+            self, text: str, video: VideoInfo | None = None, about: str | None = None
+        ) -> ClipTitle:
             return ClipTitle(title="[bold]x[/bold]", hook="[red]y")
 
     env.save(transcript=_SPEECH)
@@ -623,3 +629,43 @@ def test_a_bad_video_info_file_is_a_warning(env: Env) -> None:
     assert writer.videos == [None]
     assert "Warning: titles without video info: Cannot read video info" in result.output
     assert env.manifest().clips[0].title == "Title: hello there"
+
+
+def test_the_about_text_goes_to_every_title(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1", "--rank", "2", "--about", " Ron ")
+    assert result.exit_code == 0, result.output
+    assert writer.abouts == ["Ron", "Ron"]
+
+
+def test_titles_without_about_get_none(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert writer.abouts == [None]
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["--about", "Ron"], "--about is for titles; use it with titles on"),
+        (["--titles", "--about", "  "], "--about is empty"),
+        (["--titles", "--about", "Ron\nand Keith"], "--about must be one line"),
+        (
+            ["--titles", "--about", "x" * 301],
+            "--about is 301 characters; keep it to 300",
+        ),
+    ],
+)
+def test_an_unusable_about_fails_before_cutting(
+    env: Env, args: list[str], message: str
+) -> None:
+    env.use_title_writer(FakeTitleWriter())
+    result = env.run(*args)
+    assert result.exit_code == 1
+    assert f"Error: {message}" in result.output
+    assert not env.folder.exists()

@@ -17,7 +17,9 @@ SYSTEM_PROMPT = (
     "no emoji. No swear words of any kind, not even mild ones such as "
     '"ass", "damn" or "hell": if the speaker swears, say it another way or '
     "leave the word out. Write in the language of the transcript. A message "
-    "may start with the video's channel and title, then the transcript. On a "
+    "may start with an About line, written by the user, that names the people "
+    "and the context: use its names over the channel's. It may then give the "
+    "video's channel and title, then the transcript. On a "
     "stream the channel is the streamer, who is usually the one speaking: "
     "when the clip is about them or what they do, name them in the title, as "
     'in "Sam stunned by the hotel bill". Use a name if one is given, not a '
@@ -42,10 +44,12 @@ class OllamaTitleWriter:
     def __init__(self, generator: TextGenerator) -> None:
         self._generator = generator
 
-    def write(self, text: str, video: VideoInfo | None = None) -> ClipTitle:
+    def write(
+        self, text: str, video: VideoInfo | None = None, about: str | None = None
+    ) -> ClipTitle:
         try:
             reply = self._generator.generate(
-                SYSTEM_PROMPT, _prompt(text, video), _SCHEMA
+                SYSTEM_PROMPT, _prompt(text, video, about), _SCHEMA
             )
         except DetectionError as exc:
             # The client is shared with the detector; its messages name Ollama,
@@ -62,14 +66,18 @@ class OllamaTitleWriter:
             ) from exc
 
 
-def _prompt(text: str, video: VideoInfo | None) -> str:
-    """The clip's transcript, after the video's channel and title if known.
+def _prompt(text: str, video: VideoInfo | None, about: str | None) -> str:
+    """The clip's transcript, after the `--about` text and the video's channel
+    and title, where known.
 
     The description is left out: on YouTube it opens with sponsor links, and
     Twitch VODs have none (ADR 0018, title context amendment).
     """
-    if video is None:
+    lines = []
+    if about is not None:
+        lines.append(f"About: {about}")
+    if video is not None:
+        lines += [f"Channel: {video.channel}", f"Video title: {video.title}"]
+    if not lines:
         return text
-    return (
-        f"Channel: {video.channel}\nVideo title: {video.title}\n\nTranscript:\n{text}"
-    )
+    return "\n".join(lines) + f"\n\nTranscript:\n{text}"

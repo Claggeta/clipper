@@ -1132,6 +1132,22 @@ three titles from each run; with the info, some name the streamer (often by
 the login, such as "Stable Ronaldo"). The info file is back in place
 afterwards.
 
+### R19b. Titles with `--about`
+
+Covers the `--about` amendment to
+[ADR 0018](decisions/0018-suggested-titles-via-ollama.md), with R19a's
+video and helpers.
+
+```powershell
+Invoke-Titles $Vod $Json "--titles --rank 1 --rank 2 --rank 3 --about `"<the streamer's name> (<login>)`"" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19b" }
+Invoke-Titles $Vod $Json "--rank 1 --about `"<the name>`"" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19b-off" }
+```
+
+Pass: the first run exits 0 with a title per clip, and most of them use the
+name you gave rather than the login. The second exits 1 with `Error: --about
+is for titles; use it with titles on` and writes no folder. Record the three
+titles next to R19a's.
+
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),
