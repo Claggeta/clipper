@@ -136,6 +136,40 @@ height of the next. "Holds still" is the largest face's centre moving under
   v2917872953 rank 1 (43 s, 18 s) followed the people in the car, with one
   frame at the pump mostly an arm. Both 1080x1920 H.264.
 
+## Amended by locked framing (after V5 item 13c)
+
+The maintainer watched 13c's clips: the window followed the face in steps,
+up to five a second, and looked choppy; it would look better locked on the
+face, ignoring movement. On a podcast two-shot it also framed the person not
+talking. `plan_face_crop` now holds one position per stretch and moves only
+as a cut:
+
+- **Shots** split where the subject jumps more than `CUT_JUMP = 0.30` of
+  the frame's width between samples. The subject is the largest face, or two
+  faces framed as a pair when the second is at least `PAIR_SIZE = 0.6` of
+  the first's height and both fit within `PAIR_FIT = 1.15` windows.
+- **In a shot** the window locks on the subject's median over the first
+  `MIN_HOLD = 2.0` seconds; a stretch ends only where the subject then stays
+  outside the window for 2 s, and each stretch holds at its own median.
+  Brief movement (a gesture, leaning, another face for a moment) is ignored.
+- A position held under 2 s keeps the previous one; a move under
+  `MIN_MOVE = 0.05` of the window is not made; each move comes half a sample
+  (0.1 s) before the sample that starts it, since a camera cut falls between
+  samples. The dead zone and easing are gone.
+
+Measured on 13c's two clips:
+
+| Clip | Follow (13c): moves | Locked: moves | Notes |
+|---|---|---|---|
+| 5pk8HLcAAT0 rank 3, 44 s | 65 | 7 | 5 within a sample of the 8 camera cuts ffmpeg's scene detection finds; 2 re-locks while the speaker leans out for over 2 s |
+| v2917872953 rank 1, 43 s | 52 | 3 | one handheld shot, no cuts |
+
+- The two-shot that framed the listener is not fixed: there the speaker is
+  side-on to the camera and barely detected. Mouth movement at 5 samples a
+  second did not tell the two apart on that clip, and framing both did not
+  apply. Speaker detection is a later item; until then `fit` is the pick for
+  such clips (13d renders both).
+
 ## Alternatives considered
 
 - **A zoom that sizes the crop to the face** (the face a fixed share of the
