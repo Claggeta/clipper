@@ -52,7 +52,7 @@ CLI, so nothing in CI reads Twitch.
   `core/sources.py`, after upgrading yt-dlp, or when a `fetch` that used to
   work fails. Run the [Fetch](#fetch) section.
 - After any change to the `drafts` command, or to the shared analyze, render
-  or fetch steps in `cli/main.py`. Run steps D8 to D10.
+  or fetch steps in `cli/main.py`. Run steps D8 to D10a.
 - After any change to `core/labeling.py`, `YtDlpClipLookup` in
   `adapters/download/ytdlp.py`, `save_labels` or `load_links`, or the `labels`
   command, and after upgrading yt-dlp. Run the
@@ -1944,7 +1944,7 @@ Show-Video $YouTubeFile
 
 Pass: exit 0, yt-dlp's progress lines, then `Saved: <videos folder>\<id>.mp4`,
 where `<id>` is the 11-character ID from the URL. The folder holds that one
-`.mp4` and no `.part` or other files. The streams include video and audio, and
+`.mp4`, its `<id>.info.json` (step D10a) and no `.part` or other files. The streams include video and audio, and
 the height is at most 1080. The video codec may be AV1 or H.264; `render`
 re-encodes either. Record the time, the size, the codecs and the resolution.
 yt-dlp may warn that no JavaScript runtime was found; record it, and whether
@@ -2087,6 +2087,32 @@ Pass: the first run exits 1, with a `Failed: #N ...: Cannot reach Ollama at
 http://127.0.0.1:1 ...` line per clip, `Rendered 0 of N clips` and
 `Drafts: ...` last. `clips:` still counts D8's files, since nothing was
 deleted. The second run exits 0 with every clip rendered and no title lines.
+
+### D10a. Video info beside the video
+
+```powershell
+Get-ChildItem "$env:CLIPPER_VIDEOS_DIR" -Filter "*.info.json" | Select-Object Name, Length | Format-Table -AutoSize
+Get-Content ($TwitchFile -replace '\.mp4$', '.info.json') -Encoding UTF8
+Get-Content ($YouTubeFile -replace '\.mp4$', '.info.json') -Encoding UTF8
+Remove-Item ($YouTubeFile -replace '\.mp4$', '.info.json')
+Invoke-Fetch "fetch `"$YouTubeUrl`""
+Remove-Item ($YouTubeFile -replace '\.mp4$', '.info.json')
+$oldPath = $env:PATH
+$dir = Split-Path (Get-Command yt-dlp).Source
+$env:PATH = ($env:PATH -split ";" | Where-Object { $_.TrimEnd("\") -ne $dir.TrimEnd("\") }) -join ";"
+Invoke-Fetch "fetch `"$YouTubeUrl`""
+$env:PATH = $oldPath
+```
+
+Pass: D1 and D2 printed `Video info: <videos folder>\<id>.info.json` after
+`Saved:`. Each file is a few KB at most and holds `platform`, `video_id`,
+`title`, `channel`, `upload_date`, `duration_seconds` and `description`:
+for Twitch the channel is the streamer's login and the description is
+empty; for YouTube the channel is the channel's name. The first fetch after
+deleting prints `Already fetched:`, no download progress, then `Video info:`
+again. With yt-dlp off `PATH` it exits 0 with `Already fetched:` and
+`Warning: no video info saved: 'yt-dlp' not found on PATH ...`, and no
+`.info.json` is written. Record the two files' channel and title.
 
 ### D11. Clean up
 

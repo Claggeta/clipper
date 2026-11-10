@@ -10,7 +10,7 @@ from clipper.adapters.media._process import format_failure
 from clipper.core.labeling import clip_url
 from clipper.core.sources import video_path, video_url
 from clipper.domain.errors import DownloadError
-from clipper.domain.models import ClipInfo, VideoSource
+from clipper.domain.models import ClipInfo, VideoInfo, VideoSource
 
 logger = logging.getLogger(__name__)
 
@@ -92,29 +92,68 @@ class YtDlpClipLookup:
         self._executable = executable
 
     def lookup(self, clip_id: str) -> ClipInfo:
-        _require(self._executable)
-        args = [
-            "--ignore-config",
-            "--skip-download",
-            "--dump-single-json",
-            clip_url(clip_id),
-        ]
-        result = subprocess.run(
-            [self._executable, *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if result.returncode != 0:
-            logger.info("%s stderr:\n%s", self._executable, result.stderr)
-            raise DownloadError(format_failure(self._executable, result))
+        stdout = _dump_json(self._executable, ["--dump-single-json"], clip_url(clip_id))
         try:
-            data = json.loads(result.stdout)
+            data = json.loads(stdout)
             return ClipInfo(title=data["title"], duration_seconds=data["duration"])
         except (ValueError, TypeError, KeyError, ValidationError) as exc:
             raise DownloadError(
                 f"{self._executable} gave no usable title and duration for clip "
                 f"{clip_id}: {exc}"
             ) from exc
+
+
+class YtDlpVideoInfoLookup:
+    """Reads one video's metadata with the yt-dlp program.
+
+    Nothing is downloaded, and the user's yt-dlp config is ignored, as for
+    clip lookups (docs/decisions/0020, video info). Only the fields of
+    `VideoInfo` are kept; yt-dlp's own JSON lists every format and is large.
+    """
+
+    def __init__(self, executable: str = "yt-dlp") -> None:
+        self._executable = executable
+
+    def lookup(self, source: VideoSource) -> VideoInfo:
+        stdout = _dump_json(
+            self._executable,
+            ["--no-playlist", "--dump-single-json"],
+            video_url(source),
+        )
+        try:
+            data = json.loads(stdout)
+            return VideoInfo(
+                platform=source.platform,
+                video_id=source.video_id,
+                title=data["title"],
+                channel=data.get("uploader") or data.get("channel"),
+                upload_date=data.get("upload_date"),
+                duration_seconds=data.get("duration") or None,
+                description=data.get("description") or "",
+            )
+        except (ValueError, TypeError, KeyError, ValidationError) as exc:
+            raise DownloadError(
+                f"{self._executable} gave no usable title and channel for video "
+                f"{source.video_id}: {exc}"
+            ) from exc
+
+
+def _dump_json(executable: str, options: list[str], url: str) -> str:
+    """Run yt-dlp for one URL's metadata, without downloading; return stdout.
+
+    yt-dlp's JSON goes to stdout; stderr is kept for the failure message.
+    """
+    _require(executable)
+    args = ["--ignore-config", "--skip-download", *options, url]
+    result = subprocess.run(
+        [executable, *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        logger.info("%s stderr:\n%s", executable, result.stderr)
+        raise DownloadError(format_failure(executable, result))
+    return result.stdout

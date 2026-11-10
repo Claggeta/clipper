@@ -3,10 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from clipper.adapters.download.ytdlp import YtDlpClipLookup, YtDlpDownloader
-from clipper.core.interfaces import ClipLookup, Downloader
+from clipper.adapters.download.ytdlp import (
+    YtDlpClipLookup,
+    YtDlpDownloader,
+    YtDlpVideoInfoLookup,
+)
+from clipper.core.interfaces import ClipLookup, Downloader, VideoInfoLookup
 from clipper.domain.errors import DownloadError
-from clipper.domain.models import ClipInfo, VideoSource
+from clipper.domain.models import ClipInfo, VideoInfo, VideoSource
 
 # Constructed ID and stderr; nothing here ran the real yt-dlp.
 _SOURCE = VideoSource(platform="youtube", video_id="abcDEF123_-")
@@ -181,3 +185,116 @@ def test_clip_lookup_unusable_json_raises(
     monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
     with pytest.raises(DownloadError, match="no usable title and duration for clip"):
         YtDlpClipLookup().lookup("FunnyClip-x")
+
+
+# Video info. Constructed JSON; the fields were checked by hand on a Twitch
+# VOD and a YouTube video (`-J --skip-download`, yt-dlp 2026.10.26).
+
+_TWITCH = VideoSource(platform="twitch", video_id="v1234567890")
+
+
+def test_video_info_satisfies_protocol() -> None:
+    assert isinstance(YtDlpVideoInfoLookup(), VideoInfoLookup)
+
+
+@pytest.mark.usefixtures("on_path")
+def test_video_info_keeps_the_fields_without_downloading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    stdout = (
+        '{"title": "A talk \u2728", "uploader": "The Show", "channel": "The Show",'
+        ' "upload_date": "20261018", "duration": 7978, "description": "Links",'
+        ' "formats": [{"url": "https://example.invalid/x"}]}'
+    )
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
+
+    info = YtDlpVideoInfoLookup().lookup(_SOURCE)
+
+    assert info == VideoInfo(
+        platform="youtube",
+        video_id="abcDEF123_-",
+        title="A talk ✨",
+        channel="The Show",
+        upload_date="20261018",
+        duration_seconds=7978,
+        description="Links",
+    )
+    command, kwargs = calls[0]
+    assert command == [
+        "yt-dlp",
+        "--ignore-config",
+        "--skip-download",
+        "--no-playlist",
+        "--dump-single-json",
+        "https://www.youtube.com/watch?v=abcDEF123_-",
+    ]
+    assert kwargs["capture_output"] is True
+
+
+@pytest.mark.usefixtures("on_path")
+def test_a_twitch_vod_has_an_uploader_and_no_description(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    stdout = (
+        '{"title": "WE HERE", "uploader": "streamer", "channel": null,'
+        ' "upload_date": "20261102", "duration": 18463, "description": ""}'
+    )
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
+
+    info = YtDlpVideoInfoLookup().lookup(_TWITCH)
+
+    assert (info.channel, info.description) == ("streamer", "")
+    assert calls[0][0][-1] == "https://www.twitch.tv/videos/1234567890"
+
+
+@pytest.mark.usefixtures("on_path")
+def test_video_info_falls_back_to_the_channel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    stdout = '{"title": "x", "channel": "The Show"}'
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
+
+    info = YtDlpVideoInfoLookup().lookup(_SOURCE)
+
+    assert info.channel == "The Show"
+    assert (info.upload_date, info.duration_seconds, info.description) == (
+        None,
+        None,
+        "",
+    )
+
+
+@pytest.mark.usefixtures("on_path")
+def test_video_info_nonzero_exit_reports_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stderr = "ERROR: [youtube] abcDEF123_-: Video unavailable\n"
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, "", 1, stderr))
+    with pytest.raises(DownloadError, match=r"^yt-dlp failed \(exit 1\): .*unavail"):
+        YtDlpVideoInfoLookup().lookup(_SOURCE)
+
+
+@pytest.mark.usefixtures("on_path")
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        "",
+        "not json",
+        "[]",
+        '{"uploader": "u"}',
+        '{"title": "x"}',
+        '{"title": "", "uploader": "u"}',
+        '{"title": "x", "uploader": "u", "duration": -1}',
+    ],
+)
+def test_video_info_unusable_json_raises(
+    monkeypatch: pytest.MonkeyPatch, stdout: str
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    monkeypatch.setattr(subprocess, "run", _fake_json_run(calls, stdout))
+    with pytest.raises(DownloadError, match="no usable title and channel for video"):
+        YtDlpVideoInfoLookup().lookup(_SOURCE)

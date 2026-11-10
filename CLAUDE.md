@@ -157,6 +157,10 @@ and planned code:
   Clip lookups amendment: `labels` reads clip metadata with yt-dlp
   (`--skip-download`), one request per hand-listed clip, under the same
   accepted risk; clips stay refused by `fetch`.
+  Video info amendment (V5 8a): `fetch` saves
+  `<videos dir>/<id>.info.json` (title, channel, upload date, duration,
+  description) from one `--skip-download` request, for a reused file too;
+  a failed lookup is a warning.
 - `0021` — GPU transcription measured and not adopted: the 5:04:01 stream
   took 593 s on the GPU (`int8_float16`) against 1,260 s on the CPU, but its
   transcript drifted (87.4% word match, far fewer `.` and `?`), and the

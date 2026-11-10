@@ -10,6 +10,7 @@ from clipper.domain.models import (
     RenderedClip,
     RenderManifest,
     Transcript,
+    VideoInfo,
     VideoSource,
 )
 
@@ -130,3 +131,13 @@ class ClipLookup(Protocol):
     """
 
     def lookup(self, clip_id: str) -> ClipInfo: ...
+
+
+@runtime_checkable
+class VideoInfoLookup(Protocol):
+    """Reads one video's metadata, without downloading it.
+
+    Raises `DownloadError` on failure (see docs/decisions/0020, video info).
+    """
+
+    def lookup(self, source: VideoSource) -> VideoInfo: ...

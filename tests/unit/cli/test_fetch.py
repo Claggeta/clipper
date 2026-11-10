@@ -3,12 +3,12 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner, Result
 
-from clipper.adapters.download.ytdlp import YtDlpDownloader
+from clipper.adapters.download.ytdlp import YtDlpDownloader, YtDlpVideoInfoLookup
 from clipper.cli.context import AppContext
 from clipper.cli.main import app
 from clipper.core.config import Settings
 from clipper.domain.errors import DownloadError
-from clipper.domain.models import VideoSource
+from clipper.domain.models import VideoInfo, VideoSource
 
 # Constructed IDs and messages; nothing here downloads.
 _URL = "https://www.youtube.com/watch?v=abcDEF123_-&list=PLxyz"
@@ -29,6 +29,23 @@ class FakeDownloader:
         return path
 
 
+class FakeVideoInfo:
+    def __init__(self, error: str | None = None) -> None:
+        self.calls: list[VideoSource] = []
+        self._error = error
+
+    def lookup(self, source: VideoSource) -> VideoInfo:
+        self.calls.append(source)
+        if self._error:
+            raise DownloadError(self._error)
+        return VideoInfo(
+            platform=source.platform,
+            video_id=source.video_id,
+            title="A video",
+            channel="A channel",
+        )
+
+
 @pytest.fixture
 def videos(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     folder = tmp_path / "videos"
@@ -36,8 +53,13 @@ def videos(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return folder
 
 
-def _fetch(url: str, downloader: FakeDownloader) -> Result:
-    context = AppContext(downloader=lambda settings: downloader)
+def _fetch(
+    url: str, downloader: FakeDownloader, info: FakeVideoInfo | None = None
+) -> Result:
+    lookup = info or FakeVideoInfo()
+    context = AppContext(
+        downloader=lambda settings: downloader, video_info=lambda settings: lookup
+    )
     return CliRunner().invoke(app, ["fetch", url], obj=context)
 
 
@@ -85,3 +107,53 @@ def test_help_states_the_terms() -> None:
 
 def test_the_default_context_builds_the_ytdlp_downloader() -> None:
     assert isinstance(AppContext().downloader(Settings()), YtDlpDownloader)
+
+
+def test_fetch_saves_the_video_info_beside_it(videos: Path) -> None:
+    info = FakeVideoInfo()
+    result = _fetch(_URL, FakeDownloader(), info)
+    assert result.exit_code == 0, result.output
+    assert info.calls == [VideoSource(platform="youtube", video_id="abcDEF123_-")]
+    saved = VideoInfo.model_validate_json(
+        (videos / "abcDEF123_-.info.json").read_bytes()
+    )
+    assert (saved.title, saved.channel) == ("A video", "A channel")
+    assert f"Video info: {videos / 'abcDEF123_-.info.json'}" in result.output
+
+
+def test_a_reused_file_gets_its_video_info_once(videos: Path) -> None:
+    videos.mkdir()
+    (videos / "v1234567890.mp4").write_bytes(b"earlier")
+    info = FakeVideoInfo()
+    url = "https://www.twitch.tv/videos/1234567890"
+
+    first = _fetch(url, FakeDownloader(), info)
+    second = _fetch(url, FakeDownloader(), info)
+
+    assert first.exit_code == second.exit_code == 0
+    assert (videos / "v1234567890.info.json").is_file()
+    assert len(info.calls) == 1
+    assert "Video info:" not in second.output
+
+
+def test_a_failed_video_info_lookup_is_a_warning(videos: Path) -> None:
+    info = FakeVideoInfo(error="yt-dlp failed (exit 1): ERROR: [x] gone")
+    result = _fetch(_URL, FakeDownloader(), info)
+    assert result.exit_code == 0, result.output
+    assert (videos / "abcDEF123_-.mp4").is_file()
+    assert not (videos / "abcDEF123_-.info.json").exists()
+    assert (
+        "Warning: no video info saved: yt-dlp failed (exit 1): ERROR: [x] gone"
+        in result.output
+    )
+
+
+def test_a_failed_download_looks_up_no_video_info(videos: Path) -> None:
+    info = FakeVideoInfo()
+    result = _fetch(_URL, FakeDownloader(error="yt-dlp failed (exit 1): x"), info)
+    assert result.exit_code == 1
+    assert info.calls == []
+
+
+def test_the_default_context_builds_the_ytdlp_video_info_lookup() -> None:
+    assert isinstance(AppContext().video_info(Settings()), YtDlpVideoInfoLookup)

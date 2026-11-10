@@ -71,6 +71,11 @@ def video_path(source: VideoSource, folder: Path) -> Path:
     return folder / f"{source.video_id}.mp4"
 
 
+def video_info_path(source: VideoSource, folder: Path) -> Path:
+    """Where a fetched video's metadata is saved: `<folder>/<video id>.info.json`."""
+    return folder / f"{source.video_id}.info.json"
+
+
 def _youtube(candidate: str, url: str) -> VideoSource:
     if not _YOUTUBE_ID.fullmatch(candidate):
         raise DownloadError(f"Not a YouTube video ID in URL: {url}")

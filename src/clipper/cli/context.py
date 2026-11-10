@@ -5,7 +5,11 @@ from enum import StrEnum
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.detection.llm import LlmClipDetector
 from clipper.adapters.detection.ollama import OllamaClient
-from clipper.adapters.download.ytdlp import YtDlpClipLookup, YtDlpDownloader
+from clipper.adapters.download.ytdlp import (
+    YtDlpClipLookup,
+    YtDlpDownloader,
+    YtDlpVideoInfoLookup,
+)
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
@@ -26,6 +30,7 @@ from clipper.core.interfaces import (
     ReviewFiles,
     TitleWriter,
     Transcriber,
+    VideoInfoLookup,
 )
 from clipper.domain.errors import DetectionError, TitleError
 from clipper.review.server import ReviewSession
@@ -103,6 +108,11 @@ def build_clip_lookup(settings: Settings) -> ClipLookup:
     return YtDlpClipLookup()
 
 
+def build_video_info(settings: Settings) -> VideoInfoLookup:
+    """Compose the real video info lookup (ADR 0020, video info amendment)."""
+    return YtDlpVideoInfoLookup()
+
+
 @dataclass(frozen=True)
 class AppContext:
     """How the commands build their adapters. See docs/decisions/0013.
@@ -122,6 +132,7 @@ class AppContext:
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     downloader: Callable[[Settings], Downloader] = build_downloader
     clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup
+    video_info: Callable[[Settings], VideoInfoLookup] = build_video_info
     # Serves the review page until Ctrl+C (ADR 0024); tests pass a stub so
     # `review` does not block.
     serve: Callable[[ReviewSession, int, bool, Callable[[str], None]], None] = (

@@ -187,6 +187,33 @@ the clips are good enough to use.
   the downloads that checked the span rule were manual, in a scratch folder,
   and deleted.
 
+## Amended by video info (V5 item 8a)
+
+- `fetch`, and `drafts` from a URL, save the video's metadata beside it as
+  `<videos dir>/<id>.info.json` (`video_info_path` in `core/sources.py`),
+  for the title prompt (V5 item 8b, ADR 0018). It is written once: after a
+  download, or for a reused file that has none yet. Local files get none.
+- **One metadata request per fetch**, `--ignore-config --skip-download
+  --no-playlist --dump-single-json` on the plain URL, through a
+  `VideoInfoLookup` Protocol and `YtDlpVideoInfoLookup`. Like the clip
+  lookups, it is automated access under the risk decision 6 accepts, for a
+  video the maintainer chose (decision 2). The request does not depend on
+  the file, so a reused file gets its info the same way, which settles the
+  open question in V5 item 8a.
+- **Only `VideoInfo` is kept** (`domain/models.py`): platform, video ID,
+  title, channel (yt-dlp's `uploader`, else `channel`), `upload_date`
+  (`YYYYMMDD`), duration and description. yt-dlp's own JSON is 20 KB for a
+  Twitch VOD and 682 KB for a 2-hour YouTube video, mostly format lists with
+  signed URLs, so `--write-info-json` was not used. A missing title or
+  channel is a `DownloadError`.
+- **A failed lookup is a printed warning**, `Warning: no video info saved:
+  ...`, and the fetch still succeeds: the video is on disk, and only titles
+  use the info. The next fetch of that video tries again.
+- Checked by hand with yt-dlp 2026.10.26 (manual step D10a): a Twitch VOD
+  gives its login as `uploader`, no `channel` and an empty description; a
+  YouTube video gives the channel name for both and a description that
+  opens with sponsor links. Neither names the people on screen.
+
 ## Revisit when
 
 - Either platform's terms change, or an account receives a warning.
