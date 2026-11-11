@@ -487,8 +487,8 @@ From the V6 conversation on 2026-11-11:
 - Performance data comes from a CSV the maintainer exports by hand; no
   login from Clipper.
 - Posting context: the CORE (Stable Ronaldo, JasonTheWeen, Lacy, Silky,
-  Marlon, Adapt); campaigns wanted are CORE, Lacy and JasonTheWeen. Only
-  the Lacy brief has been read.
+  Marlon, Adapt); campaigns wanted are CORE, Lacy and JasonTheWeen, all
+  three briefs read (see "Campaign briefs read").
 
 ## Current state
 
@@ -587,8 +587,8 @@ In progress:
   the heuristic found 1 at top 5 and 3 at top 30, the LLM 1 at top 30. Clips
   and the maintainer's picks disagree, so clip labels are a weak stand-in
   for "worth posting"; trial notes count more. Small samples.
-- Campaign briefs read (2026-11-10), two so far. Neither asks for a
-  detector input; both ask for work at the edit and post stage.
+- Campaign briefs read (2026-11-10 and 11-11), four so far. None asks
+  for a detector input; all ask for work at the edit and post stage.
   - Lacy (a pool campaign, paid by share of views): clips from Lacy's
     Twitch, YouTube and other accounts, Lacy the main focus, Lacy's name in
     the caption or on-screen text and `#Lacy`, no logos, not negative, no
@@ -603,6 +603,20 @@ In progress:
     (stock or generated footage clashes with the no-paid-services
     non-goal), and the hook and caption fixes would be manual too. The
     judged labels from its drafts stay (#151).
+  - CORE (pool, $20,000 by share of approved views, 2,000,000 views
+    minimum, ends 2026-11-30): any video, stream or clip featuring at
+    least 2 CORE members; the same clip may also go to the Lacy and
+    JasonTheWeen campaigns if it meets theirs. TikTok, Reels, YouTube
+    Shorts or X; audience at least 50% from native English-speaking
+    countries, account in a related niche. Caption or overlay names CORE
+    or a member, `#CORE`; English only; no logos, collab posts, reposts or
+    botting; not negative, no hate farming or negative false narratives.
+    Wants funny moments, reactions and banter between 2 or more members.
+    Clipper's part: which members are on screen, which the transcript
+    can only hint at; checked in review.
+  - JasonTheWeen (pool, 700,000 views minimum, ends 2026-11-30): any
+    video featuring JasonTheWeen, on any channel; caption or overlay names
+    JasonTheWeen, `#JasonTheWeen`.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
@@ -1066,7 +1080,7 @@ Later, not scheduled:
   did not help, so only with a new reason a larger model would pick better.
 - Campaign briefs as a detector input, once the maintainer has read some.
   Needs an ADR.
-  Two read on 2026-11-10 (see "Campaign briefs read"); neither asks
+  Four read by 2026-11-11 (see "Campaign briefs read"); none asks
   for one. One asked for an on-screen hook, a possible small render item.
 - Speaker detection for the face style (ADR 0025, locked framing
   amendment): the largest face is sometimes the listener (a podcast
