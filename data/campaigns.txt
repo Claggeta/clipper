@@ -1,0 +1,5 @@
+# Campaigns for the post queue (ADR 0028), from the briefs in CLAUDE.md.
+# <name> | <hashtag> | <at least N> | <of these people on screen> [| <only from these channels>]
+CORE | #CORE | 2 | Ron, Jason, Lacy, Silky, Marlon, Adapt
+Lacy | #Lacy | 1 | Lacy | Lacy
+JasonTheWeen | #JasonTheWeen | 1 | Jason

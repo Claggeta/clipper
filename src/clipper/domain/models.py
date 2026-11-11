@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -694,3 +695,42 @@ class Evaluation(BaseModel):
         if not self.judged:
             return 0
         return len(self.candidates) - self.candidates_hit - len(self.on_rejected)
+
+
+class Campaign(BaseModel):
+    """A campaign a clip may be posted for. See docs/decisions/0028.
+
+    A clip qualifies when at least `minimum` of `people` are on screen and,
+    if `channels` is set, it comes from one of those channels.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(min_length=1)
+    hashtag: str = Field(pattern=r"^#\S+$")
+    minimum: int = Field(ge=1)
+    people: tuple[str, ...] = Field(min_length=1)
+    channels: tuple[str, ...] = ()
+
+
+class PostRecord(BaseModel):
+    """One clip the maintainer posted. See docs/decisions/0028.
+
+    `clip` is `<drafts folder>/<file>` under the clips dir, with a forward
+    slash; `video_id` is the YouTube ID from `url`.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    clip: str = Field(min_length=1)
+    url: str = Field(min_length=1)
+    video_id: str = Field(min_length=1)
+    posted: date
+
+
+class PostLog(BaseModel):
+    """Every post recorded with `clipper posted`, oldest first."""
+
+    model_config = ConfigDict(frozen=True)
+
+    posts: tuple[PostRecord, ...] = ()
