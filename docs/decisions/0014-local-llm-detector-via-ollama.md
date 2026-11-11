@@ -270,6 +270,44 @@ draft on a rejected span, `.` unjudged:
 item 10), a finer LLM score lands, or a larger Whisper model (item 12)
 changes either detector's keepers.
 
+## Amended by detector examples (V6 item 4, ADR 0026): measured, not adopted
+
+**Tried.** The system prompt gained 4 kept and 4 rejected excerpts (each
+the first 60 words of a judged span's transcript) from other videos'
+judged labels, drawn at random (seed 0, the podcast left out), labelled
+"kept, worth posting" and "rejected, not worth posting", with a line to
+judge each new excerpt the way the editor did but on its own words. The
+same examples served every window of a video, so the prompt prefix was
+shared; time per VOD was unchanged (235 to 618 s against 236 to 584 s).
+
+**Measured** at top 10 on four short streamer VODs with every draft
+judged (3Sbj_BZORr4, v2918956109, v2922292514, GBCYViJBuCI), each with
+examples from the other videos only (ADR 0026 decision 3). The examples
+prompt picked 22 windows never judged; the maintainer judged all of them
+in `review` (scratch folders, labels written to `data/labels/picks/`).
+Keepers / rejected / repeats:
+
+| VOD | No examples (as now) | With examples |
+|---|---|---|
+| 3Sbj_BZORr4 | 7 / 3 / 0 | 7 / 3 / 0 |
+| v2918956109 | 9 / 1 / 0 | 6 (8) / 1 / 1 |
+| v2922292514 | 5 / 5 / 0 | 5 / 5 / 0 |
+| GBCYViJBuCI | 8 / 2 / 0 | 7 / 3 / 0 |
+| Total | 29 / 11 / 0 | 25 (27) / 12 / 1 |
+
+- The examples reshuffled the top 10 rather than sharpening it: 14 of the
+  29 known keepers and 8 of the 10 known rejects dropped out, and of the
+  22 new windows the maintainer kept 10 and rejected 10.
+- The two in brackets on v2918956109 are new windows the maintainer would
+  save, but `review` refused them: each overlaps a keeper already saved
+  (by 11 and 13 s) without being a hit under ADR 0012's rule. Counted as
+  keepers, the examples are still 2 keepers behind.
+
+**Decision.** Not adopted; no code merged. The 20 judged spans stay in the
+labels. Fixed examples do not help this model; examples chosen per window
+by similarity (ADR 0026 decision 5) are a separate idea, after item 5's
+embeddings.
+
 ## Related
 
 - 0012: evaluation

@@ -48,6 +48,12 @@
       "note": "Good Clip. Interesting foods. Funny seeing them nervous."
     },
     {
+      "start": "0:27:03.9",
+      "end": "0:27:44.57",
+      "verdict": "post",
+      "style": "fit"
+    },
+    {
       "start": "0:30:01.22",
       "end": "0:31:45.18",
       "verdict": "fix",
@@ -57,6 +63,12 @@
       },
       "style": "fit",
       "note": "Good Clip. Interesting Food."
+    },
+    {
+      "start": "0:32:30.54",
+      "end": "0:33:14.42",
+      "verdict": "post",
+      "style": "fit"
     },
     {
       "start": "1:12:09.67",
@@ -75,6 +87,16 @@
       },
       "style": "fit",
       "note": "Good clip. Interesting food."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:11:06",
+      "end": "0:11:40.43"
+    },
+    {
+      "start": "1:02:20.93",
+      "end": "1:02:51.72"
     }
   ]
 }
