@@ -293,6 +293,23 @@ and planned code:
   only) with a button per style; Save keeps one style, re-rendering in it
   if the span moved (face tracking in `review`), deletes the other, and
   records `style` on the judged label (0012, 0019, 0024).
+- `0026` — learning: judged labels are the first training signal, YouTube
+  performance only after a report on linked posts shows it adds something.
+  In stages, each may end in nothing: the maintainer's titles and judged
+  spans as LLM prompt examples, then a small trained ranker, then
+  performance. Every learned change is measured per VOD with that VOD left
+  out of training (V5's measures, counts per VOD) and adopted only if it
+  beats the current default. Local and free, small models (an embedding
+  model and a simple classifier), new dependencies through 0003.
+  Retraining is a command the maintainer runs; it prints held-out measures
+  beside the current model's before replacing it. Amends the V5 non-goals.
+- `0027` — performance data: a YouTube Studio CSV exported by hand and
+  imported offline; no YouTube API, key, OAuth or login. The parser follows
+  a real export, recorded in an amendment first (columns unverified);
+  retention or swipe-away figures preferred over views. Shorts are linked
+  to drafts by matching title, length and date, ambiguous ones confirmed by
+  hand, confirmed links kept and reused. Each import a dated snapshot,
+  compared by age and channel. Imported data stays out of git.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -377,6 +394,21 @@ user accounts. Face-aware cropping was a spike that ended in ADR 0025: a
 `face` crop style and picking a style per clip are built in V5; the
 facecam split comes later.
 
+## V6 scope (scoped 2026-11-11)
+
+Input: the maintainer's judged labels and edited titles, and later a
+YouTube Studio CSV of the posted Shorts. Output: drafts picked and titled
+by what Clipper has learned from them, each learned change measured on
+VODs it did not learn from, and a report linking posted Shorts to their
+drafts. Interface: changes to `drafts` and the title prompt, a retraining
+command, and a CSV import (ADRs 0026 and 0027).
+
+Non-goals for V6: posting or uploads, the YouTube or Twitch APIs, OAuth or
+logins, hosted or paid models, training in the cloud, fine-tuning the LLM,
+a network trained from scratch, campaign payouts, the movies/TV niche,
+channel watching or scheduling, a database, user accounts. The facecam
+split and speaker detection stay under "Later".
+
 ## Maintainer's goals
 
 As stated: a personal tool, used daily and eventually mostly unattended, that
@@ -423,6 +455,19 @@ From the V5 interview on 2026-11-09, after four trial VODs:
 - Face tracking is wanted, but its form (facecam split or following the
   person) is not decided.
 - Clip length: 15 to 90 s.
+
+From the V6 conversation on 2026-11-11:
+
+- The goal is a self-learning system: the drafts kept, the titles written
+  and, eventually, how posted Shorts do should improve the next drafts.
+- The maintainer has been posting many Shorts to YouTube, all from
+  `drafts`, with no record of which draft became which Short. How many is
+  not recorded.
+- Performance data comes from a CSV the maintainer exports by hand; no
+  login from Clipper.
+- Posting context: the CORE (Stable Ronaldo, JasonTheWeen, Lacy, Silky,
+  Marlon, Adapt); campaigns wanted are CORE, Lacy and JasonTheWeen. Only
+  the Lacy brief has been read.
 
 ## Current state
 
@@ -932,6 +977,48 @@ Items 8 and 9 do not depend on picking and may land earlier.
     run after the release by the maintainer, RV10 in part, and their steps
     fixed)
 
+## V6 list
+
+Each item is one PR, and each code item states its design and waits for
+confirmation first. Learning from labels first, then performance (ADR
+0026). Every learned change is measured per VOD with that VOD left out of
+what it learned from, against the current default: keepers and rejects in
+the top 10, keepers cut short and end gaps, counts per VOD; for titles,
+titles naming the person and titles kept unedited.
+
+1. ADRs and scope (one docs PR): ADR 0026 (learning), ADR 0027
+   (performance data), the V6 scope and list.
+2. Not code: the maintainer exports one YouTube Studio CSV of the
+   channel's Shorts; its columns, the count of Shorts and whether it has
+   retention or swipe-away figures go into an ADR 0027 amendment.
+3. Title examples: the title prompt gets the maintainer's own titles (where
+   `title` differs from `model_title`) as examples, chosen from other VODs.
+   Measured on held-out VODs' keepers. ADR 0018 amendment, manual step.
+4. Detector examples: the LLM prompt gets judged keepers and rejects from
+   other VODs as examples. Measured leave one VOD out with `eval`, with the
+   time per VOD. ADR 0014 amendment. May end in nothing.
+5. A trained ranker on the judged labels (local embeddings and a simple
+   classifier, with the heuristic's signals and the LLM score as inputs if
+   they help), against the LLM leave one VOD out. Decides the libraries
+   (ADR 0003 check), where the model file lives, and how it is chosen
+   (ADR 0013). May end in nothing.
+6. `clipper` CSV import (command name decided in the item): parse the
+   export from item 2, link Shorts to drafts by matching, confirm ambiguous
+   ones, keep confirmed links and a dated snapshot. ADR 0027 amendment,
+   manual step.
+7. A performance report: linked Shorts against their verdicts, detector
+   scores, styles and titles, compared by age and channel. Sets whether
+   performance can be a target. Not a detector change.
+8. If item 7 says so: performance as a second training target for item 5's
+   ranker. ADR 0026 amendment. May end in nothing.
+9. Retraining as one command from the current labels (and links, after
+   item 8), printing held-out measures beside the current model's before
+   replacing it (ADR 0026 decision 5).
+10. Not learning, from daily use: remux after `fetch` for files whose
+    timestamps do not start at 0 (Parked), so `review` opens every
+    download. ADR 0020 amendment, manual step. May land any time.
+11. Release notes and tag `v0.6.0`.
+
 Later, not scheduled:
 
 - A URL box in the review page, after item 9, once the drafts chain moves to
@@ -947,7 +1034,6 @@ Later, not scheduled:
   Needs an ADR.
   Two read on 2026-11-10 (see "Campaign briefs read"); neither asks
   for one. One asked for an on-screen hook, a possible small render item.
-- Posting and performance data, once accounts exist.
 - Speaker detection for the face style (ADR 0025, locked framing
   amendment): the largest face is sometimes the listener (a podcast
   two-shot with the speaker side-on); mouth movement at 5 samples a
@@ -968,7 +1054,8 @@ Later, not scheduled:
   +faststart`, timestamps from 0), a lossless step of under a minute; an
   ADR 0020 amendment. Its Twitch clip labels
   (`data/labels/v2924046310.json`) may also be 64 s off, if Twitch counts
-  that VOD from 0 and the download began 64 s in; unverified.
+  that VOD from 0 and the download began 64 s in; unverified. Scheduled
+  as V6 item 10.
 
 - ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
   `exit 3199971767` for invalid data. Fix: normalise negative `AVERROR`
@@ -1007,9 +1094,6 @@ Later, not scheduled:
   public on many long videos and may be extractable with yt-dlp. Both are
   unverified, and YouTube's terms have not been checked. A short spike would
   settle whether it is usable.
-- Performance data from posted clips as a reference (ADR 0012). Needs posting
-  and analytics, which are not planned yet. Clips have no stable ID today (they
-  are named by time span), so joining metrics to clips needs one.
 - A finer LLM score. Both models tried score on a few round values (on the
   long video, `llama3.1:8b` gave 0.8 to 403 of 1,215 windows), and neither
   put a label in its top 5 there. Options: token probabilities (whether
