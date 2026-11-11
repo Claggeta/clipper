@@ -1,0 +1,10 @@
+# Names for titles, by channel (ADR 0018, saved about amendment).
+# One line per channel: <channel, as in the video's .info.json> | <about text, as for --about>.
+# Used when --about is not given; channels match ignoring case.
+stableronaldo | Ron (stableronaldo, he/him)
+jasontheween | Jason (jasontheween, he/him)
+Lacy | Lacy (he/him)
+Adapt | Adapt (he/him)
+ohnepixel | Ohne (ohnepixel, he/him)
+CORE | CORE, a group channel: Ron (Stable Ronaldo), Jason (JasonTheWeen), Lacy, Silky, Marlon and Adapt, all he/him. Name a member only when the transcript says who it is; otherwise write "the CORE boys".
+TJR | TJR (he/him)

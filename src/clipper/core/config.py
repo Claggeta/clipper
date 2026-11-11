@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     clips_dir: Path = Path("data/clips")
     labels_dir: Path = Path("data/labels")
     videos_dir: Path = Path("data/videos")
+    # Saved about text per channel for titles (ADR 0018, saved about).
+    channels_file: Path = Path("data/channels.txt")
     # Ollama's default address, and the model chosen from eval results
     # (ADR 0014, 7c amendment).
     llm_url: str = "http://127.0.0.1:11434"

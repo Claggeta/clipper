@@ -147,6 +147,8 @@ class Env:
         self.tracker = FakeFaceTracker()
         for name in ("output", "clips", "videos", "cache"):
             monkeypatch.setenv(f"CLIPPER_{name.upper()}_DIR", str(tmp_path / name))
+        self.channels = tmp_path / "channels.txt"
+        monkeypatch.setenv("CLIPPER_CHANNELS_FILE", str(self.channels))
         self.monkeypatch = monkeypatch
         self.video = tmp_path / "talk.mp4"
         self.video.write_bytes(b"not a real video")
@@ -371,6 +373,26 @@ def test_the_about_text_reaches_the_titles(env: Env) -> None:
     assert result.exit_code == 0, result.output
     assert FakeTitleWriter.abouts
     assert set(FakeTitleWriter.abouts) == {"Greg LaVecchia"}
+
+
+def test_a_fetched_video_gets_its_channels_saved_about(env: Env) -> None:
+    FakeTitleWriter.abouts = []
+    env.channels.write_text("a channel | Ron (he/him)\n", encoding="utf-8")
+    result = env.run(_URL)
+    assert result.exit_code == 0, result.output
+    assert FakeTitleWriter.abouts
+    assert set(FakeTitleWriter.abouts) == {"Ron (he/him)"}
+    assert "About (saved for A channel): Ron (he/him)" in result.output
+
+
+def test_a_bad_channels_file_fails_before_any_download(env: Env) -> None:
+    env.channels.write_text("| Ron\n", encoding="utf-8")
+    result = env.run(_URL)
+    assert result.exit_code == 1
+    assert "channels.txt: Line 1: write it as <channel> | <about text>" in (
+        result.output.replace("\n", "")
+    )
+    assert env.log.stages == []
 
 
 def test_about_without_titles_fails_before_any_download(env: Env) -> None:
