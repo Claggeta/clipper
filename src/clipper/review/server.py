@@ -84,6 +84,8 @@ class ReviewSession:
     `renderer` re-renders a saved clip, with captions from `transcript`
     (None when the folder has no captions); a `face` re-render uses
     `face_tracker` and `frame_size`, the video's width and height (ADR 0025).
+    `people` are the names the page offers to mark as on screen (ADR 0024,
+    rating amendment).
     """
 
     folder: Path
@@ -99,6 +101,7 @@ class ReviewSession:
     transcript: Transcript | None
     face_tracker: FaceTracker | None = None
     frame_size: tuple[int, int] | None = None
+    people: tuple[str, ...] = ()
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -229,6 +232,7 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "titles": manifest.titles,
         "duration": session.duration_seconds,
         "frames_key": frames_key(session),
+        "people": list(session.people),
         "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
     }
 
@@ -293,7 +297,7 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     else:
                         reply = clip_payload(session, store, trashed)
                 else:
-                    request = parse_save(data, session.duration_seconds)
+                    request = parse_save(data, session.duration_seconds, session.people)
                     if verb == "add":
                         saved = store.add(request)
                     else:

@@ -1,0 +1,8 @@
+# People the review page offers to mark as on screen (ADR 0024, rating amendment).
+# One name per line, as captions and campaigns use them.
+Ron
+Jason
+Lacy
+Silky
+Marlon
+Adapt

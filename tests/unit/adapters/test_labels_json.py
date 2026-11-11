@@ -264,3 +264,41 @@ def test_case_differences_fail_elsewhere() -> None:
         check_labels_match(
             LabeledVideo(source="Talk.MP4", labels=()), _result("talk.mp4")
         )
+
+
+def test_saved_labels_keep_rating_and_people(tmp_path: Path) -> None:
+    # Constructed label, not from a real review.
+    labeled = LabeledVideo.model_validate(
+        {
+            "source": "v.mp4",
+            "labels": [
+                {
+                    "start": "0:01:00",
+                    "end": "0:01:40",
+                    "verdict": "post",
+                    "rating": "good",
+                    "people": ["Ron", "Jason"],
+                }
+            ],
+        }
+    )
+    path = tmp_path / "v.json"
+    save_labels(labeled, path)
+    entry = json.loads(path.read_text(encoding="utf-8"))["labels"][0]
+    assert (entry["rating"], entry["people"]) == ("good", ["Ron", "Jason"])
+    assert load_labels(path) == labeled
+
+
+@pytest.mark.parametrize(
+    ("people", "message"),
+    [([" "], "a name in people is empty"), (["Ron", "ron"], "given twice")],
+)
+def test_label_people_are_named_once(people: list[str], message: str) -> None:
+    from pydantic import ValidationError
+
+    from clipper.domain.models import Label
+
+    with pytest.raises(ValidationError, match=message):
+        Label.model_validate(
+            {"start": "0:01:00", "end": "0:01:40", "verdict": "post", "people": people}
+        )

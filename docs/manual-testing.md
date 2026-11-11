@@ -2623,6 +2623,30 @@ cmd /c "set CLIPPER_LABELS_DIR=data\rv10-labels&& uv run clipper review data\cli
 
 Then delete `data\clips\rv10`, `data\rv10-output` and `data\rv10-labels`.
 
+### RV11. Rating and who is on screen
+
+Covers the rating amendment to
+[ADR 0024](decisions/0024-review-drafts-in-a-local-browser-page.md). Use any
+drafts folder with scratch labels:
+
+```powershell
+cmd /c "set CLIPPER_LABELS_DIR=data\rv11-labels&& uv run clipper review data\clips\<a drafts folder>"
+```
+
+1. Choose clip 1. Pass: under Notes, `Rating` with `Good` and `OK`, and
+   `On screen` with a button per name in `data\people.txt`; none pressed.
+2. Press `Good`, then two names. Pass: they show pressed and `Unsaved`
+   shows. Press `Good` again: it clears. Press `OK`.
+3. Save. Pass: saved as usual; reload the page and choose clip 1: `OK` and
+   the two names are still pressed, and `Unsaved` is hidden.
+4. Choose clip 2 and Save with nothing pressed. Pass: saved as before.
+5. Stop the server. `data\rv11-labels\picks\<id>.json` has `"rating": "ok"`
+   and `"people"` with the two names on clip 1's label, and neither on
+   clip 2's.
+
+Then delete `data\rv11-labels`. Saving clips here re-renders nothing unless a
+handle moved.
+
 ## Record your run
 
 | Field | Value |

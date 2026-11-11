@@ -14,7 +14,7 @@ from clipper.adapters.results.analysis_json import (
     check_source_matches,
     load_analysis_result,
 )
-from clipper.adapters.results.channels_txt import load_channel_abouts
+from clipper.adapters.results.channels_txt import load_channel_abouts, load_people
 from clipper.adapters.results.labels_json import (
     check_labels_match,
     load_labels,
@@ -1207,6 +1207,7 @@ def review(
             frame_size=(info.width, info.height)
             if info.width is not None and info.height is not None
             else None,
+            people=load_people(settings.people_file),
         )
         build.serve(
             session,

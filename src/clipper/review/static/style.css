@@ -289,7 +289,34 @@ video {
   margin-top: 16px;
 }
 
-.judge label { color: var(--muted); font-size: 12px; }
+.judge label,
+.judge .field-label { color: var(--muted); font-size: 12px; }
+
+.judge-field {
+  display: grid;
+  gap: 6px;
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.toggle-row button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.toggle-row button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 .judge input,
 .judge textarea {
