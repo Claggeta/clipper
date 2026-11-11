@@ -101,6 +101,8 @@ class Env:
         self.monkeypatch = monkeypatch
         self.context = AppContext()
         monkeypatch.setenv("CLIPPER_CLIPS_DIR", str(self.clips))
+        self.channels = tmp_path / "channels.txt"
+        monkeypatch.setenv("CLIPPER_CHANNELS_FILE", str(self.channels))
         self.save()
         self.use_probe(FakeProbe())
         self.use_renderer(self.renderer)
@@ -657,6 +659,63 @@ def test_titles_without_about_get_none(env: Env) -> None:
     result = env.run("--titles", "--rank", "1")
     assert result.exit_code == 0, result.output
     assert writer.abouts == [None]
+
+
+def test_titles_use_the_saved_about_for_the_channel(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    (env.video.parent / "talk.info.json").write_text(
+        _INFO.model_dump_json(), encoding="utf-8"
+    )
+    env.channels.write_text(
+        "# names\nother | Sam\n STREAMER | Ron (he/him)\n", encoding="utf-8"
+    )
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert writer.abouts == ["Ron (he/him)"]
+    assert "About (saved for streamer): Ron (he/him)" in result.output
+
+
+def test_about_on_the_command_line_wins_over_the_saved_one(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    (env.video.parent / "talk.info.json").write_text(
+        _INFO.model_dump_json(), encoding="utf-8"
+    )
+    env.channels.write_text("streamer | Ron (he/him)\n", encoding="utf-8")
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1", "--about", "Keith")
+    assert result.exit_code == 0, result.output
+    assert writer.abouts == ["Keith"]
+    assert "saved for" not in result.output
+
+
+def test_a_saved_about_needs_video_info(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.channels.write_text("streamer | Ron (he/him)\n", encoding="utf-8")
+    writer = FakeTitleWriter()
+    env.use_title_writer(writer)
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert writer.abouts == [None]
+
+
+def test_a_bad_channels_file_fails_before_cutting(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.channels.write_text("streamer |\n", encoding="utf-8")
+    env.use_title_writer(FakeTitleWriter())
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 1, result.output
+    output = " ".join(result.output.split())
+    assert "channels.txt: Line 1: write it as" in output
+    assert list(env.clips.rglob("*")) == []
+
+
+def test_the_channels_file_is_not_read_without_titles(env: Env) -> None:
+    env.channels.write_text("streamer |\n", encoding="utf-8")
+    result = env.run("--rank", "1")
+    assert result.exit_code == 0, result.output
 
 
 @pytest.mark.parametrize(

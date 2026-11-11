@@ -1,5 +1,6 @@
 import logging
 import statistics
+from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, NamedTuple
@@ -13,6 +14,7 @@ from clipper.adapters.results.analysis_json import (
     check_source_matches,
     load_analysis_result,
 )
+from clipper.adapters.results.channels_txt import load_channel_abouts
 from clipper.adapters.results.labels_json import (
     check_labels_match,
     load_labels,
@@ -31,6 +33,7 @@ from clipper.adapters.results.video_info_json import (
 )
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
+from clipper.core.channels import ABOUT_LIMIT, channel_about
 from clipper.core.config import Settings
 from clipper.core.evaluation import boundary_gaps, evaluate
 from clipper.core.framing import plan_face_crop
@@ -85,15 +88,14 @@ class VerticalStyle(StrEnum):
     FACE = "face"
 
 
-# Hand-written names for titles (ADR 0018, about amendment).
-_ABOUT_LIMIT = 300
 AboutOption = Annotated[
     str | None,
     typer.Option(
         "--about",
         help="Who and what the video is about, for titles: the names the model "
         "should use, and their pronouns if titles may use them, one line. "
-        'Example: "Lacy (he/him)".',
+        'Example: "Lacy (he/him)". Without it, titles use the channel\'s line '
+        "in CLIPPER_CHANNELS_FILE (data/channels.txt), if there is one.",
         show_default=False,
     ),
 ]
@@ -451,6 +453,7 @@ def render(
         check_source_matches(result, video)
         plan = _plan_render(settings, build, video, result, rank)
         _check_frame_size((style,) if face else (), plan.media, video)
+        channels = load_channel_abouts(settings.channels_file) if titles else {}
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
@@ -462,6 +465,7 @@ def render(
         titles=titles,
         about=about,
         styles=(style,) if vertical else (),
+        channels=channels,
     )
     if _cut_clips(
         settings, build, video, result, result_json, plan, writer, flags
@@ -517,6 +521,8 @@ class _RenderFlags(NamedTuple):
     about: str | None = None
     # The vertical styles to render, in order; empty for a landscape run.
     styles: tuple[VerticalStyle, ...] = ()
+    # Saved about text by channel, used when `about` is None (ADR 0018).
+    channels: Mapping[str, str] | None = None
 
 
 def _drafts_styles(
@@ -555,9 +561,9 @@ def _check_about(about: str | None, titles: bool) -> str | None:
         raise TitleError("--about is empty")
     if "\n" in about or "\r" in about:
         raise TitleError("--about must be one line")
-    if len(about) > _ABOUT_LIMIT:
+    if len(about) > ABOUT_LIMIT:
         raise TitleError(
-            f"--about is {len(about)} characters; keep it to {_ABOUT_LIMIT}"
+            f"--about is {len(about)} characters; keep it to {ABOUT_LIMIT}"
         )
     return about
 
@@ -613,11 +619,19 @@ def _cut_clips(
     cannot be written is `Error:` and exit 1.
     """
     ranks, selected, folder, paths, media = plan
-    captions, vertical, titles, about, styles = flags
+    captions, vertical, titles, about, styles, channels = flags
     renderer = build.renderer(settings)
     face_only = styles == (VerticalStyle.FACE,)
     tracker = build.face_tracker(settings) if VerticalStyle.FACE in styles else None
     video_info = _title_context(video) if writer else None
+    if writer and about is None and video_info is not None:
+        about = channel_about(channels or {}, video_info)
+        if about is not None:
+            console.print(
+                f"About (saved for {escape(video_info.channel.strip())}): "
+                f"{escape(about)}",
+                soft_wrap=True,
+            )
     failures: list[str] = []
     entries: list[ManifestClip] = []
     rendered = 0
@@ -863,6 +877,7 @@ def drafts(
         about = _check_about(about, titles)
         queue = _queue(sources or [], list_file, about)
         checked = _check_queue(queue, titles)
+        channels = load_channel_abouts(settings.channels_file) if titles else {}
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         for line in str(exc).splitlines():
@@ -874,6 +889,7 @@ def drafts(
         vertical=vertical,
         titles=titles,
         styles=styles,
+        channels=channels,
     )
     if len(checked) == 1:
         item = checked[0]

@@ -337,6 +337,48 @@ in the manifests for later uses: as a ranker input or nearest-clip
 examples (ADR 0026), or chosen by similarity of transcript rather than by
 channel.
 
+## Amended by saved about text per channel (V6 item 3a)
+
+Item 3 showed that what the maintainer adds to titles is who is on the
+channel, which `--about` already gives (8c) but has to be typed each run.
+
+- **A channels file**, `data/channels.txt` (`CLIPPER_CHANNELS_FILE`):
+  `<channel> | <about text>` per line, `#` comments, the separator of
+  `drafts --list` (0022). The channel is as in the video's `.info.json`
+  (8a), matched ignoring case and surrounding spaces (yt-dlp gave one
+  YouTube channel as "Lacy "). Committed, like the labels: it is the
+  maintainer's own names, not private data.
+- **Used when no `--about` is given**, on the command line or on a list
+  line, for a video with an info file; `--about` always wins. The run
+  prints `About (saved for <channel>): <text>`. A local file without an
+  info file gets nothing.
+- **Checked before any download or cut**, with titles on only: a line
+  without a channel or about text, over 300 characters, or a channel given
+  twice is `Error:` naming the file and line, exit 1. No file means no
+  saved text.
+- **The maintainer's file** names each streamer with their login and
+  he/him, as the maintainer stated for every channel posted from. The
+  CORE group channel lists its members and says to name one only when
+  the transcript says who it is, otherwise "the CORE boys".
+
+**Measured** on item 3's 110 keepers (89 on a channel in the file), as in
+item 3's table:
+
+| Prompt | Names a person | Same person | Wrong name | Gendered pronoun | Swear word |
+|---|---|---|---|---|---|
+| no about (as before) | 48 of 110 | 28 of 65 | 4 | 21 | 1 |
+| saved about, CORE as a plain list | 75 of 110 | 37 of 65 | 13 | 20 | 1 |
+| saved about, CORE line as adopted | 68 of 110 | 36 of 65 | 6 | 21 | 1 |
+
+- With the members as a plain list, the model named the first one ("Ron
+  tries the scrambled egg combo") on 9 CORE clips where the maintainer
+  named someone else or the group. The adopted CORE line removed 7 of the
+  9; the rest are Mafia game clips whose transcript names Jason.
+- Pronouns are stated for every channel, so gendered pronouns in titles
+  are now the right ones; their count is unchanged.
+
+**Decision.** Adopted.
+
 ## Revisit when
 
 - Titles need a different model from the detector.

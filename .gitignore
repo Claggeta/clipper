@@ -19,6 +19,8 @@ __pycache__/
 # Hand-written labels are committed (docs/decisions/0012).
 data/*
 !data/labels/
+# The channels file for titles is committed too (docs/decisions/0018).
+!data/channels.txt
 dist/
 
 clipper-reference.md

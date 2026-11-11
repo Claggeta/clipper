@@ -1151,6 +1151,26 @@ other pronouns for them. Without pronouns, he or she may still appear
 is for titles; use it with titles on` and writes no folder. Record the three
 titles next to R19a's.
 
+### R19c. Titles with a channel's saved about text
+
+Covers the saved about amendment to
+[ADR 0018](decisions/0018-suggested-titles-via-ollama.md), with R19a's
+video and helpers. `$Vod` must be on a channel listed in
+`data\channels.txt`.
+
+```powershell
+Invoke-Titles $Vod $Json "--titles --rank 1 --rank 2 --rank 3" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19c" }
+Invoke-Titles $Vod $Json "--titles --rank 1 --about `"Someone else`"" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19c-about" }
+"stableronaldo |" | Set-Content "$S\bad-channels.txt" -Encoding UTF8
+Invoke-Titles $Vod $Json "--titles --rank 1" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19c-bad"; CLIPPER_CHANNELS_FILE = "$S\bad-channels.txt" }
+```
+
+Pass: the first run prints `About (saved for <channel>): <the file's
+text>` after `Title context:`, and its titles use that name. The second
+prints no `saved for` line. The third exits 1 with `Error: ...bad-channels.txt:
+Line 1: write it as <channel> | <about text>` and writes no folder. Record
+the first run's titles.
+
 ### R20. `--vertical --style face`: a crop that follows the face
 
 Covers the face style ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)).
