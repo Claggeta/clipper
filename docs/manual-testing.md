@@ -2896,13 +2896,15 @@ this time). For `drafts`, the maintainer's second YouTube video
   26.6 s, all 5 rendered ` (vertical, captions)`, no title lines.
 - D11: no `CLIPPER_` variable left; the scratch folder was removed.
 
-**D12 and RV10**, 2026-11-10, run by the maintainer, who reported both as
-passed. Two fixes to the steps came out of it: D0 now sets
+**D12 and RV10**, 2026-11-10, run by the maintainer. D12 passed. RV10 steps
+1 to 4 and 7 passed; 5 and 6 were not reached, since the step then asked
+for `--top 2` and so made only two clips, and the maintainer judged that
+enough. Two fixes to the steps came out of it: D0 now sets
 `CLIPPER_CLIPS_DIR`, which D11 already removed, so D12's drafts no longer go
-to `data/clips/`; and RV10 asked for `--top 2` though its steps use four
-clips. The RV10 folder left behind (`5pk8HLcAAT0`) held two saved clips:
-rank 1 kept in `face` as `post`, and rank 2 in `fit` as `fix`, both ends
-moved 5 s. Its labels file had `"style"` on both.
+to `data/clips/`; and RV10 now asks for `--top 4`. The RV10 folder left
+behind (`5pk8HLcAAT0`) held two saved clips: rank 1 kept in `face` as
+`post`, and rank 2 in `fit` as `fix`, both ends moved 5 s. Its labels file
+had `"style"` on both.
 
 ### LLM detector reference run
 
