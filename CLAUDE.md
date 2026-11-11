@@ -152,6 +152,11 @@ and planned code:
   ("Lacy (he/him)"), repeat the name instead; no check on the reply. On 85
   clips: Lacy as she/her 4 to 2 of 10 (0 with pronouns stated), any
   gendered pronoun 55 to 45, keepers' titles naming the person 14 to 23 of 30.
+  Title examples amendment (V6 3, not adopted): up to 8 of the
+  maintainer's rewrites from other videos in the prompt, same channel
+  first; on 110 keepers titles naming the person 48 to 32 (titles alone
+  38), the maintainer's person 28 to 18 of 65, swear words 1 to 4. The
+  model copied tone and other videos' people, not naming. No code merged.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
@@ -998,9 +1003,12 @@ titles naming the person and titles kept unedited.
 2. Not code: the maintainer exports one YouTube Studio CSV of the
    channel's Shorts; its columns, the count of Shorts and whether it has
    retention or swipe-away figures go into an ADR 0027 amendment.
-3. Title examples: the title prompt gets the maintainer's own titles (where
+3. ~~Title examples: the title prompt gets the maintainer's own titles (where
    `title` differs from `model_title`) as examples, chosen from other VODs.
-   Measured on held-out VODs' keepers. ADR 0018 amendment, manual step.
+   Measured on held-out VODs' keepers. ADR 0018 amendment, manual step.~~
+   (done; ended in nothing: naming the person 48 to 32 of 110, the
+   maintainer's person 28 to 18 of 65, more swear words, with either
+   format; ADR 0018 amendment; no code merged)
 4. Detector examples: the LLM prompt gets judged keepers and rejects from
    other VODs as examples. Measured leave one VOD out with `eval`, with the
    time per VOD. ADR 0014 amendment. May end in nothing.

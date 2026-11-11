@@ -290,6 +290,53 @@ videos with a known name (30 of them reviewed keepers).
 get them right. Without them he or she may still appear; titles stay
 drafts checked in the review page.
 
+## Amended by title examples (V6 item 3, ADR 0026): measured, not adopted
+
+The maintainer rewrote 89 of 110 saved titles in `review`; the manifests
+keep both (`model_title` and `title`). The idea: show the model the
+maintainer's rewrites as examples, so titles come out the way they are
+posted.
+
+**Tried.** Up to 8 rewrites per prompt, titles only, from saved clips in
+every drafts folder, the video's own always left out (ADR 0026 decision
+3), the same channel first, then the newest. Each example as
+`- [channel] model's title -> maintainer's title`, before the About line,
+with a rule to write the way the user does but take every fact from the
+transcript. A second format gave the maintainer's titles alone, no model
+title and no arrow.
+
+**Measured** on every saved keeper with a title (110 clips, 13 videos,
+`data/clips` and `data/baseline`), each titled three times with
+`qwen3.5:9b` and the video's info file, no `--about`. "Same person" is the
+65 clips whose maintainer title names a CORE member or ohnepixel: does the
+model's name one of the same people. "Wrong name" is such a name that is in
+neither the maintainer's title nor the channel.
+
+| Prompt | Names a person | Same person | Wrong name | Gendered pronoun | Swear word |
+|---|---|---|---|---|---|
+| no examples (as now) | 48 of 110 | 28 of 65 | 4 | 21 | 1 |
+| rewrites, model -> maintainer | 32 of 110 | 18 of 65 | 5 | 16 | 4 |
+| maintainer's titles alone | 38 of 110 | 23 of 65 | 7 | 16 | 3 |
+
+- Both formats name the person less often and match the maintainer's
+  choice of person less often. Word overlap with the maintainer's title
+  fell too (mean 0.17 to 0.15 over all clips). 8 of 13 videos had 5 to 8
+  same-channel examples, so names were in reach; on v2924380274
+  (jasontheween) titles naming the person went 6 to 0.
+- What the model took from the examples was tone, not naming: capitals
+  and slang ("Bro Is Literally Dead With The Rod"), swearing that the
+  prompt forbids ("Ron Calls Friend a Real Shit"), and other videos' people
+  ("Lacy Smells Dried Squid", on an ohnepixel clip).
+- The maintainer's main change is naming the right person from the
+  channel; an example from another video cannot say who is on this one.
+  `--about` does that (22 of 39 named with it, 8c).
+
+**Decision.** Not adopted; no code merged. The blind side-by-side for the
+maintainer was not needed, since every count got worse. The rewrites stay
+in the manifests for later uses: as a ranker input or nearest-clip
+examples (ADR 0026), or chosen by similarity of transcript rather than by
+channel.
+
 ## Revisit when
 
 - Titles need a different model from the detector.
