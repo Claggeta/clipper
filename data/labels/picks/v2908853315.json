@@ -1,0 +1,77 @@
+{
+  "source": "v2908853315.mp4",
+  "labels": [
+    {
+      "start": "0:02:51.76",
+      "end": "0:03:49.43",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:02:51.76",
+        "end": "0:03:32.3"
+      },
+      "style": "fit",
+      "note": "OK clip. Interesting because of new popular technology"
+    },
+    {
+      "start": "0:57:48.9",
+      "end": "0:58:04.8",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. Lacy was lying about meeting a dead CEO to get the new iPhone."
+    },
+    {
+      "start": "2:10:05.19",
+      "end": "2:10:46.59",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. Has JasonTheWeen included. They review new popular technology"
+    },
+    {
+      "start": "2:15:04.26",
+      "end": "2:15:55.21",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:15:04.26",
+        "end": "2:15:46.97"
+      },
+      "style": "fit",
+      "note": "Ok clip. Funny with Ron and JasonTheWeen included"
+    },
+    {
+      "start": "2:22:17.81",
+      "end": "2:23:12.95",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:22:17.81",
+        "end": "2:23:01.74"
+      },
+      "style": "fit",
+      "note": "Good clip. Viewers like seeing crazy stunts like stabbing a new phone"
+    },
+    {
+      "start": "2:34:34.7",
+      "end": "2:35:15.13",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Crazy stunt"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:47:21.39",
+      "end": "0:48:01.47"
+    },
+    {
+      "start": "2:08:37.17",
+      "end": "2:09:11.66"
+    },
+    {
+      "start": "2:59:49.34",
+      "end": "3:00:31.97"
+    },
+    {
+      "start": "3:01:21.79",
+      "end": "3:02:01.73"
+    }
+  ]
+}

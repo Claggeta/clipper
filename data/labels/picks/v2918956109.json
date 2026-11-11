@@ -1,0 +1,80 @@
+{
+  "source": "v2918956109.mp4",
+  "labels": [
+    {
+      "start": "0:03:46.26",
+      "end": "0:04:34.97",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:03:46.26",
+        "end": "0:04:29.83"
+      },
+      "style": "fit",
+      "note": "Ok clip. Interesting food."
+    },
+    {
+      "start": "0:06:16.57",
+      "end": "0:06:57.83",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Interesting food."
+    },
+    {
+      "start": "0:16:00.24",
+      "end": "0:16:41.72",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Interesting food."
+    },
+    {
+      "start": "0:17:19.36",
+      "end": "0:17:59.34",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good Clip. Interesting food."
+    },
+    {
+      "start": "0:21:45.03",
+      "end": "0:22:26.28",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Interesting food."
+    },
+    {
+      "start": "0:24:30.76",
+      "end": "0:25:13.78",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good Clip. Interesting foods. Funny seeing them nervous."
+    },
+    {
+      "start": "0:30:01.22",
+      "end": "0:31:45.18",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:30:01.22",
+        "end": "0:30:44.38"
+      },
+      "style": "fit",
+      "note": "Good Clip. Interesting Food."
+    },
+    {
+      "start": "1:12:09.67",
+      "end": "1:12:40.99",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip"
+    },
+    {
+      "start": "1:17:46.65",
+      "end": "1:19:07.19",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:17:46.65",
+        "end": "1:18:26.45"
+      },
+      "style": "fit",
+      "note": "Good clip. Interesting food."
+    }
+  ]
+}
