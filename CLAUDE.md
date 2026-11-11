@@ -183,6 +183,9 @@ and planned code:
   setup needs ~1 GB of NVIDIA cuBLAS/cuDNN packages plus Windows DLL-path
   code. Unquantised GPU types drop nearly all punctuation. Transcription
   stays CPU `int8`; revisit with a larger Whisper model (V5).
+  `small` pilot amendment (V5 item 12): on one VOD, 1.8x slower per hour,
+  half the periods, and the LLM's top 10 lost all 5 known keepers (9
+  unjudged); stopped at one VOD, Whisper stays `base`.
 - `0022` — `clipper drafts <source>`: a `http(s)://` source is fetched
   (0020), anything else is a file; then the same analyze and render code
   (`_analyze_video`, `_plan_render`, `_cut_clips`, `_fetch_video` in
@@ -887,9 +890,11 @@ Items 8 and 9 do not depend on picking and may land earlier.
     amendment.~~ (done; #171; LLM and `--top 10` for `drafts` only, 18 to
     12 keepers at top 10; ties did not decide it, so the finer score stays
     Parked)
-12. A larger Whisper model (`small`) on the CPU, timed on the long stream
+12. ~~A larger Whisper model (`small`) on the CPU, timed on the long stream
     and measured as above. May end in nothing. ADR 0021 amendment, manual
-    step.
+    step.~~ (done; ended in nothing: a one-VOD pilot on v2922589775 instead
+    of the long stream, 2,415 s, LLM keepers 5 to 0 with 9 unjudged; ADR
+    0021 amendment; no code, so no manual step)
 13. ~~Face-aware vertical spike: a facecam found once per video and split
     above the gameplay, following the person, or nothing. Ends in a new ADR
     amending 0016; built in V5 only if it picks the facecam split.~~ (done;
@@ -925,8 +930,8 @@ Later, not scheduled:
 - Tuning for the education/speech and podcast niches, with their own judged
   labels.
 - The movies/TV niche, after an ADR on rights.
-- Whisper `medium`, or the GPU setup in ADR 0021, if item 12 helps but is
-  too slow.
+- Whisper `medium`, or the GPU setup in ADR 0021: item 12's `small` pilot
+  did not help, so only with a new reason a larger model would pick better.
 - Campaign briefs as a detector input, once the maintainer has read some.
   Needs an ADR.
   Two read on 2026-11-10 (see "Campaign briefs read"); neither asks

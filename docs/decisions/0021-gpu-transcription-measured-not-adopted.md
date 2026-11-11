@@ -101,11 +101,40 @@ Reasons:
   once per video thanks to the cache.
 - (-) Larger Whisper models stay impractical for long videos on the CPU.
 
+## Amended by the Whisper `small` pilot (V5 item 12)
+
+Measured on 2026-11-10 with no code change: `CLIPPER_WHISPER_MODEL=small`
+already works, and the cache name `faster-whisper-small+words` keeps its
+transcripts apart from `base`'s. One VOD, v2922589775 (adapt, 5:19:43),
+CPU `int8`, cold, alone on the machine, saved to a separate output folder;
+`eval` at top 10 against its judged labels (7 keepers, 13 rejected spans).
+
+- Time: 2,415 s, about 453 s per hour of video against `base`'s 249 (the
+  5:04:01 stream above), so about 1.8x slower.
+- Transcript against `base`'s: 86.4% word match, 5,643 segments against
+  4,942, periods 717 against 1,406, question marks 371 against 455.
+- LLM (`qwen3.5:9b`, the `drafts` default): `base` 5 keepers, 5 rejected,
+  0 unjudged; `small` 0 keepers, 1 rejected, 9 unjudged.
+- Heuristic: `base` 1 keeper, 8 rejected, 1 unjudged; `small` 1 keeper
+  (the same draft), 1 rejected, 8 unjudged.
+
+The bar, set before the run: 2 more keepers or 2 fewer rejects for one
+detector with no loss for the other. The LLM lost every known keeper; it
+would need 7 of its 9 unjudged drafts kept to clear the bar, where about
+half the LLM's baseline drafts were. The pilot stopped at one VOD.
+
+Decision: Whisper stays `base`. The unjudged drafts were not judged, so
+whether `small`'s picks are worse is unmeasured; that they are not much
+better is the finding. A larger model is not worth 1.8x the transcription
+time and fewer sentence ends (ADR 0017 caption chunks, the heuristic's
+`?`).
+
 ## Revisit when
 
 - A larger Whisper model (`small`, `medium`) is wanted. That is where the GPU
   pays, and it changes which moments are picked, so it belongs with picking
-  (V5). The setup above is the starting point.
+  (V5). The setup above is the starting point. `small` on the CPU was
+  piloted in V5 item 12 (amendment above) and not adopted.
 - Transcription time becomes the bottleneck of the unattended flow (V4 item
   8 measures the whole run).
 - A CTranslate2 or faster-whisper release changes GPU output enough that a
