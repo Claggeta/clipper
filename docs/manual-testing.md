@@ -1984,6 +1984,7 @@ $env:COLUMNS = "500"
 $env:CLIPPER_VIDEOS_DIR = "$S\videos"
 $env:CLIPPER_CACHE_DIR  = "$S\cache"
 $env:CLIPPER_OUTPUT_DIR = "$S\out"
+$env:CLIPPER_CLIPS_DIR  = "$S\clips"
 
 # Helper: runs `clipper <Arguments>`, keeps the exit code, the seconds taken
 # and the text, and prints them. yt-dlp's progress goes to the same file.
@@ -2571,10 +2572,13 @@ Then delete `data\clips\rv7-copy` and `data\rv7-labels`.
 
 Covers the style switch ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)).
 Make drafts in both styles into a scratch folder and serve them with
-scratch labels, so nothing touches your real judgments:
+scratch labels, so nothing touches your real judgments. The steps use four
+clips with both styles, and a clip without a face renders in `fit` only, so
+pick a video with a face on screen and check that four clips have a
+`.face.mp4`; if not, raise `--top`:
 
 ```powershell
-cmd /c "set CLIPPER_CLIPS_DIR=data\clips\rv10&& set CLIPPER_OUTPUT_DIR=data\rv10-output&& uv run clipper drafts --no-titles --detector heuristic --top 2 data\videos\<a fetched video>.mp4"
+cmd /c "set CLIPPER_CLIPS_DIR=data\clips\rv10&& set CLIPPER_OUTPUT_DIR=data\rv10-output&& uv run clipper drafts --no-titles --detector heuristic --top 4 data\videos\<a fetched video>.mp4"
 cmd /c "set CLIPPER_LABELS_DIR=data\rv10-labels&& uv run clipper review data\clips\rv10\<its id>"
 ```
 
@@ -2891,6 +2895,16 @@ this time). For `drafts`, the maintainer's second YouTube video
   clips`, then `Drafts:`; `clips: 5` (D8's). With `--no-titles`: exit 0 in
   26.6 s, all 5 rendered ` (vertical, captions)`, no title lines.
 - D11: no `CLIPPER_` variable left; the scratch folder was removed.
+
+**D12 and RV10**, 2026-11-10, run by the maintainer. D12 passed. RV10 steps
+1 to 4 and 7 passed; 5 and 6 were not reached, since the step then asked
+for `--top 2` and so made only two clips, and the maintainer judged that
+enough. Two fixes to the steps came out of it: D0 now sets
+`CLIPPER_CLIPS_DIR`, which D11 already removed, so D12's drafts no longer go
+to `data/clips/`; and RV10 now asks for `--top 4`. The RV10 folder left
+behind (`5pk8HLcAAT0`) held two saved clips: rank 1 kept in `face` as
+`post`, and rank 2 in `fit` as `fix`, both ends moved 5 s. Its labels file
+had `"style"` on both.
 
 ### LLM detector reference run
 

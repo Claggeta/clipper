@@ -922,13 +922,15 @@ Items 8 and 9 do not depend on picking and may land earlier.
       #164 first, after the maintainer found 13c choppy)
     - 13e. ~~A style switch in the review page; Save keeps the chosen style
       and records it (ADR 0024 amendment). Manual step.~~ (done; #167;
-      manual step RV10, not yet run; checked through the API)
+      manual step RV10 run 2026-11-10 by the maintainer: steps 1 to 4 and
+      7 passed, 5 and 6 not reached on two clips)
 
     Item 13 is done: ADR 0025 #159, face tracking #160, face style #162,
     locked framing #164, both styles in `drafts` #165, style switch #167.
 14. ~~Release notes and tag `v0.5.0`.~~ (done; notes #179, F1 run before
     tagging, tag `v0.5.0` and pre-release by the maintainer; RV10 and D12
-    not run as written)
+    run after the release by the maintainer, RV10 in part, and their steps
+    fixed)
 
 Later, not scheduled:
 
