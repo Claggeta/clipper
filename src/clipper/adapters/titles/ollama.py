@@ -13,8 +13,10 @@ SYSTEM_PROMPT = (
     '"title" of at most 8 words, and a "hook": one sentence of at most 15 '
     "words that makes a viewer want to watch, to open the post's caption. Use "
     "only what the transcript says and keep the speaker's meaning: do not "
-    "invent names or facts, or turn a claim into its opposite. No hashtags and "
-    "no emoji. No swear words of any kind, not even mild ones such as "
+    "invent names or facts, or turn a claim into its opposite. No hashtags. "
+    "End the title with one or two emoji that fit the clip, and the hook with "
+    "one; emoji do not count toward the word limits. No swear words of any "
+    "kind, not even mild ones such as "
     '"ass", "damn" or "hell": if the speaker swears, say it another way or '
     "leave the word out. Write in the language of the transcript. A message "
     "may start with an About line, written by the user, that names the people "
