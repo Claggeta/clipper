@@ -1,0 +1,85 @@
+{
+  "source": "XwH_o5xboKA.mp4",
+  "labels": [
+    {
+      "start": "0:42:00.14",
+      "end": "0:42:42.24",
+      "verdict": "post",
+      "note": "OK Clip. More context/substance would be better"
+    },
+    {
+      "start": "0:46:53.09",
+      "end": "0:47:28.17",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:46:53.09",
+        "end": "0:47:28.54"
+      },
+      "note": "OK Clip. It could use more substance to be better."
+    },
+    {
+      "start": "0:47:28.94",
+      "end": "0:47:48.11",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:47:28.94",
+        "end": "0:47:47.69"
+      },
+      "note": "OK Clip"
+    },
+    {
+      "start": "1:24:33.32",
+      "end": "1:25:12.48",
+      "verdict": "post",
+      "note": "Good Clip. Big Event."
+    },
+    {
+      "start": "1:29:40.86",
+      "end": "1:30:15.16",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:29:40.86",
+        "end": "1:30:01.8"
+      },
+      "note": "OK Clip."
+    },
+    {
+      "start": "5:40:15.57",
+      "end": "5:41:00.53",
+      "verdict": "fix",
+      "draft": {
+        "start": "5:40:15.57",
+        "end": "5:40:59.96"
+      },
+      "note": "Funny Clip"
+    },
+    {
+      "start": "5:41:31",
+      "end": "5:42:12.74",
+      "verdict": "post",
+      "note": "OK Clip"
+    },
+    {
+      "start": "6:00:06.34",
+      "end": "6:00:44.79",
+      "verdict": "post",
+      "note": "OK Clip. Kinda funny"
+    },
+    {
+      "start": "6:10:45.5",
+      "end": "6:11:25.18",
+      "verdict": "post",
+      "note": "OK Clip."
+    },
+    {
+      "start": "6:11:30.56",
+      "end": "6:12:18.71",
+      "verdict": "fix",
+      "draft": {
+        "start": "6:11:30.56",
+        "end": "6:12:14.89"
+      },
+      "note": "OK clip."
+    }
+  ]
+}

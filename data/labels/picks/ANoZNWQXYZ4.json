@@ -1,0 +1,87 @@
+{
+  "source": "ANoZNWQXYZ4.mp4",
+  "labels": [
+    {
+      "start": "0:03:00.92",
+      "end": "0:03:44.88",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip"
+    },
+    {
+      "start": "0:20:30.31",
+      "end": "0:21:14.09",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. Talks about food prices"
+    },
+    {
+      "start": "0:26:30.16",
+      "end": "0:27:14.76",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good Clip. Funny. Interesting Food."
+    },
+    {
+      "start": "0:30:30.26",
+      "end": "0:31:34.38",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:30:30.26",
+        "end": "0:31:14.46"
+      },
+      "style": "fit",
+      "note": "OK clip. Interesting food"
+    },
+    {
+      "start": "0:32:45.56",
+      "end": "0:33:29.68",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK clip. Could use more context"
+    },
+    {
+      "start": "0:37:01.57",
+      "end": "0:37:43.57",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. Could use more context"
+    },
+    {
+      "start": "0:38:30.52",
+      "end": "0:39:26.39",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:38:30.52",
+        "end": "0:39:14.49"
+      },
+      "style": "fit",
+      "note": "Good clip. Interesting Food."
+    },
+    {
+      "start": "0:41:45",
+      "end": "0:42:29.92",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Interesting seeing the difference in meal prices"
+    },
+    {
+      "start": "0:46:48.96",
+      "end": "0:47:59.51",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:46:48.96",
+        "end": "0:47:28.9"
+      },
+      "style": "fit",
+      "note": "Good Clip. Interesting Food."
+    },
+    {
+      "start": "0:50:45.42",
+      "end": "0:51:29.72",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip"
+    }
+  ]
+}

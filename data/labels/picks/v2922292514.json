@@ -1,0 +1,66 @@
+{
+  "source": "v2922292514.mp4",
+  "labels": [
+    {
+      "start": "0:07:10.22",
+      "end": "0:07:42.79",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:07:10.22",
+        "end": "0:07:40.09"
+      },
+      "style": "fit",
+      "note": "OK clip"
+    },
+    {
+      "start": "0:16:31.71",
+      "end": "0:17:03.27",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK clip"
+    },
+    {
+      "start": "1:14:34.72",
+      "end": "1:15:08.86",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Shows accomplishment and triumph"
+    },
+    {
+      "start": "1:20:44.94",
+      "end": "1:21:27",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip"
+    },
+    {
+      "start": "1:32:50.38",
+      "end": "1:33:27.96",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK clip."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:18:05.84",
+      "end": "0:18:33.46"
+    },
+    {
+      "start": "0:19:38.22",
+      "end": "0:20:11.68"
+    },
+    {
+      "start": "0:44:36.7",
+      "end": "0:45:05.58"
+    },
+    {
+      "start": "1:22:52.09",
+      "end": "1:23:28.86"
+    },
+    {
+      "start": "1:32:18",
+      "end": "1:32:42.23"
+    }
+  ]
+}
