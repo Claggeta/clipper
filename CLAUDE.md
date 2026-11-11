@@ -109,7 +109,10 @@ and planned code:
   seconds per window and ran out of context. The default model is
   `qwen3.5:9b`, chosen from manual steps L1 to L5; `heuristic` stays the
   default detector. Breaking score ties by the heuristic was measured and not
-  adopted.
+  adopted. Detector examples amendment (V6 4, not adopted): 4 kept and 4
+  rejected excerpts from other videos in the system prompt; on four VODs
+  at top 10, keepers 29 to 25 (27), rejects 11 to 12; the examples
+  reshuffled the top 10 rather than sharpening it.
   Drafts defaults amendment (V5 11): `drafts` uses the LLM and `--top N`
   (default 10, `CLIPPER_TOP_N` not used); `analyze` and `eval` keep the
   heuristic and top 5. Judged keepers at top 10 on three VODs: LLM 18,
@@ -1041,9 +1044,12 @@ titles naming the person and titles kept unedited.
    title prompt asks for fitting emoji in place of "no emoji". ADR 0018
    amendment, measured on the same keepers.~~ (done; every title ends with
    emoji, naming the person 68 to 61; ADR 0018 amendment)
-4. Detector examples: the LLM prompt gets judged keepers and rejects from
+4. ~~Detector examples: the LLM prompt gets judged keepers and rejects from
    other VODs as examples. Measured leave one VOD out with `eval`, with the
-   time per VOD. ADR 0014 amendment. May end in nothing.
+   time per VOD. ADR 0014 amendment. May end in nothing.~~ (done; ended in
+   nothing: on four VODs at top 10, 29 keepers and 11 rejects without, 25
+   (27 with two overlapping saves `review` refused) and 12 with; the 22
+   new windows judged, labels committed; ADR 0014 amendment; no code)
 5. A trained ranker on the judged labels (frozen local text embeddings and
    a simple classifier, with the heuristic's signals, the LLM score and
    nearest judged spans as inputs if they help), against the LLM leave one
@@ -1189,6 +1195,12 @@ Later, not scheduled:
   come from Twitch clips, which many viewers made. Fix: word it by source, or
   drop "one labeler"; how `eval` would know the source is undecided (a field
   in the labels file, or the note prefix). Seen in manual step T5.
+- `review` refuses a span that overlaps another clip's label (ADR 0024,
+  item 3c), even when the maintainer would save both: in V6 item 4 two new
+  windows on v2918956109 overlapped saved keepers by 11 and 13 s and could
+  not be saved. Fix: allow a saved span to overlap another label by less
+  than the hit rule (half the shorter span), or ask first; an ADR 0024
+  amendment.
 - Manual steps D9 and D10 pipe `Invoke-Fetch` into
   `Select-Object -Last N`, which does nothing: the helper returns the text as
   one string. Fix: split the text into lines, or drop the pipe.

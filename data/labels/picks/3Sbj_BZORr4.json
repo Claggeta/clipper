@@ -2,6 +2,24 @@
   "source": "3Sbj_BZORr4.mp4",
   "labels": [
     {
+      "start": "0:02:45.55",
+      "end": "0:03:28.12",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:02:45.55",
+        "end": "0:03:29.03"
+      },
+      "style": "fit",
+      "note": "Good clip. Funny/semi-dark humor"
+    },
+    {
+      "start": "0:04:45.85",
+      "end": "0:05:29.47",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Funny that Lays can't play smart"
+    },
+    {
       "start": "0:10:02.07",
       "end": "0:10:44.53",
       "verdict": "post",
@@ -56,6 +74,13 @@
       "note": "funny clip"
     },
     {
+      "start": "0:47:18.77",
+      "end": "0:47:53.67",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. A lot of yelling and Chaos"
+    },
+    {
       "start": "1:01:01.7",
       "end": "1:01:44.52",
       "verdict": "post",
@@ -75,6 +100,14 @@
     {
       "start": "0:20:46.65",
       "end": "0:21:29.29"
+    },
+    {
+      "start": "0:23:45.72",
+      "end": "0:24:28.74"
+    },
+    {
+      "start": "1:02:45.32",
+      "end": "1:03:29.8"
     }
   ]
 }
