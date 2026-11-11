@@ -1,0 +1,80 @@
+{
+  "source": "v2910908943.mp4",
+  "labels": [
+    {
+      "start": "0:14:05.76",
+      "end": "0:14:49.3",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:14:05.76",
+        "end": "0:14:45.6"
+      },
+      "style": "fit",
+      "note": "Funny clip. Just needed a little longer ending."
+    },
+    {
+      "start": "0:43:34.6",
+      "end": "0:44:26.98",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:43:34.6",
+        "end": "0:44:15.34"
+      },
+      "style": "fit",
+      "note": "Good clip just needed a little longer ending"
+    },
+    {
+      "start": "0:59:38.66",
+      "end": "1:00:06.45",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Funny Clip."
+    },
+    {
+      "start": "1:14:50.82",
+      "end": "1:15:20.68",
+      "verdict": "post",
+      "style": "fit",
+      "note": "funny clip"
+    },
+    {
+      "start": "1:20:21.44",
+      "end": "1:21:01.34",
+      "verdict": "post",
+      "style": "fit",
+      "note": "funny clip"
+    },
+    {
+      "start": "1:21:06.24",
+      "end": "1:21:47.33",
+      "verdict": "post",
+      "style": "fit",
+      "note": "intense and entertaining clip"
+    },
+    {
+      "start": "3:27:15.88",
+      "end": "3:27:55.21",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:27:15.88",
+        "end": "3:27:45.88"
+      },
+      "style": "fit",
+      "note": "Good clip. Entertaining"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:47:47.72",
+      "end": "0:48:31.85"
+    },
+    {
+      "start": "1:16:18.32",
+      "end": "1:17:00.95"
+    },
+    {
+      "start": "1:37:35.35",
+      "end": "1:37:54.14"
+    }
+  ]
+}
