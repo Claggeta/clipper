@@ -21,6 +21,7 @@ data/*
 !data/labels/
 # The channels file for titles is committed too (docs/decisions/0018).
 !data/channels.txt
+!data/people.txt
 dist/
 
 clipper-reference.md

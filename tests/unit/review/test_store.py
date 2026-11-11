@@ -573,3 +573,42 @@ def test_trash_logs_an_odd_style_file_name_and_still_trashes(
 
     assert trashed is not None and trashed.reviewed == "trashed"
     assert "Not deleting '../elsewhere.mp4': not a file name" in caplog.text
+
+
+def test_a_rating_and_people_in_the_body_are_read_in_the_lists_order() -> None:
+    from clipper.review.store import parse_save
+
+    body = {"start": 1.0, "end": 20.0, "rating": "good", "people": ["Lacy", "Ron"]}
+    request = parse_save(body, 100.0, ("Ron", "Jason", "Lacy"))
+    assert (request.rating, request.people) == ("good", ("Ron", "Lacy"))
+    plain = parse_save({"start": 1.0, "end": 20.0}, 100.0, ("Ron",))
+    assert (plain.rating, plain.people) == (None, ())
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ({"rating": "great"}, "the rating must be one of good, ok"),
+        ({"people": "Ron"}, "people must be a list of names"),
+        ({"people": [3]}, "people must be a list of names"),
+        ({"people": ["Keith"]}, "'Keith' is not in the people list"),
+    ],
+)
+def test_a_bad_rating_or_people_in_the_body_is_refused(
+    extra: dict[str, object], message: str
+) -> None:
+    from clipper.review.store import BadRequest, parse_save
+
+    with pytest.raises(BadRequest, match=message):
+        parse_save({"start": 1.0, "end": 20.0, **extra}, 100.0, ("Ron",))
+
+
+def test_save_writes_the_rating_and_people_and_shows_them(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    request = SaveRequest(10.0, 40.0, None, None, rating="good", people=("Ron",))
+    env.store.save(1, request)
+    [label] = load_labels(env.labels_path).labels
+    assert (label.rating, label.people) == ("good", ("Ron",))
+    judgment = env.store.judgment(env.store.manifest.clips[0])
+    assert judgment is not None
+    assert (judgment["rating"], judgment["people"]) == ("good", ["Ron"])

@@ -1,14 +1,14 @@
-"""Saved about text per channel, for titles when `--about` is not given.
+"""Saved about text per channel, and the people the review page offers.
 
-Pure functions: parsing the channels file and finding a video's line.
-Reading the file is the caller's. See docs/decisions/0018 (saved about
-amendment).
+Pure functions: parsing the channels file and finding a video's line, and
+parsing the people file. Reading the files is the caller's. See
+docs/decisions/0018 (saved about amendment) and 0024 (rating amendment).
 """
 
 from collections.abc import Mapping
 
 from clipper.core.sources import ABOUT_SEPARATOR
-from clipper.domain.errors import TitleError
+from clipper.domain.errors import ReviewError, TitleError
 from clipper.domain.models import VideoInfo
 
 # The longest about text, saved or given with --about (ADR 0018, 8c).
@@ -54,3 +54,30 @@ def channel_about(abouts: Mapping[str, str], video: VideoInfo | None) -> str | N
     if video is None:
         return None
     return abouts.get(video.channel.strip().casefold())
+
+
+# The longest name in the people file.
+PERSON_LIMIT = 40
+
+
+def parse_people(text: str) -> tuple[str, ...]:
+    """One name per line, in order; blank lines and `#` comments skipped.
+
+    Raises `ReviewError` for a name over `PERSON_LIMIT` characters or given
+    twice, ignoring case.
+    """
+    names: list[str] = []
+    seen: set[str] = set()
+    for number, raw in enumerate(text.splitlines(), start=1):
+        name = raw.strip()
+        if not name or name.startswith("#"):
+            continue
+        if len(name) > PERSON_LIMIT:
+            raise ReviewError(
+                f"Line {number}: a name is at most {PERSON_LIMIT} characters"
+            )
+        if name.casefold() in seen:
+            raise ReviewError(f"Line {number}: {name!r} is given twice")
+        seen.add(name.casefold())
+        names.append(name)
+    return tuple(names)

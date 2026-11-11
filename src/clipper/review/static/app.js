@@ -1,7 +1,8 @@
 // The review page (ADR 0024). List the clips, play the source video
 // anywhere, trim with a film strip and two handles (3b), Save or Trash each
 // clip with its title and notes (3c), re-rendered on Save (3d), and add
-// clips no draft proposed (3e).
+// clips no draft proposed (3e). A keeper gets a rating and who is on screen
+// (rating amendment).
 "use strict";
 
 const player = document.getElementById("player");
@@ -15,6 +16,8 @@ const trashButton = document.getElementById("trash");
 const draft = document.getElementById("draft");
 const draftView = document.getElementById("draft-view");
 const styleBox = document.getElementById("styles");
+const ratingBox = document.getElementById("rating");
+const peopleBox = document.getElementById("people");
 
 // Seconds per frame in the strip, from zoomed in to zoomed out. Fixed
 // steps keep frames on a grid, so views share cached frames.
@@ -42,6 +45,8 @@ const buttons = new Map(); // key -> the clip's button in the list
 const edits = new Map(); // key -> {start, end}, kept while the page is open
 const chosen = new Map(); // key -> the style picked and not yet saved
 const versions = new Map(); // key -> bumped after a Save, so the draft reloads
+const marks = new Map(); // key -> the rating and people set, not yet saved
+let people = []; // the names the page offers as on screen
 let trashArmed = null; // the timer while Trash waits for its second click
 let busy = false; // while a Save is waiting on the server (a re-render)
 let span = null; // the chosen clip's edited {start, end}
@@ -205,8 +210,12 @@ function drawUnsaved() {
     return;
   }
   const saved = savedState(current);
+  const mark = marksOf(current);
+  const savedMark = savedMarks(current);
   const changed =
     current.isNew ||
+    mark.rating !== savedMark.rating ||
+    chosenPeople(current).join(",") !== savedMark.people.join(",") ||
     chosenStyle(current) !== (current.style || null) ||
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
@@ -265,6 +274,67 @@ function drawClipInfo(clip) {
   const failed = Boolean(clip.error) && !clip.file;
   error.hidden = !failed;
   error.textContent = failed ? `Render failed: ${clip.error}` : "";
+}
+
+// --- Rating and who is on screen (rating amendment) ---
+
+// What the clip's label holds: its rating and people, or none.
+function savedMarks(clip) {
+  const judgment = clip.judgment || {};
+  return { rating: judgment.rating || null, people: judgment.people || [] };
+}
+
+// The rating and people shown for a clip: saved, or changed and not saved.
+function marksOf(clip) {
+  if (!marks.has(clip.key)) {
+    const saved = savedMarks(clip);
+    marks.set(clip.key, { rating: saved.rating, people: new Set(saved.people) });
+  }
+  return marks.get(clip.key);
+}
+
+// The people marked for a clip, in the list's order.
+function chosenPeople(clip) {
+  const mark = marksOf(clip);
+  return people.filter((name) => mark.people.has(name));
+}
+
+function drawMarks(clip) {
+  const mark = marksOf(clip);
+  for (const button of ratingBox.querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.value === mark.rating));
+  }
+  peopleBox.replaceChildren();
+  for (const name of people) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = name;
+    button.setAttribute("aria-pressed", String(mark.people.has(name)));
+    button.addEventListener("click", () => {
+      if (mark.people.has(name)) {
+        mark.people.delete(name);
+      } else {
+        mark.people.add(name);
+      }
+      drawMarks(clip);
+      drawUnsaved();
+    });
+    peopleBox.append(button);
+  }
+  document.getElementById("people-field").hidden = people.length === 0;
+}
+
+// A second press on the chosen rating clears it.
+for (const button of ratingBox.querySelectorAll("button")) {
+  button.addEventListener("click", () => {
+    if (!current) {
+      return;
+    }
+    const mark = marksOf(current);
+    mark.rating = mark.rating === button.dataset.value ? null : button.dataset.value;
+    drawMarks(current);
+    drawUnsaved();
+  });
 }
 
 // --- The rendered draft and its styles (ADR 0025) ---
@@ -338,6 +408,7 @@ function select(clip, button) {
   document.getElementById("details").hidden = false;
   titleBox.value = clip.title || "";
   noteBox.value = (clip.judgment && clip.judgment.note) || "";
+  drawMarks(clip);
   drawJudged(clip);
   drawClipInfo(clip);
   drawDraft(clip);
@@ -505,9 +576,11 @@ async function post(path, body) {
 function judged(clip, reply) {
   Object.assign(clip, reply);
   chosen.delete(clip.key);
+  marks.delete(clip.key);
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
+    drawMarks(clip);
     drawJudged(clip);
     drawClipInfo(clip);
     drawDraft(clip);
@@ -531,6 +604,8 @@ saveButton.addEventListener("click", async () => {
       title: titleBox.value,
       note: noteBox.value,
       style: chosenStyle(clip),
+      rating: marksOf(clip).rating,
+      people: chosenPeople(clip),
     });
     clip.isNew = false;
     judged(clip, reply);
@@ -718,6 +793,7 @@ async function load() {
   duration = data.duration;
   framesKey = encodeURIComponent(data.frames_key);
   text("source", data.source);
+  people = data.people || [];
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {
     if (data[name]) {

@@ -1,7 +1,13 @@
 import pytest
 
-from clipper.core.channels import ABOUT_LIMIT, channel_about, parse_channel_abouts
-from clipper.domain.errors import TitleError
+from clipper.core.channels import (
+    ABOUT_LIMIT,
+    PERSON_LIMIT,
+    channel_about,
+    parse_channel_abouts,
+    parse_people,
+)
+from clipper.domain.errors import ReviewError, TitleError
 from clipper.domain.models import VideoInfo
 
 # Constructed channel lines, not the maintainer's file.
@@ -46,3 +52,19 @@ def test_finds_the_channel_ignoring_case_and_spaces() -> None:
     assert channel_about(abouts, _video("Lacy ")) == "Lacy (he/him)"
     assert channel_about(abouts, _video("other")) is None
     assert channel_about(abouts, None) is None
+
+
+def test_parses_people_in_order() -> None:
+    assert parse_people("# CORE\nRon\n\n Jason \nLacy\n") == ("Ron", "Jason", "Lacy")
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("Ron\nron", "Line 2: 'ron' is given twice"),
+        (f"{'x' * (PERSON_LIMIT + 1)}", f"Line 1: a name is at most {PERSON_LIMIT}"),
+    ],
+)
+def test_bad_people_lines_raise_review_errors(text: str, message: str) -> None:
+    with pytest.raises(ReviewError, match=message):
+        parse_people(text)

@@ -380,6 +380,31 @@ until the drafts rarely need editing.
   (esprima); the page itself is checked by manual step RV10, since the
   browser extension was not connected.
 
+## Amended by rating and people (V6 item 4a)
+
+The maintainer posts too many clips and wants to post only the best; their
+notes already split keepers into "Good" (30) and "OK" (47). And campaign
+rules turn on who is on screen (the CORE brief needs two members), which
+the transcript only hints at.
+
+- **Rating**: Save may carry `rating`, `good` (worth posting) or `ok`
+  (kept for the backlog), from two toggle buttons; a second press clears
+  it. Optional, so a Save without one works as before. Any other value is
+  400.
+- **On screen**: a toggle button per name in the people file,
+  `data/people.txt` (`CLIPPER_PEOPLE_FILE`, committed, one name per line,
+  `#` comments, at most 40 characters, no name twice ignoring case; a bad
+  line stops `review` before it serves). Save may carry `people`, names
+  from that list only (400 otherwise), stored in the list's order. No
+  file, no buttons.
+- **Stored on the judged label** (0012), `rating` and `people`, written
+  only when set, and shown again when the clip is chosen; changing either
+  shows as unsaved. A rejected span has neither. The manifest is
+  unchanged: the post queue (V6 item 4b) reads them from the labels.
+- Checked by unit tests on the body, the store and the label file; the
+  page script parses (esprima, reading `??` as `||`); the page itself by
+  manual step RV11.
+
 ## Related
 
 - 0011: render's failure policy

@@ -483,6 +483,8 @@ class Span(BaseModel):
 
 
 Verdict = Literal["post", "fix", "added"]
+# How good a keeper is, set in the review page (ADR 0024, rating amendment).
+Rating = Literal["good", "ok"]
 
 
 class Label(Span):
@@ -493,12 +495,27 @@ class Label(Span):
     as cut, `fix` a draft whose span was moved (`draft` keeps the old span),
     and `added` a moment no draft proposed. `style` is the vertical style the
     maintainer kept for the clip, when there were styles (ADR 0025).
+    `rating` says whether a keeper is good enough to post or kept for the
+    backlog, and `people` who is on screen, both from the review page (ADR
+    0024, rating amendment).
     """
 
     note: str | None = None
     verdict: Verdict | None = None
     draft: Span | None = None
     style: VerticalStyleName | None = None
+    rating: Rating | None = None
+    people: tuple[str, ...] = ()
+
+    @field_validator("people")
+    @classmethod
+    def _people_named_once(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        names = tuple(name.strip() for name in value)
+        if any(not name for name in names):
+            raise ValueError("a name in people is empty")
+        if len({name.casefold() for name in names}) != len(names):
+            raise ValueError("a name in people is given twice")
+        return names
 
     @model_validator(mode="after")
     def _draft_only_on_fix(self) -> "Label":

@@ -74,6 +74,15 @@
           <input id="title-box" type="text" maxlength="200" autocomplete="off">
           <label for="note-box">Notes</label>
           <textarea id="note-box" rows="3"></textarea>
+          <span class="field-label" id="rating-label">Rating</span>
+          <div id="rating" class="toggle-row" role="group" aria-labelledby="rating-label">
+            <button type="button" data-value="good" title="Worth posting">Good</button>
+            <button type="button" data-value="ok" title="Keep for the backlog">OK</button>
+          </div>
+          <div id="people-field" class="judge-field" hidden>
+            <span class="field-label" id="people-label">On screen</span>
+            <div id="people" class="toggle-row" role="group" aria-labelledby="people-label"></div>
+          </div>
           <div class="judge-actions">
             <button type="button" id="save" class="primary">Save</button>
             <button type="button" id="trash" class="danger">Trash</button>

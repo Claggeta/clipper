@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 MAX_TITLE = 200
 # The styles a Save may keep (ADR 0025).
 STYLES = ("fit", "face")
+# A keeper's rating: worth posting, or for the backlog (ADR 0024).
+RATINGS = ("good", "ok")
 # The reason listed for a clip added in the page (ADR 0019, 3e amendment).
 ADDED_REASON = "added in review"
 
@@ -64,6 +66,9 @@ class SaveRequest:
     note: str | None
     # The vertical style to keep; None keeps the clip's own (ADR 0025).
     style: str | None = None
+    # The rating and who is on screen (ADR 0024, rating amendment).
+    rating: str | None = None
+    people: tuple[str, ...] = ()
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -85,9 +90,13 @@ def _seconds(data: dict[str, object], key: str) -> float:
     return float(value)
 
 
-def parse_save(data: object, duration: float) -> SaveRequest:
+def parse_save(
+    data: object, duration: float, people: tuple[str, ...] = ()
+) -> SaveRequest:
     """Check a Save body: times inside the video, end after start, a one-line
     title of at most `MAX_TITLE` characters, and any note. Empty text is None.
+    A rating is one of `RATINGS`; people are names from `people`, the run's
+    list, kept in that list's order.
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -105,7 +114,17 @@ def parse_save(data: object, duration: float) -> SaveRequest:
     style = data.get("style")
     if style is not None and style not in STYLES:
         raise BadRequest(f"the style must be one of {', '.join(STYLES)}")
-    return SaveRequest(start, end, title, _text(data, "note"), style)
+    rating = data.get("rating")
+    if rating is not None and rating not in RATINGS:
+        raise BadRequest(f"the rating must be one of {', '.join(RATINGS)}")
+    named = data.get("people", [])
+    if not isinstance(named, list) or not all(isinstance(n, str) for n in named):
+        raise BadRequest("people must be a list of names")
+    unknown = [name for name in named if name not in people]
+    if unknown:
+        raise BadRequest(f"{unknown[0]!r} is not in the people list")
+    chosen = tuple(name for name in people if name in named)
+    return SaveRequest(start, end, title, _text(data, "note"), style, rating, chosen)
 
 
 def parse_trash(data: object) -> str | None:
@@ -184,6 +203,8 @@ class ReviewStore:
                     "end": label.end_seconds,
                     "note": label.note,
                     "style": label.style,
+                    "rating": label.rating,
+                    "people": list(label.people),
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -252,6 +273,8 @@ class ReviewStore:
             request.end,
             request.note,
             style,
+            request.rating,
+            request.people,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
