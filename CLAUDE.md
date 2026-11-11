@@ -566,6 +566,20 @@ keepers whose label ends over 1 s later or starts over 1 s earlier.
   remuxed file before counting it.
 - v2917438534 (its clip labels only) was left out of the baseline.
 
+More judged drafts (2026-11-10), after the baseline: `drafts` with the LLM
+at top 10, every draft judged in `review`, labels in `data/labels/picks/`.
+Keepers saved and drafts trashed per VOD:
+
+- v2922292514 (stableronaldo, Twitch): 5 keepers, 5 trashed.
+- v2924380274 (jasontheween, Twitch): 6 keepers, 4 trashed.
+- 3Sbj_BZORr4 (CORE, YouTube IRL): 7 keepers, 3 trashed.
+- ANoZNWQXYZ4 (CORE, YouTube IRL): 10 keepers, none trashed.
+- XwH_o5xboKA (Lacy, YouTube stream): 10 keepers, none trashed; rendered
+  before item 13d, so no style.
+- Styles (ADR 0025): the other four rendered `fit` and `face`, and all 28
+  keepers were saved in `fit`, none in `face`. Input for the speaker
+  detection and facecam split items under "Later".
+
 Loudness spike (V5 item 10a, 2026-11-10), ended in nothing. Per-second
 loudness from ffmpeg's `ebur128` (`-v verbose` prints the 100 ms frame log;
 the max momentary and short-term value per second kept), about 30 to 45 s per

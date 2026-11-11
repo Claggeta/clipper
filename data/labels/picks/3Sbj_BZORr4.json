@@ -1,0 +1,80 @@
+{
+  "source": "3Sbj_BZORr4.mp4",
+  "labels": [
+    {
+      "start": "0:10:02.07",
+      "end": "0:10:44.53",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Funny"
+    },
+    {
+      "start": "0:13:00.9",
+      "end": "0:13:57.37",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:13:00.9",
+        "end": "0:13:44.72"
+      },
+      "style": "fit",
+      "note": "Funny clip."
+    },
+    {
+      "start": "0:14:54.17",
+      "end": "0:15:32.3",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:14:45.39",
+        "end": "0:15:28.49"
+      },
+      "style": "fit",
+      "note": "Funny clip"
+    },
+    {
+      "start": "0:23:16.18",
+      "end": "0:23:58.78",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Funny clip"
+    },
+    {
+      "start": "0:26:00.07",
+      "end": "0:26:31.63",
+      "verdict": "post",
+      "style": "fit",
+      "note": "funny clip"
+    },
+    {
+      "start": "0:33:00.71",
+      "end": "0:34:01.7",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:33:00.71",
+        "end": "0:33:43.65"
+      },
+      "style": "fit",
+      "note": "funny clip"
+    },
+    {
+      "start": "1:01:01.7",
+      "end": "1:01:44.52",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. funny"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:11:17.29",
+      "end": "0:11:59.95"
+    },
+    {
+      "start": "0:16:45.4",
+      "end": "0:17:29.8"
+    },
+    {
+      "start": "0:20:46.65",
+      "end": "0:21:29.29"
+    }
+  ]
+}

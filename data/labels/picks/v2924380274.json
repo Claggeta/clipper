@@ -1,0 +1,65 @@
+{
+  "source": "v2924380274.mp4",
+  "labels": [
+    {
+      "start": "0:25:37.02",
+      "end": "0:26:18.84",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Hot topic news. OK Clip"
+    },
+    {
+      "start": "0:27:35.44",
+      "end": "0:28:08.46",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Hot Topic News. OK Clip"
+    },
+    {
+      "start": "0:41:21.61",
+      "end": "0:42:02.78",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Talking about upcoming event. OK Clip"
+    },
+    {
+      "start": "1:07:12.65",
+      "end": "1:07:45.58",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. Kinda funny"
+    },
+    {
+      "start": "3:23:21.46",
+      "end": "3:24:03.58",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK Clip. Kinda funny"
+    },
+    {
+      "start": "5:12:37.56",
+      "end": "5:13:19.64",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Kinda funny. OK Clip"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:47:05.2",
+      "end": "0:47:46.4"
+    },
+    {
+      "start": "2:18:09.88",
+      "end": "2:18:40.34"
+    },
+    {
+      "start": "3:48:55.26",
+      "end": "3:49:33.03"
+    },
+    {
+      "start": "3:52:52.68",
+      "end": "3:53:34.06"
+    }
+  ]
+}
