@@ -566,6 +566,38 @@ keepers whose label ends over 1 s later or starts over 1 s earlier.
   remuxed file before counting it.
 - v2917438534 (its clip labels only) was left out of the baseline.
 
+Loudness spike (V5 item 10a, 2026-11-10), ended in nothing. Per-second
+loudness from ffmpeg's `ebur128` (`-v verbose` prints the 100 ms frame log;
+the max momentary and short-term value per second kept), about 30 to 45 s per
+VOD, on the five judged streamer VODs with files: v2917872953, v2922695332,
+v2922589775, v2924380274, v2922292514 (ohnepixel left out for its start
+offset). 42 keepers (`post`, `fix`, `added`), 40 rejected spans, 14 Twitch
+clip labels, and 200 random 45 s spans per VOD. Per span: peak short-term
+loudness over the VOD's median, the 90th percentile of momentary loudness,
+the rise against the 60 s before, and the share of seconds above the VOD's
+90th percentile. Scratch scripts, not committed.
+
+| Feature | Keepers over rejected (AUC) | Keepers over random | Clip labels over random |
+|---|---|---|---|
+| Peak short-term | 0.56 | 0.54 | 0.61 |
+| 90th percentile momentary | 0.56 | 0.55 | 0.68 |
+| Rise against the 60 s before | 0.58 | 0.59 | 0.68 |
+| Share of loud seconds | 0.52 | 0.52 | 0.63 |
+
+- Keepers against rejected spans sit inside chance (0.37 to 0.63 for 42
+  against 40 by simulation), and per VOD the direction flips: peak loudness
+  0.37 on stableronaldo, 0.79 on the 2026-11-09 Jason VOD.
+- Community clips lean loud (0.61 to 0.68 over random spans), on 14 clips;
+  the maintainer's keepers do not. Clips and the maintainer's picks already
+  disagree (see the clip labels above).
+- The one mostly silent keeper (jasontheween 5:16:02, lost to the LLM in
+  ADR 0023 item 6) is loud: peak short-term 17.1 LU over the VOD's median,
+  above 97% of same-length windows. One example, which louder-is-better
+  would find, against no difference over all keepers.
+- Decision: loudness is not a detector input (10b dropped). Revisit if
+  silent or visual keepers become common in judged labels, or the facecam
+  or speaker work (ADR 0025) needs an audio signal.
+
 V3 results, for reference:
 
 - Item 7, the LLM detector: `--detector llm` via Ollama, with thinking off
@@ -829,11 +861,13 @@ Items 8 and 9 do not depend on picking and may land earlier.
    (done; #169; several sources or `--list`, `| about` per line, all
    checked first, a summary table; manual step D12)
 10. Audio loudness:
-    - 10a. Spike: per-second loudness with ffmpeg on two trial VODs,
+    - 10a. ~~Spike: per-second loudness with ffmpeg on two trial VODs,
       compared with the judged keepers and the clip labels. Ends in a new
-      ADR or in nothing. Manual step.
-    - 10b. If 10a says so: loudness as a detector input, a `core/` change.
-      Measured on judged and clip labels.
+      ADR or in nothing. Manual step.~~ (done; ended in nothing, five VODs
+      instead of two, results under "Loudness spike" in "Current state";
+      no code, so no manual step)
+    - 10b. ~~If 10a says so: loudness as a detector input, a `core/` change.
+      Measured on judged and clip labels.~~ (dropped: 10a did not say so)
 11. ~~Defaults for `drafts`: detector (heuristic or LLM) and top N, from the
     measures above; a finer LLM score if ties decide it (Parked). ADR 0014
     amendment.~~ (done; #171; LLM and `--top 10` for `drafts` only, 18 to
