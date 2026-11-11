@@ -51,15 +51,29 @@ The two signals differ:
    per VOD, not percentages. It is adopted only if it does better. A
    change that only does better on the VODs it learned from is not.
 4. **Local and free.** Training and inference run on the maintainer's
-   machine (CPU, or the RTX 4070 Ti), with small models: a local
-   embedding model and a simple classifier, not a network trained from
-   scratch. No hosted models or paid services. New dependencies go through
-   0003's check.
-5. **Retraining is a command the maintainer runs**, not a background job:
+   machine (CPU, or the RTX 4070 Ti). Pretrained encoders (text first;
+   audio and video frames later) stay frozen and turn a span into
+   embeddings; what is trained is small and sits on top: a simple
+   classifier first, a small neural network once the labels are enough
+   for it to do better on held-out VODs. Fine-tuning the encoders or the
+   LLM, and networks trained from scratch, are out: they need far more
+   labels than 4 to 10 VODs a week give. No hosted models or paid
+   services. New dependencies go through 0003's check; a GPU deep-learning
+   stack (PyTorch with CUDA) is several GB and comes only with an
+   encoder that needs it.
+5. **Embeddings are kept for lookup.** The embedding of every judged span
+   (and, after 0027, every linked Short) is stored with its verdict and
+   figures, so a new candidate can be compared with its nearest past
+   clips: as a ranker input, to pick the LLM's prompt examples, and to
+   explain a pick. A file is enough at this size (thousands of vectors,
+   compared in milliseconds); a local embedded vector store (no server)
+   only if a file stops being enough. Replaces the V3 non-goal "a vector
+   database or retrieval", which had nothing to retrieve then.
+6. **Retraining is a command the maintainer runs**, not a background job:
    it reads the current labels (and later the linked posts), trains,
    prints the held-out measures beside the current model's, and only then
    replaces it. The same data gives the same model (0015).
-6. **Where labels come from does not change.** `review` stays the way
+7. **Where labels come from does not change.** `review` stays the way
    drafts are judged; nothing is learned from drafts that were not judged.
 
 ## Alternatives considered
@@ -73,7 +87,7 @@ The two signals differ:
   of the benefit for a fraction of the cost. Revisit when the labels run
   to thousands.
 - **Retrain automatically after each review.** Hides when the picks
-  changed and why. Rejected for decision 5's explicit command.
+  changed and why. Rejected for decision 6's explicit command.
 
 ## Consequences
 
@@ -82,7 +96,7 @@ The two signals differ:
 - Each judged VOD is worth more: it is both training data and, when left
   out, a test.
 - A learned model is a new file to keep and version, and a new way for
-  picks to drift; decision 5's printed comparison is the guard.
+  picks to drift; decision 6's printed comparison is the guard.
 - Streamer VODs dominate the labels, so a learned model is tuned to them
   first; other niches need their own labels (as in the V5 scope).
 

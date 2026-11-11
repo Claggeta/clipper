@@ -299,8 +299,13 @@ and planned code:
   spans as LLM prompt examples, then a small trained ranker, then
   performance. Every learned change is measured per VOD with that VOD left
   out of training (V5's measures, counts per VOD) and adopted only if it
-  beats the current default. Local and free, small models (an embedding
-  model and a simple classifier), new dependencies through 0003.
+  beats the current default. Local and free: frozen pretrained encoders
+  (text first, audio and frames later) with a small trained model on top,
+  a simple classifier first and a small neural network once labels are
+  enough; no fine-tuning, nothing trained from scratch; new dependencies
+  through 0003. Embeddings of judged spans (and linked Shorts) are kept in
+  a file for nearest-clip lookup (ranker input, prompt examples, why a
+  pick); a local vector store only if a file stops being enough.
   Retraining is a command the maintainer runs; it prints held-out measures
   beside the current model's before replacing it. Amends the V5 non-goals.
 - `0027` — performance data: a YouTube Studio CSV exported by hand and
@@ -404,8 +409,9 @@ drafts. Interface: changes to `drafts` and the title prompt, a retraining
 command, and a CSV import (ADRs 0026 and 0027).
 
 Non-goals for V6: posting or uploads, the YouTube or Twitch APIs, OAuth or
-logins, hosted or paid models, training in the cloud, fine-tuning the LLM,
-a network trained from scratch, campaign payouts, the movies/TV niche,
+logins, hosted or paid models, training in the cloud, fine-tuning the LLM
+or the encoders, a network trained from scratch, a vector database server,
+audio or frame embeddings (after item 5, under "Later"), campaign payouts, the movies/TV niche,
 channel watching or scheduling, a database, user accounts. The facecam
 split and speaker detection stay under "Later".
 
@@ -997,11 +1003,12 @@ titles naming the person and titles kept unedited.
 4. Detector examples: the LLM prompt gets judged keepers and rejects from
    other VODs as examples. Measured leave one VOD out with `eval`, with the
    time per VOD. ADR 0014 amendment. May end in nothing.
-5. A trained ranker on the judged labels (local embeddings and a simple
-   classifier, with the heuristic's signals and the LLM score as inputs if
-   they help), against the LLM leave one VOD out. Decides the libraries
-   (ADR 0003 check), where the model file lives, and how it is chosen
-   (ADR 0013). May end in nothing.
+5. A trained ranker on the judged labels (frozen local text embeddings and
+   a simple classifier, with the heuristic's signals, the LLM score and
+   nearest judged spans as inputs if they help), against the LLM leave one
+   VOD out. Keeps the embeddings in a file (ADR 0026 decision 5). Decides
+   the libraries (ADR 0003 check), where the model file lives, and how it
+   is chosen (ADR 0013). May end in nothing.
 6. `clipper` CSV import (command name decided in the item): parse the
    export from item 2, link Shorts to drafts by matching, confirm ambiguous
    ones, keep confirmed links and a dated snapshot. ADR 0027 amendment,
@@ -1013,7 +1020,7 @@ titles naming the person and titles kept unedited.
    ranker. ADR 0026 amendment. May end in nothing.
 9. Retraining as one command from the current labels (and links, after
    item 8), printing held-out measures beside the current model's before
-   replacing it (ADR 0026 decision 5).
+   replacing it (ADR 0026 decision 6).
 10. Not learning, from daily use: remux after `fetch` for files whose
     timestamps do not start at 0 (Parked), so `review` opens every
     download. ADR 0020 amendment, manual step. May land any time.
@@ -1042,6 +1049,15 @@ Later, not scheduled:
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
   first, and stack it above the gameplay. After V5 item 13e's picks show
   how often facecam clips are posted.
+- Audio and video-frame embeddings as ranker inputs (ADR 0026), for the
+  visual moments a transcript cannot see. After V6 item 5 shows the
+  transcript-only ranker works; a frame encoder likely brings PyTorch with
+  CUDA (several GB), so ADR 0003's check first.
+- A small neural network in place of the ranker's classifier, once the
+  labels are enough for it to do better on held-out VODs (ADR 0026).
+- Nearest-clip lookup beyond item 5: prompt examples for the LLM detector
+  chosen as the judged spans closest to each window, and "picked because
+  it resembles these keepers" in the review page.
 
 ## Parked
 
