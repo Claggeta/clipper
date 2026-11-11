@@ -579,7 +579,9 @@ Keepers saved and drafts trashed per VOD:
 - ANoZNWQXYZ4 (CORE, YouTube IRL): 10 keepers, none trashed.
 - XwH_o5xboKA (Lacy, YouTube stream): 10 keepers, none trashed; rendered
   before item 13d, so no style.
-- Styles (ADR 0025): the other four rendered `fit` and `face`, and all 28
+- v2910908943 (stableronaldo at Jason's NMS Boxing, Twitch): 7 keepers (3
+  `fix`, each end moved later by 3.7 to 11.6 s), 3 trashed.
+- Styles (ADR 0025): the other five rendered `fit` and `face`, and all 35
   keepers were saved in `fit`, none in `face`. Input for the speaker
   detection and facecam split items under "Later".
 
