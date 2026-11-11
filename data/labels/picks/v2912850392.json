@@ -1,0 +1,73 @@
+{
+  "source": "v2912850392.mp4",
+  "labels": [
+    {
+      "start": "2:19:37.75",
+      "end": "2:20:36.96",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:19:54.06",
+        "end": "2:20:36.96"
+      },
+      "style": "fit",
+      "note": "Ok clip. Kind of funny"
+    },
+    {
+      "start": "2:42:53.48",
+      "end": "2:43:47.09",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:42:53.48",
+        "end": "2:43:35.26"
+      },
+      "style": "fit",
+      "note": "Good clip. Funny calling a sumo's diet light implying he eats more than them."
+    },
+    {
+      "start": "4:06:08.42",
+      "end": "4:06:41.42",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Funny content"
+    },
+    {
+      "start": "5:07:06.16",
+      "end": "5:07:37.26",
+      "verdict": "post",
+      "style": "fit",
+      "note": "OK clip. Interesting hearing what a picky eater eats in Japan"
+    },
+    {
+      "start": "5:11:09.32",
+      "end": "5:11:50.9",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Saying he killed the fish grabs viewer's attention. Interesting food"
+    },
+    {
+      "start": "5:14:09.65",
+      "end": "5:14:41.09",
+      "verdict": "post",
+      "style": "fit",
+      "note": "Good clip. Interesting food."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "3:52:26.84",
+      "end": "3:53:07.04"
+    },
+    {
+      "start": "4:10:56.58",
+      "end": "4:11:35.08"
+    },
+    {
+      "start": "4:13:55.55",
+      "end": "4:14:35.96"
+    },
+    {
+      "start": "4:16:11.5",
+      "end": "4:16:49.96"
+    }
+  ]
+}
