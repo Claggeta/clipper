@@ -115,6 +115,16 @@ def test_the_prompt_prefers_the_about_names() -> None:
     assert "use its names over the channel's" in SYSTEM_PROMPT
 
 
+def test_the_prompt_asks_for_emoji_at_the_end_of_the_title() -> None:
+    assert "End the title with one or two emoji" in SYSTEM_PROMPT
+    assert "no emoji" not in SYSTEM_PROMPT
+
+
+def test_a_title_with_emoji_is_kept_as_written() -> None:
+    writer = OllamaTitleWriter(FakeGenerator(_reply("Ron at the pump ⛽😱")))
+    assert writer.write("text").title == "Ron at the pump ⛽😱"
+
+
 def test_the_prompt_takes_pronouns_only_from_the_about_line() -> None:
     assert "do not use he, she" in SYSTEM_PROMPT
     assert "whose pronouns the About line states" in SYSTEM_PROMPT

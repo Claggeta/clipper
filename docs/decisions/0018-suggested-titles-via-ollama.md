@@ -379,6 +379,34 @@ item 3's table:
 
 **Decision.** Adopted.
 
+## Amended by emoji in titles (V6 item 3b)
+
+The maintainer posts titles with emoji and asked for the model to add
+them (2026-11-11), reversing the title prompt amendment's "no emoji".
+
+- **The prompt** asks for one or two fitting emoji at the end of the
+  title, and one at the end of the hook, not counted in the word limits.
+  No check on the reply, as for the other rules.
+- Emoji are stored and shown as written: the manifest is UTF-8, and the
+  console prints them, redirected to a file too (checked on Windows).
+
+**Measured** on item 3's 110 keepers with the saved about text (3a):
+
+| Prompt | Title with emoji | Names a person | Same person | Wrong name | Gendered pronoun | Swear word |
+|---|---|---|---|---|---|---|
+| no emoji (3a) | 0 | 68 of 110 | 36 of 65 | 6 | 21 | 1 |
+| emoji rule beside the other rules (adopted) | 110 | 61 of 110 | 34 of 65 | 5 | 13 | 2 |
+| emoji rule after the reply format | 90 | 61 of 110 | 33 of 65 | 4 | 13 | 2 |
+
+- Every title ended with one to three emoji (`Grandma Stops Ron's
+  Lamborghini Run 🚗👵`); no hook had one, whatever the prompt asked.
+  Longest title 9 words without its emoji, hook 16, one over each limit.
+- The cost is 7 fewer titles naming the person, and 2 fewer naming the
+  maintainer's person: still above the 48 and 28 before 3a.
+
+**Decision.** Adopted, the first wording, as the maintainer's choice; the
+naming cost is recorded so it can be weighed again.
+
 ## Revisit when
 
 - Titles need a different model from the detector.

@@ -164,6 +164,9 @@ and planned code:
   the 110 keepers: naming the person 48 to 68, the maintainer's person 28
   to 36 of 65, wrong names 4 to 6 (13 before the CORE line said to name a
   member only when the transcript does).
+  Emoji amendment (V6 3b, the maintainer's choice): titles end with one
+  or two fitting emoji (110 of 110; hooks got none); naming the person 68
+  to 61, the maintainer's person 36 to 34 of 65.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
@@ -1016,12 +1019,14 @@ titles naming the person and titles kept unedited.
    (done; ended in nothing: naming the person 48 to 32 of 110, the
    maintainer's person 28 to 18 of 65, more swear words, with either
    format; ADR 0018 amendment; no code merged)
-3a. Saved about text per channel (added after item 3): a channels file of
+3a. ~~Saved about text per channel (added after item 3): a channels file of
    `<channel> | <about text>`, used for titles when no `--about` is given.
-   ADR 0018 amendment, manual step R19c.
-3b. Emoji in titles (added after item 3, the maintainer's choice): the
+   ADR 0018 amendment, manual step R19c.~~ (done; #185; naming the person
+   48 to 68 of 110)
+3b. ~~Emoji in titles (added after item 3, the maintainer's choice): the
    title prompt asks for fitting emoji in place of "no emoji". ADR 0018
-   amendment, measured on the same keepers.
+   amendment, measured on the same keepers.~~ (done; every title ends with
+   emoji, naming the person 68 to 61; ADR 0018 amendment)
 4. Detector examples: the LLM prompt gets judged keepers and rejects from
    other VODs as examples. Measured leave one VOD out with `eval`, with the
    time per VOD. ADR 0014 amendment. May end in nothing.
