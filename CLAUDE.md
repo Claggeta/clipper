@@ -961,9 +961,6 @@ Later, not scheduled:
   (`data/labels/v2924046310.json`) may also be 64 s off, if Twitch counts
   that VOD from 0 and the download began 64 s in; unverified.
 
-- `pyproject.toml` says `version = "0.2.0"`, but `v0.4.0` is tagged (seen
-  in V5 item 3a). Fix with the `v0.5.0` release notes (V5 item 14).
-
 - ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
   `exit 3199971767` for invalid data. Fix: normalise negative `AVERROR`
   values to signed form before display, and map the few codes this tool
