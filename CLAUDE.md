@@ -992,8 +992,9 @@ what it learned from, against the current default: keepers and rejects in
 the top 10, keepers cut short and end gaps, counts per VOD; for titles,
 titles naming the person and titles kept unedited.
 
-1. ADRs and scope (one docs PR): ADR 0026 (learning), ADR 0027
-   (performance data), the V6 scope and list.
+1. ~~ADRs and scope (one docs PR): ADR 0026 (learning), ADR 0027
+   (performance data), the V6 scope and list.~~ (done; #182, with small
+   networks on frozen embeddings and nearest-clip lookup allowed)
 2. Not code: the maintainer exports one YouTube Studio CSV of the
    channel's Shorts; its columns, the count of Shorts and whether it has
    retention or swipe-away figures go into an ADR 0027 amendment.
