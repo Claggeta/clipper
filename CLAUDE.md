@@ -336,6 +336,14 @@ and planned code:
   to drafts by matching title, length and date, ambiguous ones confirmed by
   hand, confirmed links kept and reused. Each import a dated snapshot,
   compared by age and channel. Imported data stays out of git.
+- `0028` — post queue: `clipper queue` lists saved clips rated `good`, not
+  yet posted, one per drafts folder in turn (newest first), with a day each
+  (`--per-day`, default 2, `--start`), and writes `<clips dir>/queue.md`
+  (titles and captions in code blocks, campaigns, people); `--include-ok`.
+  Campaigns from `data/campaigns.txt` (`<name> | <hashtag> | <minimum> |
+  <people> [| <channels>]`), people only from review marks. `clipper posted
+  <folder>/<file> <YouTube link>` records the post in `data/posts.json`
+  (committed); a posted clip leaves the queue, and the link serves 0027.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1053,13 +1061,15 @@ titles naming the person and titles kept unedited.
    nothing: on four VODs at top 10, 29 keepers and 11 rejects without, 25
    (27 with two overlapping saves `review` refused) and 12 with; the 22
    new windows judged, labels committed; ADR 0014 amendment; no code)
-4a. Rating and people in `review` (added 2026-11-11, the maintainer's
+4a. ~~Rating and people in `review` (added 2026-11-11, the maintainer's
    choice): Good or OK on each keeper, and who is on screen from a people
-   file, on the judged label. ADR 0024 amendment, manual step RV11.
-4b. A post queue (added 2026-11-11): the Good, unposted keepers across
+   file, on the judged label. ADR 0024 amendment, manual step RV11.~~
+   (done; #190)
+4b. ~~A post queue (added 2026-11-11): the Good, unposted keepers across
    drafts folders, interleaved by VOD, with titles, captions and campaign
    tags, and a way to mark each posted with its date and YouTube link (the
-   link also serves ADR 0027's matching). Design stated first.
+   link also serves ADR 0027's matching). Design stated first.~~ (ADR 0028;
+   `clipper queue` and `clipper posted`; manual step Q1)
 5. A trained ranker on the judged labels (frozen local text embeddings and
    a simple classifier, with the heuristic's signals, the LLM score and
    nearest judged spans as inputs if they help), against the LLM leave one

@@ -1,6 +1,7 @@
 import logging
 import statistics
 from collections.abc import Mapping
+from datetime import date
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, NamedTuple
@@ -26,6 +27,12 @@ from clipper.adapters.results.manifest_json import (
     load_manifest,
     save_manifest,
 )
+from clipper.adapters.results.posting_files import (
+    load_campaigns,
+    load_drafts_folders,
+    load_posts,
+    save_posts,
+)
 from clipper.adapters.results.video_info_json import (
     load_video_info,
     save_video_info,
@@ -42,6 +49,13 @@ from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths, variant_file_name
 from clipper.core.pipeline import AnalysisPipeline
+from clipper.core.posting import (
+    build_queue,
+    clip_key,
+    queue_markdown,
+    record_post,
+    schedule,
+)
 from clipper.core.sources import (
     parse_source_list,
     parse_video_url,
@@ -53,6 +67,7 @@ from clipper.domain.errors import (
     ClipRenderError,
     DetectionError,
     LabelsError,
+    QueueError,
     ReviewError,
     SourceListError,
     TitleError,
@@ -64,6 +79,7 @@ from clipper.domain.models import (
     Evaluation,
     ManifestClip,
     MediaInfo,
+    PostRecord,
     QueuedSource,
     RenderManifest,
     Transcript,
@@ -1222,3 +1238,159 @@ def review(
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(code=1) from exc
+
+
+@app.command("queue")
+def queue_(
+    per_day: Annotated[
+        int,
+        typer.Option("--per-day", min=1, help="Clips to post a day."),
+    ] = 2,
+    start: Annotated[
+        str | None,
+        typer.Option(
+            "--start",
+            help="The first posting day, YYYY-MM-DD. Default: today.",
+            show_default=False,
+        ),
+    ] = None,
+    include_ok: Annotated[
+        bool,
+        typer.Option(
+            "--include-ok", help="Add the clips rated ok after the good ones."
+        ),
+    ] = False,
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            "--out",
+            help="Where to write the queue page. Default: <clips dir>/queue.md.",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """List the saved clips rated good and not posted yet, one video after
+    another, with a posting day, title, caption and campaigns (ADR 0028).
+
+    Writes the same list, ready to copy, to a queue page. Mark a clip posted
+    with `clipper posted`.
+    """
+    settings = Settings()
+    try:
+        first = _parse_day(start) if start is not None else date.today()
+        campaigns = load_campaigns(settings.campaigns_file)
+        posts = load_posts(settings.posts_file)
+        folders = load_drafts_folders(
+            settings.clips_dir, settings.labels_dir, settings.videos_dir
+        )
+        scheduled = schedule(
+            build_queue(folders, campaigns, posts, include_ok), first, per_day
+        )
+        page = out or settings.clips_dir / "queue.md"
+        try:
+            page.parent.mkdir(parents=True, exist_ok=True)
+            page.write_text(
+                queue_markdown(scheduled, settings.clips_dir.resolve()) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+        except OSError as exc:
+            raise QueueError(f"Cannot write queue page {page}: {exc}") from exc
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+
+    if not scheduled:
+        console.print("Nothing to post: no saved clip rated good is left.")
+    else:
+        table = Table("#", "Day", "Video", "Rank", "Title", "Campaigns")
+        for number, (day, item) in enumerate(scheduled, start=1):
+            table.add_row(
+                str(number),
+                day.isoformat(),
+                escape(item.folder),
+                str(item.rank),
+                escape(item.title or ""),
+                escape(", ".join(c.name for c in item.eligible.campaigns)),
+            )
+        console.print(table)
+    console.print(f"Queue: {escape(str(page))}", soft_wrap=True)
+
+
+def _parse_day(text: str) -> date:
+    try:
+        return date.fromisoformat(text)
+    except ValueError as exc:
+        raise QueueError(f"--start must be a date as YYYY-MM-DD, got {text!r}") from exc
+
+
+@app.command()
+def posted(
+    clip: Annotated[
+        str,
+        typer.Argument(
+            help="The clip file, as the queue lists it: <folder>/<file> under "
+            "the clips dir, or its full path.",
+            show_default=False,
+        ),
+    ],
+    url: Annotated[
+        str,
+        typer.Argument(help="The posted Short's YouTube link.", show_default=False),
+    ],
+    on: Annotated[
+        str | None,
+        typer.Option(
+            "--on",
+            help="The day it was posted, YYYY-MM-DD. Default: today.",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """Record that a clip was posted, with its YouTube link (ADR 0028).
+
+    The clip leaves the queue, and the link ties the Short to its draft for
+    performance data later (ADR 0027).
+    """
+    settings = Settings()
+    try:
+        key = _clip_key(settings.clips_dir, clip)
+        source = parse_video_url(url)
+        if source.platform != "youtube":
+            raise QueueError(f"Not a YouTube link: {url}")
+        day = _parse_day(on) if on is not None else date.today()
+        posts, replaced = record_post(
+            load_posts(settings.posts_file),
+            PostRecord(clip=key, url=url.strip(), video_id=source.video_id, posted=day),
+        )
+        save_posts(posts, settings.posts_file)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+    action = "Replaced the post for" if replaced else "Posted"
+    console.print(
+        f"{action} {escape(key)}: {source.video_id} on {day.isoformat()}",
+        soft_wrap=True,
+    )
+
+
+def _clip_key(clips_dir: Path, clip: str) -> str:
+    """`<folder>/<file>` for a clip a drafts folder's manifest lists."""
+    path = Path(clip)
+    if path.is_absolute():
+        try:
+            path = path.resolve().relative_to(clips_dir.resolve())
+        except ValueError as exc:
+            raise QueueError(f"{clip} is not under the clips dir {clips_dir}") from exc
+    if len(path.parts) != 2:
+        raise QueueError(
+            f"Name the clip as <folder>/<file> under the clips dir, got {clip!r}"
+        )
+    folder, file = path.parts
+    try:
+        manifest = load_manifest(clips_dir / folder)
+    except ClipperError as exc:
+        raise QueueError(f"{clip}: {exc}") from exc
+    if not any(c.file == file for c in manifest.clips):
+        raise QueueError(f"{folder}'s manifest lists no clip {file}")
+    return clip_key(folder, file)

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     channels_file: Path = Path("data/channels.txt")
     # Names the review page offers as on screen (ADR 0024, rating amendment).
     people_file: Path = Path("data/people.txt")
+    # The post queue's campaigns and posts record (ADR 0028).
+    campaigns_file: Path = Path("data/campaigns.txt")
+    posts_file: Path = Path("data/posts.json")
     # Ollama's default address, and the model chosen from eval results
     # (ADR 0014, 7c amendment).
     llm_url: str = "http://127.0.0.1:11434"

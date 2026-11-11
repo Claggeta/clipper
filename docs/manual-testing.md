@@ -2253,6 +2253,33 @@ Get-ChildItem Env:CLIPPER_* -ErrorAction SilentlyContinue   # should print nothi
 Remove-Item -Recurse -Force $S
 ```
 
+## Post queue
+
+### Q1. `clipper queue` and `clipper posted`
+
+Covers [ADR 0028](decisions/0028-post-queue.md). Needs at least two drafts
+folders with clips rated in `review` (RV11), some `good`, one with two or
+more CORE members marked. `posted` writes the real `data\posts.json`, so
+use a scratch copy:
+
+```powershell
+$env:CLIPPER_POSTS_FILE = "$env:TEMP\q1-posts.json"
+uv run clipper queue --start 2026-11-12 --per-day 2
+uv run clipper posted <folder>/<file from the first row> https://youtube.com/shorts/<an id>
+uv run clipper queue --start 2026-11-12 --per-day 2
+uv run clipper queue --include-ok --out "$env:TEMP\q1-queue.md"
+Remove-Item Env:CLIPPER_POSTS_FILE; Remove-Item "$env:TEMP\q1-posts.json", "$env:TEMP\q1-queue.md"
+```
+
+Pass: the first run lists only `good` clips, two a day from 2026-11-12,
+never two of one video in a row while another has clips left, and prints
+`Queue: ...\queue.md`. In that page each clip has its path, a title block
+and a caption block naming the marked people, with `#CORE` on the clip with
+two members, and `#Lacy` only on Lacy's own videos (elsewhere "Lacy (not
+from its channels)"). `posted` prints `Posted <folder>/<file>: <id> on
+<today>`, and the second queue no longer lists that clip. The last run adds
+the `ok` clips after the good ones.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`

@@ -64,3 +64,7 @@ class FaceError(ClipperError):
 
 class SourceListError(ClipperError):
     """Raised when a `drafts --list` file cannot be used."""
+
+
+class QueueError(ClipperError):
+    """Raised when the post queue or the posts record cannot be built or read."""
