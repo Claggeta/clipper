@@ -355,7 +355,7 @@ hosted APIs or paid services, web UI, database, user accounts, ML training.
 V4 closed with item 9. GPU transcription (item 7) was measured and not adopted
 (ADR 0021). V5 was scoped on 2026-11-09 (below).
 
-## V5 scope (in progress)
+## V5 scope (shipped as `v0.5.0`)
 
 Input: a video URL or local file, or a list of them, as in V4; and the
 maintainer's judgments on drafts, made in a review page. Output: the same
@@ -447,6 +447,11 @@ All merged to `main` with green CI:
   styled captions, `--titles` and a folder per video with a manifest.
   Released as `v0.4.0` (pre-release, tag on 603e410). Notes are in
   `docs/releases/v0.4.0.md`.
+- V5: `clipper review` and judged labels in `eval`; `drafts` lists, the
+  LLM and top 10 by default, `fit` and `face` styles, titles with video
+  info and `--about`; heuristic end extension and a 15 s minimum.
+  Released as `v0.5.0` (pre-release, tag on 9cda982). Notes are in
+  `docs/releases/v0.5.0.md`.
 
 In progress:
 
@@ -921,7 +926,9 @@ Items 8 and 9 do not depend on picking and may land earlier.
 
     Item 13 is done: ADR 0025 #159, face tracking #160, face style #162,
     locked framing #164, both styles in `drafts` #165, style switch #167.
-14. Release notes and tag `v0.5.0`.
+14. ~~Release notes and tag `v0.5.0`.~~ (done; notes #179, F1 run before
+    tagging, tag `v0.5.0` and pre-release by the maintainer; RV10 and D12
+    not run as written)
 
 Later, not scheduled:
 
