@@ -1,0 +1,63 @@
+{
+  "source": "v2924392099.mp4",
+  "labels": [
+    {
+      "start": "1:22:16.12",
+      "end": "1:22:53.86",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Jason",
+        "Adapt"
+      ],
+      "note": "Ok clip. Not super funny and not a lot of context"
+    },
+    {
+      "start": "2:04:13.44",
+      "end": "2:04:55.36",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Jason",
+        "Adapt"
+      ],
+      "note": "Not a lot of context. little humor."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:17:14.98",
+      "end": "0:17:53.98"
+    },
+    {
+      "start": "0:21:33.4",
+      "end": "0:22:11.55"
+    },
+    {
+      "start": "0:29:17.82",
+      "end": "0:29:56.58"
+    },
+    {
+      "start": "0:50:30.94",
+      "end": "0:51:11.95"
+    },
+    {
+      "start": "1:08:33.49",
+      "end": "1:09:11.75"
+    },
+    {
+      "start": "1:45:29.92",
+      "end": "1:46:12.88"
+    },
+    {
+      "start": "2:10:33.76",
+      "end": "2:11:06.1"
+    },
+    {
+      "start": "4:16:59.11",
+      "end": "4:17:38.69"
+    }
+  ]
+}
