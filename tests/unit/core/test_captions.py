@@ -1,5 +1,11 @@
 from clipper.core.captions import Captions, build_ass, clip_text
-from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
+from clipper.domain.models import (
+    ClipCandidate,
+    OnScreenText,
+    Segment,
+    Transcript,
+    Word,
+)
 
 # All transcripts here are constructed, not Whisper output.
 
@@ -104,7 +110,9 @@ def test_a_word_is_held_until_the_next_word_in_its_chunk() -> None:
 
 def test_a_word_starting_at_the_clip_end_is_dropped() -> None:
     seg = _wseg((20.0, 20.5, "after"))
-    assert build_ass(_t(seg), _c(10.0, 20.0), vertical=True) == ("", False)
+    assert build_ass(_t(seg), _c(10.0, 20.0), vertical=True) == Captions(
+        "", from_segments=False
+    )
 
 
 def test_a_zero_length_word_shows_in_its_chunk_but_is_never_highlighted() -> None:
@@ -178,13 +186,11 @@ def test_from_segments_is_false_when_the_segment_cue_is_outside_the_clip() -> No
 
 
 def test_no_speech_in_range_returns_empty_text() -> None:
-    assert build_ass(_t(_seg(0.0, 1.0, "early")), _c(10.0, 20.0), vertical=True) == (
-        "",
-        False,
-    )
-    assert build_ass(Transcript(segments=()), _c(0.0, 5.0), vertical=False) == (
-        "",
-        False,
+    assert build_ass(
+        _t(_seg(0.0, 1.0, "early")), _c(10.0, 20.0), vertical=True
+    ) == Captions("", from_segments=False)
+    assert build_ass(Transcript(segments=()), _c(0.0, 5.0), vertical=False) == Captions(
+        "", from_segments=False
     )
 
 
@@ -268,3 +274,59 @@ def test_a_segment_cue_across_a_cut_closes_up_with_it() -> None:
         cuts=((12.0, 15.0),),
     )
     assert _events(captions) == ["0:00:00.00,0:00:05.00,hello"]
+
+
+def _text(text: str, start: float, end: float, place: str = "top") -> OnScreenText:
+    return OnScreenText.model_validate(
+        {"text": text, "start_seconds": start, "end_seconds": end, "place": place}
+    )
+
+
+def test_texts_are_pinned_events_in_their_own_style() -> None:
+    seg = _wseg((10.0, 10.4, "one."))
+    captions = build_ass(
+        _t(seg),
+        _c(10.0, 20.0),
+        vertical=True,
+        texts=(_text("Ron at the pump", 0.0, 3.0), _text("Wait", 2.0, 4.0, "middle")),
+    )
+    lines = captions.text.splitlines()
+    assert sum(line.startswith("Style: Text,Arial,84,") for line in lines) == 1
+    assert (
+        "Dialogue: 1,0:00:00.00,0:00:03.00,Text,,0,0,0,,{\\an8\\pos(540,300)}"
+        "Ron at the pump" in lines
+    )
+    assert (
+        "Dialogue: 1,0:00:02.00,0:00:04.00,Text,,0,0,0,,{\\an5\\pos(540,960)}Wait"
+        in lines
+    )
+    assert captions.speech is True
+
+
+def test_texts_alone_make_captions_without_speech() -> None:
+    captions = build_ass(
+        Transcript(segments=()),
+        _c(10.0, 20.0),
+        vertical=False,
+        texts=(_text("{Hook}", 1.0, 2.5),),
+    )
+    assert captions.speech is False
+    assert "Style: Text,Arial,64," in captions.text
+    assert captions.text.endswith("{\\an8\\pos(960,80)}Hook\n")
+
+
+def test_texts_are_clamped_to_the_cut_clip_and_late_ones_dropped() -> None:
+    captions = build_ass(
+        Transcript(segments=()),
+        _c(10.0, 20.0),
+        vertical=True,
+        cuts=((12.0, 16.0),),
+        texts=(_text("long", 4.0, 9.0), _text("late", 6.5, 8.0)),
+    )
+    # The clip is 6 s after its cut: "long" ends at 6 s, "late" starts past it.
+    assert _events(captions) == ["0:00:04.00,0:00:06.00,{\\an8\\pos(540,300)}long"]
+
+
+def test_without_texts_the_header_has_no_text_style() -> None:
+    seg = _wseg((10.0, 10.4, "one."))
+    assert "Style: Text" not in build_ass(_t(seg), _c(10.0, 20.0), vertical=True).text

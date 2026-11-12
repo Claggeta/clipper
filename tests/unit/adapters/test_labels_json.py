@@ -352,3 +352,49 @@ def test_label_cuts_must_be_inside_and_in_order(cuts: list[dict[str, str]]) -> N
         Label.model_validate(
             {"start": "0:01:00", "end": "0:01:40", "verdict": "post", "cuts": cuts}
         )
+
+
+def test_saved_labels_keep_texts(tmp_path: Path) -> None:
+    # Constructed label, not from a real review.
+    text = {"text": "Ron at the pump", "start_seconds": 0.0, "end_seconds": 3.0}
+    labeled = LabeledVideo.model_validate(
+        {
+            "source": "v.mp4",
+            "labels": [
+                {
+                    "start": "0:01:00",
+                    "end": "0:01:40",
+                    "verdict": "post",
+                    "texts": [text],
+                }
+            ],
+        }
+    )
+    path = tmp_path / "v.json"
+    save_labels(labeled, path)
+    entry = json.loads(path.read_text(encoding="utf-8"))["labels"][0]
+    assert entry["texts"] == [text | {"place": "top"}]
+    assert load_labels(path) == labeled
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ({"text": " ", "start_seconds": 0, "end_seconds": 1}, "a text is empty"),
+        ({"text": "a\nb", "start_seconds": 0, "end_seconds": 1}, "one line"),
+        ({"text": "x" * 121, "start_seconds": 0, "end_seconds": 1}, "at most 120"),
+        ({"text": "a", "start_seconds": 2, "end_seconds": 1}, "end after it starts"),
+        ({"text": "a", "start_seconds": -1, "end_seconds": 1}, "greater than"),
+        (
+            {"text": "a", "start_seconds": 0, "end_seconds": 1, "place": "bottom"},
+            "top",
+        ),
+    ],
+)
+def test_bad_texts_are_refused(text: dict[str, object], message: str) -> None:
+    from pydantic import ValidationError
+
+    from clipper.domain.models import OnScreenText
+
+    with pytest.raises(ValidationError, match=message):
+        OnScreenText.model_validate(text)

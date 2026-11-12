@@ -2,7 +2,13 @@ from collections.abc import Iterator
 from typing import NamedTuple
 
 from clipper.core.cuts import Cut, TimeMap
-from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
+from clipper.domain.models import (
+    ClipCandidate,
+    OnScreenText,
+    Segment,
+    Transcript,
+    Word,
+)
 
 # libass reads `{...}` as override tags and `\n`, `\N` and `\h` as a line break
 # or a space, so spoken text containing them could be dropped or restyled
@@ -42,11 +48,31 @@ _VERTICAL = _Layout(1080, 1920, font_size=80, outline=6, margin_h=60, margin_v=4
 _SOURCE = _Layout(1920, 1080, font_size=72, outline=5, margin_h=80, margin_v=80)
 
 
+class _TextLayout(NamedTuple):
+    """On-screen text (ADR 0030): its size, the box's padding, and where
+    each place puts it, as an anchor point on the canvas."""
+
+    font_size: int
+    padding: int
+    top: tuple[int, int]
+    middle: tuple[int, int]
+
+
+# Checked by eye on a rendered frame: below the area Shorts' own buttons
+# and title cover at the top, and the frame's centre. The box is the ASS
+# opaque box, half transparent.
+_VERTICAL_TEXT = _TextLayout(84, 18, top=(540, 300), middle=(540, 960))
+_SOURCE_TEXT = _TextLayout(64, 14, top=(960, 80), middle=(960, 540))
+_HALF_BLACK = "&H80000000"
+
+
 class Captions(NamedTuple):
-    """ASS text for one clip, and whether any cue lacked word times."""
+    """ASS text for one clip, whether any cue lacked word times, and whether
+    any speech is in it (beside on-screen texts)."""
 
     text: str
     from_segments: bool
+    speech: bool = False
 
 
 def _to_ms(seconds: float) -> int:
@@ -70,7 +96,39 @@ def _clean(text: str) -> str:
     return " ".join(text.translate(_MARKUP).split())
 
 
-def _header(layout: _Layout) -> str:
+def _text_style(layout: _Layout, text: _TextLayout) -> str:
+    """The on-screen text's style: bold white on a half-dark opaque box."""
+    return ",".join(
+        str(v)
+        for v in (
+            "Text",
+            _FONT,
+            text.font_size,
+            _WHITE,
+            _WHITE,
+            _HALF_BLACK,  # the box, with BorderStyle 3
+            _HALF_BLACK,
+            -1,  # bold
+            0,
+            0,
+            0,
+            100,
+            100,
+            0,
+            0,
+            3,  # an opaque box
+            text.padding,
+            0,
+            8,  # top centre; each event sets its own point
+            layout.margin_h,
+            layout.margin_h,
+            0,
+            1,
+        )
+    )
+
+
+def _header(layout: _Layout, text: _TextLayout | None = None) -> str:
     style = ",".join(
         str(v)
         for v in (
@@ -113,7 +171,8 @@ def _header(layout: _Layout) -> str:
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: {style}\n"
-        "\n"
+        + (f"Style: {_text_style(layout, text)}\n" if text else "")
+        + "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
         "Effect, Text\n"
@@ -209,6 +268,7 @@ def build_ass(
     *,
     vertical: bool,
     cuts: tuple[Cut, ...] = (),
+    texts: tuple[OnScreenText, ...] = (),
 ) -> Captions:
     """Build styled ASS captions for the part of `transcript` inside the clip.
 
@@ -224,6 +284,11 @@ def build_ass(
 
     `cuts` are source-time ranges removed from the clip (ADR 0029): words
     that start inside one are dropped, and every time moves to the cut clip.
+
+    `texts` are lines burned over the clip (ADR 0030), in a style of their
+    own, each pinned to its place; their times are the finished clip's,
+    clamped to its length, and one starting past the end is dropped.
+    `speech` says whether any caption came from the transcript.
 
     The text is "" when no event remains. The caller decides what that means.
     """
@@ -246,10 +311,31 @@ def build_ass(
         words = _words_in_clip(segment.words, clip_start, clip_end, time_map)
         for chunk in _chunks(words):
             events.extend(_word_events(chunk))
+    speech = bool(events)
+    text_layout = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
+    length = round(time_map.duration) if time_map else clip_end - clip_start
+    shown = [e for t in texts if (e := _text_event(t, text_layout, length))]
+    events.extend(shown)
     if not events:
         return Captions("", from_segments=False)
     layout = _VERTICAL if vertical else _SOURCE
-    return Captions(_header(layout) + "".join(events), from_segments)
+    header = _header(layout, text_layout if shown else None)
+    return Captions(header + "".join(events), from_segments, speech)
+
+
+def _text_event(text: OnScreenText, layout: _TextLayout, length: int) -> str | None:
+    """One on-screen text as a Dialogue line on the layer above captions,
+    pinned to its place so libass does not move it out of another's way."""
+    start = _to_ms(text.start_seconds)
+    end = min(_to_ms(text.end_seconds), length)
+    words = _clean(text.text)
+    if start >= length or not words or _centis(end) <= _centis(start):
+        return None
+    align, (x, y) = (8, layout.top) if text.place == "top" else (5, layout.middle)
+    return (
+        f"Dialogue: 1,{_timestamp(start)},{_timestamp(end)},Text,,0,0,0,,"
+        f"{{\\an{align}\\pos({x},{y})}}{words}\n"
+    )
 
 
 def clip_text(transcript: Transcript, candidate: ClipCandidate) -> str:

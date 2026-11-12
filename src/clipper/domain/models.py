@@ -312,6 +312,44 @@ class ClipTitle(BaseModel):
 
 VerticalStyleName = Literal["fit", "face"]
 
+# Where an on-screen text sits (ADR 0030): below the area YouTube's own
+# interface covers, or the middle. Never the bottom, the captions' place.
+TextPlace = Literal["top", "middle"]
+TEXT_LIMIT = 120
+
+
+class OnScreenText(BaseModel):
+    """A line of text burned over the clip (ADR 0030).
+
+    `start_seconds` and `end_seconds` are seconds of the finished clip,
+    after any cuts, not of the source video.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    text: str
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    place: TextPlace = "top"
+
+    @field_validator("text")
+    @classmethod
+    def _one_line(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("a text is empty")
+        if "\n" in text or "\r" in text:
+            raise ValueError("a text must be one line")
+        if len(text) > TEXT_LIMIT:
+            raise ValueError(f"a text must be at most {TEXT_LIMIT} characters")
+        return text
+
+    @model_validator(mode="after")
+    def _ends_after_start(self) -> "OnScreenText":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("a text must end after it starts")
+        return self
+
 
 class ClipVariant(BaseModel):
     """One rendered style of a clip: the style and its file name in the folder.
@@ -358,6 +396,7 @@ class ManifestClip(BaseModel):
 
     `cuts` are the source-time ranges left out of the file (ADR 0029), in
     order and inside `start_seconds`..`end_seconds`; empty when uncut.
+    `texts` are the lines burned over it (ADR 0030).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -379,6 +418,7 @@ class ManifestClip(BaseModel):
     added: bool = False
     variants: tuple[ClipVariant, ...] = ()
     cuts: tuple[tuple[float, float], ...] = ()
+    texts: tuple[OnScreenText, ...] = ()
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":
@@ -503,7 +543,8 @@ class Label(Span):
     `rating` says whether a keeper is good enough to post or kept for the
     backlog, and `people` who is on screen, both from the review page (ADR
     0024, rating amendment). `cuts` are the ranges left out of the clip, in
-    order and inside its span (ADR 0029).
+    order and inside its span (ADR 0029), and `texts` the lines burned over
+    it (ADR 0030).
     """
 
     note: str | None = None
@@ -513,6 +554,7 @@ class Label(Span):
     rating: Rating | None = None
     people: tuple[str, ...] = ()
     cuts: tuple[Span, ...] = ()
+    texts: tuple[OnScreenText, ...] = ()
 
     @field_validator("people")
     @classmethod

@@ -62,6 +62,23 @@ cuts since 0029.
 - Texts with no clip time left after cuts are dropped from the render.
 - Thumbnails are files the queue lists; posting stays manual.
 
+## Amended by the text rendering PR (V6 item 4e, second PR)
+
+- `OnScreenText` (text up to 120 characters, one line; start and end in
+  the finished clip's seconds; `top` or `middle`) on `ManifestClip.texts`
+  and `Label.texts`; `build_ass(..., texts=)` adds a `Text` style only
+  when a text is shown, and `Captions.speech` says whether any caption
+  came from the transcript, so a clip with texts and no speech is not
+  recorded as captioned.
+- Each text is pinned with `\pos` (top: 540,300 on the vertical canvas;
+  middle: 540,960; landscape 960,80 and 960,540). Without it, libass moved
+  a middle line up under a top line shown at the same time.
+- Emoji render, through a fallback font, in monochrome outline: libass
+  draws no colour emoji. Titles' emoji stay; the maintainer can remove
+  them from a text.
+- Checked on a real render of `test_input.mp4` with a cut, word captions,
+  a top hook and a middle line.
+
 ## Revisit when
 
 - The maintainer wants other looks (colours, outlined text, all caps) or
