@@ -91,6 +91,14 @@ until the drafts rarely need editing.
   stay biased toward what some detector proposed.
 - (-) The largest piece of V5, in several PRs.
 
+## Amended by cutting pauses (ADR 0029, V6 item 4c)
+
+"Cut silence" proposes cuts at the pauses in speech inside the span
+(`GET /api/pauses`), shown striped on the film strip; a click keeps one,
+Preview jumps over the rest, and Save sends `cuts` with the label and
+re-renders the clip when they changed. Reset and "Clear cuts" remove
+them. Manual step RV12.
+
 ## Revisit when
 
 - The URL box is wanted: move the drafts chain into `core/` first (0022).

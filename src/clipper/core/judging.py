@@ -107,11 +107,13 @@ def save_judgment(
     style: str | None = None,
     rating: str | None = None,
     people: tuple[str, ...] = (),
+    cuts: tuple[tuple[float, float], ...] = (),
 ) -> LabeledVideo:
     """The labels with `clip` saved as `post` (span unchanged) or `fix`, or
     as `added` for a clip added in the page, whatever its span. `style` is the
     vertical style kept, if the clip had styles (ADR 0025); `rating` and
-    `people` are the page's rating and who is on screen (ADR 0024).
+    `people` are the page's rating and who is on screen (ADR 0024); `cuts`
+    the ranges left out (ADR 0029), which do not change the verdict.
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
     if the span overlaps another label: one label per moment.
@@ -131,6 +133,8 @@ def save_judgment(
         fields["rating"] = rating
     if people:
         fields["people"] = people
+    if cuts:
+        fields["cuts"] = [_times(a, b) for a, b in cuts]
     if clip.added:
         fields["verdict"] = "added"
     elif same_span(clip.draft_span, (start, end)):

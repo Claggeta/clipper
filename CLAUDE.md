@@ -287,7 +287,8 @@ and planned code:
   moved by -64 s). Rating amendment (V6 4a): Save may carry `rating`
   (`good` to post, `ok` for the backlog) and `people` on screen, names from
   `data/people.txt` (`CLIPPER_PEOPLE_FILE`, committed); both on the judged
-  label, optional; manual step RV11.
+  label, optional; manual step RV11. Cuts amendment (0029): Cut silence,
+  toggles, Preview over cuts, Save with `cuts`; manual step RV12.
 - `0025` — vertical styles: `fit` (0016, the default) and `face`, a
   full-height crop on the largest face, faces found once per clip by
   OpenCV YuNet (5 samples a second, cached); `drafts` renders both and the
@@ -356,7 +357,8 @@ and planned code:
   captions and face-crop moves go through one time map. The span and
   `eval` are unchanged. Manual cuts later. Core amendment: `select`/
   `aselect` rather than `concat` (audio stays optional), `-t` on the input
-  when cutting; `core/cuts.py`.
+  when cutting; `core/cuts.py`. Page amendment: `GET /api/pauses`, Save
+  re-renders when the cuts change, manual step RV12.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1083,11 +1085,12 @@ titles naming the person and titles kept unedited.
    tags, and a way to mark each posted with its date and YouTube link (the
    link also serves ADR 0027's matching). Design stated first.~~ (ADR 0028;
    `clipper queue` and `clipper posted`; manual step Q1)
-4c. Cut pauses in review (added 2026-11-11, the maintainer's choice; ADR
+4c. ~~Cut pauses in review (added 2026-11-11, the maintainer's choice; ADR
    0029), in PRs: the ADR; the time map, pause finder, captions and face
    crop through the map, the renderer joining kept parts and `cuts` on the
    label and manifest; then the page's Cut silence, toggles, Preview and
-   Save with a manual step.
+   Save with a manual step.~~ (done; ADR #192, core #194, handles fix
+   #195, page with manual step RV12)
 4d. ~~Drafts filed by channel and day (added 2026-11-11, the maintainer's
    choice): `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, the day the
    drafts ran, an existing folder reused; queue and `posted` find nested

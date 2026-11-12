@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from clipper.core.captions import build_ass
+from clipper.core.cuts import Cut, TimeMap, check_cuts, cut_crop
 from clipper.core.framing import plan_face_crop
 from clipper.core.interfaces import ClipRenderer, FaceTracker, ReviewFiles
 from clipper.core.judging import (
@@ -69,6 +70,8 @@ class SaveRequest:
     # The rating and who is on screen (ADR 0024, rating amendment).
     rating: str | None = None
     people: tuple[str, ...] = ()
+    # Source-time ranges left out of the clip (ADR 0029).
+    cuts: tuple[Cut, ...] = ()
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -96,7 +99,8 @@ def parse_save(
     """Check a Save body: times inside the video, end after start, a one-line
     title of at most `MAX_TITLE` characters, and any note. Empty text is None.
     A rating is one of `RATINGS`; people are names from `people`, the run's
-    list, kept in that list's order.
+    list, kept in that list's order. Cuts are `[start, end]` pairs in order,
+    apart and strictly inside the span (ADR 0029).
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -124,7 +128,26 @@ def parse_save(
     if unknown:
         raise BadRequest(f"{unknown[0]!r} is not in the people list")
     chosen = tuple(name for name in people if name in named)
-    return SaveRequest(start, end, title, _text(data, "note"), style, rating, chosen)
+    cuts = _cuts(data.get("cuts", []))
+    try:
+        check_cuts(cuts, start, end)
+    except ClipperError as exc:
+        raise BadRequest(str(exc)) from exc
+    return SaveRequest(
+        start, end, title, _text(data, "note"), style, rating, chosen, cuts
+    )
+
+
+def _cuts(value: object) -> tuple[Cut, ...]:
+    if not isinstance(value, list):
+        raise BadRequest("cuts must be a list of [start, end] pairs")
+    cuts: list[Cut] = []
+    for pair in value:
+        if not isinstance(pair, list) or len(pair) != 2:
+            raise BadRequest("cuts must be a list of [start, end] pairs")
+        a, b = (_seconds({"cut": x}, "cut") for x in pair)
+        cuts.append((a, b))
+    return tuple(cuts)
 
 
 def parse_trash(data: object) -> str | None:
@@ -205,6 +228,7 @@ class ReviewStore:
                     "style": label.style,
                     "rating": label.rating,
                     "people": list(label.people),
+                    "cuts": [[c.start_seconds, c.end_seconds] for c in label.cuts],
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -250,8 +274,10 @@ class ReviewStore:
     ) -> SaveResult:
         """Save `clip` as listed in `base`; the caller holds the lock."""
         span = (request.start, request.end)
-        needs_render = clip.file is None or not same_span(
-            (clip.start_seconds, clip.end_seconds), span
+        needs_render = (
+            clip.file is None
+            or not same_span((clip.start_seconds, clip.end_seconds), span)
+            or not _same_cuts(clip.cuts, request.cuts)
         )
         candidate = ClipCandidate(
             start_seconds=request.start,
@@ -275,6 +301,7 @@ class ReviewStore:
             style,
             request.rating,
             request.people,
+            request.cuts,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -287,7 +314,7 @@ class ReviewStore:
         render_error = warning = None
         if needs_render:
             try:
-                changes |= self._rerender(clip, candidate, name, style)
+                changes |= self._rerender(clip, candidate, name, style, request.cuts)
             except ClipperError as exc:
                 render_error = str(exc)
                 if clip.file is None:
@@ -346,19 +373,25 @@ class ReviewStore:
         candidate: ClipCandidate,
         name: str,
         style: str | None,
+        cuts: tuple[Cut, ...] = (),
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
         Returns the manifest changes. A failure leaves no temporary file and
-        any old file untouched.
+        any old file untouched. With cuts, the face crop and captions follow
+        the cut clip's times (ADR 0029).
         """
         manifest = self.manifest
-        crop = self._crop(candidate) if style == "face" else None
+        time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
+        crop = cut_crop(self._crop(candidate), time_map) if style == "face" else None
         ass = ""
         burned: str | None = None
         if manifest.captions and self._render.transcript is not None:
             built = build_ass(
-                self._render.transcript, candidate, vertical=manifest.vertical
+                self._render.transcript,
+                candidate,
+                vertical=manifest.vertical,
+                cuts=cuts,
             )
             ass = built.text
             if ass:
@@ -373,6 +406,7 @@ class ReviewStore:
                 captions=ass or None,
                 vertical=manifest.vertical,
                 crop=crop,
+                cuts=cuts,
             )
             try:
                 os.replace(temp, target)
@@ -389,6 +423,7 @@ class ReviewStore:
             "captions": burned,
             "draft_start_seconds": draft_start,
             "draft_end_seconds": draft_end,
+            "cuts": cuts,
         }
 
     def _delete_others(self, clip: ManifestClip, keep: str, done: str) -> str | None:
@@ -469,6 +504,11 @@ class ReviewStore:
             (self._folder / clip.file).unlink(missing_ok=True)
         except OSError as exc:
             raise ReviewError(f"Cannot delete {clip.file}: {exc}") from exc
+
+
+def _same_cuts(a: tuple[Cut, ...], b: tuple[Cut, ...]) -> bool:
+    """The same cuts, compared to the millisecond as labels keep them."""
+    return len(a) == len(b) and all(same_span(x, y) for x, y in zip(a, b, strict=True))
 
 
 def _kept(style: str | None, file: str) -> tuple[ClipVariant, ...]:
