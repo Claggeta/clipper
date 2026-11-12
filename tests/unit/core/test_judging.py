@@ -71,14 +71,30 @@ def test_saving_again_replaces_the_label_and_keeps_others_in_order() -> None:
     ]
 
 
-def test_an_overlap_with_another_label_is_refused() -> None:
+def test_an_overlap_of_half_the_shorter_span_is_refused() -> None:
     labeled = save_judgment(None, "t.mp4", TWO, 300.0, 340.0, None)
 
-    with pytest.raises(JudgingError, match=r"0:05:00-0:05:40 \(post\)") as info:
-        save_judgment(labeled, "t.mp4", ONE, 100.0, 300.5, None)
+    # 280-320 overlaps 300-340 by 20 s, half of the shorter 40 s.
+    with pytest.raises(JudgingError, match=r"0:05:00-0:05:40 \(post\) by half") as info:
+        save_judgment(labeled, "t.mp4", ONE, 280.0, 320.0, None)
     assert isinstance(info.value, ClipperError)
 
-    # Touching is not overlapping.
+    # A span inside the other overlaps it by all of the shorter one.
+    with pytest.raises(JudgingError):
+        save_judgment(labeled, "t.mp4", ONE, 310.0, 330.0, None)
+
+
+def test_a_smaller_overlap_is_saved_as_a_neighbour() -> None:
+    labeled = save_judgment(None, "t.mp4", TWO, 300.0, 340.0, None)
+
+    # 260-310 overlaps by 10 s, a quarter of the shorter 40 s.
+    labeled = save_judgment(labeled, "t.mp4", ONE, 260.0, 310.0, None)
+
+    assert [(lb.start_seconds, lb.end_seconds) for lb in labeled.labels] == [
+        (260.0, 310.0),
+        (300.0, 340.0),
+    ]
+    # Touching is not overlapping either.
     assert len(save_judgment(labeled, "t.mp4", ONE, 100.0, 300.0, None).labels) == 2
 
 

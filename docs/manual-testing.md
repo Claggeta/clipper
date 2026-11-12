@@ -2812,6 +2812,35 @@ Remove-Item Env:CLIPPER_LABELS_DIR   # after stopping the server
 
 Then delete the scratch folders.
 
+### RV15. Overlap on Save
+
+Covers [ADR 0024](decisions/0024-review-drafts-in-a-local-browser-page.md)'s
+overlap amendment (V7 item 2). Use a scratch copy of a drafts folder and a
+scratch labels dir, as in RV12:
+
+```powershell
+Copy-Item -Recurse "data\clips\<channel>\<MM-DD-YYYY>\<id>" "$env:TEMP\rv15\<id>"
+$env:CLIPPER_LABELS_DIR = "$env:TEMP\rv15-labels"
+uv run clipper review "$env:TEMP\rv15\<id>"
+Remove-Item Env:CLIPPER_LABELS_DIR   # after stopping the server
+```
+
+1. Save a clip as is. Note its span, say `1:00:00-1:00:45`.
+2. Play to about 10 s before that clip's end, `Add clip here`, and set
+   the new span to start there and run about 40 s past it
+   (`1:00:35-1:01:25`). Save. Pass: saved; both clips are in the list,
+   and `$env:TEMP\rv15-labels\picks\<id>.json` has both labels, ordered by
+   start.
+3. Add another clip that starts in the middle of the first
+   (`1:00:20-1:01:00`) and Save. Pass: refused with "Overlaps the label
+   1:00:00-1:00:45 (post) by half or more of the shorter span"; the labels
+   file is unchanged.
+4. With the server stopped, run
+   `uv run clipper eval data\output\<id>.json "$env:TEMP\rv15-labels\picks\<id>.json"`.
+   Pass: the table prints, with no error loading the labels.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

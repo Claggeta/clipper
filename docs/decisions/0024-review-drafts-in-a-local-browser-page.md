@@ -426,6 +426,15 @@ A Thumbnail row makes `<clip stem>.thumb.jpg` from the frame at the
 playhead, in the style shown, with optional text; it is shown in the page
 from `/thumbs/<name>` and deleted by Trash. Manual step RV14.
 
+## Amended by overlap on Save (V7 item 2)
+
+Save and Add clip refuse a span only when it overlaps another clip's label
+by half or more of the shorter span, the hit rule (ADR 0012), still with a
+409 that names the label. A smaller overlap is saved as a neighbouring
+moment: in V6 item 4 two keepers overlapping saved ones by 11 and 13 s
+could not be saved. Asking first for every overlap was not chosen, since
+the hit rule already says when two spans are one moment. Manual step RV15.
+
 ## Related
 
 - 0011: render's failure policy

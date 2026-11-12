@@ -7,6 +7,7 @@ from clipper.core.evaluation import (
     evaluate,
     is_draft_of,
     is_hit,
+    spans_hit,
 )
 from clipper.domain.models import ClipCandidate, Label, LabeledVideo
 
@@ -47,6 +48,12 @@ def test_overlap_of_exactly_half_the_shorter_range_hits() -> None:
 def test_overlap_just_under_half_misses() -> None:
     # Candidate 39.999-60 is 20.001 s; overlap is still 10 s, under half.
     assert not is_hit(_c(39.999, 60.0), _l("0:50", "2:00"))
+
+
+def test_spans_hit_is_the_same_rule_either_way_round() -> None:
+    assert spans_hit((40.0, 60.0), (50.0, 120.0))
+    assert spans_hit((50.0, 120.0), (40.0, 60.0))
+    assert not spans_hit((39.999, 60.0), (50.0, 120.0))
 
 
 def test_float_noise_does_not_move_the_boundary() -> None:

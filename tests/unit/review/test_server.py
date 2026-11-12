@@ -441,11 +441,17 @@ def test_a_span_over_another_clips_label_is_refused(
 ) -> None:
     _post(base_url, "/api/clips/2/save", {"start": 400.0, "end": 440.0})
 
-    status, reply = _post(base_url, "/api/clips/1/save", {"start": 60.0, "end": 405.0})
+    # 380-420 overlaps 400-440 by 20 s, half of the shorter 40 s.
+    status, reply = _post(base_url, "/api/clips/1/save", {"start": 380.0, "end": 420.0})
 
     assert status == 409
     assert "Overlaps the label 0:06:40-0:07:20 (post)" in str(reply["error"])
     assert len(load_labels(_labels_path(tmp_path)).labels) == 1
+
+    # Under half is a neighbouring moment, saved.
+    status, _ = _post(base_url, "/api/clips/1/save", {"start": 360.0, "end": 405.0})
+    assert status == 200
+    assert len(load_labels(_labels_path(tmp_path)).labels) == 2
 
 
 def test_trash_deletes_the_file_and_writes_a_rejected_span(

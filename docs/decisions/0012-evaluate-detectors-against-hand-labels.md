@@ -401,6 +401,22 @@ names it.
   clips without styles and on older files. `eval` does not read it; it is
   there to count which style wins.
 
+## Amended by overlap on Save (V7 item 2)
+
+- Judged labels may overlap each other; they stay ordered by start. The
+  review page saves a neighbour that overlaps another label by less than
+  the hit rule (`HIT_FRACTION` of the shorter span) and refuses one at or
+  above it, so a candidate that hits one of them is still one moment.
+  Files without verdicts (clip labels) stay non-overlapping, since
+  `labels` merges overlapping clips.
+- The model checks only the order; the hit-rule limit is checked by the
+  review page's Save (`core/judging.py`), so a hand-edited file could hold
+  a larger overlap. `eval` is unchanged: in rank order a candidate claims
+  the earliest unclaimed label it hits, so two overlapping keepers need
+  two candidates to count twice.
+- The span form of the rule is `spans_hit` in `core/evaluation.py`;
+  `is_hit` calls it.
+
 ## Related
 
 - 0013: detector choice on the CLI
