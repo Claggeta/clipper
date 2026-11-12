@@ -1,5 +1,7 @@
 import math
+import re
 from collections.abc import Sequence
+from datetime import date
 from pathlib import Path
 
 from clipper.domain.errors import ClipRenderError
@@ -33,9 +35,25 @@ def variant_file_name(name: str, style: str) -> str:
     return f"{path.stem}.{style}{path.suffix}"
 
 
-def clip_folder(video: Path, clips_dir: Path) -> Path:
-    """The folder for one video's clips, `<clips dir>/<stem>`. See ADR 0019."""
-    return clips_dir / video.stem
+LOCAL_CHANNEL = "Local"
+_UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def channel_folder_name(channel: str | None) -> str:
+    """A channel's name as a folder name: characters Windows refuses dropped,
+    trailing dots and spaces trimmed, `Local` when there is none."""
+    name = _UNSAFE.sub("", channel or "").strip().rstrip(". ")
+    return name or LOCAL_CHANNEL
+
+
+def clip_folder(video: Path, clips_dir: Path, channel: str | None, day: date) -> Path:
+    """The folder for one video's clips,
+    `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>`. See ADR 0019.
+
+    `day` is the day the drafts ran; the caller reuses an existing folder for
+    the same video instead, so a re-run does not start a second one.
+    """
+    return clips_dir / channel_folder_name(channel) / f"{day:%m-%d-%Y}" / video.stem
 
 
 def plan_clip_paths(

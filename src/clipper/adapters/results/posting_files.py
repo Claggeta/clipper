@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from clipper.adapters.results.labels_json import load_labels
-from clipper.adapters.results.manifest_json import MANIFEST_NAME, load_manifest
+from clipper.adapters.results.manifest_json import find_drafts_folders, load_manifest
 from clipper.adapters.results.video_info_json import load_video_info
 from clipper.core.judging import judged_labels_path
 from clipper.core.posting import DraftsFolder, parse_campaigns
@@ -53,39 +53,35 @@ def save_posts(posts: PostLog, path: Path) -> None:
 def load_drafts_folders(
     clips_dir: Path, labels_dir: Path, videos_dir: Path
 ) -> list[DraftsFolder]:
-    """Every drafts folder under `clips_dir`, newest manifest first, with its
-    judged labels and its video's channel.
+    """Every drafts folder under `clips_dir`, at any depth, newest manifest
+    first, with its judged labels and its video's channel.
 
     A folder whose manifest or labels cannot be read is skipped with a
     warning, and a bad info file only loses the channel: an old or broken
     folder must not stop the queue.
     """
-    paths = sorted(
-        clips_dir.glob(f"*/{MANIFEST_NAME}"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
     folders: list[DraftsFolder] = []
-    for path in paths:
+    for path in find_drafts_folders(clips_dir):
         try:
-            manifest = load_manifest(path.parent)
+            manifest = load_manifest(path)
             labels_path = judged_labels_path(labels_dir, manifest.source)
             labels = load_labels(labels_path) if labels_path.is_file() else None
         except ClipperError as exc:
-            logger.warning("Queue skips %s: %s", path.parent, exc)
+            logger.warning("Queue skips %s: %s", path, exc)
             continue
         info_path = videos_dir / f"{Path(manifest.source).stem}.info.json"
         try:
             info = load_video_info(info_path)
         except ClipperError as exc:
-            logger.warning("Queue has no channel for %s: %s", path.parent, exc)
+            logger.warning("Queue has no channel for %s: %s", path, exc)
             info = None
         folders.append(
             DraftsFolder(
-                name=path.parent.name,
+                name=path.name,
                 manifest=manifest,
                 labels=labels,
                 channel=info.channel if info else None,
+                location=path.relative_to(clips_dir),
             )
         )
     return folders

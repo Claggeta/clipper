@@ -1,8 +1,10 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from clipper.core.naming import (
+    channel_folder_name,
     clip_file_name,
     clip_folder,
     plan_clip_paths,
@@ -72,13 +74,34 @@ def test_clip_render_error_is_a_clipper_error() -> None:
     assert issubclass(ClipRenderError, ClipperError)
 
 
-def test_folder_is_the_video_stem_under_the_clips_dir() -> None:
-    folder = clip_folder(Path("videos/oFbD0Ot7nQ8.mp4"), Path("data/clips"))
-    assert folder == Path("data/clips/oFbD0Ot7nQ8")
+def test_folder_is_channel_then_day_then_video_stem() -> None:
+    folder = clip_folder(
+        Path("videos/oFbD0Ot7nQ8.mp4"), Path("data/clips"), "Lacy", date(2026, 11, 9)
+    )
+    assert folder == Path("data/clips/Lacy/11-09-2026/oFbD0Ot7nQ8")
 
 
 def test_folder_keeps_dots_before_the_extension() -> None:
-    assert clip_folder(Path("my.talk.mkv"), Path("c")) == Path("c/my.talk")
+    day = date(2026, 1, 2)
+    assert clip_folder(Path("my.talk.mkv"), Path("c"), None, day) == Path(
+        "c/Local/01-02-2026/my.talk"
+    )
+
+
+@pytest.mark.parametrize(
+    ("channel", "name"),
+    [
+        ("stableronaldo", "stableronaldo"),
+        ('A/B: "C"?', "AB C"),
+        ("Dots... ", "Dots"),
+        ("  ", "Local"),
+        (None, "Local"),
+    ],
+)
+def test_channel_folder_names_are_safe_on_windows(
+    channel: str | None, name: str
+) -> None:
+    assert channel_folder_name(channel) == name
 
 
 def test_a_styles_file_sits_beside_the_fit_one() -> None:

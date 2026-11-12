@@ -1,9 +1,11 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner, Result
 
 from clipper.adapters.rendering.fake import FakeClipRenderer
+from clipper.adapters.results.manifest_json import find_drafts_folder
 from clipper.adapters.transcription.fake import FakeTranscriber
 from clipper.cli.context import AppContext, DetectorName
 from clipper.cli.main import app
@@ -194,7 +196,9 @@ class Env:
         )
 
     def manifest(self, stem: str) -> RenderManifest:
-        raw = (self.tmp / "clips" / stem / "manifest.json").read_bytes()
+        folder = find_drafts_folder(self.tmp / "clips", stem)
+        assert folder is not None, f"no drafts folder for {stem}"
+        raw = (folder / "manifest.json").read_bytes()
         return RenderManifest.model_validate_json(raw)
 
 
@@ -230,7 +234,8 @@ def test_a_file_becomes_vertical_captioned_titled_drafts(env: Env) -> None:
     output = result.output
     assert output.index("Top clips: talk.mp4") < output.index("Rendered #1")
     assert output.index("Saved: ") < output.index("Rendered #1")
-    assert output.rstrip().endswith(f"Drafts: {env.tmp / 'clips' / 'talk'}")
+    folder = env.tmp / "clips" / "Local" / f"{date.today():%m-%d-%Y}" / "talk"
+    assert output.rstrip().endswith(f"Drafts: {folder}")
 
 
 def test_a_url_is_fetched_then_analysed_by_its_id(env: Env) -> None:

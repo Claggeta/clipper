@@ -103,13 +103,16 @@ def eligibility(
 
 @dataclass(frozen=True)
 class DraftsFolder:
-    """One drafts folder as the queue reads it: its name under the clips dir,
-    its manifest, its judged labels (None if none yet) and its channel."""
+    """One drafts folder as the queue reads it: its name (the video's stem),
+    its manifest, its judged labels (None if none yet), its channel, and
+    where it sits under the clips dir (`<channel>/<date>/<stem>`, or just
+    the name for an older flat folder; ADR 0019)."""
 
     name: str
     manifest: RenderManifest
     labels: LabeledVideo | None
     channel: str | None
+    location: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -118,6 +121,7 @@ class QueueItem:
 
     clip: str
     folder: str
+    path: Path
     rank: int
     title: str | None
     hook: str | None
@@ -178,6 +182,7 @@ def _waiting(
             QueueItem(
                 clip=key,
                 folder=folder.name,
+                path=(folder.location or Path(folder.name)) / clip.file,
                 rank=clip.rank,
                 title=clip.title,
                 hook=clip.hook,
@@ -236,7 +241,7 @@ def queue_markdown(scheduled: Sequence[tuple[date, QueueItem]], clips_dir: Path)
         lines += [
             f"## {number}. {day.isoformat()}: {item.folder} #{item.rank}",
             "",
-            f"`{clips_dir / item.clip}`",
+            f"`{clips_dir / item.path}`",
             "",
             "```text",
             item.title or "(no title)",
