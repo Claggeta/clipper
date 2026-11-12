@@ -734,3 +734,102 @@ def test_texts_in_the_body_are_read_and_checked() -> None:
     ]:
         with pytest.raises(BadRequest, match=message):
             parse_save({"start": 10.0, "end": 40.0, "texts": texts}, 100.0)
+
+
+def test_a_thumbnail_is_written_beside_the_clip_and_recorded(tmp_path: Path) -> None:
+    from clipper.review.store import ThumbnailRequest
+
+    env = Env(tmp_path)
+    text = _hook("Ron at the pump", "middle")
+
+    clip, note = env.store.thumbnail(1, ThumbnailRequest(25.0, text))
+
+    assert note is None
+    assert clip.thumbnail == "talk_1.thumb.jpg"
+    assert (env.folder / "talk_1.thumb.jpg").read_bytes() == b"fake jpeg"
+    [(at, _, captions, vertical, crop)] = env.renderer.stills
+    assert (at, vertical, crop) == (25.0, True, None)
+    assert captions is not None
+    assert "Ron at the pump" in captions
+    # Making it again replaces it; no text means no captions.
+    again, _ = env.store.thumbnail(1, ThumbnailRequest(30.0, None))
+    assert again.thumbnail == "talk_1.thumb.jpg"
+    assert env.renderer.stills[-1][2] is None
+
+
+def test_a_face_clips_thumbnail_without_a_face_is_framed_as_fit(
+    tmp_path: Path,
+) -> None:
+    from clipper.review.store import ThumbnailRequest
+
+    env = _styled_env(tmp_path, FakeFaceTracker(faces=False))
+
+    clip, note = env.store.thumbnail(1, ThumbnailRequest(25.0, None, "face"))
+
+    assert note == "No face at that moment; framed as Fit."
+    assert env.renderer.stills[0][4] is None
+    assert clip.thumbnail is not None
+    # With a face, the window is held on it; Fit is the clip's own style.
+    env.store._render = RenderInputs(  # noqa: SLF001
+        tmp_path / "talk.mp4", env.renderer, TRANSCRIPT, FakeFaceTracker(), (1920, 1080)
+    )
+    _, note = env.store.thumbnail(1, ThumbnailRequest(25.0, None, "face"))
+    assert note is None
+    assert env.renderer.stills[-1][4] is not None
+    env.store.thumbnail(1, ThumbnailRequest(25.0, None))
+    assert env.renderer.stills[-1][4] is None
+
+
+def test_a_clip_without_a_file_has_no_thumbnail(tmp_path: Path) -> None:
+    from clipper.review.store import ThumbnailRequest
+
+    env = Env(tmp_path)
+    env.store.trash(1, None)
+    with pytest.raises(JudgingError, match="Save the clip before"):
+        env.store.thumbnail(1, ThumbnailRequest(25.0, None))
+
+
+def test_a_failed_thumbnail_keeps_the_old_one(tmp_path: Path) -> None:
+    from clipper.domain.errors import ClipRenderError
+    from clipper.review.store import ThumbnailRequest
+
+    env = Env(tmp_path)
+    env.store.thumbnail(1, ThumbnailRequest(25.0, None))
+    env.renderer.fail_stills = True
+    with pytest.raises(ClipRenderError):
+        env.store.thumbnail(1, ThumbnailRequest(26.0, None))
+    assert (env.folder / "talk_1.thumb.jpg").read_bytes() == b"fake jpeg"
+    assert not list(env.folder.glob("*.part.jpg"))
+
+
+def test_trash_deletes_the_thumbnail(tmp_path: Path) -> None:
+    from clipper.review.store import ThumbnailRequest
+
+    env = Env(tmp_path)
+    env.store.thumbnail(1, ThumbnailRequest(25.0, None))
+    trashed = env.store.trash(1, None)
+    assert trashed is not None
+    assert trashed.thumbnail is None
+    assert not (env.folder / "talk_1.thumb.jpg").exists()
+
+
+def test_thumbnail_bodies_are_checked() -> None:
+    from clipper.review.store import BadRequest, parse_thumbnail, thumbnail_name
+
+    plain = parse_thumbnail({"at": 12.5}, 100.0)
+    assert (plain.at, plain.text) == (12.5, None)
+    texted = parse_thumbnail({"at": 1, "text": " Hi ", "place": "top"}, 100.0)
+    assert texted.text is not None
+    assert (texted.text.text, texted.text.place) == ("Hi", "top")
+    for body, message in [
+        ({}, "at must be a number"),
+        ({"at": 100.0}, "inside the video"),
+        ({"at": 1, "text": "a\nb"}, "text: a text must be one line"),
+        ({"at": 1, "text": "a", "place": "bottom"}, "text: "),
+        ({"at": 1, "style": "wide"}, "the style must be one of"),
+    ]:
+        with pytest.raises(BadRequest, match=message):
+            parse_thumbnail(body, 100.0)
+    assert thumbnail_name("talk_000010-000040.face.mp4") == (
+        "talk_000010-000040.thumb.jpg"
+    )

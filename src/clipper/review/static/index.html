@@ -94,6 +94,19 @@
             <div id="texts" class="texts"></div>
             <div><button type="button" id="add-text">Add text</button></div>
           </div>
+          <div class="judge-field">
+            <span class="field-label">Thumbnail <span class="muted">(the frame at the playhead, in the draft's style)</span></span>
+            <div class="thumb-row">
+              <input id="thumb-text" type="text" maxlength="120" autocomplete="off" placeholder="Text on it (optional)">
+              <select id="thumb-place" aria-label="Thumbnail text place">
+                <option value="middle">Middle</option>
+                <option value="top">Top</option>
+              </select>
+              <button type="button" id="thumb-make">Make thumbnail</button>
+            </div>
+            <img id="thumb" class="thumb" alt="The clip's thumbnail" hidden>
+            <p id="thumb-notice" class="judge-notice" role="status"></p>
+          </div>
           <div class="judge-actions">
             <button type="button" id="save" class="primary">Save</button>
             <button type="button" id="trash" class="danger">Trash</button>

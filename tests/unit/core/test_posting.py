@@ -214,3 +214,16 @@ def test_queue_markdown_lists_each_clip_ready_to_copy() -> None:
 
 def test_clip_key() -> None:
     assert clip_key("v1", "v1_000100-000130.mp4") == "v1/v1_000100-000130.mp4"
+
+
+def test_queue_markdown_lists_a_thumbnail_when_there_is_one() -> None:
+    folder = _folder(
+        "v",
+        (_clip(1, 0.0, thumbnail="c1.thumb.jpg"), _clip(2, 60.0)),
+        (_label(0.0, "good"), _label(60.0, "good")),
+    )
+    queue = build_queue([folder], CAMPAIGNS, PostLog())
+    assert [item.thumbnail for item in queue] == [Path("v/c1.thumb.jpg"), None]
+    page = queue_markdown(schedule(queue, date(2026, 11, 12), 2), Path("clips"))
+    assert page.count("- Thumbnail: ") == 1
+    assert f"`{Path('clips') / 'v' / 'c1.thumb.jpg'}`" in page

@@ -396,7 +396,8 @@ class ManifestClip(BaseModel):
 
     `cuts` are the source-time ranges left out of the file (ADR 0029), in
     order and inside `start_seconds`..`end_seconds`; empty when uncut.
-    `texts` are the lines burned over it (ADR 0030).
+    `texts` are the lines burned over it (ADR 0030), and `thumbnail` the
+    name of its thumbnail image in the folder, if one was made.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -419,6 +420,7 @@ class ManifestClip(BaseModel):
     variants: tuple[ClipVariant, ...] = ()
     cuts: tuple[tuple[float, float], ...] = ()
     texts: tuple[OnScreenText, ...] = ()
+    thumbnail: str | None = None
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":

@@ -861,3 +861,25 @@ def test_pauses_payload_finds_word_gaps(tmp_path: Path) -> None:
     assert pauses_payload(session, "start=60&end=90") == {"cuts": [[62.65, 64.85]]}
     with pytest.raises(ReviewError, match="no transcript"):
         pauses_payload(dataclasses.replace(session, transcript=None), "start=60&end=90")
+
+
+def test_a_thumbnail_is_made_listed_and_served(base_url: str) -> None:
+    status, reply = _post(
+        base_url,
+        "/api/clips/1/thumbnail",
+        {"at": 65.0, "text": "Look", "place": "top"},
+    )
+    assert status == 200, reply
+    name = reply["thumbnail"]
+    assert name.endswith(".thumb.jpg")
+    assert reply["note"] is None
+    status, headers, body = _get(f"{base_url}/thumbs/{name}")
+    assert (status, headers["Content-Type"], body) == (200, "image/jpeg", b"fake jpeg")
+    status, _, _ = _get(f"{base_url}/thumbs/other.thumb.jpg")
+    assert status == 404
+
+
+def test_a_bad_thumbnail_body_is_refused(base_url: str) -> None:
+    status, reply = _post(base_url, "/api/clips/1/thumbnail", {"at": 9999.0})
+    assert status == 400
+    assert "inside the video" in reply["error"]

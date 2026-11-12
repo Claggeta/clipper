@@ -92,6 +92,25 @@ cuts since 0029.
   captions the texts are burned alone, and the manifest's `captions`
   stays empty. Reset removes them. Manual step RV13.
 
+## Amended by the thumbnails PR (V6 item 4e, last PR)
+
+- `ClipRenderer.still`: one frame at a source moment, `-ss` before `-i`,
+  `-frames:v 1`, JPEG quality 2, framed by the fit filter or the face
+  crop held where it starts, with the text's ASS from time 0. Checked on
+  `test_input.mp4`: a 1080x1920 JPEG of about 90 KB.
+- The page's Thumbnail row: optional text with Middle (the default for a
+  thumbnail) or Top, and "Make thumbnail" for the frame at the source
+  player's playhead, in the style shown (the request carries `style`, as
+  Save does). `POST /api/clips/<rank>/thumbnail` writes
+  `<clip stem>.thumb.jpg` (the same name for both styles) through a
+  `.part.jpg`, records `ManifestClip.thumbnail`, and the page shows it
+  from `/thumbs/<name>`, only names the manifest lists. A face thumbnail
+  with no face at that moment is framed as fit, with a note; a clip
+  without a file is refused until saved. Making it again replaces it;
+  Trash deletes it. It does not touch unsaved edits.
+- The queue page lists each clip's thumbnail path (0028). Manual step
+  RV14.
+
 ## Revisit when
 
 - The maintainer wants other looks (colours, outlined text, all caps) or

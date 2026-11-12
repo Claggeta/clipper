@@ -107,6 +107,21 @@ class ClipRenderer(Protocol):
         cuts: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip: ...
 
+    def still(
+        self,
+        video_path: Path,
+        seconds: float,
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        vertical: bool = False,
+        crop: CropPath | None = None,
+    ) -> Path:
+        """One frame at `seconds` of the source as a JPEG, framed as a clip
+        is (fit, or the crop's first window) with `captions` burned in from
+        time 0: a thumbnail (ADR 0030). Raises `ClipRenderError`."""
+        ...
+
 
 @runtime_checkable
 class TitleWriter(Protocol):
