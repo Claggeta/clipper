@@ -2280,6 +2280,27 @@ from its channels)"). `posted` prints `Posted <folder>/<file>: <id> on
 <today>`, and the second queue no longer lists that clip. The last run adds
 the `ok` clips after the good ones.
 
+### Q2. Drafts filed by channel and day
+
+Covers [ADR 0019](decisions/0019-a-folder-per-video.md)'s channel and day
+folders amendment. Uses a scratch clips dir, a fetched video with its info
+file and one without (`data\test_input.mp4`):
+
+```powershell
+$env:CLIPPER_CLIPS_DIR = "$env:TEMP\q2-clips"
+uv run clipper drafts --top 1 --style fit data\videos\<a fetched id>.mp4
+uv run clipper drafts --top 1 --style fit data\test_input.mp4
+uv run clipper drafts --top 1 --style fit data\videos\<the same id>.mp4
+Get-ChildItem -Recurse -Directory $env:CLIPPER_CLIPS_DIR | Select-Object FullName
+uv run clipper queue --include-ok
+Remove-Item Env:CLIPPER_CLIPS_DIR; Remove-Item -Recurse "$env:TEMP\q2-clips"
+```
+
+Pass: the first run ends with `Drafts: ...\q2-clips\<channel>\<today as
+MM-DD-YYYY>\<id>`, the channel as in `<id>.info.json`; the second with
+`...\Local\<today>\test_input`; the third reuses the first folder (no
+second `<id>` folder). `queue` runs without error.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`

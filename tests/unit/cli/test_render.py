@@ -1,10 +1,12 @@
 import dataclasses
+from datetime import date
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner, Result
 
 from clipper.adapters.rendering.fake import FakeClipRenderer
+from clipper.adapters.results.manifest_json import find_drafts_folder
 from clipper.cli.context import AppContext
 from clipper.cli.main import app
 from clipper.domain.errors import (
@@ -140,7 +142,10 @@ class Env:
 
     @property
     def folder(self) -> Path:
-        return self.clips / "talk"
+        """The video's drafts folder: under `Local` and today's date with no
+        info file, under its channel with one (ADR 0019)."""
+        found = find_drafts_folder(self.clips, "talk")
+        return found or self.clips / "Local" / f"{date.today():%m-%d-%Y}" / "talk"
 
     def written(self) -> list[str]:
         """The clips in the video's folder (ADR 0019), without the manifest."""
@@ -372,7 +377,8 @@ def test_vertical_with_captions_shows_both(env: Env) -> None:
 def test_clips_go_to_a_folder_per_video_with_a_manifest(env: Env) -> None:
     result = env.run()
     assert result.exit_code == 0, result.output
-    assert sorted(p.name for p in env.clips.iterdir()) == ["talk"]
+    assert env.folder == env.clips / "Local" / f"{date.today():%m-%d-%Y}" / "talk"
+    assert sorted(p.name for p in env.clips.iterdir()) == ["Local"]
     assert f"Rendered 3 of 3 clips to {env.folder}" in result.output
     assert f"Manifest: {env.folder / 'manifest.json'}" in result.output
     assert env.manifest() == RenderManifest(
@@ -619,6 +625,27 @@ def test_titles_get_the_video_info_beside_the_video(env: Env) -> None:
     assert result.exit_code == 0, result.output
     assert writer.videos == [_INFO, _INFO]
     assert "Title context: streamer" in result.output
+
+
+def test_drafts_folder_is_named_by_the_channel_in_the_info_file(env: Env) -> None:
+    (env.video.parent / "talk.info.json").write_text(
+        _INFO.model_dump_json(), encoding="utf-8"
+    )
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    day = f"{date.today():%m-%d-%Y}"
+    assert env.folder == env.clips / "streamer" / day / "talk"
+
+
+def test_a_rerun_reuses_the_videos_existing_folder(env: Env) -> None:
+    old = env.clips / "streamer" / "01-02-2026" / "talk"
+    old.mkdir(parents=True)
+    (old / "manifest.json").write_text("{}", encoding="utf-8")
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    assert env.manifest().source == "talk.mp4"  # the placeholder was replaced
+    assert find_drafts_folder(env.clips, "talk") == old
+    assert sorted(p.name for p in env.clips.iterdir()) == ["streamer"]
 
 
 def test_titles_without_video_info_get_none(env: Env) -> None:

@@ -137,9 +137,11 @@ This renders every candidate. Options:
   gets no title, with a note. If the title fails (Ollama not running, model not
   pulled, a bad reply), that clip is not rendered and counts as a failure.
 
-Clips are written to a folder per video,
-`<clips dir>/<video name>/<video name>_<HHMMSS>-<HHMMSS>.mp4` (by default
-`data/clips/`), and re-encoded as H.264 video and AAC audio. The name comes
+Clips are written to a folder per video, filed by channel and day:
+`<clips dir>/<channel>/<MM-DD-YYYY>/<video name>/<video name>_<HHMMSS>-<HHMMSS>.mp4`
+(by default `data/clips/`). The channel comes from the video's info file
+(`Local` without one) and the day is when the folder was made; a later run
+on the same video reuses its folder. Clips are re-encoded as H.264 video and AAC audio. The name comes
 from the clip's span, not its rank, so rendering the same candidate again
 overwrites the same file. A captioned clip has the same name as a plain one, so
 `--captions` overwrites a plain clip of the same span. Clips rendered before
@@ -186,7 +188,7 @@ uv run clipper drafts path\to\video.mp4
 ```
 
 `drafts` runs `fetch` (for a URL), `analyze` and `render` in one go and ends
-with `Drafts: <clips dir>/<video name>`: a folder with every candidate as a
+with `Drafts: <clips dir>/<channel>/<MM-DD-YYYY>/<video name>`: a folder with every candidate as a
 vertical, captioned clip, and a suggested title and hook for each in the
 manifest. Each clip comes in two styles to pick from: `<name>.mp4` fits the
 whole frame, and `<name>.face.mp4` crops on the largest face (a clip with no

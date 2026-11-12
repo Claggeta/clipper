@@ -46,6 +46,32 @@ def load_manifest(folder: Path) -> RenderManifest:
         ) from exc
 
 
+def find_drafts_folders(clips_dir: Path) -> list[Path]:
+    """Every folder under `clips_dir` with a manifest, newest manifest first.
+
+    At any depth, so `<channel>/<date>/<stem>` folders and older flat
+    `<stem>` ones are both found (ADR 0019).
+    """
+    return [
+        path.parent
+        for path in sorted(
+            clips_dir.rglob(MANIFEST_NAME),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    ]
+
+
+def find_drafts_folder(clips_dir: Path, stem: str) -> Path | None:
+    """The existing drafts folder for a video, by its stem, if any; with more
+    than one, the newest manifest's."""
+    key = os.path.normcase(stem)
+    return next(
+        (f for f in find_drafts_folders(clips_dir) if os.path.normcase(f.name) == key),
+        None,
+    )
+
+
 def check_manifest_source(manifest: RenderManifest, video: Path) -> None:
     """Fail if the manifest was written for a differently named video.
 

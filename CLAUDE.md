@@ -171,7 +171,8 @@ and planned code:
   or two fitting emoji (110 of 110; hooks got none); naming the person 68
   to 61, the maintainer's person 36 to 34 of 65.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
-  each run. File names inside are unchanged. Amends 0008. Item 4a amendment:
+  each run (since V6 4d `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, an
+  existing folder reused). File names inside are unchanged. Amends 0008. Item 4a amendment:
   run-level flags, per-clip `file` or `error` and burned-in `captions`; no
   titles fields until item 5; a failure before cutting leaves the manifest.
   Review amendment (V5 3c): `reviewed` (`saved`/`trashed`) per clip; a
@@ -344,6 +345,9 @@ and planned code:
   <people> [| <channels>]`), people only from review marks. `clipper posted
   <folder>/<file> <YouTube link>` records the post in `data/posts.json`
   (committed); a posted clip leaves the queue, and the link serves 0027.
+  Channel folders amendment (0019): drafts go to
+  `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`; `posted` takes a full path
+  or `<stem>/<file>`.
 - `0029` — cuts: the review page proposes cutting pauses in speech (word
   gaps of `MIN_PAUSE_SECONDS = 0.6`, less `CUT_PADDING_SECONDS = 0.15` a
   side), each toggleable, Preview skipping them; Save stores `cuts`
@@ -1082,6 +1086,10 @@ titles naming the person and titles kept unedited.
    crop through the map, the renderer joining kept parts and `cuts` on the
    label and manifest; then the page's Cut silence, toggles, Preview and
    Save with a manual step.
+4d. ~~Drafts filed by channel and day (added 2026-11-11, the maintainer's
+   choice): `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, the day the
+   drafts ran, an existing folder reused; queue and `posted` find nested
+   folders. ADR 0019 amendment, manual step Q2.~~ (done)
 5. A trained ranker on the judged labels (frozen local text embeddings and
    a simple classifier, with the heuristic's signals, the LLM score and
    nearest judged spans as inputs if they help), against the LLM leave one

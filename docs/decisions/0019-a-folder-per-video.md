@@ -123,6 +123,31 @@ analysis of the same video gave `captions` `segments` and `detector` `null`.
   `render` or `drafts` run on the folder still replaces it and loses these
   fields (decision 3); the judged labels are separate files.
 
+## Amended by the channel and day folders PR (V6 item 4d)
+
+The maintainer asked for drafts filed by channel and day, to find them
+when posting.
+
+- **Where**: `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`. The channel is
+  the info file's (0020 video info amendment), as the platform spells it,
+  with the characters Windows refuses in a folder name dropped; no info
+  file, or a bad one, files the drafts under `Local`. The day is the day
+  the run made the folder (the maintainer's choice over the stream date),
+  in US order with dashes, since `/` cannot be in a folder name.
+- **One folder per video**: a run reuses the video's existing folder,
+  found by stem anywhere under the clips dir, flat or nested, so a re-run
+  on another day replaces that folder's manifest as before (decision 3)
+  instead of starting a second folder. With two, the newest manifest's.
+- **Inside the folder** nothing changes: the same file names and
+  `manifest.json`.
+- **Readers**: the queue (0028) finds manifests at any depth and writes
+  each clip's full path; `posted` takes the full path or `<stem>/<file>`,
+  and the post record keeps naming a clip `<stem>/<file>`. `review` takes
+  the folder's path, as before.
+- **Existing folders** were moved into the layout once, by hand, with a
+  script that is not kept: channel from the info file, day from the
+  folder's creation date.
+
 ## Revisit when
 
 - The maintainer wants a run's earlier clips kept in the manifest.

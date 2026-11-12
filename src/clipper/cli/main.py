@@ -24,6 +24,7 @@ from clipper.adapters.results.labels_json import (
 )
 from clipper.adapters.results.manifest_json import (
     check_manifest_source,
+    find_drafts_folder,
     load_manifest,
     save_manifest,
 )
@@ -596,9 +597,21 @@ def _plan_render(
     selected = [result.candidates[r - 1] for r in ranks]
     media = build.probe().probe(video)
     _check_media(selected, media)
-    folder = clip_folder(video, settings.clips_dir)
+    folder = find_drafts_folder(settings.clips_dir, video.stem) or clip_folder(
+        video, settings.clips_dir, _channel_of(video), date.today()
+    )
     paths = plan_clip_paths(video, selected, folder)
     return _RenderPlan(ranks, selected, folder, paths, media)
+
+
+def _channel_of(video: Path) -> str | None:
+    """The channel from the video's info file, for its drafts folder (ADR
+    0019); no file or a bad one files the drafts under `Local`."""
+    try:
+        info = load_video_info(video_info_beside(video))
+    except ClipperError:
+        return None
+    return info.channel if info is not None else None
 
 
 def _title_context(video: Path) -> VideoInfo | None:
@@ -1375,20 +1388,29 @@ def posted(
 
 
 def _clip_key(clips_dir: Path, clip: str) -> str:
-    """`<folder>/<file>` for a clip a drafts folder's manifest lists."""
+    """`<folder>/<file>` for a clip a drafts folder's manifest lists.
+
+    The clip is a full path under the clips dir, at any depth (ADR 0019), or
+    `<folder>/<file>` with the folder found by its name.
+    """
     path = Path(clip)
     if path.is_absolute():
         try:
-            path = path.resolve().relative_to(clips_dir.resolve())
+            path.resolve().relative_to(clips_dir.resolve())
         except ValueError as exc:
             raise QueueError(f"{clip} is not under the clips dir {clips_dir}") from exc
-    if len(path.parts) != 2:
+        found: Path | None = path.parent
+    elif len(path.parts) == 2:
+        found = find_drafts_folder(clips_dir, path.parts[0])
+    else:
         raise QueueError(
-            f"Name the clip as <folder>/<file> under the clips dir, got {clip!r}"
+            f"Name the clip by its full path or as <folder>/<file>, got {clip!r}"
         )
-    folder, file = path.parts
+    folder, file = path.parent.name, path.name
+    if found is None:
+        raise QueueError(f"{clip}: no drafts folder {folder} under {clips_dir}")
     try:
-        manifest = load_manifest(clips_dir / folder)
+        manifest = load_manifest(found)
     except ClipperError as exc:
         raise QueueError(f"{clip}: {exc}") from exc
     if not any(c.file == file for c in manifest.clips):

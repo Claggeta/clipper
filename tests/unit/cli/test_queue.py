@@ -31,7 +31,7 @@ class Env:
             monkeypatch.setenv(f"CLIPPER_{name}", str(value))
         monkeypatch.setenv("COLUMNS", "200")
 
-    def folder(self, name: str, ratings: list[str | None]) -> None:
+    def folder(self, name: str, ratings: list[str | None], under: str = "") -> Path:
         clips = tuple(
             ManifestClip(
                 rank=n,
@@ -56,7 +56,7 @@ class Env:
                 titles=True,
                 clips=clips,
             ),
-            self.clips / name,
+            self.clips / under / name,
         )
         labels = [
             {
@@ -72,6 +72,7 @@ class Env:
             LabeledVideo.model_validate({"source": f"{name}.mp4", "labels": labels}),
             self.labels / "picks" / f"{name}.json",
         )
+        return self.clips / under / name
 
     def run(self, *args: str) -> Result:
         return CliRunner().invoke(app, list(args))
@@ -152,7 +153,7 @@ def test_posted_records_the_clip_and_it_leaves_the_queue(env: Env) -> None:
         (
             "v1_1.mp4",
             "https://youtu.be/abcDEF12345",
-            "Name the clip as <folder>/<file>",
+            "Name the clip by its full path or as <folder>/<file>",
         ),
         ("v1/v1_1.mp4", "https://www.twitch.tv/videos/123", "Not a YouTube link"),
         ("v1/v1_1.mp4", "https://example.com/x", "Not a"),
@@ -164,3 +165,28 @@ def test_posted_refuses_bad_input(env: Env, clip: str, url: str, message: str) -
     assert result.exit_code == 1
     assert message in " ".join(result.output.split())
     assert not env.posts.exists()
+
+
+def test_folders_by_channel_and_day_are_queued_and_posted(env: Env) -> None:
+    folder = env.folder("v2", ["good", "good"], under="Lacy/11-10-2026")
+    result = env.run("queue", "--start", "2026-11-12")
+    assert result.exit_code == 0, result.output
+    page = (env.clips / "queue.md").read_text(encoding="utf-8")
+    assert f"`{(folder / 'v2_1.mp4').resolve()}`" in page
+    by_name = env.run("posted", "v2/v2_1.mp4", "https://youtu.be/abcDEF12345")
+    assert by_name.exit_code == 0, by_name.output
+    by_path = env.run(
+        "posted", str(folder / "v2_2.mp4"), "https://youtu.be/xyzDEF12345"
+    )
+    assert by_path.exit_code == 0, by_path.output
+    assert [p.clip for p in load_posts(env.posts).posts] == [
+        "v2/v2_1.mp4",
+        "v2/v2_2.mp4",
+    ]
+
+
+def test_posted_names_a_missing_folder(env: Env) -> None:
+    env.folder("v1", ["good"])
+    result = env.run("posted", "v9/v9_1.mp4", "https://youtu.be/abcDEF12345")
+    assert result.exit_code == 1
+    assert "no drafts folder v9" in " ".join(result.output.split())
