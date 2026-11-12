@@ -2866,6 +2866,13 @@ amendment (V7 item 3a). Same scratch copy and labels dir as RV12.
 8. Reload and choose the clip. Pass: its cuts are all striped yellow
    (saved cuts count as manual), `Unsaved` hidden. `Cut silence` keeps
    them.
+9. Press on the frames inside the span and drag a few seconds right
+   (V7 item 3b). Pass: a yellow stretch follows the pointer and stays as a
+   manual cut when let go; the playhead does not move. Drag back over it
+   from the right: one longer stretch.
+10. Click a frame without dragging. Pass: the playhead moves there, no
+    cut. Drag from before the start handle into the span. Pass: "A cut
+    must start inside the span; move the start instead." and no cut.
 
 Then delete the scratch folders.
 

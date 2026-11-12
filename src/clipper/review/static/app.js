@@ -749,9 +749,69 @@ function timeAt(clientX) {
 }
 
 tiles.addEventListener("click", (event) => {
+  if (dragged) {
+    // The click that ends a drag is not a seek.
+    dragged = false;
+    return;
+  }
   if (current) {
     player.currentTime = clamp(timeAt(event.clientX), 0, duration);
   }
+});
+
+// --- A drag on the frames cuts the range (V7 item 3b) ---
+
+// How far the pointer moves before a press is a drag, not a click, in px.
+const DRAG_PX = 4;
+const cutDrag = document.getElementById("cut-drag");
+let dragged = false; // set when a drag ends, so its click does not seek
+
+// Inside the strip's view, so the range is what the frames show.
+function viewTimeAt(clientX) {
+  return clamp(timeAt(clientX), Math.max(view.start, 0), Math.min(viewEnd(), duration));
+}
+
+tiles.addEventListener("dragstart", (event) => event.preventDefault());
+
+tiles.addEventListener("pointerdown", (event) => {
+  dragged = false;
+  if (!current || event.button !== 0) {
+    return;
+  }
+  const fromX = event.clientX;
+  const from = viewTimeAt(fromX);
+  let dragging = false;
+  tiles.setPointerCapture(event.pointerId);
+  const range = (clientX) => {
+    const to = viewTimeAt(clientX);
+    return [Math.min(from, to), Math.max(from, to)];
+  };
+  const onMove = (moveEvent) => {
+    if (!dragging && Math.abs(moveEvent.clientX - fromX) < DRAG_PX) {
+      return;
+    }
+    dragging = true;
+    const [start, end] = range(moveEvent.clientX);
+    cutDrag.hidden = false;
+    cutDrag.style.left = `${percent(start)}%`;
+    cutDrag.style.width = `${percent(end) - percent(start)}%`;
+  };
+  const onUp = (upEvent) => {
+    tiles.removeEventListener("pointermove", onMove);
+    tiles.removeEventListener("pointerup", onUp);
+    tiles.removeEventListener("pointercancel", onUp);
+    cutDrag.hidden = true;
+    if (dragging) {
+      dragged = true;
+      if (upEvent.type === "pointerup") {
+        const [start, end] = range(upEvent.clientX);
+        addManualCut(round(start), round(end));
+      }
+    }
+  };
+  tiles.addEventListener("pointermove", onMove);
+  tiles.addEventListener("pointerup", onUp);
+  tiles.addEventListener("pointercancel", onUp);
 });
 
 // --- The handles ---
@@ -914,20 +974,38 @@ function markCutOut() {
     notice("Cut out must be after Cut in.");
     return;
   }
+  if (addManualCut(start, end)) {
+    cutIn = null;
+    drawMarks();
+  }
+}
+
+// Adds `start`..`end` as a cut marked by hand, from Cut out or a drag on the
+// strip (V7 items 3a and 3b). False, with a notice, if it is too short or
+// would not lie inside the span.
+function addManualCut(start, end) {
+  if (end < start + MIN_CUT) {
+    notice(`A cut must be at least ${MIN_CUT} s long.`);
+    return false;
+  }
+  if (start <= span.start) {
+    notice("A cut must start inside the span; move the start instead.");
+    return false;
+  }
   if (end >= span.end) {
     notice("A cut must end inside the span; move the end instead.");
-    return;
+    return false;
   }
   const cuts = withCut(cutsOf(current), { start, end, manual: true });
   const merged = cuts.find((cut) => cut.start <= start && end <= cut.end);
   if (merged.start <= span.start || merged.end >= span.end) {
     notice("That cut would join one past the span's edge; clear it or move the span.");
-    return;
+    return false;
   }
   cutEdits.set(current.key, cuts);
-  cutIn = null;
   notice("");
   drawMarks();
+  return true;
 }
 
 function dropCutIn() {
