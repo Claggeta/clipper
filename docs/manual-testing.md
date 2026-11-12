@@ -2746,10 +2746,15 @@ it copies into the current folder.
 6. Reload the page and choose the clip. Pass: the same stretches striped,
    `Unsaved` hidden. Press `Clear cuts` and Save: the full-length clip is
    rendered again.
-7. Stop the server. `%TEMP%\rv12-labels\picks\<id>.json`: the clip's label
+7. Stop the server. `$env:TEMP\rv12-labels\picks\<id>.json`: the clip's label
    has `"cuts"` after step 5 and none after step 6.
 
-Then delete `%TEMP%\rv12` and `%TEMP%\rv12-labels`.
+Then clean up:
+
+```powershell
+Remove-Item Env:CLIPPER_LABELS_DIR
+Remove-Item -Recurse "$env:TEMP\rv12", "$env:TEMP\rv12-labels"
+```
 
 ### RV13. On-screen text
 

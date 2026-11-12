@@ -334,6 +334,13 @@ and planned code:
   pick); a local vector store only if a file stops being enough.
   Retraining is a command the maintainer runs; it prints held-out measures
   beside the current model's before replacing it. Amends the V5 non-goals.
+  Ranker spike amendment (V6 5, not adopted): `nomic-embed-text` window
+  embeddings and the heuristic's signals, logistic regression, leave one
+  VOD out on 15 VODs (377 keeper, 204 reject windows): keeper over
+  reject 0.59 to 0.61, per VOD 0.24 to 0.80; its top 10 141 to 145 of 150
+  unjudged, so not scored; inside the LLM's top 10, 0.61 against the
+  LLM's 0.56. Embedding 15 VODs about 1.5 min. Rerun when the labels
+  about double.
 - `0027` — performance data: a YouTube Studio CSV exported by hand and
   imported offline; no YouTube API, key, OAuth or login. The parser follows
   a real export, recorded in an amendment first (columns unverified);
@@ -1115,12 +1122,14 @@ titles naming the person and titles kept unedited.
    choice): `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, the day the
    drafts ran, an existing folder reused; queue and `posted` find nested
    folders. ADR 0019 amendment, manual step Q2.~~ (done)
-5. A trained ranker on the judged labels (frozen local text embeddings and
+5. ~~A trained ranker on the judged labels (frozen local text embeddings and
    a simple classifier, with the heuristic's signals, the LLM score and
    nearest judged spans as inputs if they help), against the LLM leave one
    VOD out. Keeps the embeddings in a file (ADR 0026 decision 5). Decides
    the libraries (ADR 0003 check), where the model file lives, and how it
-   is chosen (ADR 0013). May end in nothing.
+   is chosen (ADR 0013). May end in nothing.~~ (done; ended in nothing:
+   keeper over reject 0.59 to 0.61 on held-out VODs, its own top 10 almost
+   all unjudged; ADR 0026 amendment; no code)
 6. `clipper` CSV import (command name decided in the item): parse the
    export from item 2, link Shorts to drafts by matching, confirm ambiguous
    ones, keep confirmed links and a dated snapshot. ADR 0027 amendment,
@@ -1132,7 +1141,8 @@ titles naming the person and titles kept unedited.
    ranker. ADR 0026 amendment. May end in nothing.
 9. Retraining as one command from the current labels (and links, after
    item 8), printing held-out measures beside the current model's before
-   replacing it (ADR 0026 decision 6).
+   replacing it (ADR 0026 decision 6). Waits for a ranker that is adopted
+   (item 5 was not).
 10. ~~Not learning, from daily use: remux after `fetch` for files whose
     timestamps do not start at 0 (Parked), so `review` opens every
     download. ADR 0020 amendment, manual step. May land any time.~~
@@ -1167,6 +1177,9 @@ Later, not scheduled:
   visual moments a transcript cannot see. After V6 item 5 shows the
   transcript-only ranker works; a frame encoder likely brings PyTorch with
   CUDA (several GB), so ADR 0003's check first.
+- Rerun the V6 item 5 ranker spike once the judged windows about double
+  (377 keeper and 204 reject windows on 15 VODs at the first run), or
+  judge a ranker's own top 10 on a few VODs to score its picks.
 - A small neural network in place of the ranker's classifier, once the
   labels are enough for it to do better on held-out VODs (ADR 0026).
 - Nearest-clip lookup beyond item 5: prompt examples for the LLM detector
