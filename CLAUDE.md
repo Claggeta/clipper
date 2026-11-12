@@ -359,6 +359,13 @@ and planned code:
   `aselect` rather than `concat` (audio stays optional), `-t` on the input
   when cutting; `core/cuts.py`. Page amendment: `GET /api/pauses`, Save
   re-renders when the cuts change, manual step RV12.
+- `0030` — on-screen text and thumbnails, made in review: text boxes per
+  clip (words, start and end in the finished clip's seconds, `top` or
+  `middle`), bold white on a half-dark box, extra events in the clip's ASS
+  (one encode, with or without word captions); the first starts as the
+  title, 0 to 3 s at the top; stored on manifest and label, re-rendered on
+  change. "Thumbnail" saves the playhead's frame in the clip's framing,
+  without captions, with optional text, as `<clip stem>.thumb.jpg`.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1091,6 +1098,10 @@ titles naming the person and titles kept unedited.
    label and manifest; then the page's Cut silence, toggles, Preview and
    Save with a manual step.~~ (done; ADR #192, core #194, handles fix
    #195, page with manual step RV12)
+4e. On-screen text and thumbnails (added 2026-11-11, the maintainer's
+   choice; ADR 0030), in PRs: the ADR; text rendering (the model, ASS
+   events, manifest and label); text in the page with a manual step;
+   thumbnails with a manual step.
 4d. ~~Drafts filed by channel and day (added 2026-11-11, the maintainer's
    choice): `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, the day the
    drafts ran, an existing folder reused; queue and `posted` find nested
