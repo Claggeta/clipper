@@ -2,10 +2,12 @@
 
 AI-assisted tool that finds clip-worthy moments in long-form video.
 
-**Status:** V1 to V4 work locally as a command-line tool (v0.4.0).
+**Status:** V1 to V6 work locally as a command-line tool (v0.6.0).
 `clipper drafts` takes a YouTube or Twitch URL, or a local file, to a folder of
 vertical clips with word-by-word captions and a suggested title and hook for
-each. `fetch`, `analyze`, `render` and `eval` are also separate commands, and
+each. `clipper review` opens a local page to judge, trim, cut, add text to and
+make thumbnails for those drafts, and `clipper queue` lists the kept clips to
+post. `fetch`, `analyze`, `render` and `eval` are also separate commands, and
 `labels` turns a Twitch VOD's community clips into a labels file for `eval`.
 Posting, uploads and analytics are not built.
 
@@ -209,6 +211,42 @@ it before anything is downloaded or transcribed. If one clip fails, the rest
 still render and it exits 1. A URL is subject to the same terms warning as
 `fetch`. See [ADR 0022](docs/decisions/0022-one-command-to-drafts.md).
 
+### Reviewing drafts
+
+```powershell
+uv run clipper review "data\clips\<channel>\<MM-DD-YYYY>\<video name>"
+```
+
+`review` opens a page on 127.0.0.1 (`--port 8765`, `--no-open`) with the
+clip list, a player over the whole source video and a film strip with start
+and end handles. For each draft: move its ends, pick the `fit` or `face`
+style, edit the title, rate it `good` or `ok` and mark who is on screen (from
+`data/people.txt`), press "Cut silence" to cut pauses (each cut toggles,
+Preview skips them), add up to 5 on-screen text boxes, and "Make thumbnail"
+from the playhead's frame. Save writes a judged label to
+`<labels dir>/picks/<video name>.json` and re-renders the clip when it
+changed; Trash deletes it and records a rejected span; "Add clip here" saves
+a moment no draft proposed. Ctrl+C stops the server. See
+[ADR 0024](docs/decisions/0024-review-drafts-in-a-local-browser-page.md),
+[0029](docs/decisions/0029-cut-pauses-in-review.md) and
+[0030](docs/decisions/0030-on-screen-text-and-thumbnails.md).
+
+### The post queue
+
+```powershell
+uv run clipper queue
+uv run clipper posted "<video name>/<clip file>" "https://youtube.com/shorts/<id>"
+```
+
+`queue` lists the saved clips rated `good` and not yet posted, one drafts
+folder after another (newest first), two a day from today (`--per-day`,
+`--start YYYY-MM-DD`, `--include-ok` to add the `ok` ones), and writes
+`<clips dir>/queue.md` with each clip's file, thumbnail, title and caption
+ready to copy, the people marked in review and the campaigns from
+`data/campaigns.txt` it qualifies for. `posted` records a clip's YouTube
+link in `data/posts.json`, and it leaves the queue. See
+[ADR 0028](docs/decisions/0028-post-queue.md).
+
 ### Evaluating detectors
 
 `eval` measures the detector against moments you labeled by hand. It reruns the
@@ -308,6 +346,10 @@ repo root or set absolute paths.
 | `CLIPPER_CLIPS_DIR`    | `data/clips`  | Where rendered clips are written       |
 | `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files, and `labels` writes them |
 | `CLIPPER_VIDEOS_DIR`   | `data/videos` | Where `fetch` saves downloaded videos  |
+| `CLIPPER_CHANNELS_FILE`| `data/channels.txt` | Saved `<channel> \| <about text>` lines for titles |
+| `CLIPPER_PEOPLE_FILE`  | `data/people.txt` | Names offered in `review` |
+| `CLIPPER_CAMPAIGNS_FILE`| `data/campaigns.txt` | Campaigns `queue` checks clips against |
+| `CLIPPER_POSTS_FILE`   | `data/posts.json` | Where `posted` records posts |
 | `CLIPPER_LLM_URL`      | `http://127.0.0.1:11434` | Ollama server for `--detector llm` |
 | `CLIPPER_LLM_MODEL`    | `qwen3.5:9b`  | Ollama model for `--detector llm`      |
 
