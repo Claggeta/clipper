@@ -99,6 +99,24 @@ inside a clip are known without another pass over the audio.
   the rating PR (#190, a second `drawMarks` in the page script), fixed
   first in #195.
 
+## Amended by manual cuts (V7 item 3a)
+
+- Cuts are also marked by hand: `Cut in` and `Cut out` (keys `[` and `]`,
+  ignored while typing; Esc drops a pending Cut in) add the range between
+  two playhead times as a cut. It must lie strictly inside the span, at
+  least 0.1 s long; one that overlaps or touches other cuts is merged with
+  them, since the renderer needs cuts apart. It toggles, previews and saves
+  like a pause cut, and is striped in the accent colour.
+- On disk a manual cut is an ordinary cut: no `kind` field on the label
+  or manifest, so the renderer, captions, face crop and `eval` are
+  unchanged. The page therefore treats saved cuts as manual after a
+  reload. Recording the kind would let manual and pause cuts be counted
+  apart, but no measure needs it yet.
+- `Cut silence` no longer replaces every cut: it replaces the pause cuts
+  it proposed before, keeps manual and saved ones, and leaves out a pause
+  that meets one of them. `Clear cuts` and Reset still empty the list.
+- Manual step RV16. Dragging a range on the strip is item 3b.
+
 ## Revisit when
 
 - The maintainer keeps most proposed cuts, or turns most off: change the

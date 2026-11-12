@@ -39,6 +39,7 @@
         <div id="strip" class="strip">
           <div id="tiles" class="tiles"></div>
           <div id="cuts" class="cuts"></div>
+          <div id="cut-in" class="cut-in" hidden></div>
           <div id="dim-before" class="dim before"></div>
           <div id="dim-after" class="dim after"></div>
           <div id="selection" class="selection"></div>
@@ -52,6 +53,8 @@
           <button type="button" id="preview" class="primary">Preview span</button>
           <button type="button" id="reset">Reset</button>
           <button type="button" id="cut-silence" title="Cut the pauses in speech inside the span">Cut silence</button>
+          <button type="button" id="cut-in-button" title="Start a cut at the playhead ( [ )">Cut in</button>
+          <button type="button" id="cut-out-button" title="End the cut at the playhead ( ] ); Esc drops it">Cut out</button>
           <button type="button" id="clear-cuts">Clear cuts</button>
           <span id="trim-notice" class="error"></span>
         </div>

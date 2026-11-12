@@ -371,7 +371,10 @@ and planned code:
   `eval` are unchanged. Manual cuts later. Core amendment: `select`/
   `aselect` rather than `concat` (audio stays optional), `-t` on the input
   when cutting; `core/cuts.py`. Page amendment: `GET /api/pauses`, Save
-  re-renders when the cuts change, manual step RV12.
+  re-renders when the cuts change, manual step RV12. Manual cuts
+  amendment (V7 3a): Cut in/out at the playhead (`[`, `]`), merged with
+  cuts they meet, stored as ordinary cuts; Cut silence keeps manual and
+  saved cuts; manual step RV16.
 - `0030` — on-screen text and thumbnails, made in review: text boxes per
   clip (words, start and end in the finished clip's seconds, `top` or
   `middle`), bold white on a half-dark box, extra events in the clip's ASS
@@ -1217,9 +1220,10 @@ in item 7 may land any time.
    ADR 0024 amendment, unit tests, manual step.~~ (done; ADR 0024 and
    0012 amendments, `spans_hit`, manual step RV15)
 3. Manual cuts (ADR 0029 "later"), in PRs:
-   - 3a. Cut in and out at the playhead, by buttons and keys, added to the
+   - 3a. ~~Cut in and out at the playhead, by buttons and keys, added to the
      cut list beside the pause cuts, toggled, previewed and saved in
-     `cuts` the same way. ADR 0029 amendment, manual step.
+     `cuts` the same way. ADR 0029 amendment, manual step.~~ (done;
+     keys `[`, `]`, Esc; Cut silence keeps manual cuts; manual step RV16)
    - 3b. Drag a range on the film strip to cut it. Manual step.
 4. Move `OllamaClient` to a shared adapter module with its own error,
    behaviour-neutral (Parked), before item 5 changes the prompt.
