@@ -18,6 +18,7 @@ from clipper.adapters.media.faces import (
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
+from clipper.adapters.media.remux import FfmpegRemuxer
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.adapters.titles.ollama import OllamaTitleWriter
@@ -33,6 +34,7 @@ from clipper.core.interfaces import (
     FaceTracker,
     FrameExtractor,
     MediaProbe,
+    Remuxer,
     ReviewFiles,
     TitleWriter,
     Transcriber,
@@ -92,6 +94,11 @@ def build_face_tracker(settings: Settings) -> FaceTracker:
     )
 
 
+def build_remuxer() -> Remuxer:
+    """Compose the remuxer for downloads that do not start at 0 (ADR 0020)."""
+    return FfmpegRemuxer()
+
+
 def build_frames() -> FrameExtractor:
     """Compose the frame extractor for the review page's film strip."""
     return FfmpegFrameExtractor()
@@ -147,6 +154,7 @@ class AppContext:
     downloader: Callable[[Settings], Downloader] = build_downloader
     clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup
     video_info: Callable[[Settings], VideoInfoLookup] = build_video_info
+    remuxer: Callable[[], Remuxer] = build_remuxer
     # Serves the review page until Ctrl+C (ADR 0024); tests pass a stub so
     # `review` does not block.
     serve: Callable[[ReviewSession, int, bool, Callable[[str], None]], None] = (

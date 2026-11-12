@@ -2245,6 +2245,25 @@ Pass:
 3. The third exits 1: the Twitch VOD renders, the unavailable YouTube ID
    fails with yt-dlp's message, and the table shows that source's error.
 
+### D13. A download that starts late is remuxed
+
+Covers [ADR 0020](decisions/0020-fetch-a-video-by-url.md)'s remux
+amendment. Run when a Twitch VOD downloads with its timestamps starting
+late (seen once, at 64 s; why is unknown):
+
+```powershell
+ffprobe -v error -show_entries format=start_time -of csv=p=0 data\videos\<id>.mp4
+uv run clipper fetch https://www.twitch.tv/videos/<number>
+ffprobe -v error -show_entries format=start_time -of csv=p=0 data\videos\<id>.mp4
+```
+
+Pass: the first `ffprobe` prints the late start; `fetch` prints
+`Already fetched`, `Remuxing <id>.mp4: it starts at <n> s` and
+`Remuxed: ...`; the second `ffprobe` prints a start under 0.1, and
+`clipper review` on its drafts folder opens. A second `fetch` prints no
+`Remuxing`. Without a late file at hand, any `fetch` passes if it prints
+no `Remuxing` for a file starting at 0.
+
 ### D11. Clean up
 
 ```powershell

@@ -124,6 +124,17 @@ class ClipRenderer(Protocol):
 
 
 @runtime_checkable
+class Remuxer(Protocol):
+    """Rewrites a video in place so its timestamps start at 0, losslessly.
+
+    Raises `RemuxError` and leaves the video as it was on failure (see
+    docs/decisions/0020, remux amendment).
+    """
+
+    def remux(self, video_path: Path) -> None: ...
+
+
+@runtime_checkable
 class TitleWriter(Protocol):
     """Suggests a title and hook for one clip from its spoken text.
 
