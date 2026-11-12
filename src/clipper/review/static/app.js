@@ -299,7 +299,7 @@ function chosenPeople(clip) {
   return people.filter((name) => mark.people.has(name));
 }
 
-function drawMarks(clip) {
+function drawRating(clip) {
   const mark = marksOf(clip);
   for (const button of ratingBox.querySelectorAll("button")) {
     button.setAttribute("aria-pressed", String(button.dataset.value === mark.rating));
@@ -316,7 +316,7 @@ function drawMarks(clip) {
       } else {
         mark.people.add(name);
       }
-      drawMarks(clip);
+      drawRating(clip);
       drawUnsaved();
     });
     peopleBox.append(button);
@@ -332,7 +332,7 @@ for (const button of ratingBox.querySelectorAll("button")) {
     }
     const mark = marksOf(current);
     mark.rating = mark.rating === button.dataset.value ? null : button.dataset.value;
-    drawMarks(current);
+    drawRating(current);
     drawUnsaved();
   });
 }
@@ -408,7 +408,7 @@ function select(clip, button) {
   document.getElementById("details").hidden = false;
   titleBox.value = clip.title || "";
   noteBox.value = (clip.judgment && clip.judgment.note) || "";
-  drawMarks(clip);
+  drawRating(clip);
   drawJudged(clip);
   drawClipInfo(clip);
   drawDraft(clip);
@@ -580,7 +580,7 @@ function judged(clip, reply) {
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
-    drawMarks(clip);
+    drawRating(clip);
     drawJudged(clip);
     drawClipInfo(clip);
     drawDraft(clip);

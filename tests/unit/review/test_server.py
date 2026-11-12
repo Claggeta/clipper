@@ -1,5 +1,6 @@
 import http.client
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -807,3 +808,13 @@ def test_the_payload_lists_each_clips_styles(tmp_path: Path) -> None:
     ]
     plain = clip_payload(session, store, MANIFEST.clips[1])
     assert (plain["style"], plain["variants"]) == (None, [])
+
+
+def test_the_page_script_declares_each_function_once() -> None:
+    # A second `function drawMarks` silently replaced the strip's, so the
+    # handles stopped drawing (V6 4a); JavaScript does not complain.
+    from importlib.resources import files
+
+    script = (files("clipper.review") / "static" / "app.js").read_text("utf-8")
+    names = re.findall(r"^(?:async )?function (\w+)\(", script, re.MULTILINE)
+    assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
