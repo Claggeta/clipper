@@ -465,7 +465,7 @@ user accounts. Face-aware cropping was a spike that ended in ADR 0025: a
 `face` crop style and picking a style per clip are built in V5; the
 facecam split comes later.
 
-## V6 scope (scoped 2026-11-11)
+## V6 scope (shipped as `v0.6.0`)
 
 Input: the maintainer's judged labels and edited titles, and later a
 YouTube Studio CSV of the posted Shorts. Output: drafts picked and titled
@@ -480,6 +480,11 @@ or the encoders, a network trained from scratch, a vector database server,
 audio or frame embeddings (after item 5, under "Later"), campaign payouts, the movies/TV niche,
 channel watching or scheduling, a database, user accounts. The facecam
 split and speaker detection stay under "Later".
+
+V6 closed with item 11 on 2026-11-12. Daily-use editing in `review` (items
+4a to 4e) and the remux landed; the learning items ended in nothing (3, 4,
+5). The performance work (items 2 and 6 to 9) moved to a later version, at
+the maintainer's choice; ADRs 0026 and 0027 still stand for it.
 
 ## Maintainer's goals
 
@@ -569,6 +574,12 @@ All merged to `main` with green CI:
   info and `--about`; heuristic end extension and a 15 s minimum.
   Released as `v0.5.0` (pre-release, tag on 9cda982). Notes are in
   `docs/releases/v0.5.0.md`.
+- V6: cuts, on-screen text, thumbnails, ratings and people in `review`;
+  `queue` and `posted`; drafts filed by channel and day; saved about text
+  and emoji in titles; remux after `fetch`; title examples, detector
+  examples and a trained ranker measured and not adopted. Released as
+  `v0.6.0` (pre-release, tag on 13935cf). Notes are in
+  `docs/releases/v0.6.0.md`.
 
 In progress:
 
@@ -1078,6 +1089,7 @@ titles naming the person and titles kept unedited.
 2. Not code: the maintainer exports one YouTube Studio CSV of the
    channel's Shorts; its columns, the count of Shorts and whether it has
    retention or swipe-away figures go into an ADR 0027 amendment.
+   (Moved to a later version with items 6 to 9.)
 3. ~~Title examples: the title prompt gets the maintainer's own titles (where
    `title` differs from `model_title`) as examples, chosen from other VODs.
    Measured on held-out VODs' keepers. ADR 0018 amendment, manual step.~~
@@ -1133,22 +1145,26 @@ titles naming the person and titles kept unedited.
 6. `clipper` CSV import (command name decided in the item): parse the
    export from item 2, link Shorts to drafts by matching, confirm ambiguous
    ones, keep confirmed links and a dated snapshot. ADR 0027 amendment,
-   manual step.
+   manual step. (Moved to a later version.)
 7. A performance report: linked Shorts against their verdicts, detector
    scores, styles and titles, compared by age and channel. Sets whether
-   performance can be a target. Not a detector change.
+   performance can be a target. Not a detector change. (Moved to a later
+   version.)
 8. If item 7 says so: performance as a second training target for item 5's
-   ranker. ADR 0026 amendment. May end in nothing.
+   ranker. ADR 0026 amendment. May end in nothing. (Moved to a later
+   version.)
 9. Retraining as one command from the current labels (and links, after
    item 8), printing held-out measures beside the current model's before
    replacing it (ADR 0026 decision 6). Waits for a ranker that is adopted
-   (item 5 was not).
+   (item 5 was not). (Moved to a later version.)
 10. ~~Not learning, from daily use: remux after `fetch` for files whose
     timestamps do not start at 0 (Parked), so `review` opens every
     download. ADR 0020 amendment, manual step. May land any time.~~
     (done; `Remuxer`, new and reused files, manual step D13; no late file
     was at hand to check, v2924046310 already remuxed by hand)
-11. Release notes and tag `v0.6.0`.
+11. ~~Release notes and tag `v0.6.0`.~~ (done; notes #205, README
+    review and queue sections, F1 run 2026-11-12 before tagging, tag
+    `v0.6.0` and pre-release by the maintainer)
 
 Later, not scheduled:
 
