@@ -486,6 +486,28 @@ V6 closed with item 11 on 2026-11-12. Daily-use editing in `review` (items
 5). The performance work (items 2 and 6 to 9) moved to a later version, at
 the maintainer's choice; ADRs 0026 and 0027 still stand for it.
 
+## V7 scope
+
+Input: the same sources and drafts folders as V6, and the maintainer's
+edits in `review`. Output: drafts picked by a finer LLM score if it
+measures better, a `facecam` vertical style for streams with a facecam
+box if a spike finds the box reliably, and a review page that saves
+neighbouring keepers and takes cuts marked by hand. Interface: changes to
+`review`, the LLM prompt, `render`/`drafts` styles, and small fixes from
+"Parked".
+
+Every picking change is measured as in V5 and V6: per VOD at top 10
+against the judged labels, keepers and rejects, keepers cut short and end
+gaps, unjudged drafts judged first, against the current default.
+
+Non-goals for V7: the performance work (CSV export, import, report,
+performance as a target, retraining; ADRs 0026 and 0027 still stand,
+after an export), rerunning the ranker spike (the judged labels have not
+grown since it: 144 labels and 90 rejected spans on 17 VODs), speaker
+detection, audio or frame embeddings, posting or uploads, the YouTube or
+Twitch APIs, hosted or paid models, the movies/TV niche, a URL box in the
+review page, channel watching or scheduling, a database, user accounts.
+
 ## Maintainer's goals
 
 As stated: a personal tool, used daily and eventually mostly unattended, that
@@ -545,6 +567,18 @@ From the V6 conversation on 2026-11-11:
 - Posting context: the CORE (Stable Ronaldo, JasonTheWeen, Lacy, Silky,
   Marlon, Adapt); campaigns wanted are CORE, Lacy and JasonTheWeen, all
   three briefs read (see "Campaign briefs read").
+
+From the V7 interview on 2026-11-12:
+
+- Bad picks are still the costliest failure, and a mix: nothing
+  happening, moments that are seen rather than said, and the right moment
+  cut badly. The lever to try is a finer LLM score.
+- Some posted clips come from gaming streams with a facecam box, so the
+  facecam split is worth a spike.
+- No Studio CSV export yet, so the performance work stays out of V7.
+- In `review`: save a span that overlaps another clip's label by less than
+  the hit rule, and mark cuts by hand, at the playhead and on the strip.
+- The small Parked fixes ride along, each its own PR.
 
 ## Current state
 
@@ -1166,6 +1200,50 @@ titles naming the person and titles kept unedited.
     review and queue sections, F1 run 2026-11-12 before tagging, tag
     `v0.6.0` and pre-release by the maintainer)
 
+## V7 list
+
+Each item is one PR, and each code item states its design and waits for
+confirmation first. Review first, then picking, then framing; the fixes
+in item 7 may land any time.
+
+1. ADRs and scope (one docs PR): the V7 scope, goals and list. ADRs come
+   with each item as amendments.
+2. Overlap on Save: `review` saves a span that overlaps another clip's
+   label by less than half the shorter span (the hit rule, ADR 0012), so
+   `eval` still counts them apart, and refuses above that (409, as now).
+   ADR 0024 amendment, unit tests, manual step.
+3. Manual cuts (ADR 0029 "later"), in PRs:
+   - 3a. Cut in and out at the playhead, by buttons and keys, added to the
+     cut list beside the pause cuts, toggled, previewed and saved in
+     `cuts` the same way. ADR 0029 amendment, manual step.
+   - 3b. Drag a range on the film strip to cut it. Manual step.
+4. Move `OllamaClient` to a shared adapter module with its own error,
+   behaviour-neutral (Parked), before item 5 changes the prompt.
+5. A finer LLM score (Parked): a scoring rubric in the prompt, so scores
+   stop clustering on round values; token probabilities only if Ollama
+   returns them (unverified). Measured on the judged VODs at top 10
+   against the current prompt, with the time per VOD and the count of
+   distinct scores. ADR 0014 amendment. May end in nothing.
+6. The facecam split (ADR 0025), in PRs:
+   - 6a. Spike: find a fixed facecam box per clip on a few gaming VODs,
+     checked against boxes marked by hand. Ends in an ADR 0025 amendment
+     or in nothing.
+   - 6b. If 6a says so: a `facecam` style in `render` and `drafts`, the
+     box stacked above the gameplay; a clip with no box is a note and
+     renders in `fit`. Manual step.
+   - 6c. The `facecam` style in the review page's style switch (ADR 0024
+     amendment). Manual step.
+7. Small fixes from "Parked", each its own PR:
+   - 7a. ffmpeg exit codes: signed `AVERROR` values, with short names for
+     invalid data, no stream and permission denied.
+   - 7b. The repeated prefix in `render`'s malformed-JSON message.
+   - 7c. Letterboxed sources under `--vertical`: fit only the picture area
+     (`cropdetect`, untried here). ADR 0016 amendment, manual step.
+   - 7d. Docs and housekeeping: `docs/architecture.md` drift and code
+     fences, mojibake in `docs/roadmap.md` and `docs/architecture.md`,
+     duplicate `.gitignore` entries, the D9 and D10 pipe.
+8. Release notes and tag `v0.7.0`.
+
 Later, not scheduled:
 
 - A URL box in the review page, after item 9, once the drafts chain moves to
@@ -1188,7 +1266,7 @@ Later, not scheduled:
   13e's picks show how often `face` loses to `fit` for it.
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
   first, and stack it above the gameplay. After V5 item 13e's picks show
-  how often facecam clips are posted.
+  how often facecam clips are posted. Scheduled as V7 item 6.
 - Audio and video-frame embeddings as ranker inputs (ADR 0026), for the
   visual moments a transcript cannot see. After V6 item 5 shows the
   transcript-only ranker works; a frame encoder likely brings PyTorch with
@@ -1213,17 +1291,21 @@ Later, not scheduled:
   actually produces (invalid data, no stream, permission denied) to a short
   name, falling back to the bare signed number. `-1094995529` alone is no
   friendlier than `3199971767`. Seen again in manual step R14: exit
-  `4294967283` is -13 (`EACCES`), cause "Permission denied".
+  `4294967283` is -13 (`EACCES`), cause "Permission denied". Scheduled as
+  V7 item 7a.
 - The `render` message for a malformed analysis JSON repeats the prefix:
   `Invalid JSON in analysis result <path>: Invalid JSON: ...`. The second
   part is pydantic's own message (manual step R11). Drop one of the two.
+  Scheduled as V7 item 7b.
 - Docs drift in `docs/architecture.md`: omits `AudioExtractor` from core
   interfaces; says the CLI depends on core, but it imports adapters; promises
   CLI config flags that don't exist; says ffmpeg is checked at startup, when
   the check is lazy. The diagram and layer text also need code fences so
-  GitHub renders them correctly.
+  GitHub renders them correctly. Scheduled as V7 item 7d.
 - Possible mojibake in `docs/roadmap.md` and `docs/architecture.md`.
+  Scheduled as V7 item 7d.
 - `.gitignore` duplicate entries (`.venv`, `dist/`, `__pycache__/`).
+  Scheduled as V7 item 7d.
 - Opt-in model-load test: needs a marker, `--strict-markers`, and
   deselecting by default.
 - Captions on a build without libass: every selected clip fails with the same
@@ -1249,7 +1331,7 @@ Later, not scheduled:
   put a label in its top 5 there. Options: token probabilities (whether
   Ollama returns them is unverified) or a scoring rubric in the prompt. Needs
   an ADR 0014 amendment and `eval` results. Part of V5 item 11 if ties
-  decide the detector choice.
+  decide the detector choice. Scheduled as V7 item 5.
 - Labels may hinge on what is seen, not said. Several `oFbD0Ot7nQ8.json`
   labels name visual moments ("Biz Hits a Long Putt"), which a
   transcript-only detector cannot see. Unverified as the cause of the LLM's
@@ -1261,13 +1343,14 @@ Later, not scheduled:
   step R15): `test_input.mp4` has black bars in its 1280x720 frame, and they
   show inside the fitted picture and blurred in the fill. Fix: detect the
   picture area first (ffmpeg's `cropdetect`, untried here) and fit only that.
-  An ADR 0016 amendment.
+  An ADR 0016 amendment. Scheduled as V7 item 7c.
 - `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
   temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.
 - `OllamaClient` lives in `adapters/detection/` but titles use it too, so
   `adapters/titles/` imports across adapters, and the client raises
   `DetectionError`, which the title writer re-raises as `TitleError`. Fix:
   move it to a shared adapter module with its own error, behaviour-neutral.
+  Scheduled as V7 item 4.
 - Title quality after the prompt fix (#114, `qwen3.5:9b`): lengths are
   within the limits on 35 clips, but one clip keeps "Ass" in its title under
   every prompt tried, and some hooks misstate the speaker or may add details
@@ -1287,10 +1370,11 @@ Later, not scheduled:
   windows on v2918956109 overlapped saved keepers by 11 and 13 s and could
   not be saved. Fix: allow a saved span to overlap another label by less
   than the hit rule (half the shorter span), or ask first; an ADR 0024
-  amendment.
+  amendment. Scheduled as V7 item 2 (under the hit rule).
 - Manual steps D9 and D10 pipe `Invoke-Fetch` into
   `Select-Object -Last N`, which does nothing: the helper returns the text as
-  one string. Fix: split the text into lines, or drop the pipe.
+  one string. Fix: split the text into lines, or drop the pipe. Scheduled
+  as V7 item 7d.
 - yt-dlp warns on every YouTube request that no JavaScript runtime was found
   and "some formats may be missing" (it asks for deno). Downloads worked in
   manual step D1. Revisit if YouTube downloads fail or lose formats (ADR 0020
