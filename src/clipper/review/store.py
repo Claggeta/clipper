@@ -13,6 +13,8 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from clipper.core.captions import build_ass
 from clipper.core.cuts import Cut, TimeMap, check_cuts, cut_crop
 from clipper.core.framing import plan_face_crop
@@ -36,6 +38,7 @@ from clipper.domain.models import (
     CropPath,
     LabeledVideo,
     ManifestClip,
+    OnScreenText,
     RenderManifest,
     Transcript,
 )
@@ -49,6 +52,10 @@ STYLES = ("fit", "face")
 RATINGS = ("good", "ok")
 # The reason listed for a clip added in the page (ADR 0019, 3e amendment).
 ADDED_REASON = "added in review"
+# On-screen texts per clip (ADR 0030); a hook and a few lines.
+MAX_TEXTS = 5
+# No speech, for texts alone in a folder without captions.
+_SILENT = Transcript(segments=())
 
 
 class BadRequest(Exception):
@@ -72,6 +79,8 @@ class SaveRequest:
     people: tuple[str, ...] = ()
     # Source-time ranges left out of the clip (ADR 0029).
     cuts: tuple[Cut, ...] = ()
+    # Lines burned over the clip (ADR 0030).
+    texts: tuple[OnScreenText, ...] = ()
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -100,7 +109,9 @@ def parse_save(
     title of at most `MAX_TITLE` characters, and any note. Empty text is None.
     A rating is one of `RATINGS`; people are names from `people`, the run's
     list, kept in that list's order. Cuts are `[start, end]` pairs in order,
-    apart and strictly inside the span (ADR 0029).
+    apart and strictly inside the span (ADR 0029). Texts are objects of
+    `text`, `start`, `end` (seconds of the finished clip) and `place`
+    (ADR 0030).
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -133,9 +144,34 @@ def parse_save(
         check_cuts(cuts, start, end)
     except ClipperError as exc:
         raise BadRequest(str(exc)) from exc
+    texts = _texts(data.get("texts", []))
     return SaveRequest(
-        start, end, title, _text(data, "note"), style, rating, chosen, cuts
+        start, end, title, _text(data, "note"), style, rating, chosen, cuts, texts
     )
+
+
+def _texts(value: object) -> tuple[OnScreenText, ...]:
+    if not isinstance(value, list) or len(value) > MAX_TEXTS:
+        raise BadRequest(f"texts must be a list of at most {MAX_TEXTS}")
+    texts: list[OnScreenText] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise BadRequest("each text must be an object")
+        try:
+            texts.append(
+                OnScreenText.model_validate(
+                    {
+                        "text": item.get("text"),
+                        "start_seconds": _seconds(item, "start"),
+                        "end_seconds": _seconds(item, "end"),
+                        "place": item.get("place", "top"),
+                    }
+                )
+            )
+        except ValidationError as exc:
+            message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+            raise BadRequest(f"text: {message}") from exc
+    return tuple(texts)
 
 
 def _cuts(value: object) -> tuple[Cut, ...]:
@@ -229,6 +265,7 @@ class ReviewStore:
                     "rating": label.rating,
                     "people": list(label.people),
                     "cuts": [[c.start_seconds, c.end_seconds] for c in label.cuts],
+                    "texts": [text_payload(t) for t in label.texts],
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -278,6 +315,7 @@ class ReviewStore:
             clip.file is None
             or not same_span((clip.start_seconds, clip.end_seconds), span)
             or not _same_cuts(clip.cuts, request.cuts)
+            or clip.texts != request.texts
         )
         candidate = ClipCandidate(
             start_seconds=request.start,
@@ -302,6 +340,7 @@ class ReviewStore:
             request.rating,
             request.people,
             request.cuts,
+            request.texts,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -314,7 +353,9 @@ class ReviewStore:
         render_error = warning = None
         if needs_render:
             try:
-                changes |= self._rerender(clip, candidate, name, style, request.cuts)
+                changes |= self._rerender(
+                    clip, candidate, name, style, request.cuts, request.texts
+                )
             except ClipperError as exc:
                 render_error = str(exc)
                 if clip.file is None:
@@ -374,27 +415,33 @@ class ReviewStore:
         name: str,
         style: str | None,
         cuts: tuple[Cut, ...] = (),
+        texts: tuple[OnScreenText, ...] = (),
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
         Returns the manifest changes. A failure leaves no temporary file and
         any old file untouched. With cuts, the face crop and captions follow
-        the cut clip's times (ADR 0029).
+        the cut clip's times (ADR 0029). Texts are burned with the captions,
+        or alone in a folder without them (ADR 0030).
         """
         manifest = self.manifest
         time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
         crop = cut_crop(self._crop(candidate), time_map) if style == "face" else None
         ass = ""
         burned: str | None = None
-        if manifest.captions and self._render.transcript is not None:
+        captioned = manifest.captions and self._render.transcript is not None
+        if captioned or texts:
             built = build_ass(
-                self._render.transcript,
+                self._render.transcript
+                if captioned and self._render.transcript
+                else _SILENT,
                 candidate,
                 vertical=manifest.vertical,
                 cuts=cuts,
+                texts=texts,
             )
             ass = built.text
-            if ass:
+            if built.speech:
                 burned = "segments" if built.from_segments else "words"
         target = self._folder / name
         temp = target.with_name(f"{target.stem}.part.mp4")
@@ -424,6 +471,7 @@ class ReviewStore:
             "draft_start_seconds": draft_start,
             "draft_end_seconds": draft_end,
             "cuts": cuts,
+            "texts": texts,
         }
 
     def _delete_others(self, clip: ManifestClip, keep: str, done: str) -> str | None:
@@ -504,6 +552,16 @@ class ReviewStore:
             (self._folder / clip.file).unlink(missing_ok=True)
         except OSError as exc:
             raise ReviewError(f"Cannot delete {clip.file}: {exc}") from exc
+
+
+def text_payload(text: OnScreenText) -> dict[str, object]:
+    """A text as the page sends and shows it."""
+    return {
+        "text": text.text,
+        "start": text.start_seconds,
+        "end": text.end_seconds,
+        "place": text.place,
+    }
 
 
 def _same_cuts(a: tuple[Cut, ...], b: tuple[Cut, ...]) -> bool:

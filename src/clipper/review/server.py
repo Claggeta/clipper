@@ -44,6 +44,7 @@ from clipper.review.store import (
     UnknownClip,
     parse_save,
     parse_trash,
+    text_payload,
 )
 
 HOST = "127.0.0.1"
@@ -202,7 +203,8 @@ def clip_payload(
     are the detector's span, the same until a re-render. `model_title` is
     the model's title, kept once the page has written the clip. `variants`
     are the rendered styles and `style` the clip's own, its first (ADR 0025).
-    `cuts` are the ranges left out of the file (ADR 0029).
+    `cuts` are the ranges left out of the file (ADR 0029), and `texts`
+    the lines burned over it (ADR 0030).
     """
     draft_start, draft_end = clip.draft_span
     return {
@@ -223,6 +225,7 @@ def clip_payload(
         "error": clip.error,
         "reviewed": clip.reviewed,
         "cuts": [list(cut) for cut in clip.cuts],
+        "texts": [text_payload(text) for text in clip.texts],
         "judgment": store.judgment(clip),
     }
 

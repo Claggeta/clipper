@@ -471,3 +471,48 @@ video {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* On-screen texts (ADR 0030): rows to edit them, and a preview of unsaved
+   ones over the draft at about where they will burn in. */
+.texts {
+  display: grid;
+  gap: 6px;
+}
+
+.text-row {
+  display: grid;
+  grid-template-columns: 1fr 72px 72px 96px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.draft-frame {
+  position: relative;
+  container-type: inline-size;
+}
+
+.draft-texts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.draft-text {
+  position: absolute;
+  left: 50%;
+  max-width: 85%;
+  padding: 0.6cqw 1.6cqw;
+  transform: translateX(-50%);
+  background: rgb(0 0 0 / 0.5);
+  color: #fff;
+  font: 700 7.8cqw/1.15 Arial, sans-serif;
+  text-align: center;
+}
+
+.draft-text.top { top: 15.6%; }
+
+.draft-text.middle { top: 50%; transform: translate(-50%, -50%); }
+
+@media (max-width: 720px) {
+  .text-row { grid-template-columns: 1fr 1fr; }
+}

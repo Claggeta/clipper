@@ -10,6 +10,7 @@ from clipper.domain.models import (
     ClipCandidate,
     ClipVariant,
     ManifestClip,
+    OnScreenText,
     RenderManifest,
     Segment,
     Transcript,
@@ -669,3 +670,67 @@ def test_cuts_in_the_body_are_read_and_checked() -> None:
     ]:
         with pytest.raises(BadRequest, match=message):
             parse_save({"start": 10.0, "end": 40.0, "cuts": cuts}, 100.0)
+
+
+def _hook(text: str = "Ron at the pump", place: str = "top") -> OnScreenText:
+    return OnScreenText.model_validate(
+        {"text": text, "start_seconds": 0.0, "end_seconds": 3.0, "place": place}
+    )
+
+
+def test_texts_re_render_and_are_recorded_on_manifest_and_label(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+
+    request = SaveRequest(10.0, 40.0, None, None, texts=(_hook(),))
+    clip = env.store.save(1, request).clip
+
+    captions = env.renderer.captions[0]
+    assert captions is not None
+    assert "Ron at the pump" in captions
+    assert clip.texts == (_hook(),)
+    assert clip.captions == "words"
+    [label] = load_labels(env.labels_path).labels
+    assert label.texts == (_hook(),)
+    assert env.store.judgment(clip)["texts"] == [  # type: ignore[index]
+        {"text": "Ron at the pump", "start": 0.0, "end": 3.0, "place": "top"}
+    ]
+    env.store.save(1, request)
+    assert len(env.renderer.calls) == 1  # the same texts do not re-render
+
+
+def test_texts_burn_in_a_folder_without_captions(tmp_path: Path) -> None:
+    env = Env(tmp_path, captions=False)
+
+    request = SaveRequest(10.0, 40.0, None, None, texts=(_hook(),))
+    clip = env.store.save(1, request).clip
+
+    captions = env.renderer.captions[0]
+    assert captions is not None
+    assert "Ron at the pump" in captions
+    assert "Hello" not in captions
+    assert clip.captions is None
+
+
+def test_texts_in_the_body_are_read_and_checked() -> None:
+    from clipper.review.store import BadRequest, parse_save
+
+    text = {"text": "Wait", "start": 1, "end": 2.5, "place": "middle"}
+    request = parse_save({"start": 10.0, "end": 40.0, "texts": [text]}, 100.0)
+    assert request.texts == (
+        _hook("Wait", "middle").model_copy(
+            update={"start_seconds": 1.0, "end_seconds": 2.5}
+        ),
+    )
+    for texts, message in [
+        ("x", "texts must be a list"),
+        ([text] * 6, "at most 5"),
+        (["x"], "each text must be an object"),
+        ([{"text": "a", "start": "0", "end": 1}], "must be a number of seconds"),
+        ([{"text": " ", "start": 0, "end": 1}], "text: a text is empty"),
+        ([{"text": "a", "start": 2, "end": 1}], "end after it starts"),
+        ([{"text": "a", "start": 0, "end": 1, "place": "bottom"}], "text: "),
+    ]:
+        with pytest.raises(BadRequest, match=message):
+            parse_save({"start": 10.0, "end": 40.0, "texts": texts}, 100.0)

@@ -2732,6 +2732,33 @@ it copies into the current folder.
 
 Then delete `%TEMP%\rv12` and `%TEMP%\rv12-labels`.
 
+### RV13. On-screen text
+
+Covers [ADR 0030](decisions/0030-on-screen-text-and-thumbnails.md)'s text.
+Same scratch copy as RV12 (make a new one if you deleted it):
+
+```powershell
+$env:CLIPPER_LABELS_DIR = "$env:TEMP\rv12-labels"
+uv run clipper review "$env:TEMP\rv12\<id>"
+```
+
+1. Choose a clip. Pass: under `On screen`, `On-screen text` with an
+   `Add text` button and no rows.
+2. Press `Add text`. Pass: a row with the clip's title, `0`, `3` and
+   `Top`; `Unsaved` shows. Play the draft from 0: the text shows over its
+   top for 3 s.
+3. Press `Add text` again, type `Wait for it...`, set `2` to `5` and
+   `Middle`. Pass: it shows in the middle of the draft from 2 to 5 s.
+4. Save. Pass: "Re-rendering"; the new draft has both texts burned in, on
+   half-dark boxes, the hook below YouTube's top area and the other in the
+   middle, word captions still at the bottom; nothing is drawn twice.
+5. Reload and choose the clip. Pass: both rows are back, `Unsaved` hidden.
+   Remove the middle one and Save: the new draft has only the hook.
+6. Stop the server. The clip's label in
+   `$env:TEMP\rv12-labels\picks\<id>.json` has `"texts"` with the hook.
+
+Then `Remove-Item Env:CLIPPER_LABELS_DIR` and delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |
