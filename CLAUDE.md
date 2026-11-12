@@ -344,6 +344,13 @@ and planned code:
   <people> [| <channels>]`), people only from review marks. `clipper posted
   <folder>/<file> <YouTube link>` records the post in `data/posts.json`
   (committed); a posted clip leaves the queue, and the link serves 0027.
+- `0029` — cuts: the review page proposes cutting pauses in speech (word
+  gaps of `MIN_PAUSE_SECONDS = 0.6`, less `CUT_PADDING_SECONDS = 0.15` a
+  side), each toggleable, Preview skipping them; Save stores `cuts`
+  (source-time ranges inside the span) on the judged label and manifest,
+  and the renderer joins the kept parts in the one re-encode (0007);
+  captions and face-crop moves go through one time map. The span and
+  `eval` are unchanged. Manual cuts later.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1070,6 +1077,11 @@ titles naming the person and titles kept unedited.
    tags, and a way to mark each posted with its date and YouTube link (the
    link also serves ADR 0027's matching). Design stated first.~~ (ADR 0028;
    `clipper queue` and `clipper posted`; manual step Q1)
+4c. Cut pauses in review (added 2026-11-11, the maintainer's choice; ADR
+   0029), in PRs: the ADR; the time map, pause finder, captions and face
+   crop through the map, the renderer joining kept parts and `cuts` on the
+   label and manifest; then the page's Cut silence, toggles, Preview and
+   Save with a manual step.
 5. A trained ranker on the judged labels (frozen local text embeddings and
    a simple classifier, with the heuristic's signals, the LLM score and
    nearest judged spans as inputs if they help), against the LLM leave one
