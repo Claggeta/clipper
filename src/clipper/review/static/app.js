@@ -2,8 +2,8 @@
 // anywhere, trim with a film strip and two handles (3b), Save or Trash each
 // clip with its title and notes (3c), re-rendered on Save (3d), and add
 // clips no draft proposed (3e). A keeper gets a rating and who is on screen
-// (rating amendment); pauses can be cut out (ADR 0029) and text added on
-// screen (ADR 0030).
+// (rating amendment); pauses can be cut out, or any range marked by hand
+// (ADR 0029), and text added on screen (ADR 0030).
 "use strict";
 
 const player = document.getElementById("player");
@@ -47,7 +47,11 @@ const edits = new Map(); // key -> {start, end}, kept while the page is open
 const chosen = new Map(); // key -> the style picked and not yet saved
 const versions = new Map(); // key -> bumped after a Save, so the draft reloads
 const marks = new Map(); // key -> the rating and people set, not yet saved
-const cutEdits = new Map(); // key -> [{start, end, on}], the cuts shown (ADR 0029)
+// key -> [{start, end, on, manual}], the cuts shown (ADR 0029)
+const cutEdits = new Map();
+// The shortest cut marked by hand, in seconds.
+const MIN_CUT = 0.1;
+let cutIn = null; // {key, seconds} after Cut in, until Cut out or Esc
 const textEdits = new Map(); // key -> [{text, start, end, place}] (ADR 0030)
 const textsBox = document.getElementById("texts");
 const draftTexts = document.getElementById("draft-texts");
@@ -184,6 +188,7 @@ function drawMarks() {
   place("handle-end", span.end);
   place("playhead", player.currentTime);
   drawCuts();
+  drawCutIn();
   drawTimes();
 }
 
@@ -209,15 +214,38 @@ function savedCuts(clip) {
   return (judged ? clip.judgment.cuts : clip.cuts) || [];
 }
 
-// The cuts shown for a clip: proposed or saved, each cut or kept.
+// The cuts shown for a clip: proposed, marked by hand or saved, each cut or
+// kept. A saved cut counts as marked by hand, since the file does not say
+// which it was, so Cut silence keeps it (V7 item 3a).
 function cutsOf(clip) {
   if (!cutEdits.has(clip.key)) {
     cutEdits.set(
       clip.key,
-      savedCuts(clip).map(([start, end]) => ({ start, end, on: true })),
+      savedCuts(clip).map(([start, end]) => ({ start, end, on: true, manual: true })),
     );
   }
   return cutEdits.get(clip.key);
+}
+
+function cutsMeet(a, b) {
+  return a.start <= b.end && b.start <= a.end;
+}
+
+// `cut` added to `cuts`, merged with every cut it overlaps or touches, since
+// the renderer needs cuts apart (ADR 0029). The merged cut is `cut`'s kind
+// and is cut.
+function withCut(cuts, cut) {
+  const merged = { ...cut, on: true };
+  const rest = [];
+  for (const other of cuts) {
+    if (cutsMeet(other, merged)) {
+      merged.start = Math.min(merged.start, other.start);
+      merged.end = Math.max(merged.end, other.end);
+    } else {
+      rest.push(other);
+    }
+  }
+  return [...rest, merged].sort((a, b) => a.start - b.start);
 }
 
 // The cuts Save sends: those still cut and inside the span, as pairs.
@@ -444,18 +472,29 @@ function drawCuts() {
     }
     const element = document.createElement("div");
     element.className = cut.on ? "cut" : "cut kept";
+    element.classList.toggle("manual", Boolean(cut.manual));
     element.style.left = `${left}%`;
     element.style.width = `${right - left}%`;
     const length = (cut.end - cut.start).toFixed(1);
+    const kind = cut.manual ? "manual " : "";
     element.title = cut.on
-      ? `${length} s cut; click to keep it`
-      : `${length} s kept; click to cut it`;
+      ? `${length} s ${kind}cut; click to keep it`
+      : `${length} s ${kind}cut kept; click to cut it`;
     element.addEventListener("click", (event) => {
       event.stopPropagation();
       cut.on = !cut.on;
       drawMarks();
     });
     box.append(element);
+  }
+}
+
+function drawCutIn() {
+  const marker = document.getElementById("cut-in");
+  if (current && cutIn && cutIn.key === current.key) {
+    place("cut-in", cutIn.seconds);
+  } else {
+    marker.hidden = true;
   }
 }
 
@@ -672,6 +711,7 @@ function select(clip, button) {
   }
   span = edits.get(clip.key);
   preview = null;
+  cutIn = null;
   disarmTrash();
   notice("");
   judgeNotice(
@@ -797,6 +837,7 @@ document.getElementById("reset").addEventListener("click", () => {
   span.end = current.draft_end;
   titleBox.value = current.model_title || "";
   cutEdits.set(current.key, []);
+  cutIn = null;
   textEdits.set(current.key, []);
   drawTexts(current);
   drawDraftTexts();
@@ -805,7 +846,9 @@ document.getElementById("reset").addEventListener("click", () => {
 });
 
 // Propose a cut at every pause in speech inside the span, all cut; a
-// click on one keeps it (ADR 0029). Nothing is written until Save.
+// click on one keeps it (ADR 0029). The pauses replace those proposed
+// before; cuts marked by hand or saved stay, and a pause that meets one is
+// left out (V7 item 3a). Nothing is written until Save.
 document.getElementById("cut-silence").addEventListener("click", async () => {
   const clip = current;
   const query = `start=${span.start}&end=${span.end}`;
@@ -815,9 +858,13 @@ document.getElementById("cut-silence").addEventListener("click", async () => {
     if (!response.ok) {
       throw new Error(data.error || `The server answered ${response.status}`);
     }
+    const manual = cutsOf(clip).filter((cut) => cut.manual);
+    const pauses = data.cuts
+      .map(([start, end]) => ({ start, end, on: true, manual: false }))
+      .filter((pause) => !manual.some((cut) => cutsMeet(cut, pause)));
     cutEdits.set(
       clip.key,
-      data.cuts.map(([start, end]) => ({ start, end, on: true })),
+      [...manual, ...pauses].sort((a, b) => a.start - b.start),
     );
     if (clip === current) {
       notice(data.cuts.length ? "" : "No pauses of 0.6 s or more in the span.");
@@ -832,8 +879,84 @@ document.getElementById("cut-silence").addEventListener("click", async () => {
 
 document.getElementById("clear-cuts").addEventListener("click", () => {
   cutEdits.set(current.key, []);
+  cutIn = null;
   notice("");
   drawMarks();
+});
+
+// Cuts marked by hand (ADR 0029, V7 item 3a): Cut in at the playhead, then
+// Cut out at a later time adds the range between them as a cut.
+function markCutIn() {
+  if (!current) {
+    return;
+  }
+  const seconds = round(player.currentTime);
+  if (seconds <= span.start || seconds >= span.end) {
+    notice("A cut must start inside the span; move the start instead.");
+    return;
+  }
+  notice("");
+  cutIn = { key: current.key, seconds };
+  drawMarks();
+}
+
+function markCutOut() {
+  if (!current) {
+    return;
+  }
+  if (!cutIn || cutIn.key !== current.key) {
+    notice("Press Cut in first.");
+    return;
+  }
+  const start = cutIn.seconds;
+  const end = round(player.currentTime);
+  if (end < start + MIN_CUT) {
+    notice("Cut out must be after Cut in.");
+    return;
+  }
+  if (end >= span.end) {
+    notice("A cut must end inside the span; move the end instead.");
+    return;
+  }
+  const cuts = withCut(cutsOf(current), { start, end, manual: true });
+  const merged = cuts.find((cut) => cut.start <= start && end <= cut.end);
+  if (merged.start <= span.start || merged.end >= span.end) {
+    notice("That cut would join one past the span's edge; clear it or move the span.");
+    return;
+  }
+  cutEdits.set(current.key, cuts);
+  cutIn = null;
+  notice("");
+  drawMarks();
+}
+
+function dropCutIn() {
+  if (cutIn) {
+    cutIn = null;
+    notice("");
+    drawMarks();
+  }
+}
+
+document.getElementById("cut-in-button").addEventListener("click", markCutIn);
+document.getElementById("cut-out-button").addEventListener("click", markCutOut);
+
+// `[` and `]` for Cut in and out, Esc to drop a Cut in; not while typing.
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const typing =
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable);
+  if (typing || event.ctrlKey || event.metaKey || event.altKey || !current) {
+    return;
+  }
+  const action = { "[": markCutIn, "]": markCutOut, Escape: dropCutIn }[event.key];
+  if (action) {
+    event.preventDefault();
+    action();
+  }
 });
 
 // --- Save and Trash ---

@@ -2841,6 +2841,34 @@ Remove-Item Env:CLIPPER_LABELS_DIR   # after stopping the server
 
 Then delete the scratch folders.
 
+### RV16. Manual cuts
+
+Covers [ADR 0029](decisions/0029-cut-pauses-in-review.md)'s manual cuts
+amendment (V7 item 3a). Same scratch copy and labels dir as RV12.
+
+1. Choose a clip with talking in it. Play to a few seconds in, press `[`.
+   Pass: a red line on the strip at the playhead.
+2. Play on about 3 s, press `]`. Pass: a yellow-striped stretch between
+   the two times, the red line gone, `Length` shows the shorter time and
+   `Unsaved` shows. Hovering it says "manual cut".
+3. Press `]` again. Pass: "Press Cut in first." Move the playhead before
+   the start handle and press `[`. Pass: "A cut must start inside the
+   span; move the start instead."
+4. Press `[` inside the yellow stretch and `]` a second past its end.
+   Pass: one longer yellow stretch, not two.
+5. Press `[`, then Esc. Pass: the red line goes. Click in the title box
+   and press `[`. Pass: `[` is typed; no red line.
+6. Press `Cut silence`. Pass: red-striped pauses appear, the yellow
+   stretch stays, and no pause stripe overlaps it.
+7. Press `Preview span`. Pass: playback jumps over the yellow stretch.
+   Save. Pass: the re-rendered draft leaves that stretch out, lips in
+   sync, captions on the right words.
+8. Reload and choose the clip. Pass: its cuts are all striped yellow
+   (saved cuts count as manual), `Unsaved` hidden. `Cut silence` keeps
+   them.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |
