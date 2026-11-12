@@ -1,0 +1,67 @@
+{
+  "source": "v2926143637.mp4",
+  "labels": [
+    {
+      "start": "1:08:25.21",
+      "end": "1:09:03.27",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Ron",
+        "Jason"
+      ],
+      "note": "OK clip. Kind of funny. Could use more context"
+    },
+    {
+      "start": "1:20:51.21",
+      "end": "1:21:52.41",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:20:51.21",
+        "end": "1:21:29.39"
+      },
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Ron",
+        "Jason"
+      ],
+      "note": "Funny content"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:57:56.43",
+      "end": "0:58:31.39"
+    },
+    {
+      "start": "1:03:20.61",
+      "end": "1:03:59.19"
+    },
+    {
+      "start": "3:50:07.5",
+      "end": "3:50:42.42"
+    },
+    {
+      "start": "4:05:18.98",
+      "end": "4:06:03.08"
+    },
+    {
+      "start": "5:57:37.11",
+      "end": "5:58:17.65"
+    },
+    {
+      "start": "6:29:40.63",
+      "end": "6:30:15.08"
+    },
+    {
+      "start": "7:21:13.64",
+      "end": "7:21:33.9"
+    },
+    {
+      "start": "7:21:40.33",
+      "end": "7:22:13.89"
+    }
+  ]
+}

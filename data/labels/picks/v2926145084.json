@@ -1,0 +1,65 @@
+{
+  "source": "v2926145084.mp4",
+  "labels": [
+    {
+      "start": "1:42:16.98",
+      "end": "1:42:58.36",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Ron"
+      ],
+      "note": "Ok clip. Interesting because it is mentioning a popular event coming up"
+    },
+    {
+      "start": "5:14:29.92",
+      "end": "5:14:55.51",
+      "verdict": "fix",
+      "draft": {
+        "start": "5:14:29.92",
+        "end": "5:14:45.86"
+      },
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Ron"
+      ],
+      "note": "OK clip. Funny and unique setting being on a motorcycle."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:21:34.36",
+      "end": "0:22:14.28"
+    },
+    {
+      "start": "0:38:18.46",
+      "end": "0:38:39.28"
+    },
+    {
+      "start": "0:38:39.28",
+      "end": "0:39:12.18"
+    },
+    {
+      "start": "1:06:31.29",
+      "end": "1:07:14.55"
+    },
+    {
+      "start": "1:19:19.83",
+      "end": "1:20:01.04"
+    },
+    {
+      "start": "1:28:51.41",
+      "end": "1:29:26.51"
+    },
+    {
+      "start": "4:17:08.67",
+      "end": "4:17:43.15"
+    },
+    {
+      "start": "5:10:35.75",
+      "end": "5:11:15.55"
+    }
+  ]
+}

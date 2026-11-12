@@ -280,6 +280,11 @@ video {
   border: 1px dashed var(--muted);
 }
 
+/* The range under a drag on the frames, until it is let go (V7 item 3b). */
+.cut-drag {
+  pointer-events: none;
+}
+
 /* Where a cut marked by hand starts, until Cut out ends it. */
 .cut-in {
   position: absolute;

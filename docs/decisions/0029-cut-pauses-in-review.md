@@ -117,6 +117,16 @@ inside a clip are known without another pass over the audio.
   that meets one of them. `Clear cuts` and Reset still empty the list.
 - Manual step RV16. Dragging a range on the strip is item 3b.
 
+## Amended by dragging on the strip (V7 item 3b)
+
+A press on the frames dragged more than 4 px adds a manual cut over the
+dragged range, through the same checks and merging as Cut out; a press
+with less movement still seeks. The range stays inside the strip's view
+(no panning mid-drag, which would move the frames under the pointer). A
+press on a handle or a cut stripe keeps its own meaning. Shift+drag only
+was not chosen: a plain drag on the frames did nothing before. Manual
+step RV16, steps 9 and 10.
+
 ## Revisit when
 
 - The maintainer keeps most proposed cuts, or turns most off: change the

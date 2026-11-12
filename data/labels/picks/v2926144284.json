@@ -1,0 +1,73 @@
+{
+  "source": "v2926144284.mp4",
+  "labels": [
+    {
+      "start": "0:53:10.57",
+      "end": "0:54:00.51",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:53:19.53",
+        "end": "0:54:00.51"
+      },
+      "style": "fit",
+      "rating": "good",
+      "people": [
+        "Lacy"
+      ],
+      "texts": [
+        {
+          "text": "Drew Coping",
+          "start_seconds": 0.0,
+          "end_seconds": 10.0,
+          "place": "top"
+        }
+      ],
+      "note": "Good clip. Dramatic with firing and funny with the types of purchases he was claiming were made."
+    },
+    {
+      "start": "1:06:11.74",
+      "end": "1:06:32.1",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Lacy"
+      ],
+      "note": "Ok clip. Good hook saying that the UK is banning social media."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:09:45.76",
+      "end": "0:10:20.8"
+    },
+    {
+      "start": "0:29:37.56",
+      "end": "0:30:15.68"
+    },
+    {
+      "start": "0:50:31.93",
+      "end": "0:51:11.07"
+    },
+    {
+      "start": "0:56:57.31",
+      "end": "0:57:29.73"
+    },
+    {
+      "start": "0:58:35.71",
+      "end": "0:59:12.41"
+    },
+    {
+      "start": "2:37:48.18",
+      "end": "2:38:17.09"
+    },
+    {
+      "start": "3:32:03.12",
+      "end": "3:32:44.09"
+    },
+    {
+      "start": "3:49:20.62",
+      "end": "3:49:56.51"
+    }
+  ]
+}

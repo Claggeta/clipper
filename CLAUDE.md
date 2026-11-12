@@ -374,7 +374,8 @@ and planned code:
   re-renders when the cuts change, manual step RV12. Manual cuts
   amendment (V7 3a): Cut in/out at the playhead (`[`, `]`), merged with
   cuts they meet, stored as ordinary cuts; Cut silence keeps manual and
-  saved cuts; manual step RV16.
+  saved cuts; manual step RV16. Strip drag amendment (V7 3b): a drag
+  over 4 px on the frames cuts the range, a click still seeks.
 - `0030` — on-screen text and thumbnails, made in review: text boxes per
   clip (words, start and end in the finished clip's seconds, `top` or
   `middle`), bold white on a half-dark box, extra events in the clip's ASS
@@ -1224,7 +1225,8 @@ in item 7 may land any time.
      cut list beside the pause cuts, toggled, previewed and saved in
      `cuts` the same way. ADR 0029 amendment, manual step.~~ (done;
      keys `[`, `]`, Esc; Cut silence keeps manual cuts; manual step RV16)
-   - 3b. Drag a range on the film strip to cut it. Manual step.
+   - 3b. ~~Drag a range on the film strip to cut it. Manual step.~~
+     (done; over 4 px is a drag, a click still seeks; RV16 steps 9, 10)
 4. Move `OllamaClient` to a shared adapter module with its own error,
    behaviour-neutral (Parked), before item 5 changes the prompt.
 5. A finer LLM score (Parked): a scoring rubric in the prompt, so scores
