@@ -9,8 +9,8 @@ class FakeClipRenderer:
     """A ClipRenderer that writes a placeholder file, for tests and offline runs.
 
     The file is not a video. Calls are recorded in `calls`, the captions of
-    each call in `captions`, its `vertical` flag in `vertical` and its crop
-    path in `crops`. Candidates
+    each call in `captions`, its `vertical` flag in `vertical`, its crop
+    path in `crops` and its cuts in `cuts`. Candidates
     in `fail_on` raise ClipRenderError and write nothing.
     """
 
@@ -20,6 +20,7 @@ class FakeClipRenderer:
         self.captions: list[str | None] = []
         self.vertical: list[bool] = []
         self.crops: list[CropPath | None] = []
+        self.cuts: list[tuple[tuple[float, float], ...]] = []
 
     def render(
         self,
@@ -30,8 +31,10 @@ class FakeClipRenderer:
         *,
         vertical: bool = False,
         crop: CropPath | None = None,
+        cuts: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip:
         self.calls.append((video_path, candidate, output_path))
+        self.cuts.append(cuts)
         self.captions.append(captions)
         self.vertical.append(vertical)
         self.crops.append(crop)

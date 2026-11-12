@@ -355,6 +355,9 @@ class ManifestClip(BaseModel):
     `variants` lists each vertical style rendered for the clip, in the run's
     order (ADR 0025); `file` is the first of them. Empty for a landscape run,
     an older manifest, or after the review page re-rendered or trashed it.
+
+    `cuts` are the source-time ranges left out of the file (ADR 0029), in
+    order and inside `start_seconds`..`end_seconds`; empty when uncut.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -375,6 +378,7 @@ class ManifestClip(BaseModel):
     model_title: str | None = None
     added: bool = False
     variants: tuple[ClipVariant, ...] = ()
+    cuts: tuple[tuple[float, float], ...] = ()
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":
@@ -498,7 +502,8 @@ class Label(Span):
     maintainer kept for the clip, when there were styles (ADR 0025).
     `rating` says whether a keeper is good enough to post or kept for the
     backlog, and `people` who is on screen, both from the review page (ADR
-    0024, rating amendment).
+    0024, rating amendment). `cuts` are the ranges left out of the clip, in
+    order and inside its span (ADR 0029).
     """
 
     note: str | None = None
@@ -507,6 +512,7 @@ class Label(Span):
     style: VerticalStyleName | None = None
     rating: Rating | None = None
     people: tuple[str, ...] = ()
+    cuts: tuple[Span, ...] = ()
 
     @field_validator("people")
     @classmethod
@@ -517,6 +523,20 @@ class Label(Span):
         if len({name.casefold() for name in names}) != len(names):
             raise ValueError("a name in people is given twice")
         return names
+
+    @model_validator(mode="after")
+    def _cuts_inside_in_order(self) -> "Label":
+        previous = self.start_seconds
+        for cut in self.cuts:
+            if (
+                not previous < cut.start_seconds
+                or not cut.end_seconds < self.end_seconds
+            ):
+                raise ValueError(
+                    "cuts must be in order, apart, and inside the label's span"
+                )
+            previous = cut.end_seconds
+        return self
 
     @model_validator(mode="after")
     def _draft_only_on_fix(self) -> "Label":

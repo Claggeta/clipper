@@ -444,6 +444,7 @@ class FaceFailingRenderer(FakeClipRenderer):
         *,
         vertical: bool = False,
         crop: CropPath | None = None,
+        cuts: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip:
         if crop is not None:
             raise ClipRenderError("[face] crop failed")
