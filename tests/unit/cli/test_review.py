@@ -272,7 +272,7 @@ def test_a_video_that_starts_late_is_refused_with_the_fix(env: Env) -> None:
 
     assert result.exit_code == 1
     assert "starts at 64.0 s, not 0" in result.output
-    assert "-movflags +faststart" in result.output
+    assert "run `clipper fetch` on its URL again" in " ".join(result.output.split())
     assert env.calls == []
 
 

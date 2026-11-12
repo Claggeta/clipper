@@ -196,6 +196,9 @@ and planned code:
   `<videos dir>/<id>.info.json` (title, channel, upload date, duration,
   description) from one `--skip-download` request, for a reused file too;
   a failed lookup is a warning.
+  Remux amendment (V6 10): `fetch` probes the start time of a new or
+  reused file and, past 0.1 s, remuxes it in place (`-map 0 -c copy
+  -movflags +faststart`, through a `.part.mp4`); manual step D13.
 - `0021` — GPU transcription measured and not adopted: the 5:04:01 stream
   took 593 s on the GPU (`int8_float16`) against 1,260 s on the CPU, but its
   transcript drifted (87.4% word match, far fewer `.` and `?`), and the
@@ -1130,9 +1133,11 @@ titles naming the person and titles kept unedited.
 9. Retraining as one command from the current labels (and links, after
    item 8), printing held-out measures beside the current model's before
    replacing it (ADR 0026 decision 6).
-10. Not learning, from daily use: remux after `fetch` for files whose
+10. ~~Not learning, from daily use: remux after `fetch` for files whose
     timestamps do not start at 0 (Parked), so `review` opens every
-    download. ADR 0020 amendment, manual step. May land any time.
+    download. ADR 0020 amendment, manual step. May land any time.~~
+    (done; `Remuxer`, new and reused files, manual step D13; no late file
+    was at hand to check, v2924046310 already remuxed by hand)
 11. Release notes and tag `v0.6.0`.
 
 Later, not scheduled:
@@ -1170,18 +1175,9 @@ Later, not scheduled:
 
 ## Parked
 
-- `fetch` can save a fragmented MP4 whose timestamps do not start at 0:
-  yt-dlp saved Twitch VOD v2924046310 that way (no index up front, start
-  64 s), while four other Twitch VODs came out as standard MP4s starting at
-  0; why is unverified. ffmpeg-based steps agree on such a file, but the
-  review page refuses it (ADR 0024 start offset amendment) and a browser
-  loads it slowly. Fix: remux after download (`-c copy -movflags
-  +faststart`, timestamps from 0), a lossless step of under a minute; an
-  ADR 0020 amendment. Its Twitch clip labels
-  (`data/labels/v2924046310.json`) may also be 64 s off, if Twitch counts
-  that VOD from 0 and the download began 64 s in; unverified. Scheduled
-  as V6 item 10.
-
+- Twitch clip labels for v2924046310 (`data/labels/v2924046310.json`) may
+  be 64 s off, if Twitch counts that VOD from 0 and the download began
+  64 s in (its file was later remuxed to start at 0); unverified.
 - ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
   `exit 3199971767` for invalid data. Fix: normalise negative `AVERROR`
   values to signed form before display, and map the few codes this tool

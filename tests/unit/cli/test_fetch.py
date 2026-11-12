@@ -7,8 +7,8 @@ from clipper.adapters.download.ytdlp import YtDlpDownloader, YtDlpVideoInfoLooku
 from clipper.cli.context import AppContext
 from clipper.cli.main import app
 from clipper.core.config import Settings
-from clipper.domain.errors import DownloadError
-from clipper.domain.models import VideoInfo, VideoSource
+from clipper.domain.errors import DownloadError, RemuxError
+from clipper.domain.models import MediaInfo, VideoInfo, VideoSource
 
 # Constructed IDs and messages; nothing here downloads.
 _URL = "https://www.youtube.com/watch?v=abcDEF123_-&list=PLxyz"
@@ -46,6 +46,31 @@ class FakeVideoInfo:
         )
 
 
+class FakeProbe:
+    """Every file starts at `start` seconds."""
+
+    def __init__(self, start: float = 0.0) -> None:
+        self.start = start
+
+    def probe(self, media_path: Path) -> MediaInfo:
+        return MediaInfo(
+            duration_seconds=100.0, has_video=True, start_seconds=self.start
+        )
+
+
+class FakeRemuxer:
+    def __init__(self, probe: FakeProbe, error: str | None = None) -> None:
+        self.calls: list[Path] = []
+        self._probe = probe
+        self._error = error
+
+    def remux(self, video_path: Path) -> None:
+        self.calls.append(video_path)
+        if self._error:
+            raise RemuxError(self._error)
+        self._probe.start = 0.0
+
+
 @pytest.fixture
 def videos(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     folder = tmp_path / "videos"
@@ -54,11 +79,20 @@ def videos(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _fetch(
-    url: str, downloader: FakeDownloader, info: FakeVideoInfo | None = None
+    url: str,
+    downloader: FakeDownloader,
+    info: FakeVideoInfo | None = None,
+    probe: FakeProbe | None = None,
+    remuxer: FakeRemuxer | None = None,
 ) -> Result:
     lookup = info or FakeVideoInfo()
+    media = probe or FakeProbe()
+    remux = remuxer or FakeRemuxer(media)
     context = AppContext(
-        downloader=lambda settings: downloader, video_info=lambda settings: lookup
+        downloader=lambda settings: downloader,
+        video_info=lambda settings: lookup,
+        probe=lambda: media,
+        remuxer=lambda: remux,
     )
     return CliRunner().invoke(app, ["fetch", url], obj=context)
 
@@ -157,3 +191,43 @@ def test_a_failed_download_looks_up_no_video_info(videos: Path) -> None:
 
 def test_the_default_context_builds_the_ytdlp_video_info_lookup() -> None:
     assert isinstance(AppContext().video_info(Settings()), YtDlpVideoInfoLookup)
+
+
+def test_a_download_that_starts_late_is_remuxed(videos: Path) -> None:
+    probe = FakeProbe(start=64.0)
+    remuxer = FakeRemuxer(probe)
+    result = _fetch(_URL, FakeDownloader(), probe=probe, remuxer=remuxer)
+    assert result.exit_code == 0, result.output
+    assert remuxer.calls == [videos / "abcDEF123_-.mp4"]
+    assert "Remuxing abcDEF123_-.mp4: it starts at 64.0 s" in result.output
+    assert f"Remuxed: {videos / 'abcDEF123_-.mp4'}" in result.output
+
+
+def test_a_download_that_starts_at_zero_is_left_alone(videos: Path) -> None:
+    probe = FakeProbe(start=0.05)
+    remuxer = FakeRemuxer(probe)
+    result = _fetch(_URL, FakeDownloader(), probe=probe, remuxer=remuxer)
+    assert result.exit_code == 0, result.output
+    assert remuxer.calls == []
+    assert "Remux" not in result.output
+
+
+def test_a_reused_file_that_starts_late_is_remuxed_once(videos: Path) -> None:
+    videos.mkdir()
+    (videos / "abcDEF123_-.mp4").write_bytes(b"old download")
+    probe = FakeProbe(start=64.0)
+    remuxer = FakeRemuxer(probe)
+    downloader = FakeDownloader()
+    first = _fetch(_URL, downloader, probe=probe, remuxer=remuxer)
+    second = _fetch(_URL, downloader, probe=probe, remuxer=remuxer)
+    assert (first.exit_code, second.exit_code) == (0, 0)
+    assert downloader.calls == []
+    assert len(remuxer.calls) == 1
+
+
+def test_a_failed_remux_fails_the_fetch(videos: Path) -> None:
+    probe = FakeProbe(start=64.0)
+    remuxer = FakeRemuxer(probe, error="ffmpeg failed (exit 1): bad")
+    result = _fetch(_URL, FakeDownloader(), probe=probe, remuxer=remuxer)
+    assert result.exit_code == 1
+    assert "Error: ffmpeg failed (exit 1): bad" in result.output

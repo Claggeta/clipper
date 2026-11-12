@@ -214,6 +214,25 @@ the clips are good enough to use.
   YouTube video gives the channel name for both and a description that
   opens with sponsor links. Neither names the people on screen.
 
+## Amended by the remux PR (V6 item 10)
+
+- After a download, and for a reused file, `fetch` (and so `drafts` from
+  a URL) probes the video's start time. Past `MAX_START_SECONDS` (0.1 s,
+  the review page's limit), a `Remuxer` rewrites it in place:
+  `ffmpeg -i <file> -map 0 -c copy -movflags +faststart <stem>.part.mp4`,
+  then the part file replaces the video. ffmpeg subtracts the input's
+  start time unless given `-copyts`, so the copy starts at 0, losslessly;
+  `+faststart` puts the index first for the browser. It prints
+  `Remuxing <file>: it starts at <n> s` and `Remuxed: <path>`. A failure
+  is the fetch's error, and leaves the video and no part file.
+- A remuxed file is new bytes, so its transcript is made again once.
+- `review`'s refusal now says to run `clipper fetch` on the URL again.
+- v2924046310, the one file seen starting late (64 s), had already been
+  remuxed by hand and starts at 0; no file at hand starts late, and
+  ffmpeg's MP4 writer reset every test file made to start late to 0. On
+  `test_input.mp4` the remuxer kept the duration and put the index
+  first. Manual step D13 checks the next late download.
+
 ## Revisit when
 
 - Either platform's terms change, or an account receives a warning.

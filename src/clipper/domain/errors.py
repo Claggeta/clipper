@@ -68,3 +68,7 @@ class SourceListError(ClipperError):
 
 class QueueError(ClipperError):
     """Raised when the post queue or the posts record cannot be built or read."""
+
+
+class RemuxError(ClipperError):
+    """Raised when a video cannot be remuxed to start at 0 (ADR 0020)."""

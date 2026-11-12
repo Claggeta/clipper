@@ -371,8 +371,23 @@ def _fetch_video(settings: Settings, build: AppContext, source: VideoSource) -> 
     else:
         video = build.downloader(settings).download(source, settings.videos_dir)
         console.print(f"Saved: {escape(str(video))}", soft_wrap=True)
+    _start_at_zero(build, video)
     _save_video_info(settings, build, source)
     return video
+
+
+def _start_at_zero(build: AppContext, video: Path) -> None:
+    """Remux a video whose timestamps start late, so `review` can open it
+    (ADR 0020, remux amendment). A reused file is checked too, so a re-fetch
+    fixes an old download. Raises `ClipperError` if it cannot be done."""
+    start = build.probe().probe(video).start_seconds
+    if abs(start) <= MAX_START_SECONDS:
+        return
+    console.print(
+        f"Remuxing {escape(video.name)}: it starts at {start:.1f} s", soft_wrap=True
+    )
+    build.remuxer().remux(video)
+    console.print(f"Remuxed: {escape(str(video))}", soft_wrap=True)
 
 
 def _save_video_info(
@@ -1199,10 +1214,9 @@ def review(
         if abs(info.start_seconds) > MAX_START_SECONDS:
             raise ReviewError(
                 f"{video} starts at {info.start_seconds:.1f} s, not 0, so the "
-                "page's player would not match the transcript; remux it: "
-                f'ffmpeg -i "{video}" -map 0:v:0 -map 0:a:0 -c copy '
-                f'-movflags +faststart "{video.with_suffix(".remuxed.mp4")}", '
-                "then put it in place of the original"
+                "page's player would not match the transcript; run "
+                "`clipper fetch` on its URL again, which remuxes it in place "
+                "(ADR 0020)"
             )
         files = build.review_files()
         labels_path = judged_labels_path(settings.labels_dir, manifest.source)
