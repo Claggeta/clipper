@@ -9,6 +9,7 @@ labels).
 import os
 from pathlib import Path
 
+from clipper.core.evaluation import spans_hit
 from clipper.domain.errors import JudgingError, LabelsError
 from clipper.domain.models import (
     Label,
@@ -55,10 +56,6 @@ def same_span(a: tuple[float, float], b: tuple[float, float]) -> bool:
 
 def _span(span: Span) -> tuple[float, float]:
     return span.start_seconds, span.end_seconds
-
-
-def _overlaps(span: Span, start: float, end: float) -> bool:
-    return span.start_seconds < end and start < span.end_seconds
 
 
 def _times(start: float, end: float) -> dict[str, str]:
@@ -119,15 +116,18 @@ def save_judgment(
     0030), neither of which changes the verdict.
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
-    if the span overlaps another label: one label per moment.
+    if the span overlaps another label by the hit rule (half the shorter
+    span, ADR 0012): one label per moment. A smaller overlap is a
+    neighbouring moment and is saved (ADR 0024, V7 item 2 amendment).
     """
     labels, rejected = _without_clip(labeled, clip)
     for other in labels:
-        if _overlaps(other, start, end):
+        if spans_hit(_span(other), (start, end)):
             raise JudgingError(
                 f"Overlaps the label {format_timestamp(other.start_seconds)}-"
-                f"{format_timestamp(other.end_seconds)} ({other.verdict}); trim "
-                "this span, or trash it as a duplicate"
+                f"{format_timestamp(other.end_seconds)} ({other.verdict}) by half "
+                "or more of the shorter span; trim this span, or trash it as a "
+                "duplicate"
             )
     fields: dict[str, object] = {**_times(start, end), "note": note}
     if style is not None:

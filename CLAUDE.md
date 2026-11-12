@@ -90,7 +90,8 @@ and planned code:
   candidate) at each end instead of seconds dragged, and a keeper ends
   early or starts late past `CUT_SHORT_SECONDS = 1.0`. Draft span
   amendment: a candidate also hits a `fix` label whose `draft` is its exact
-  span, however far the fix moved it.
+  span, however far the fix moved it. Overlap amendment (V7 2): judged
+  labels may overlap, ordered by start; clip labels may not.
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
@@ -292,6 +293,8 @@ and planned code:
   `data/people.txt` (`CLIPPER_PEOPLE_FILE`, committed); both on the judged
   label, optional; manual step RV11. Cuts amendment (0029): Cut silence,
   toggles, Preview over cuts, Save with `cuts`; manual step RV12.
+  Overlap amendment (V7 2): Save and Add clip refuse only an overlap
+  that would be a hit (half the shorter span); manual step RV15.
 - `0025` — vertical styles: `fit` (0016, the default) and `face`, a
   full-height crop on the largest face, faces found once per clip by
   OpenCV YuNet (5 samples a second, cached); `drafts` renders both and the
@@ -1208,10 +1211,11 @@ in item 7 may land any time.
 
 1. ADRs and scope (one docs PR): the V7 scope, goals and list. ADRs come
    with each item as amendments.
-2. Overlap on Save: `review` saves a span that overlaps another clip's
+2. ~~Overlap on Save: `review` saves a span that overlaps another clip's
    label by less than half the shorter span (the hit rule, ADR 0012), so
    `eval` still counts them apart, and refuses above that (409, as now).
-   ADR 0024 amendment, unit tests, manual step.
+   ADR 0024 amendment, unit tests, manual step.~~ (done; ADR 0024 and
+   0012 amendments, `spans_hit`, manual step RV15)
 3. Manual cuts (ADR 0029 "later"), in PRs:
    - 3a. Cut in and out at the playhead, by buttons and keys, added to the
      cut list beside the pause cuts, toggled, previewed and saved in
@@ -1365,12 +1369,6 @@ Later, not scheduled:
   come from Twitch clips, which many viewers made. Fix: word it by source, or
   drop "one labeler"; how `eval` would know the source is undecided (a field
   in the labels file, or the note prefix). Seen in manual step T5.
-- `review` refuses a span that overlaps another clip's label (ADR 0024,
-  item 3c), even when the maintainer would save both: in V6 item 4 two new
-  windows on v2918956109 overlapped saved keepers by 11 and 13 s and could
-  not be saved. Fix: allow a saved span to overlap another label by less
-  than the hit rule (half the shorter span), or ask first; an ADR 0024
-  amendment. Scheduled as V7 item 2 (under the hit rule).
 - Manual steps D9 and D10 pipe `Invoke-Fetch` into
   `Select-Object -Last N`, which does nothing: the helper returns the text as
   one string. Fix: split the text into lines, or drop the pipe. Scheduled

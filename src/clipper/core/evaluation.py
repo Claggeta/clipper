@@ -23,17 +23,25 @@ def _to_ms(seconds: float) -> int:
     return round(seconds * 1000)
 
 
-def is_hit(candidate: ClipCandidate, label: Span) -> bool:
-    """True if the overlap is at least HIT_FRACTION of the shorter range.
+def spans_hit(a: tuple[float, float], b: tuple[float, float]) -> bool:
+    """True if two ranges overlap by at least HIT_FRACTION of the shorter.
 
     Times are converted to whole milliseconds first so float noise cannot move
     a result at the boundary. Touching ranges do not overlap, so never hit.
     """
-    c_start, c_end = _to_ms(candidate.start_seconds), _to_ms(candidate.end_seconds)
-    l_start, l_end = _to_ms(label.start_seconds), _to_ms(label.end_seconds)
-    overlap = min(c_end, l_end) - max(c_start, l_start)
-    shorter = min(c_end - c_start, l_end - l_start)
+    a_start, a_end = _to_ms(a[0]), _to_ms(a[1])
+    b_start, b_end = _to_ms(b[0]), _to_ms(b[1])
+    overlap = min(a_end, b_end) - max(a_start, b_start)
+    shorter = min(a_end - a_start, b_end - b_start)
     return overlap > 0 and overlap >= HIT_FRACTION * shorter
+
+
+def is_hit(candidate: ClipCandidate, label: Span) -> bool:
+    """True if the candidate overlaps the label by the hit rule (`spans_hit`)."""
+    return spans_hit(
+        (candidate.start_seconds, candidate.end_seconds),
+        (label.start_seconds, label.end_seconds),
+    )
 
 
 def is_draft_of(candidate: ClipCandidate, label: Label) -> bool:

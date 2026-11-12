@@ -297,6 +297,17 @@ def _judged(**fields: object) -> Label:
     return Label.model_validate({"start": "1:00", "end": "1:45", **fields})
 
 
+def test_judged_labels_may_overlap_but_stay_ordered_by_start() -> None:
+    first = _judged(verdict="post")  # 1:00-1:45
+    neighbour = _judged(verdict="added", start="1:35", end="2:20")
+
+    video = LabeledVideo(source="talk.mp4", labels=(first, neighbour))
+    assert [label.start_seconds for label in video.labels] == [60.0, 95.0]
+
+    with pytest.raises(ValidationError, match=r"labels.1 starts before labels.0 \["):
+        LabeledVideo(source="talk.mp4", labels=(neighbour, first))
+
+
 def test_label_without_a_verdict_has_none() -> None:
     label = _label("0:00", "0:50")
     assert (label.verdict, label.draft) == (None, None)

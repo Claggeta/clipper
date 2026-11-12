@@ -188,7 +188,8 @@ def test_an_add_over_a_label_writes_nothing(tmp_path: Path) -> None:
     env.save(1, 10.0, 40.0)
 
     with pytest.raises(JudgingError, match="Overlaps the label"):
-        env.store.add(SaveRequest(30.0, 60.0, None, None))
+        # 20-50 overlaps 10-40 by 20 s, over half of either 30 s span.
+        env.store.add(SaveRequest(20.0, 50.0, None, None))
 
     assert [c.rank for c in env.store.manifest.clips] == [1]
     assert len(load_labels(env.labels_path).labels) == 1

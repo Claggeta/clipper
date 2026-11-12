@@ -607,11 +607,14 @@ def _same_span(a: Span, b: Span) -> bool:
 
 
 class LabeledVideo(BaseModel):
-    """One video's labels, ordered and non-overlapping.
+    """One video's labels, ordered by start.
 
+    A file without verdicts has non-overlapping labels and no rejected spans.
     A judged file (ADR 0012, V5 amendment) has a verdict on every label and may
     list rejected spans, ordered by start; they may overlap each other and the
-    labels. A file without verdicts has no rejected spans.
+    labels. Its labels may overlap each other too (V7 item 2 amendment): the
+    review page saves neighbours that overlap by less than the hit rule, which
+    is checked there, not here.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -623,7 +626,14 @@ class LabeledVideo(BaseModel):
     @model_validator(mode="after")
     def _labels_ordered(self) -> "LabeledVideo":
         for index in range(1, len(self.labels)):
-            if self.labels[index].start_seconds < self.labels[index - 1].end_seconds:
+            label, previous = self.labels[index], self.labels[index - 1]
+            if self.judged:
+                if label.start_seconds < previous.start_seconds:
+                    raise ValueError(
+                        f"labels must be ordered: labels.{index} starts before "
+                        f"labels.{index - 1}"
+                    )
+            elif label.start_seconds < previous.end_seconds:
                 raise ValueError(
                     f"labels must be ordered and non-overlapping: labels.{index} "
                     f"starts before labels.{index - 1} ends"
