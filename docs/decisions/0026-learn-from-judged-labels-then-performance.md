@@ -100,6 +100,35 @@ The two signals differ:
 - Streamer VODs dominate the labels, so a learned model is tuned to them
   first; other niches need their own labels (as in the V5 scope).
 
+## Amended by the ranker spike (V6 item 5, not adopted)
+
+- Measured with scratch scripts, no product code: every 45 s window
+  (`sliding_windows`) of 15 judged VODs embedded with `nomic-embed-text`
+  through Ollama (already installed, no new dependency), with and without
+  the heuristic's signal strengths as extra inputs; an L2 logistic
+  regression with balanced classes, trained leave one VOD out on the
+  other VODs' judged windows (a window on a keeper label is 1, on a
+  rejected span 0, else unused: 377 and 204). 5pk8HLcAAT0 (podcast) and
+  v2924046310 (start offset) left out.
+- Embedding is cheap: about 13,400 windows in about 1.5 minutes in all,
+  against 15 to 17 minutes per VOD for the LLM detector.
+- Keeper over reject on the held-out VOD's judged windows (AUC): 0.59
+  with signals only, 0.60 with embeddings, 0.61 with both; per VOD 0.24
+  to 0.80, and on two VODs no rejects to compare.
+- Its own top 10 cannot be scored yet: of 150 picks on 15 VODs, 141 to
+  145 are unjudged, against 82 keepers, 38 rejects and 0 unjudged for
+  the LLM's drafts on 12 VODs. The judged labels cover only the drafts
+  the LLM and heuristic picked.
+- Inside the LLM's judged top 10 (100 drafts, 10 VODs with both kinds),
+  keeper over reject: the ranker 0.61, the LLM's own order 0.56; both
+  near chance at this size.
+- Decision: not adopted, nothing merged; the LLM stays `drafts`'
+  detector. Rerun the same measure once the judged windows about double,
+  or judge a ranker's top 10 on a few VODs in `review` if a faster
+  detector is wanted sooner. No model file, so item 9 (retraining) has
+  nothing to retrain yet. The script and embeddings are kept outside
+  git, on the maintainer's machine.
+
 ## Revisit when
 
 - Labels pass a few thousand judged spans (fine-tuning becomes plausible).
