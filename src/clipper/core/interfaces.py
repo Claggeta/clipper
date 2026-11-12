@@ -89,6 +89,10 @@ class ClipRenderer(Protocol):
     of itself, before any captions are drawn (see docs/decisions/0016).
     `crop` is the face style instead: a full-height window that moves over
     time, scaled to 1080x1920 (see docs/decisions/0025).
+
+    `cuts` are source-time ranges strictly inside the candidate's span to
+    leave out, in order (ADR 0029); the kept parts are joined in the same
+    encode. Captions and crop times are then times in the cut clip.
     """
 
     def render(
@@ -100,6 +104,7 @@ class ClipRenderer(Protocol):
         *,
         vertical: bool = False,
         crop: CropPath | None = None,
+        cuts: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip: ...
 
 

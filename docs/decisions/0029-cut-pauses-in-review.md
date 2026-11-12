@@ -65,6 +65,25 @@ inside a clip are known without another pass over the audio.
 - Captions and crop times depend on the cuts, so both builders take the
   time map.
 
+## Amended by the cuts core PR (V6 item 4c, second PR)
+
+- **`select`, not `trim` and `concat`**: the renderer drops the cuts with
+  `select`/`aselect` on `between(t, ...)` and new timestamps
+  (`setpts=N/FRAME_RATE/TB`, `asetpts=N/SR/TB`), first in the video filter
+  and as an audio filter. `concat` needs the audio stream named, and the
+  audio is optional (`-map 0:a:0?`, 0005). Still one encode.
+- **The length limits the input**: with cuts, `-t` goes before `-i`. As an
+  output limit, ffmpeg read past the span's end to make up the dropped
+  frames, and a 30 s clip with 10 s cut came out 30 s long. `t` counts
+  from the clip's start after `-ss`. Checked on `test_input.mp4`: 30 s
+  with two 5 s cuts gave 20.02 s of video and 19.99 s of audio.
+- `select` with `N/FRAME_RATE` assumes a constant frame rate; a variable
+  rate source could drift out of sync. The manual step checks sync.
+- `core/cuts.py`: `find_pauses`, `check_cuts`, `TimeMap` and `cut_crop`;
+  `build_ass(..., cuts=)`; the renderer's `cuts`; `Label.cuts` (spans,
+  written to the millisecond) and `ManifestClip.cuts`. Nothing sets cuts
+  until the review page's PR.
+
 ## Revisit when
 
 - The maintainer keeps most proposed cuts, or turns most off: change the

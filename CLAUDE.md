@@ -354,7 +354,9 @@ and planned code:
   (source-time ranges inside the span) on the judged label and manifest,
   and the renderer joins the kept parts in the one re-encode (0007);
   captions and face-crop moves go through one time map. The span and
-  `eval` are unchanged. Manual cuts later.
+  `eval` are unchanged. Manual cuts later. Core amendment: `select`/
+  `aselect` rather than `concat` (audio stays optional), `-t` on the input
+  when cutting; `core/cuts.py`.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

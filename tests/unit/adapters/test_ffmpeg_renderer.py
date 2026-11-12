@@ -394,3 +394,51 @@ def test_a_crop_path_with_captions_crops_before_subtitles(
         _FACE + ",subtitles=clip.ass:charenc=UTF-8"
     )
     assert sorted(run.files[0]) == ["clip.ass", "crop.cmd"]
+
+
+def test_cuts_drop_their_ranges_from_video_and_audio_first(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+
+    FfmpegClipRenderer().render(
+        video,
+        _CANDIDATE,
+        tmp_path / "c.mp4",
+        vertical=True,
+        cuts=((40.0, 41.5), (50.25, 52.0)),
+    )
+
+    command = captured[0]
+    removed = "between(t,7.500,9.000)+between(t,17.750,19.500)"
+    vf = command[command.index("-vf") + 1]
+    assert vf == f"select='not({removed})',setpts=N/FRAME_RATE/TB," + _VERTICAL
+    af = command[command.index("-af") + 1]
+    assert af == f"aselect='not({removed})',asetpts=N/SR/TB"
+    # The length limits the input, before `-i`, so dropped frames are not
+    # made up from past the span.
+    assert command.index("-ss") < command.index("-t") < command.index("-i")
+    assert command[command.index("-t") + 1] == "40.750"
+
+
+def test_no_cuts_means_no_audio_filter(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4")
+
+    assert "-af" not in captured[0]
+
+
+@pytest.mark.parametrize(
+    "cuts",
+    [((30.0, 35.0),), ((70.0, 74.0),), ((40.0, 45.0), (44.0, 46.0)), ((40.0, 40.0),)],
+)
+def test_cuts_outside_the_span_or_overlapping_are_refused(
+    video: Path, tmp_path: Path, cuts: tuple[tuple[float, float], ...]
+) -> None:
+    with pytest.raises(ClipRenderError, match="must lie inside the clip"):
+        FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", cuts=cuts)

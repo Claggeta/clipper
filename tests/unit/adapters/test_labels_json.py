@@ -302,3 +302,53 @@ def test_label_people_are_named_once(people: list[str], message: str) -> None:
         Label.model_validate(
             {"start": "0:01:00", "end": "0:01:40", "verdict": "post", "people": people}
         )
+
+
+def test_saved_labels_keep_cuts_to_the_millisecond(tmp_path: Path) -> None:
+    # Constructed label, not from a real review.
+    labeled = LabeledVideo.model_validate(
+        {
+            "source": "v.mp4",
+            "labels": [
+                {
+                    "start": "0:01:00",
+                    "end": "0:01:40",
+                    "verdict": "post",
+                    "cuts": [
+                        {"start": "0:01:05.250", "end": "0:01:06.100"},
+                        {"start": "0:01:20", "end": "0:01:21.5"},
+                    ],
+                }
+            ],
+        }
+    )
+    path = tmp_path / "v.json"
+    save_labels(labeled, path)
+    entry = json.loads(path.read_text(encoding="utf-8"))["labels"][0]
+    assert entry["cuts"] == [
+        {"start": "0:01:05.25", "end": "0:01:06.1"},
+        {"start": "0:01:20", "end": "0:01:21.5"},
+    ]
+    assert load_labels(path) == labeled
+
+
+@pytest.mark.parametrize(
+    "cuts",
+    [
+        [{"start": "0:00:59", "end": "0:01:02"}],
+        [{"start": "0:01:38", "end": "0:01:40"}],
+        [
+            {"start": "0:01:10", "end": "0:01:20"},
+            {"start": "0:01:15", "end": "0:01:25"},
+        ],
+    ],
+)
+def test_label_cuts_must_be_inside_and_in_order(cuts: list[dict[str, str]]) -> None:
+    from pydantic import ValidationError
+
+    from clipper.domain.models import Label
+
+    with pytest.raises(ValidationError, match="cuts must be in order"):
+        Label.model_validate(
+            {"start": "0:01:00", "end": "0:01:40", "verdict": "post", "cuts": cuts}
+        )

@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 from clipper.adapters.media._process import format_failure, run_tool
+from clipper.core.cuts import check_cuts
 from clipper.domain.errors import ClipRenderError
 from clipper.domain.models import ClipCandidate, CropPath, RenderedClip
 
@@ -56,6 +57,28 @@ def _crop_commands(crop: CropPath) -> str:
     return "".join(f"{_seconds(t)} crop@face x {left};\n" for t, left in crop.points)
 
 
+def _cut_filters(
+    candidate: ClipCandidate, cuts: tuple[tuple[float, float], ...]
+) -> tuple[str, str]:
+    """ADR 0029. Video and audio filters that drop the cut ranges and close
+    the gaps, so the kept parts play back to back.
+
+    Times are from the clip's start, since `-ss` before `-i` starts the
+    input's timestamps at 0. `select`/`aselect` with new timestamps (rather
+    than `trim` and `concat`) leaves the audio optional (`-map 0:a:0?`):
+    with no audio stream the audio filter has nothing to run on.
+    """
+    removed = "+".join(
+        f"between(t,{_seconds(a - candidate.start_seconds)},"
+        f"{_seconds(b - candidate.start_seconds)})"
+        for a, b in cuts
+    )
+    return (
+        f"select='not({removed})',setpts=N/FRAME_RATE/TB",
+        f"aselect='not({removed})',asetpts=N/SR/TB",
+    )
+
+
 def _seconds(value: float) -> str:
     """Fixed-point milliseconds, never scientific notation."""
     return f"{value:.3f}"
@@ -76,6 +99,7 @@ class FfmpegClipRenderer:
         *,
         vertical: bool = False,
         crop: CropPath | None = None,
+        cuts: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -84,10 +108,18 @@ class FfmpegClipRenderer:
                 f"Output path is the input file, refusing to overwrite: {video_path}"
             )
 
+        check_cuts(cuts, candidate.start_seconds, candidate.end_seconds)
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        # Make the vertical frame first, so captions are laid out on it. A
-        # crop path is the face style, in place of the fit (ADR 0025).
+        # Drop the cuts first, so the frame, crop moves and captions all run
+        # on the cut clip's times (ADR 0029). Make the vertical frame next, so
+        # captions are laid out on it. A crop path is the face style, in
+        # place of the fit (ADR 0025).
         filters: list[str] = []
+        audio_filter: str | None = None
+        if cuts:
+            video_cut, audio_filter = _cut_filters(candidate, cuts)
+            filters.append(video_cut)
         # UTF-8 with no BOM and LF line endings, whatever the platform.
         files: dict[str, bytes] = {}
         if crop is not None:
@@ -100,7 +132,13 @@ class FfmpegClipRenderer:
             files[_CAPTIONS_NAME] = captions.encode("utf-8")
         video_filter = ",".join(filters) or None
         if not files:
-            self._cut(video_path, candidate, output_path, video_filter=video_filter)
+            self._cut(
+                video_path,
+                candidate,
+                output_path,
+                video_filter=video_filter,
+                audio_filter=audio_filter,
+            )
         else:
             with tempfile.TemporaryDirectory(
                 prefix="clipper-render-", ignore_cleanup_errors=True
@@ -115,6 +153,7 @@ class FfmpegClipRenderer:
                     output_path.resolve(),
                     cwd=Path(folder),
                     video_filter=video_filter,
+                    audio_filter=audio_filter,
                 )
         return RenderedClip(candidate=candidate, path=output_path)
 
@@ -126,7 +165,13 @@ class FfmpegClipRenderer:
         *,
         cwd: Path | None = None,
         video_filter: str | None = None,
+        audio_filter: str | None = None,
     ) -> None:
+        # With cuts the length goes on the input: as an output limit, ffmpeg
+        # would read past the span's end to make up the frames `select`
+        # dropped (ADR 0029).
+        duration = ["-t", _seconds(candidate.duration_seconds)]
+        on_input = audio_filter is not None
         args = [
             "-hide_banner",
             "-loglevel",
@@ -135,10 +180,10 @@ class FfmpegClipRenderer:
             "-y",
             "-ss",
             _seconds(candidate.start_seconds),
+            *(duration if on_input else []),
             "-i",
             str(video_path),
-            "-t",
-            _seconds(candidate.duration_seconds),
+            *([] if on_input else duration),
             # Video is required. Audio is the first stream only, the one the
             # transcriber heard, and optional so a silent source still renders.
             "-map",
@@ -146,6 +191,7 @@ class FfmpegClipRenderer:
             "-map",
             "0:a:0?",
             *(["-vf", video_filter] if video_filter else []),
+            *(["-af", audio_filter] if audio_filter else []),
             "-c:v",
             "libx264",
             "-preset",

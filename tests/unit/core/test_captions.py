@@ -243,3 +243,28 @@ def test_clip_text_removes_caption_markup() -> None:
 def test_clip_text_is_empty_with_no_speech_in_range() -> None:
     transcript = _t(_seg(0.0, 1.0, "early"), _wseg((5.0, 5.5, "late")))
     assert clip_text(transcript, _c(1.0, 5.0)) == ""
+
+
+def test_cuts_drop_words_inside_them_and_move_the_rest_earlier() -> None:
+    seg = _wseg((10.0, 10.4, "one."), (12.0, 12.4, "gone."), (15.0, 15.5, "two."))
+    captions = build_ass(_t(seg), _c(10.0, 20.0), vertical=True, cuts=((11.0, 14.0),))
+    assert _events(captions) == [
+        f"0:00:00.00,0:00:00.40,{_hl(['one.'], 0)}",
+        f"0:00:02.00,0:00:02.50,{_hl(['two.'], 0)}",
+    ]
+
+
+def test_a_word_running_into_a_cut_ends_where_the_cut_starts() -> None:
+    seg = _wseg((10.0, 11.5, "long."), (15.0, 15.5, "next."))
+    captions = build_ass(_t(seg), _c(10.0, 20.0), vertical=True, cuts=((11.0, 14.0),))
+    assert _events(captions)[0] == f"0:00:00.00,0:00:01.00,{_hl(['long.'], 0)}"
+
+
+def test_a_segment_cue_across_a_cut_closes_up_with_it() -> None:
+    captions = build_ass(
+        _t(_seg(10.0, 18.0, "hello")),
+        _c(10.0, 20.0),
+        vertical=True,
+        cuts=((12.0, 15.0),),
+    )
+    assert _events(captions) == ["0:00:00.00,0:00:05.00,hello"]

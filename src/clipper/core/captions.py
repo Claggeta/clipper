@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from typing import NamedTuple
 
+from clipper.core.cuts import Cut, TimeMap
 from clipper.domain.models import ClipCandidate, Segment, Transcript, Word
 
 # libass reads `{...}` as override tags and `\n`, `\N` and `\h` as a line break
@@ -133,9 +134,16 @@ class _Timed(NamedTuple):
 
 
 def _words_in_clip(
-    words: tuple[Word, ...], clip_start: int, clip_end: int
+    words: tuple[Word, ...],
+    clip_start: int,
+    clip_end: int,
+    cuts: TimeMap | None = None,
 ) -> list[_Timed]:
-    """Words that start inside the clip, clamped to it and shifted to zero."""
+    """Words that start inside the clip, clamped to it and shifted to zero.
+
+    With cuts (in milliseconds), a word that starts inside a cut is dropped
+    and the rest move to their times in the cut clip (ADR 0029).
+    """
     kept: list[_Timed] = []
     for word in words:
         start = _to_ms(word.start_seconds)
@@ -143,7 +151,12 @@ def _words_in_clip(
         if not (clip_start <= start < clip_end) or not text:
             continue
         end = min(_to_ms(word.end_seconds), clip_end)
-        kept.append(_Timed(start - clip_start, end - clip_start, text))
+        if cuts is None:
+            kept.append(_Timed(start - clip_start, end - clip_start, text))
+            continue
+        moved = cuts.output(start)
+        if moved is not None:
+            kept.append(_Timed(round(moved), round(cuts.clamped(end)), text))
     return kept
 
 
@@ -175,18 +188,27 @@ def _word_events(chunk: list[_Timed]) -> Iterator[str]:
             yield event
 
 
-def _segment_event(segment: Segment, clip_start: int, clip_end: int) -> str | None:
-    """The whole segment as one cue, for a segment without word times."""
+def _segment_event(
+    segment: Segment, clip_start: int, clip_end: int, cuts: TimeMap | None = None
+) -> str | None:
+    """The whole segment as one cue, for a segment without word times; with
+    cuts, its ends move to the cut clip and a cut inside it is shown through."""
     start = max(_to_ms(segment.start_seconds), clip_start)
     end = min(_to_ms(segment.end_seconds), clip_end)
     text = _clean(segment.text)
     if end <= start or not text:
         return None
-    return _event(start - clip_start, end - clip_start, text)
+    if cuts is None:
+        return _event(start - clip_start, end - clip_start, text)
+    return _event(round(cuts.clamped(start)), round(cuts.clamped(end)), text)
 
 
 def build_ass(
-    transcript: Transcript, candidate: ClipCandidate, *, vertical: bool
+    transcript: Transcript,
+    candidate: ClipCandidate,
+    *,
+    vertical: bool,
+    cuts: tuple[Cut, ...] = (),
 ) -> Captions:
     """Build styled ASS captions for the part of `transcript` inside the clip.
 
@@ -200,20 +222,29 @@ def build_ass(
     removed from spoken text. `vertical` picks the 1080x1920 layout; otherwise
     the source-frame layout.
 
+    `cuts` are source-time ranges removed from the clip (ADR 0029): words
+    that start inside one are dropped, and every time moves to the cut clip.
+
     The text is "" when no event remains. The caller decides what that means.
     """
     clip_start = _to_ms(candidate.start_seconds)
     clip_end = _to_ms(candidate.end_seconds)
+    time_map = (
+        TimeMap(clip_start, clip_end, [(_to_ms(a), _to_ms(b)) for a, b in cuts])
+        if cuts
+        else None
+    )
     events: list[str] = []
     from_segments = False
     for segment in transcript.segments:
         if not segment.words:
-            event = _segment_event(segment, clip_start, clip_end)
+            event = _segment_event(segment, clip_start, clip_end, time_map)
             if event:
                 events.append(event)
                 from_segments = True
             continue
-        for chunk in _chunks(_words_in_clip(segment.words, clip_start, clip_end)):
+        words = _words_in_clip(segment.words, clip_start, clip_end, time_map)
+        for chunk in _chunks(words):
             events.extend(_word_events(chunk))
     if not events:
         return Captions("", from_segments=False)
