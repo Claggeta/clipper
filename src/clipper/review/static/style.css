@@ -516,3 +516,18 @@ video {
 @media (max-width: 720px) {
   .text-row { grid-template-columns: 1fr 1fr; }
 }
+
+/* Thumbnails (ADR 0030). */
+.thumb-row {
+  display: grid;
+  grid-template-columns: 1fr 96px auto;
+  gap: 6px;
+}
+
+.thumb {
+  height: 240px;
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #000;
+}

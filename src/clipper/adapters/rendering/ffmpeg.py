@@ -57,6 +57,12 @@ def _crop_commands(crop: CropPath) -> str:
     return "".join(f"{_seconds(t)} crop@face x {left};\n" for t, left in crop.points)
 
 
+def _still_crop(crop: CropPath) -> str:
+    """The face style's window, held where it starts (ADR 0030)."""
+    left = crop.points[0][1]
+    return f"crop={crop.width}:{crop.height}:{left}:0,scale=1080:1920,setsar=1"
+
+
 def _cut_filters(
     candidate: ClipCandidate, cuts: tuple[tuple[float, float], ...]
 ) -> tuple[str, str]:
@@ -156,6 +162,62 @@ class FfmpegClipRenderer:
                     audio_filter=audio_filter,
                 )
         return RenderedClip(candidate=candidate, path=output_path)
+
+    def still(
+        self,
+        video_path: Path,
+        seconds: float,
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        vertical: bool = False,
+        crop: CropPath | None = None,
+    ) -> Path:
+        """A thumbnail: one frame, framed as the clip, as a JPEG (ADR 0030)."""
+        if not video_path.is_file():
+            raise ClipRenderError(f"Input file not found: {video_path}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        filters: list[str] = []
+        if crop is not None:
+            filters.append(_still_crop(crop))
+        elif vertical:
+            filters.append(_VERTICAL_FILTER)
+        if captions:
+            filters.append(_SUBTITLES_FILTER)
+        with tempfile.TemporaryDirectory(
+            prefix="clipper-still-", ignore_cleanup_errors=True
+        ) as folder:
+            if captions:
+                (Path(folder) / _CAPTIONS_NAME).write_bytes(captions.encode("utf-8"))
+            args = [
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-y",
+                "-ss",
+                _seconds(seconds),
+                "-i",
+                str(video_path.resolve()),
+                "-frames:v",
+                "1",
+                *(["-vf", ",".join(filters)] if filters else []),
+                # JPEG quality 2 of 31 (lower is better), as for an upload.
+                "-q:v",
+                "2",
+                str(output_path.resolve()),
+            ]
+            result = run_tool(
+                self._executable,
+                args,
+                error_type=ClipRenderError,
+                log=logger,
+                cwd=Path(folder),
+            )
+        if result.returncode != 0 or not output_path.is_file():
+            output_path.unlink(missing_ok=True)
+            raise ClipRenderError(format_failure(self._executable, result))
+        return output_path
 
     def _cut(
         self,

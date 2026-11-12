@@ -368,6 +368,54 @@ function drawDraftTexts() {
 draft.addEventListener("timeupdate", drawDraftTexts);
 draft.addEventListener("seeked", drawDraftTexts);
 
+// --- Thumbnail: the frame at the playhead (ADR 0030) ---
+
+const thumbImage = document.getElementById("thumb");
+const thumbButton = document.getElementById("thumb-make");
+let thumbVersion = 0; // bumped on each new thumbnail, so the image reloads
+
+function drawThumb(clip) {
+  text("thumb-notice", "");
+  document.getElementById("thumb-notice").classList.remove("error");
+  thumbButton.disabled = Boolean(clip.isNew) || !clip.file;
+  thumbButton.title = thumbButton.disabled ? "Save the clip first" : "";
+  thumbImage.hidden = !clip.thumbnail;
+  if (clip.thumbnail) {
+    const name = encodeURIComponent(clip.thumbnail);
+    thumbImage.src = `/thumbs/${name}?v=${thumbVersion}`;
+  } else {
+    thumbImage.removeAttribute("src");
+  }
+}
+
+thumbButton.addEventListener("click", async () => {
+  const clip = current;
+  thumbButton.disabled = true;
+  text("thumb-notice", "Making the thumbnail…");
+  try {
+    const reply = await post(`/api/clips/${clip.rank}/thumbnail`, {
+      at: player.currentTime,
+      text: document.getElementById("thumb-text").value,
+      place: document.getElementById("thumb-place").value,
+      style: chosenStyle(clip),
+    });
+    // Only the thumbnail: unsaved edits on the clip stay as they are.
+    clip.thumbnail = reply.thumbnail;
+    thumbVersion += 1;
+    if (clip === current) {
+      drawThumb(clip);
+      text("thumb-notice", reply.note || `Saved as ${reply.thumbnail}.`);
+    }
+  } catch (error) {
+    if (clip === current) {
+      drawThumb(clip);
+      const line = document.getElementById("thumb-notice");
+      line.textContent = error.message;
+      line.classList.add("error");
+    }
+  }
+});
+
 // The first text is a hook: the title, over the first seconds at the top.
 document.getElementById("add-text").addEventListener("click", () => {
   const texts = textsOf(current);
@@ -639,6 +687,7 @@ function select(clip, button) {
   drawClipInfo(clip);
   drawDraft(clip);
   drawDraftTexts();
+  drawThumb(clip);
   player.currentTime = span.start;
   fit();
 }
@@ -856,6 +905,7 @@ function judged(clip, reply) {
     drawClipInfo(clip);
     drawDraft(clip);
     drawDraftTexts();
+    drawThumb(clip);
     drawUnsaved();
   }
 }

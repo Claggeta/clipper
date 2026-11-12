@@ -54,6 +54,8 @@ RATINGS = ("good", "ok")
 ADDED_REASON = "added in review"
 # On-screen texts per clip (ADR 0030); a hook and a few lines.
 MAX_TEXTS = 5
+# A thumbnail's text is shown from time 0 of its one frame; any length will do.
+THUMBNAIL_TEXT_SECONDS = 10.0
 # No speech, for texts alone in a folder without captions.
 _SILENT = Transcript(segments=())
 
@@ -184,6 +186,51 @@ def _cuts(value: object) -> tuple[Cut, ...]:
         a, b = (_seconds({"cut": x}, "cut") for x in pair)
         cuts.append((a, b))
     return tuple(cuts)
+
+
+@dataclass(frozen=True)
+class ThumbnailRequest:
+    """A thumbnail at a moment of the source, with optional text (ADR 0030)."""
+
+    at: float
+    text: OnScreenText | None
+    # The style shown in the page; None is the clip's own (ADR 0025).
+    style: str | None = None
+
+
+def parse_thumbnail(data: object, duration: float) -> ThumbnailRequest:
+    """Check a Thumbnail body: `at` inside the video, an optional style, and
+    an optional one-line `text` with its `place`."""
+    if not isinstance(data, dict):
+        raise BadRequest("the body must be a JSON object")
+    at = _seconds(data, "at")
+    if not 0 <= at < duration:
+        raise BadRequest("the moment must be inside the video")
+    style = data.get("style")
+    if style is not None and style not in STYLES:
+        raise BadRequest(f"the style must be one of {', '.join(STYLES)}")
+    words = _text(data, "text")
+    if words is None:
+        return ThumbnailRequest(at, None, style)
+    try:
+        text = OnScreenText.model_validate(
+            {
+                "text": words,
+                "start_seconds": 0.0,
+                "end_seconds": THUMBNAIL_TEXT_SECONDS,
+                "place": data.get("place", "middle"),
+            }
+        )
+    except ValidationError as exc:
+        message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+        raise BadRequest(f"text: {message}") from exc
+    return ThumbnailRequest(at, text, style)
+
+
+def thumbnail_name(clip_file: str) -> str:
+    """`<clip stem>.thumb.jpg`, the same for each style of a clip."""
+    stem = Path(clip_file).stem.removesuffix(".face")
+    return f"{stem}.thumb.jpg"
 
 
 def parse_trash(data: object) -> str | None:
@@ -494,6 +541,71 @@ class ReviewStore:
                 )
         return warning
 
+    def thumbnail(
+        self, rank: int, request: ThumbnailRequest
+    ) -> tuple[ManifestClip, str | None]:
+        """Write the clip's thumbnail at `request.at`, in the style it keeps,
+        replacing any earlier one, and record it (ADR 0030).
+
+        Returns the clip and a note: a face clip with no face at that moment
+        is framed as `fit`. Raises `JudgingError` for a clip without a file.
+        """
+        with self._lock:
+            clip = self._clip(rank)
+            if clip.file is None:
+                raise JudgingError("Save the clip before making its thumbnail")
+            manifest = self.manifest
+            style = self._style(clip, request.style)
+            crop = None
+            note = None
+            if style == "face":
+                try:
+                    crop = self._crop(
+                        ClipCandidate(
+                            start_seconds=request.at,
+                            end_seconds=request.at + 1.0,
+                            score=0.0,
+                            reasons=("thumbnail",),
+                        )
+                    )
+                except ReviewError:
+                    note = "No face at that moment; framed as Fit."
+            ass = None
+            if request.text is not None:
+                ass = build_ass(
+                    _SILENT,
+                    ClipCandidate(
+                        start_seconds=0.0,
+                        end_seconds=THUMBNAIL_TEXT_SECONDS,
+                        score=0.0,
+                        reasons=("thumbnail",),
+                    ),
+                    vertical=manifest.vertical,
+                    texts=(request.text,),
+                ).text
+            name = thumbnail_name(clip.file)
+            target = self._folder / name
+            temp = target.with_name(f"{target.stem}.part.jpg")
+            try:
+                self._render.renderer.still(
+                    self._render.video,
+                    request.at,
+                    temp,
+                    captions=ass or None,
+                    vertical=manifest.vertical,
+                    crop=crop,
+                )
+                try:
+                    os.replace(temp, target)
+                except OSError as exc:
+                    raise ReviewError(f"Cannot replace {name}: {exc}") from exc
+            finally:
+                temp.unlink(missing_ok=True)
+            manifest = mark_clip(manifest, rank, thumbnail=name)
+            self._files.save_manifest(manifest, self._folder)
+            self.manifest = manifest
+            return self._clip(rank), note
+
     def trash(self, rank: int, note: str | None) -> ManifestClip | None:
         """Write a rejected span, delete the clip's file, then mark it trashed.
 
@@ -515,6 +627,8 @@ class ReviewStore:
             # A style file left behind does not stop the trash (ADR 0025).
             if warning := self._delete_variants(clip):
                 logger.warning("%s", warning)
+            if warning := self._delete_thumbnail(clip):
+                logger.warning("%s", warning)
             if clip.added:
                 manifest = drop_clip(self.manifest, rank)
             else:
@@ -524,6 +638,7 @@ class ReviewStore:
                     reviewed="trashed",
                     file=None,
                     variants=(),
+                    thumbnail=None,
                     **_first_write(clip),
                 )
             self._files.save_manifest(manifest, self._folder)
@@ -541,6 +656,19 @@ class ReviewStore:
                 (self._folder / variant.file).unlink(missing_ok=True)
             except OSError as exc:
                 return f"The {variant.style} file {variant.file} was not deleted: {exc}"
+        return None
+
+    def _delete_thumbnail(self, clip: ManifestClip) -> str | None:
+        """Delete the clip's thumbnail, if any; a message if not."""
+        name = clip.thumbnail
+        if name is None:
+            return None
+        if Path(name).name != name:
+            return f"Not deleting {name!r}: not a file name"
+        try:
+            (self._folder / name).unlink(missing_ok=True)
+        except OSError as exc:
+            return f"The thumbnail {name} was not deleted: {exc}"
         return None
 
     def _delete_file(self, clip: ManifestClip) -> None:

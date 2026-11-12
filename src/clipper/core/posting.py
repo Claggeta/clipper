@@ -128,6 +128,8 @@ class QueueItem:
     rating: str
     people: tuple[str, ...]
     eligible: Eligibility
+    # Its thumbnail beside it, under the clips dir, if one was made (ADR 0030).
+    thumbnail: Path | None = None
 
 
 def clip_key(folder: str, file: str) -> str:
@@ -178,17 +180,19 @@ def _waiting(
         label = next((x for x in labels if is_own_label(x, clip)), None)
         if label is None or label.rating != rating:
             continue
+        place = folder.location or Path(folder.name)
         items.append(
             QueueItem(
                 clip=key,
                 folder=folder.name,
-                path=(folder.location or Path(folder.name)) / clip.file,
+                path=place / clip.file,
                 rank=clip.rank,
                 title=clip.title,
                 hook=clip.hook,
                 rating=rating,
                 people=label.people,
                 eligible=eligibility(campaigns, label.people, folder.channel),
+                thumbnail=place / clip.thumbnail if clip.thumbnail else None,
             )
         )
     return items
@@ -253,6 +257,11 @@ def queue_markdown(scheduled: Sequence[tuple[date, QueueItem]], clips_dir: Path)
             "",
             f"- Campaigns: {_campaign_list(item)}",
             f"- On screen: {', '.join(item.people) or 'not marked'}",
+            *(
+                [f"- Thumbnail: `{clips_dir / item.thumbnail}`"]
+                if item.thumbnail
+                else []
+            ),
             f"- Rating: {item.rating}",
             "",
         ]

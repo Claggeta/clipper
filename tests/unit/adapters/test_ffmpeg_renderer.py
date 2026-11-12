@@ -442,3 +442,47 @@ def test_cuts_outside_the_span_or_overlapping_are_refused(
 ) -> None:
     with pytest.raises(ClipRenderError, match="must lie inside the clip"):
         FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", cuts=cuts)
+
+
+def test_a_still_is_one_frame_framed_and_captioned_as_a_jpeg(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    out = tmp_path / "c.thumb.jpg"
+    _patch_run(monkeypatch, captured, write=out)
+
+    FfmpegClipRenderer().still(video, 61.25, out, captions=_ASS, vertical=True)
+
+    command = captured[0]
+    assert command[command.index("-ss") + 1] == "61.250"
+    assert command.index("-ss") < command.index("-i")
+    assert command[command.index("-frames:v") + 1] == "1"
+    vf = command[command.index("-vf") + 1]
+    assert vf == _VERTICAL + ",subtitles=clip.ass:charenc=UTF-8"
+    assert command[-1] == str(out.resolve())
+
+
+def test_a_face_still_holds_the_crop_where_it_starts(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    out = tmp_path / "c.thumb.jpg"
+    _patch_run(monkeypatch, captured, write=out)
+    crop = CropPath(width=608, height=1080, points=((0.0, 400), (1.0, 500)))
+
+    FfmpegClipRenderer().still(video, 5.0, out, crop=crop)
+
+    vf = captured[0][captured[0].index("-vf") + 1]
+    assert vf == "crop=608:1080:400:0,scale=1080:1920,setsar=1"
+
+
+def test_a_failed_still_raises_and_leaves_no_file(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    out = tmp_path / "c.thumb.jpg"
+    _patch_run(monkeypatch, captured, code=1, stderr="bad", write=out)
+
+    with pytest.raises(ClipRenderError, match="bad"):
+        FfmpegClipRenderer().still(video, 5.0, out)
+    assert not out.exists()

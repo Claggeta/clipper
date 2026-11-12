@@ -2759,6 +2759,35 @@ uv run clipper review "$env:TEMP\rv12\<id>"
 
 Then `Remove-Item Env:CLIPPER_LABELS_DIR` and delete the scratch folders.
 
+### RV14. Thumbnails
+
+Covers [ADR 0030](decisions/0030-on-screen-text-and-thumbnails.md)'s
+thumbnails. Same scratch copy and labels dir as RV12 and RV13:
+
+```powershell
+$env:CLIPPER_LABELS_DIR = "$env:TEMP\rv12-labels"
+uv run clipper review "$env:TEMP\rv12\<id>"
+Remove-Item Env:CLIPPER_LABELS_DIR   # after stopping the server
+```
+
+1. Choose a saved clip. Pass: a `Thumbnail` row with a text box, `Middle`
+   and `Make thumbnail`; no image yet. On a trashed clip the button is
+   greyed out ("Save the clip first").
+2. Play the source to a good face, pause, type `He did WHAT?!` and press
+   `Make thumbnail`. Pass: within a few seconds a 9:16 image appears under
+   the row, framed like the draft, with the text on a half-dark box in the
+   middle; "Saved as <name>.thumb.jpg".
+3. Move the playhead, choose `Top`, press it again. Pass: the image is
+   replaced (new frame, text at the top). `<name>.thumb.jpg` is in the
+   scratch folder, a JPEG that opens at 1080x1920.
+4. Change the title box first, then make a thumbnail. Pass: the title
+   edit is still there and `Unsaved` still shows.
+5. With the server stopped, run
+   `$env:CLIPPER_CLIPS_DIR = "$env:TEMP\rv12"; uv run clipper queue --include-ok --out "$env:TEMP\rv14-queue.md"; Remove-Item Env:CLIPPER_CLIPS_DIR`.
+   Pass: that clip, if rated, lists `- Thumbnail:` with the image's path.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

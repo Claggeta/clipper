@@ -368,7 +368,9 @@ and planned code:
   without captions, with optional text, as `<clip stem>.thumb.jpg`.
   Rendering amendment: `OnScreenText`, events pinned with `\pos`, emoji
   monochrome. Page amendment: up to 5 rows, unsaved ones drawn over the
-  draft, manual step RV13.
+  draft, manual step RV13. Thumbnails amendment: `ClipRenderer.still`,
+  `POST /api/clips/<rank>/thumbnail` in the style shown (fit when no face),
+  `ManifestClip.thumbnail`, deleted by Trash, listed by the queue; RV14.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1101,11 +1103,11 @@ titles naming the person and titles kept unedited.
    label and manifest; then the page's Cut silence, toggles, Preview and
    Save with a manual step.~~ (done; ADR #192, core #194, handles fix
    #195, page with manual step RV12)
-4e. On-screen text and thumbnails (added 2026-11-11, the maintainer's
+4e. ~~On-screen text and thumbnails (added 2026-11-11, the maintainer's
    choice; ADR 0030), in PRs: the ADR; text rendering (the model, ASS
    events, manifest and label); text in the page with a manual step;
-   thumbnails with a manual step. (ADR #198, rendering #199, page with
-   manual step RV13; thumbnails next)
+   thumbnails with a manual step.~~ (done; ADR #198, rendering #199, page
+   with manual step RV13, thumbnails with manual step RV14)
 4d. ~~Drafts filed by channel and day (added 2026-11-11, the maintainer's
    choice): `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, the day the
    drafts ran, an existing folder reused; queue and `posted` find nested

@@ -43,6 +43,7 @@ from clipper.review.store import (
     ReviewStore,
     UnknownClip,
     parse_save,
+    parse_thumbnail,
     parse_trash,
     text_payload,
 )
@@ -73,8 +74,11 @@ _FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7})\.jpg")
 _CLIP_PATH = re.compile(r"/clips/([^/\\]+\.mp4)")
 # Frames never change for a given video, so the browser may keep them.
 _FRAME_CACHE = "max-age=86400"
-# A judgment on one clip: /api/clips/<rank>/save or /trash; or a new clip.
-_ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash)")
+# A judgment on one clip: /api/clips/<rank>/save or /trash, or its
+# thumbnail (ADR 0030); or a new clip.
+_ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash|thumbnail)")
+# A thumbnail the manifest lists: /thumbs/<file name> (ADR 0030).
+_THUMB_PATH = re.compile(r"/thumbs/([^/\\]+\.jpg)")
 _ADD_PATH = "/api/clips/add"
 _MAX_BODY = 64 * 1024
 
@@ -226,6 +230,7 @@ def clip_payload(
         "reviewed": clip.reviewed,
         "cuts": [list(cut) for cut in clip.cuts],
         "texts": [text_payload(text) for text in clip.texts],
+        "thumbnail": clip.thumbnail,
         "judgment": store.judgment(clip),
     }
 
@@ -263,6 +268,11 @@ def pauses_payload(session: ReviewSession, query: str) -> dict[str, object]:
     return {"cuts": [list(cut) for cut in cuts]}
 
 
+def _listed_thumbnails(store: ReviewStore) -> set[str]:
+    """The thumbnails the manifest lists, which are all the page may fetch."""
+    return {c.thumbnail for c in store.manifest.clips if c.thumbnail is not None}
+
+
 def _listed_files(store: ReviewStore) -> set[str]:
     """The draft files the manifest lists, which are all the page may fetch."""
     names = {clip.file for clip in store.manifest.clips if clip.file is not None}
@@ -292,6 +302,10 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     1
                 ) in _listed_files(store):
                     self._send_file(session.folder / draft.group(1), "video/mp4")
+                elif (thumb := _THUMB_PATH.fullmatch(path)) and thumb.group(
+                    1
+                ) in _listed_thumbnails(store):
+                    self._send_file(session.folder / thumb.group(1), "image/jpeg")
                 elif (frame := _FRAME_PATH.fullmatch(path)) and frame.group(
                     1
                 ) == frames_key(session):
@@ -318,7 +332,12 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             reply: dict[str, object]
             try:
                 data = self._read_json()
-                if verb == "trash":
+                if verb == "thumbnail":
+                    clip, note = store.thumbnail(
+                        rank, parse_thumbnail(data, session.duration_seconds)
+                    )
+                    reply = clip_payload(session, store, clip) | {"note": note}
+                elif verb == "trash":
                     trashed = store.trash(rank, parse_trash(data))
                     if trashed is None:
                         reply = {"removed": rank}

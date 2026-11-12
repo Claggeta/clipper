@@ -21,6 +21,8 @@ class FakeClipRenderer:
         self.vertical: list[bool] = []
         self.crops: list[CropPath | None] = []
         self.cuts: list[tuple[tuple[float, float], ...]] = []
+        self.stills: list[tuple[float, Path, str | None, bool, CropPath | None]] = []
+        self.fail_stills = False
 
     def render(
         self,
@@ -43,3 +45,21 @@ class FakeClipRenderer:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(b"fake clip")
         return RenderedClip(candidate=candidate, path=output_path)
+
+    def still(
+        self,
+        video_path: Path,
+        seconds: float,
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        vertical: bool = False,
+        crop: CropPath | None = None,
+    ) -> Path:
+        """Writes a placeholder JPEG and records the call in `stills`."""
+        self.stills.append((seconds, output_path, captions, vertical, crop))
+        if self.fail_stills:
+            raise ClipRenderError(f"Fake still failed for {output_path.name}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"fake jpeg")
+        return output_path

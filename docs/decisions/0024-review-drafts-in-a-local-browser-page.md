@@ -91,20 +91,7 @@ until the drafts rarely need editing.
   stay biased toward what some detector proposed.
 - (-) The largest piece of V5, in several PRs.
 
-## Amended by cutting pauses (ADR 0029, V6 item 4c)
-
-"Cut silence" proposes cuts at the pauses in speech inside the span
-(`GET /api/pauses`), shown striped on the film strip; a click keeps one,
-Preview jumps over the rest, and Save sends `cuts` with the label and
-re-renders the clip when they changed. Reset and "Clear cuts" remove
-them. Manual step RV12.
-
-## Amended by on-screen text (ADR 0030, V6 item 4e)
-
-"On-screen text" rows under the people buttons add up to 5 lines burned
-over the clip (words, from and to in the finished clip's seconds, Top or
-Middle); unsaved ones are drawn over the draft player, and Save sends
-`texts` and re-renders when they changed. Manual step RV13.
+## Revisit when
 
 - The URL box is wanted: move the drafts chain into `core/` first (0022).
 - Drafts rarely need editing: the page's job shrinks to judging.
@@ -417,6 +404,27 @@ the transcript only hints at.
 - Checked by unit tests on the body, the store and the label file; the
   page script parses (esprima, reading `??` as `||`); the page itself by
   manual step RV11.
+
+## Amended by cutting pauses (ADR 0029, V6 item 4c)
+
+"Cut silence" proposes cuts at the pauses in speech inside the span
+(`GET /api/pauses`), shown striped on the film strip; a click keeps one,
+Preview jumps over the rest, and Save sends `cuts` with the label and
+re-renders the clip when they changed. Reset and "Clear cuts" remove
+them. Manual step RV12.
+
+## Amended by on-screen text (ADR 0030, V6 item 4e)
+
+"On-screen text" rows under the people buttons add up to 5 lines burned
+over the clip (words, from and to in the finished clip's seconds, Top or
+Middle); unsaved ones are drawn over the draft player, and Save sends
+`texts` and re-renders when they changed. Manual step RV13.
+
+## Amended by thumbnails (ADR 0030, V6 item 4e)
+
+A Thumbnail row makes `<clip stem>.thumb.jpg` from the frame at the
+playhead, in the style shown, with optional text; it is shown in the page
+from `/thumbs/<name>` and deleted by Trash. Manual step RV14.
 
 ## Related
 
