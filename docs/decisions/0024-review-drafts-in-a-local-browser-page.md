@@ -99,7 +99,12 @@ Preview jumps over the rest, and Save sends `cuts` with the label and
 re-renders the clip when they changed. Reset and "Clear cuts" remove
 them. Manual step RV12.
 
-## Revisit when
+## Amended by on-screen text (ADR 0030, V6 item 4e)
+
+"On-screen text" rows under the people buttons add up to 5 lines burned
+over the clip (words, from and to in the finished clip's seconds, Top or
+Middle); unsaved ones are drawn over the draft player, and Save sends
+`texts` and re-renders when they changed. Manual step RV13.
 
 - The URL box is wanted: move the drafts chain into `core/` first (0022).
 - Drafts rarely need editing: the page's job shrinks to judging.

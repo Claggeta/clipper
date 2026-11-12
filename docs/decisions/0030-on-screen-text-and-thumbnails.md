@@ -79,6 +79,19 @@ cuts since 0029.
 - Checked on a real render of `test_input.mp4` with a cut, word captions,
   a top hook and a middle line.
 
+## Amended by the review page PR (V6 item 4e, third PR)
+
+- The page's "On-screen text" rows: words (up to 120 characters), from
+  and to in seconds of the finished clip, Top or Middle, Remove; at most
+  5 per clip (`MAX_TEXTS`). "Add text" starts the first as the title, 0
+  to 3 s at the top, and later ones empty in the middle.
+- Unsaved texts are drawn over the draft player at about their place;
+  once saved they are burned into the draft, so nothing is drawn.
+- Save sends `texts`; the server checks them like the model and
+  re-renders when they differ from the file's. In a folder without
+  captions the texts are burned alone, and the manifest's `captions`
+  stays empty. Reset removes them. Manual step RV13.
+
 ## Revisit when
 
 - The maintainer wants other looks (colours, outlined text, all caps) or

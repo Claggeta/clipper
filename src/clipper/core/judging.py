@@ -14,6 +14,7 @@ from clipper.domain.models import (
     Label,
     LabeledVideo,
     ManifestClip,
+    OnScreenText,
     RejectedSpan,
     RenderManifest,
     Span,
@@ -108,12 +109,14 @@ def save_judgment(
     rating: str | None = None,
     people: tuple[str, ...] = (),
     cuts: tuple[tuple[float, float], ...] = (),
+    texts: tuple[OnScreenText, ...] = (),
 ) -> LabeledVideo:
     """The labels with `clip` saved as `post` (span unchanged) or `fix`, or
     as `added` for a clip added in the page, whatever its span. `style` is the
     vertical style kept, if the clip had styles (ADR 0025); `rating` and
     `people` are the page's rating and who is on screen (ADR 0024); `cuts`
-    the ranges left out (ADR 0029), which do not change the verdict.
+    the ranges left out (ADR 0029) and `texts` the lines burned over it (ADR
+    0030), neither of which changes the verdict.
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
     if the span overlaps another label: one label per moment.
@@ -135,6 +138,8 @@ def save_judgment(
         fields["people"] = people
     if cuts:
         fields["cuts"] = [_times(a, b) for a, b in cuts]
+    if texts:
+        fields["texts"] = texts
     if clip.added:
         fields["verdict"] = "added"
     elif same_span(clip.draft_span, (start, end)):

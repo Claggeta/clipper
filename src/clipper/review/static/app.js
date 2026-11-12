@@ -2,7 +2,8 @@
 // anywhere, trim with a film strip and two handles (3b), Save or Trash each
 // clip with its title and notes (3c), re-rendered on Save (3d), and add
 // clips no draft proposed (3e). A keeper gets a rating and who is on screen
-// (rating amendment), and pauses can be cut out (ADR 0029).
+// (rating amendment); pauses can be cut out (ADR 0029) and text added on
+// screen (ADR 0030).
 "use strict";
 
 const player = document.getElementById("player");
@@ -47,6 +48,12 @@ const chosen = new Map(); // key -> the style picked and not yet saved
 const versions = new Map(); // key -> bumped after a Save, so the draft reloads
 const marks = new Map(); // key -> the rating and people set, not yet saved
 const cutEdits = new Map(); // key -> [{start, end, on}], the cuts shown (ADR 0029)
+const textEdits = new Map(); // key -> [{text, start, end, place}] (ADR 0030)
+const textsBox = document.getElementById("texts");
+const draftTexts = document.getElementById("draft-texts");
+// At most this many texts per clip, as the server allows (ADR 0030).
+const MAX_TEXTS = 5;
+const HOOK_SECONDS = 3;
 let people = []; // the names the page offers as on screen
 let trashArmed = null; // the timer while Trash waits for its second click
 let busy = false; // while a Save is waiting on the server (a re-render)
@@ -230,6 +237,151 @@ function sameCuts(a, b) {
   );
 }
 
+// --- On-screen text (ADR 0030) ---
+
+// The texts on disk: the label's, else those the file was rendered with.
+function savedTexts(clip) {
+  const judged = clip.judgment && clip.judgment.start !== undefined;
+  return (judged ? clip.judgment.texts : clip.texts) || [];
+}
+
+// The texts shown for a clip, edited and not yet saved.
+function textsOf(clip) {
+  if (!textEdits.has(clip.key)) {
+    textEdits.set(
+      clip.key,
+      savedTexts(clip).map((t) => ({ ...t })),
+    );
+  }
+  return textEdits.get(clip.key);
+}
+
+// The texts Save sends: those with words.
+function sentTexts(clip) {
+  return textsOf(clip)
+    .filter((t) => t.text.trim())
+    .map((t) => ({ text: t.text.trim(), start: t.start, end: t.end, place: t.place }));
+}
+
+function sameTexts(a, b) {
+  return (
+    a.length === b.length &&
+    a.every(
+      (t, i) =>
+        t.text === b[i].text &&
+        t.place === b[i].place &&
+        sameTime(t.start, b[i].start) &&
+        sameTime(t.end, b[i].end),
+    )
+  );
+}
+
+function numberInput(value, onChange) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.step = "0.1";
+  input.value = String(value);
+  input.addEventListener("input", () => {
+    const seconds = Number(input.value);
+    if (Number.isFinite(seconds)) {
+      onChange(seconds);
+    }
+  });
+  return input;
+}
+
+function drawTexts(clip) {
+  textsBox.replaceChildren();
+  const texts = textsOf(clip);
+  texts.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.className = "text-row";
+    const words = document.createElement("input");
+    words.type = "text";
+    words.maxLength = 120;
+    words.placeholder = "Text";
+    words.value = item.text;
+    words.addEventListener("input", () => {
+      item.text = words.value;
+      textsChanged();
+    });
+    const start = numberInput(item.start, (seconds) => {
+      item.start = seconds;
+      textsChanged();
+    });
+    start.title = "From (s)";
+    const end = numberInput(item.end, (seconds) => {
+      item.end = seconds;
+      textsChanged();
+    });
+    end.title = "To (s)";
+    const place = document.createElement("select");
+    for (const [value, label] of [["top", "Top"], ["middle", "Middle"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      place.append(option);
+    }
+    place.value = item.place;
+    place.addEventListener("change", () => {
+      item.place = place.value;
+      textsChanged();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => {
+      texts.splice(index, 1);
+      drawTexts(clip);
+      textsChanged();
+    });
+    row.append(words, start, end, place, remove);
+    textsBox.append(row);
+  });
+  document.getElementById("add-text").disabled = texts.length >= MAX_TEXTS;
+}
+
+function textsChanged() {
+  drawUnsaved();
+  drawDraftTexts();
+}
+
+// Unsaved texts over the draft, at about their place; once saved they are
+// burned into the draft itself, so nothing is drawn over it.
+function drawDraftTexts() {
+  draftTexts.replaceChildren();
+  if (!current || sameTexts(sentTexts(current), current.texts || [])) {
+    return;
+  }
+  const now = draft.currentTime || 0;
+  for (const item of sentTexts(current)) {
+    if (now >= item.start && now < item.end) {
+      const box = document.createElement("div");
+      box.className = `draft-text ${item.place}`;
+      box.textContent = item.text;
+      draftTexts.append(box);
+    }
+  }
+}
+
+draft.addEventListener("timeupdate", drawDraftTexts);
+draft.addEventListener("seeked", drawDraftTexts);
+
+// The first text is a hook: the title, over the first seconds at the top.
+document.getElementById("add-text").addEventListener("click", () => {
+  const texts = textsOf(current);
+  const first = texts.length === 0;
+  texts.push({
+    text: first ? titleBox.value.trim() || current.title || "" : "",
+    start: 0,
+    end: HOOK_SECONDS,
+    place: first ? "top" : "middle",
+  });
+  drawTexts(current);
+  textsChanged();
+});
+
 function drawCuts() {
   const box = document.getElementById("cuts");
   box.replaceChildren();
@@ -291,6 +443,7 @@ function drawUnsaved() {
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
     !sameCuts(activeCuts(), savedCuts(current)) ||
+    !sameTexts(sentTexts(current), savedTexts(current)) ||
     titleBox.value.trim() !== saved.title ||
     noteBox.value.trim() !== saved.note;
   document.getElementById("unsaved").hidden = !changed;
@@ -481,9 +634,11 @@ function select(clip, button) {
   titleBox.value = clip.title || "";
   noteBox.value = (clip.judgment && clip.judgment.note) || "";
   drawRating(clip);
+  drawTexts(clip);
   drawJudged(clip);
   drawClipInfo(clip);
   drawDraft(clip);
+  drawDraftTexts();
   player.currentTime = span.start;
   fit();
 }
@@ -593,6 +748,9 @@ document.getElementById("reset").addEventListener("click", () => {
   span.end = current.draft_end;
   titleBox.value = current.model_title || "";
   cutEdits.set(current.key, []);
+  textEdits.set(current.key, []);
+  drawTexts(current);
+  drawDraftTexts();
   notice("");
   fit();
 });
@@ -652,7 +810,8 @@ function rendersOnSave(clip) {
     !clip.file ||
     !sameTime(span.start, clip.start) ||
     !sameTime(span.end, clip.end) ||
-    !sameCuts(activeCuts(), clip.cuts || [])
+    !sameCuts(activeCuts(), clip.cuts || []) ||
+    !sameTexts(sentTexts(clip), clip.texts || [])
   );
 }
 
@@ -687,13 +846,16 @@ function judged(clip, reply) {
   Object.assign(clip, reply);
   chosen.delete(clip.key);
   marks.delete(clip.key);
+  textEdits.delete(clip.key);
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
     drawRating(clip);
+    drawTexts(clip);
     drawJudged(clip);
     drawClipInfo(clip);
     drawDraft(clip);
+    drawDraftTexts();
     drawUnsaved();
   }
 }
@@ -717,6 +879,7 @@ saveButton.addEventListener("click", async () => {
       rating: marksOf(clip).rating,
       people: chosenPeople(clip),
       cuts: activeCuts(),
+      texts: sentTexts(clip),
     });
     clip.isNew = false;
     judged(clip, reply);

@@ -56,7 +56,10 @@
           <span id="trim-notice" class="error"></span>
         </div>
         <div id="draft-view" class="draft-view" hidden>
-          <video id="draft" controls preload="metadata" playsinline></video>
+          <div class="draft-frame">
+            <video id="draft" controls preload="metadata" playsinline></video>
+            <div id="draft-texts" class="draft-texts"></div>
+          </div>
           <div class="draft-side">
             <span class="muted">Draft</span>
             <div id="styles" class="style-buttons" role="group" aria-label="Style"></div>
@@ -85,6 +88,11 @@
           <div id="people-field" class="judge-field" hidden>
             <span class="field-label" id="people-label">On screen</span>
             <div id="people" class="toggle-row" role="group" aria-labelledby="people-label"></div>
+          </div>
+          <div class="judge-field">
+            <span class="field-label">On-screen text <span class="muted">(seconds of the finished clip)</span></span>
+            <div id="texts" class="texts"></div>
+            <div><button type="button" id="add-text">Add text</button></div>
           </div>
           <div class="judge-actions">
             <button type="button" id="save" class="primary">Save</button>
