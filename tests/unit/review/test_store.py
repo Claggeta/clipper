@@ -612,3 +612,60 @@ def test_save_writes_the_rating_and_people_and_shows_them(tmp_path: Path) -> Non
     judgment = env.store.judgment(env.store.manifest.clips[0])
     assert judgment is not None
     assert (judgment["rating"], judgment["people"]) == ("good", ["Ron"])
+
+
+def test_cuts_re_render_the_same_span_and_are_recorded(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+
+    result = env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, cuts=((13.5, 20.0),))
+    )
+
+    assert env.renderer.cuts == [((13.5, 20.0),)]
+    assert result.clip.cuts == ((13.5, 20.0),)
+    assert result.clip.file == "talk_000010-000040.mp4"
+    [label] = load_labels(env.labels_path).labels
+    assert label.verdict == "post"  # cuts do not move the span
+    assert [(c.start_seconds, c.end_seconds) for c in label.cuts] == [(13.5, 20.0)]
+    assert env.store.judgment(result.clip) is not None
+    assert env.store.judgment(result.clip)["cuts"] == [[13.5, 20.0]]  # type: ignore[index]
+
+
+def test_the_same_cuts_again_do_not_re_render_and_none_undo_them(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    request = SaveRequest(10.0, 40.0, None, None, cuts=((13.5, 20.0),))
+    env.store.save(1, request)
+    env.store.save(1, request)
+    assert len(env.renderer.calls) == 1
+
+    uncut = env.store.save(1, SaveRequest(10.0, 40.0, None, None)).clip
+    assert len(env.renderer.calls) == 2
+    assert env.renderer.cuts[-1] == ()
+    assert uncut.cuts == ()
+
+
+def test_captions_move_with_the_cuts(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    # "Hello" starts 2.0 s in; cutting 10.5 to 11.5 brings it to 1.0 s.
+    env.store.save(1, SaveRequest(10.0, 40.0, None, None, cuts=((10.5, 11.5),)))
+    captions = env.renderer.captions[0]
+    assert captions is not None
+    assert "Dialogue: 0,0:00:01.00," in captions
+
+
+def test_cuts_in_the_body_are_read_and_checked() -> None:
+    from clipper.review.store import BadRequest, parse_save
+
+    body = {"start": 10.0, "end": 40.0, "cuts": [[12.0, 13.0], [20, 21.5]]}
+    assert parse_save(body, 100.0).cuts == ((12.0, 13.0), (20.0, 21.5))
+    for cuts, message in [
+        ("x", "cuts must be a list"),
+        ([[1.0]], "cuts must be a list"),
+        ([["a", 2.0]], "must be a number of seconds"),
+        ([[5.0, 12.0]], "must lie inside the clip"),
+        ([[12.0, 14.0], [13.0, 15.0]], "must lie inside the clip"),
+    ]:
+        with pytest.raises(BadRequest, match=message):
+            parse_save({"start": 10.0, "end": 40.0, "cuts": cuts}, 100.0)

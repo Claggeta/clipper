@@ -1,3 +1,4 @@
+import dataclasses
 import http.client
 import json
 import re
@@ -22,6 +23,7 @@ from clipper.domain.models import (
     RenderManifest,
     Segment,
     Transcript,
+    Word,
 )
 from clipper.review.server import (
     RANGE_SECONDS,
@@ -33,6 +35,7 @@ from clipper.review.server import (
     make_server,
     make_store,
     parse_range,
+    pauses_payload,
 )
 
 # Constructed manifest and video bytes, not the output of a real run.
@@ -368,6 +371,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "style": None,
         "rating": None,
         "people": [],
+        "cuts": [],
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -534,6 +538,7 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "style": None,
         "rating": None,
         "people": [],
+        "cuts": [],
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
@@ -818,3 +823,39 @@ def test_the_page_script_declares_each_function_once() -> None:
     script = (files("clipper.review") / "static" / "app.js").read_text("utf-8")
     names = re.findall(r"^(?:async )?function (\w+)\(", script, re.MULTILINE)
     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
+
+
+def test_pauses_are_served_for_a_span(base_url: str) -> None:
+    status, _, body = _get(base_url + "/api/pauses?start=60&end=90")
+    assert status == 200
+    # The one segment has no word times, so it is speech throughout.
+    assert json.loads(body) == {"cuts": []}
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["", "?start=60", "?start=x&end=90", "?start=90&end=60", "?start=0&end=700"],
+)
+def test_a_bad_pauses_span_is_refused(base_url: str, query: str) -> None:
+    status, _, _ = _get(base_url + "/api/pauses" + query)
+    assert status == 400
+
+
+def test_pauses_payload_finds_word_gaps(tmp_path: Path) -> None:
+    worded = Transcript(
+        segments=(
+            Segment(
+                start_seconds=62.0,
+                end_seconds=66.0,
+                text="Hello there.",
+                words=(
+                    Word(start_seconds=62.0, end_seconds=62.5, text="Hello"),
+                    Word(start_seconds=65.0, end_seconds=66.0, text="there."),
+                ),
+            ),
+        )
+    )
+    session = dataclasses.replace(_session(tmp_path), transcript=worded)
+    assert pauses_payload(session, "start=60&end=90") == {"cuts": [[62.65, 64.85]]}
+    with pytest.raises(ReviewError, match="no transcript"):
+        pauses_payload(dataclasses.replace(session, transcript=None), "start=60&end=90")

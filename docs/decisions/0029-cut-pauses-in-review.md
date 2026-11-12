@@ -84,6 +84,21 @@ inside a clip are known without another pass over the audio.
   written to the millisecond) and `ManifestClip.cuts`. Nothing sets cuts
   until the review page's PR.
 
+## Amended by the review page PR (V6 item 4c, third PR)
+
+- `GET /api/pauses?start=&end=` returns `find_pauses` for the span the
+  handles show, so the proposals follow the handles; 409 when the folder
+  has no transcript. On a real 43 s Stable Ronaldo clip it proposed 8
+  cuts, 9.1 s in all.
+- The page keeps each clip's cuts, cut or kept, until Save; Save sends
+  only those cut and inside the span. Reset and "Clear cuts" empty them.
+- A Save re-renders when the cuts differ from the file's (to the
+  millisecond), as for a moved span; the manifest records the file's
+  cuts and the label the saved ones. Cuts never change the verdict.
+- Manual step RV12. The film strip's handles had stopped drawing since
+  the rating PR (#190, a second `drawMarks` in the page script), fixed
+  first in #195.
+
 ## Revisit when
 
 - The maintainer keeps most proposed cuts, or turns most off: change the

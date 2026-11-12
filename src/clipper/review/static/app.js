@@ -2,7 +2,7 @@
 // anywhere, trim with a film strip and two handles (3b), Save or Trash each
 // clip with its title and notes (3c), re-rendered on Save (3d), and add
 // clips no draft proposed (3e). A keeper gets a rating and who is on screen
-// (rating amendment).
+// (rating amendment), and pauses can be cut out (ADR 0029).
 "use strict";
 
 const player = document.getElementById("player");
@@ -46,6 +46,7 @@ const edits = new Map(); // key -> {start, end}, kept while the page is open
 const chosen = new Map(); // key -> the style picked and not yet saved
 const versions = new Map(); // key -> bumped after a Save, so the draft reloads
 const marks = new Map(); // key -> the rating and people set, not yet saved
+const cutEdits = new Map(); // key -> [{start, end, on}], the cuts shown (ADR 0029)
 let people = []; // the names the page offers as on screen
 let trashArmed = null; // the timer while Trash waits for its second click
 let busy = false; // while a Save is waiting on the server (a re-render)
@@ -175,17 +176,87 @@ function drawMarks() {
   place("handle-start", span.start);
   place("handle-end", span.end);
   place("playhead", player.currentTime);
+  drawCuts();
   drawTimes();
 }
 
 function drawTimes() {
   const length = span.end - span.start;
+  const removed = activeCuts().reduce((sum, [start, end]) => sum + end - start, 0);
+  const final = length - removed;
   text("edit-start", fmtTenths(span.start));
   text("edit-end", fmtTenths(span.end));
   const lengthCell = document.getElementById("edit-length");
-  lengthCell.textContent = `${length.toFixed(1)} s`;
-  lengthCell.classList.toggle("warn", length < MIN_LENGTH || length > MAX_LENGTH);
+  lengthCell.textContent = removed
+    ? `${length.toFixed(1)} s → ${final.toFixed(1)} s`
+    : `${length.toFixed(1)} s`;
+  lengthCell.classList.toggle("warn", final < MIN_LENGTH || final > MAX_LENGTH);
   drawUnsaved();
+}
+
+// --- Cuts: pauses left out of the clip (ADR 0029) ---
+
+// The cuts on disk: the label's, else those the file was rendered with.
+function savedCuts(clip) {
+  const judged = clip.judgment && clip.judgment.start !== undefined;
+  return (judged ? clip.judgment.cuts : clip.cuts) || [];
+}
+
+// The cuts shown for a clip: proposed or saved, each cut or kept.
+function cutsOf(clip) {
+  if (!cutEdits.has(clip.key)) {
+    cutEdits.set(
+      clip.key,
+      savedCuts(clip).map(([start, end]) => ({ start, end, on: true })),
+    );
+  }
+  return cutEdits.get(clip.key);
+}
+
+// The cuts Save sends: those still cut and inside the span, as pairs.
+function activeCuts() {
+  if (!current || !span) {
+    return [];
+  }
+  return cutsOf(current)
+    .filter((cut) => cut.on && cut.start > span.start && cut.end < span.end)
+    .map((cut) => [cut.start, cut.end]);
+}
+
+function sameCuts(a, b) {
+  return (
+    a.length === b.length &&
+    a.every(([start, end], i) => sameTime(start, b[i][0]) && sameTime(end, b[i][1]))
+  );
+}
+
+function drawCuts() {
+  const box = document.getElementById("cuts");
+  box.replaceChildren();
+  if (!current) {
+    return;
+  }
+  for (const cut of cutsOf(current)) {
+    const left = percent(cut.start);
+    const right = percent(cut.end);
+    if (right < 0 || left > 100) {
+      continue;
+    }
+    const element = document.createElement("div");
+    element.className = cut.on ? "cut" : "cut kept";
+    element.style.left = `${left}%`;
+    element.style.width = `${right - left}%`;
+    const length = (cut.end - cut.start).toFixed(1);
+    element.title = cut.on
+      ? `${length} s cut; click to keep it`
+      : `${length} s kept; click to cut it`;
+    element.addEventListener("click", (event) => {
+      event.stopPropagation();
+      cut.on = !cut.on;
+      drawMarks();
+    });
+    box.append(element);
+  }
 }
 
 // What is on disk for a clip: its label's span, else the draft's; its
@@ -219,6 +290,7 @@ function drawUnsaved() {
     chosenStyle(current) !== (current.style || null) ||
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
+    !sameCuts(activeCuts(), savedCuts(current)) ||
     titleBox.value.trim() !== saved.title ||
     noteBox.value.trim() !== saved.note;
   document.getElementById("unsaved").hidden = !changed;
@@ -514,14 +586,47 @@ document.getElementById("set-end").addEventListener("click", () => {
   drawMarks();
 });
 
-// Back to the draft: its span and the model's title. Notes stay; nothing
-// is written until Save.
+// Back to the draft: its span and the model's title, uncut. Notes stay;
+// nothing is written until Save.
 document.getElementById("reset").addEventListener("click", () => {
   span.start = current.draft_start;
   span.end = current.draft_end;
   titleBox.value = current.model_title || "";
+  cutEdits.set(current.key, []);
   notice("");
   fit();
+});
+
+// Propose a cut at every pause in speech inside the span, all cut; a
+// click on one keeps it (ADR 0029). Nothing is written until Save.
+document.getElementById("cut-silence").addEventListener("click", async () => {
+  const clip = current;
+  const query = `start=${span.start}&end=${span.end}`;
+  try {
+    const response = await fetch(`/api/pauses?${query}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || `The server answered ${response.status}`);
+    }
+    cutEdits.set(
+      clip.key,
+      data.cuts.map(([start, end]) => ({ start, end, on: true })),
+    );
+    if (clip === current) {
+      notice(data.cuts.length ? "" : "No pauses of 0.6 s or more in the span.");
+      drawMarks();
+    }
+  } catch (error) {
+    if (clip === current) {
+      notice(error.message);
+    }
+  }
+});
+
+document.getElementById("clear-cuts").addEventListener("click", () => {
+  cutEdits.set(current.key, []);
+  notice("");
+  drawMarks();
 });
 
 // --- Save and Trash ---
@@ -540,10 +645,15 @@ function drawJudged(clip) {
   text("title", clipName(clip));
 }
 
-// Whether Save will re-render: the span differs from what the file covers,
-// or there is no file.
+// Whether Save will re-render: the span or cuts differ from what the file
+// covers, or there is no file.
 function rendersOnSave(clip) {
-  return !clip.file || !sameTime(span.start, clip.start) || !sameTime(span.end, clip.end);
+  return (
+    !clip.file ||
+    !sameTime(span.start, clip.start) ||
+    !sameTime(span.end, clip.end) ||
+    !sameCuts(activeCuts(), clip.cuts || [])
+  );
 }
 
 function savedMessage(reply, rendered) {
@@ -606,6 +716,7 @@ saveButton.addEventListener("click", async () => {
       style: chosenStyle(clip),
       rating: marksOf(clip).rating,
       people: chosenPeople(clip),
+      cuts: activeCuts(),
     });
     clip.isNew = false;
     judged(clip, reply);
@@ -753,6 +864,14 @@ function watchPreview() {
   if (!preview.settling && player.currentTime >= preview.end) {
     player.pause();
     return;
+  }
+  // Jump over each cut, as the rendered clip will (ADR 0029). The jump is
+  // a seek of our own, so it does not cancel the preview.
+  const now = player.currentTime;
+  const cut = activeCuts().find(([start, end]) => now >= start && now < end);
+  if (!preview.settling && cut) {
+    preview.settling = true;
+    player.currentTime = cut[1];
   }
   requestAnimationFrame(watchPreview);
 }

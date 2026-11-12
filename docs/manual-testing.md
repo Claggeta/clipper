@@ -2695,6 +2695,37 @@ cmd /c "set CLIPPER_LABELS_DIR=data\rv11-labels&& uv run clipper review data\cli
 Then delete `data\rv11-labels`. Saving clips here re-renders nothing unless a
 handle moved.
 
+### RV12. Cut silence
+
+Covers [ADR 0029](decisions/0029-cut-pauses-in-review.md). Save re-renders
+the clip, so work on a copy of a drafts folder with scratch labels:
+
+```powershell
+Copy-Item -Recurse "D:\Clippett\clips\<channel>\<day>\<id>" "$env:TEMP\rv12\<id>"
+cmd /c "set CLIPPER_LABELS_DIR=%TEMP%\rv12-labels&& uv run clipper review %TEMP%\rv12\<id>"
+```
+
+1. Choose a clip with talking in it. Drag a handle. Pass: the selection,
+   handles and playhead follow (the #195 fix).
+2. Press `Cut silence`. Pass: striped stretches over the strip at the gaps
+   in speech, `Length` shows `<before> s → <after> s`, `Unsaved` shows. On
+   a clip with no gaps of 0.6 s: "No pauses of 0.6 s or more in the span."
+3. Click one stripe. Pass: it becomes a dashed outline (kept) and the
+   after-length grows; click again to cut it.
+4. Press `Preview span`. Pass: playback jumps over each striped stretch
+   and stops at the end handle; outlined stretches play.
+5. Save. Pass: "Re-rendering"; then the draft player shows the cut clip:
+   shorter, the pauses gone, **lips in sync with the audio to the end**,
+   captions on the right words. Also try a `Face` clip if the folder has
+   one: the crop follows the speaker after each cut.
+6. Reload the page and choose the clip. Pass: the same stretches striped,
+   `Unsaved` hidden. Press `Clear cuts` and Save: the full-length clip is
+   rendered again.
+7. Stop the server. `%TEMP%\rv12-labels\picks\<id>.json`: the clip's label
+   has `"cuts"` after step 5 and none after step 6.
+
+Then delete `%TEMP%\rv12` and `%TEMP%\rv12-labels`.
+
 ## Record your run
 
 | Field | Value |

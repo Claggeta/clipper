@@ -3,8 +3,9 @@
 The server binds to the loopback address only and serves a fixed set of
 paths: the page's own files, the clips as JSON, the source video with HTTP
 range requests so the browser can seek in it, and cached still frames for
-the film strip. Two POST paths save or trash a clip; they answer only the
-page itself (see `_trusted`).
+the film strip, and the pauses in speech inside a span (ADR 0029). Two
+POST paths save or trash a clip; they answer only the page itself (see
+`_trusted`).
 """
 
 import contextlib
@@ -20,7 +21,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
+from urllib.parse import parse_qs
 
+from clipper.core.cuts import find_pauses
 from clipper.core.interfaces import (
     ClipRenderer,
     FaceTracker,
@@ -199,6 +202,7 @@ def clip_payload(
     are the detector's span, the same until a re-render. `model_title` is
     the model's title, kept once the page has written the clip. `variants`
     are the rendered styles and `style` the clip's own, its first (ADR 0025).
+    `cuts` are the ranges left out of the file (ADR 0029).
     """
     draft_start, draft_end = clip.draft_span
     return {
@@ -218,6 +222,7 @@ def clip_payload(
         "style": clip.variants[0].style if clip.variants else None,
         "error": clip.error,
         "reviewed": clip.reviewed,
+        "cuts": [list(cut) for cut in clip.cuts],
         "judgment": store.judgment(clip),
     }
 
@@ -237,6 +242,24 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
     }
 
 
+def pauses_payload(session: ReviewSession, query: str) -> dict[str, object]:
+    """The proposed cuts for the pauses in speech inside `?start=&end=`, in
+    source seconds (ADR 0029). Raises `BadRequest` for a bad span and
+    `ReviewError` when the folder has no transcript."""
+    values = parse_qs(query)
+    try:
+        start = float(values["start"][0])
+        end = float(values["end"][0])
+    except (KeyError, ValueError) as exc:
+        raise BadRequest("give start and end in seconds") from exc
+    if not 0 <= start < end <= session.duration_seconds:
+        raise BadRequest("the span must be inside the video")
+    if session.transcript is None:
+        raise ReviewError("This folder has no transcript to find pauses in")
+    cuts = find_pauses(session.transcript, start, end)
+    return {"cuts": [list(cut) for cut in cuts]}
+
+
 def _listed_files(store: ReviewStore) -> set[str]:
     """The draft files the manifest lists, which are all the page may fetch."""
     names = {clip.file for clip in store.manifest.clips if clip.file is not None}
@@ -250,7 +273,7 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            path = self.path.split("?", 1)[0]
+            path, _, query = self.path.partition("?")
             try:
                 if path in _STATIC:
                     name, content_type = _STATIC[path]
@@ -258,6 +281,8 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     self._send(HTTPStatus.OK, content_type, body)
                 elif path == "/api/clips":
                     self._send_json(HTTPStatus.OK, clips_payload(session, store))
+                elif path == "/api/pauses":
+                    self._send_pauses(query)
                 elif path == "/video":
                     self._send_file(session.video, video_type)
                 elif (draft := _CLIP_PATH.fullmatch(path)) and draft.group(
@@ -314,6 +339,16 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self._send_error(HTTPStatus.CONFLICT, str(exc))
             except (ClipperError, OSError) as exc:
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, reply)
+
+        def _send_pauses(self, query: str) -> None:
+            try:
+                reply = pauses_payload(session, query)
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except ReviewError as exc:
+                self._send_error(HTTPStatus.CONFLICT, str(exc))
             else:
                 self._send_json(HTTPStatus.OK, reply)
 

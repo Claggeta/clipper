@@ -244,6 +244,33 @@ video {
 
 .dim { background: rgb(0 0 0 / 0.6); }
 
+/* Proposed cuts (ADR 0029): struck through while cut, outlined once kept.
+   Above the frames, below the handles, and clickable to toggle. */
+.cuts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 3px;
+  background: repeating-linear-gradient(
+    135deg,
+    rgb(255 107 107 / 0.75) 0 4px,
+    rgb(0 0 0 / 0.7) 4px 8px
+  );
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cut.kept {
+  background: none;
+  border: 1px dashed var(--muted);
+}
+
 .dim.before { left: 0; }
 
 .dim.after { right: 0; }
