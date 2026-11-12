@@ -2701,9 +2701,15 @@ Covers [ADR 0029](decisions/0029-cut-pauses-in-review.md). Save re-renders
 the clip, so work on a copy of a drafts folder with scratch labels:
 
 ```powershell
-Copy-Item -Recurse "D:\Clippett\clips\<channel>\<day>\<id>" "$env:TEMP\rv12\<id>"
-cmd /c "set CLIPPER_LABELS_DIR=%TEMP%\rv12-labels&& uv run clipper review %TEMP%\rv12\<id>"
+$Id = "<id>"   # e.g. v2924380274
+New-Item -ItemType Directory -Force "$env:TEMP\rv12" | Out-Null
+Copy-Item -Recurse "D:\Clippett\clips\<channel>\<day>\$Id" "$env:TEMP\rv12\$Id"
+$env:CLIPPER_LABELS_DIR = "$env:TEMP\rv12-labels"
+uv run clipper review "$env:TEMP\rv12\$Id"
 ```
+
+Copy-Item needs both paths, with a space between them; without the second
+it copies into the current folder.
 
 1. Choose a clip with talking in it. Drag a handle. Pass: the selection,
    handles and playhead follow (the #195 fix).
