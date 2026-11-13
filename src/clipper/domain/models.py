@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import date
 from pathlib import Path
@@ -351,6 +352,65 @@ class OnScreenText(BaseModel):
         return self
 
 
+# A caption word's fixed text, at most this long (ADR 0017, V7 9f).
+WORD_FIX_LIMIT = 40
+# Fixes or key words per clip, at most; a long clip has about 250 words.
+MAX_CAPTION_EDITS = 400
+# The colours a clip's active and key words may take, by name.
+Highlight = Literal["yellow", "green", "cyan", "pink", "orange"]
+
+
+class WordFix(BaseModel):
+    """A caption word's text replaced, by the word's start in the source.
+
+    Empty text hides the word. See docs/decisions/0017 (caption editing
+    amendment).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    text: str
+
+    @field_validator("text")
+    @classmethod
+    def _one_short_line(cls, value: str) -> str:
+        text = " ".join(value.split())
+        if len(text) > WORD_FIX_LIMIT:
+            raise ValueError(f"a word fix must be at most {WORD_FIX_LIMIT} characters")
+        return text
+
+
+class CaptionEdits(BaseModel):
+    """How a clip's word captions differ from the transcript (ADR 0017,
+    caption editing amendment): words with fixed text (`fixes`), words shown
+    in the highlight colour throughout their chunk (`keys`, by start time),
+    and the colour the active and key words take."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    fixes: tuple[WordFix, ...] = Field(default=(), max_length=MAX_CAPTION_EDITS)
+    keys: tuple[float, ...] = Field(default=(), max_length=MAX_CAPTION_EDITS)
+    highlight: Highlight = "yellow"
+
+    @model_validator(mode="after")
+    def _each_word_once(self) -> "CaptionEdits":
+        starts = [round(fix.start_seconds, 3) for fix in self.fixes]
+        if len(set(starts)) != len(starts):
+            raise ValueError("a word is fixed twice")
+        keys = [round(key, 3) for key in self.keys]
+        if len(set(keys)) != len(keys):
+            raise ValueError("a key word is given twice")
+        if any(key < 0 or not math.isfinite(key) for key in self.keys):
+            raise ValueError("a key word's time must be a number of seconds")
+        return self
+
+    @property
+    def empty(self) -> bool:
+        """True when the captions are the transcript's, in yellow."""
+        return not self.fixes and not self.keys and self.highlight == "yellow"
+
+
 class ClipVariant(BaseModel):
     """One rendered style of a clip: the style and its file name in the folder.
 
@@ -398,6 +458,8 @@ class ManifestClip(BaseModel):
     order and inside `start_seconds`..`end_seconds`; empty when uncut.
     `texts` are the lines burned over it (ADR 0030), and `thumbnail` the
     name of its thumbnail image in the folder, if one was made.
+    `caption_edits` are its word fixes, key words and colour (ADR 0017,
+    caption editing amendment), None when the captions are as transcribed.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -421,6 +483,7 @@ class ManifestClip(BaseModel):
     cuts: tuple[tuple[float, float], ...] = ()
     texts: tuple[OnScreenText, ...] = ()
     thumbnail: str | None = None
+    caption_edits: CaptionEdits | None = None
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":
@@ -546,7 +609,8 @@ class Label(Span):
     backlog, and `people` who is on screen, both from the review page (ADR
     0024, rating amendment). `cuts` are the ranges left out of the clip, in
     order and inside its span (ADR 0029), and `texts` the lines burned over
-    it (ADR 0030).
+    it (ADR 0030). `caption_edits` are its caption fixes, key words and
+    colour (ADR 0017, caption editing amendment).
     """
 
     note: str | None = None
@@ -557,6 +621,7 @@ class Label(Span):
     people: tuple[str, ...] = ()
     cuts: tuple[Span, ...] = ()
     texts: tuple[OnScreenText, ...] = ()
+    caption_edits: CaptionEdits | None = None
 
     @field_validator("people")
     @classmethod

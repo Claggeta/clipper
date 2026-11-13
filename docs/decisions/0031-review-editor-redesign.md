@@ -226,6 +226,22 @@ asked for a chat box that turns a described edit into the page's edits.
 - Zooms join with 9h. Captions from segments without word times are not
   previewed. Manual step RV20.
 
+## Amended by the caption editing PR (V7 item 9f)
+
+- A Captions tab (`static/captions.js`): the span's words from
+  `/api/words` as chips, grouped by the chunks `/api/captions` returns
+  with the edits applied, so the grouping is the burn-in's. Click a chip
+  to fix it (Enter or leaving keeps it, Esc drops it, empty hides it);
+  right-click or K on a focused chip marks a key word (K does not play
+  there); five swatches set the colour. Words in a cut are dimmed.
+- The preview draws the active and key words in the clip's colour and
+  asks for chunks with the edits. Reset clears them; Save sends them and
+  says it re-rendered when they changed.
+- The test for names declared twice across the page scripts now also
+  catches a binding named like a function in another script (a
+  `captionsChanged` clash stopped `preview.js` loading in testing).
+  Manual step RV21.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

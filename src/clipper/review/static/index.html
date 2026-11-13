@@ -55,6 +55,7 @@
       <form class="inspector judge" onsubmit="return false">
         <div class="tabs" role="tablist" aria-label="Inspector">
           <button type="button" role="tab" id="tab-clip" data-tab="clip" aria-selected="true" aria-controls="panel-clip">Clip</button>
+          <button type="button" role="tab" id="tab-captions" data-tab="captions" aria-selected="false" aria-controls="panel-captions">Captions</button>
           <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Text</button>
           <button type="button" role="tab" id="tab-frame" data-tab="frame" aria-selected="false" aria-controls="panel-frame">Frame</button>
         </div>
@@ -82,6 +83,13 @@
             <span class="field-label" id="people-label">On screen</span>
             <div id="people" class="toggle-row" role="group" aria-labelledby="people-label"></div>
           </div>
+        </section>
+        <section id="panel-captions" class="panel" role="tabpanel" data-panel="captions" aria-labelledby="tab-captions" hidden>
+          <span class="field-label">Words in the span <span class="muted">(as the captions will group them)</span></span>
+          <p id="caption-notice" class="muted"></p>
+          <div id="caption-words" class="caption-words"></div>
+          <span class="field-label" id="highlight-label">Highlight colour <span class="muted">(the spoken word and key words)</span></span>
+          <div id="highlights" class="toggle-row" role="group" aria-labelledby="highlight-label"></div>
         </section>
         <section id="panel-text" class="panel" role="tabpanel" data-panel="text" aria-labelledby="tab-text" hidden>
           <div class="judge-field">
@@ -185,6 +193,7 @@
   <script src="/app.js"></script>
   <script src="/keys.js"></script>
   <script src="/precision.js"></script>
+  <script src="/captions.js"></script>
   <script src="/preview.js"></script>
 </body>
 </html>

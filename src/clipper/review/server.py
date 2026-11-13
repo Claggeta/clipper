@@ -54,6 +54,8 @@ from clipper.review.store import (
     RenderInputs,
     ReviewStore,
     UnknownClip,
+    edits_payload,
+    parse_caption_edits,
     parse_save,
     parse_thumbnail,
     parse_trash,
@@ -77,6 +79,7 @@ _STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
     "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
+    "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
     "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
@@ -287,6 +290,7 @@ def clip_payload(
         "cuts": [list(cut) for cut in clip.cuts],
         "texts": [text_payload(text) for text in clip.texts],
         "thumbnail": clip.thumbnail,
+        "caption_edits": edits_payload(clip.caption_edits),
         "judgment": store.judgment(clip),
     }
 
@@ -356,17 +360,22 @@ def _cuts_query(
 
 def captions_payload(session: ReviewSession, query: str) -> dict[str, object]:
     """The caption chunks `build_ass` would burn into `?start=&end=` with
-    `&cuts=`, in source seconds, for the live preview (ADR 0031). Raises
-    `BadRequest` for a bad span or cuts and `ReviewError` without a
-    transcript."""
+    `&cuts=` and `&edits=` (caption edits as JSON, ADR 0017), in source
+    seconds, for the live preview (ADR 0031). Raises `BadRequest` for a bad
+    span, cuts or edits and `ReviewError` without a transcript."""
     start, end = _span_query(session, query)
     cuts = _cuts_query(query, start, end)
+    edits_text = parse_qs(query).get("edits", [""])[0]
+    try:
+        edits = parse_caption_edits(json.loads(edits_text)) if edits_text else None
+    except json.JSONDecodeError as exc:
+        raise BadRequest("give edits as JSON") from exc
     if session.transcript is None:
         raise ReviewError("This folder has no captions to preview")
     candidate = ClipCandidate(
         start_seconds=start, end_seconds=end, score=0.0, reasons=("preview",)
     )
-    chunks = caption_chunks(session.transcript, candidate, cuts)
+    chunks = caption_chunks(session.transcript, candidate, cuts, edits)
     return {"chunks": [[list(word) for word in chunk] for chunk in chunks]}
 
 

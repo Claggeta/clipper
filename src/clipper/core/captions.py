@@ -3,6 +3,7 @@ from typing import NamedTuple
 
 from clipper.core.cuts import Cut, TimeMap
 from clipper.domain.models import (
+    CaptionEdits,
     ClipCandidate,
     OnScreenText,
     Segment,
@@ -28,8 +29,25 @@ _SENTENCE_END = (".", "?", "!")
 _FONT = "Arial"
 _WHITE = "&H00FFFFFF"
 _BLACK = "&H00000000"
-_HIGHLIGHT = "{\\c&H0000FFFF&}"
 _RESET = "{\\r}"
+# The active word's colour, and key words' (ADR 0017, caption editing
+# amendment), as RGB; yellow is the original highlight.
+HIGHLIGHTS = {
+    "yellow": "#FFFF00",
+    "green": "#00E676",
+    "cyan": "#00E5FF",
+    "pink": "#FF4FD8",
+    "orange": "#FF9100",
+}
+
+
+def _colour_tag(name: str) -> str:
+    """`{\\c&HBBGGRR&}`, ASS's colour override, for a highlight name."""
+    rgb = HIGHLIGHTS[name].removeprefix("#")
+    return f"{{\\c&H00{rgb[4:6]}{rgb[2:4]}{rgb[0:2]}&}}"
+
+
+_HIGHLIGHT = _colour_tag("yellow")
 
 
 class _Layout(NamedTuple):
@@ -68,11 +86,13 @@ _CLEAR = "&HFF000000"
 
 
 class CaptionWord(NamedTuple):
-    """One word of a caption chunk, in source seconds (ADR 0031)."""
+    """One word of a caption chunk, in source seconds (ADR 0031); `key`
+    words stay in the highlight colour (ADR 0017)."""
 
     start: float
     end: float
     text: str
+    key: bool = False
 
 
 class Captions(NamedTuple):
@@ -205,6 +225,7 @@ class _Timed(NamedTuple):
     start: int
     end: int
     text: str
+    key: bool = False
 
 
 def _kept_words(
@@ -212,17 +233,25 @@ def _kept_words(
     clip_start: int,
     clip_end: int,
     cuts: TimeMap | None = None,
+    edits: CaptionEdits | None = None,
 ) -> Iterator[_Timed]:
     """The words captions show, in source milliseconds: those that start
-    inside the clip and not inside a cut, their ends clamped to the clip."""
+    inside the clip and not inside a cut, their ends clamped to the clip.
+
+    With edits, a fixed word takes its new text (none hides it) and a key
+    word is marked; both are found by the word's start, to the millisecond.
+    """
+    fixes = {_to_ms(f.start_seconds): f.text for f in edits.fixes} if edits else {}
+    keys = {_to_ms(k) for k in edits.keys} if edits else set()
     for word in words:
         start = _to_ms(word.start_seconds)
-        text = _clean(word.text)
+        text = _clean(fixes.get(start, word.text))
         if not (clip_start <= start < clip_end) or not text:
             continue
         if cuts is not None and cuts.output(start) is None:
             continue
-        yield _Timed(start, min(_to_ms(word.end_seconds), clip_end), text)
+        end = min(_to_ms(word.end_seconds), clip_end)
+        yield _Timed(start, end, text, start in keys)
 
 
 def _words_in_clip(
@@ -230,6 +259,7 @@ def _words_in_clip(
     clip_start: int,
     clip_end: int,
     cuts: TimeMap | None = None,
+    edits: CaptionEdits | None = None,
 ) -> list[_Timed]:
     """Words that start inside the clip, clamped to it and shifted to zero.
 
@@ -237,15 +267,17 @@ def _words_in_clip(
     and the rest move to their times in the cut clip (ADR 0029).
     """
     kept: list[_Timed] = []
-    for word in _kept_words(words, clip_start, clip_end, cuts):
+    for word in _kept_words(words, clip_start, clip_end, cuts, edits):
         if cuts is None:
             kept.append(
-                _Timed(word.start - clip_start, word.end - clip_start, word.text)
+                word._replace(start=word.start - clip_start, end=word.end - clip_start)
             )
             continue
         moved = cuts.output(word.start)
         assert moved is not None  # _kept_words drops words inside a cut
-        kept.append(_Timed(round(moved), round(cuts.clamped(word.end)), word.text))
+        kept.append(
+            word._replace(start=round(moved), end=round(cuts.clamped(word.end)))
+        )
     return kept
 
 
@@ -260,16 +292,17 @@ def _chunks(words: list[_Timed]) -> Iterator[list[_Timed]]:
         yield chunk
 
 
-def _word_events(chunk: list[_Timed]) -> Iterator[str]:
+def _word_events(chunk: list[_Timed], highlight: str = _HIGHLIGHT) -> Iterator[str]:
     """One event per word, showing the chunk with that word highlighted.
 
     A word's event lasts until the next word in the chunk starts, so the chunk
-    does not flicker between words. The last word's ends with the word.
+    does not flicker between words. The last word's ends with the word. Key
+    words are in the highlight colour throughout.
     """
     for i, word in enumerate(chunk):
         end = chunk[i + 1].start if i + 1 < len(chunk) else word.end
         text = " ".join(
-            f"{_HIGHLIGHT}{w.text}{_RESET}" if j == i else w.text
+            f"{highlight}{w.text}{_RESET}" if j == i or w.key else w.text
             for j, w in enumerate(chunk)
         )
         event = _event(word.start, end, text)
@@ -296,10 +329,11 @@ def caption_chunks(
     transcript: Transcript,
     candidate: ClipCandidate,
     cuts: tuple[Cut, ...] = (),
+    edits: CaptionEdits | None = None,
 ) -> list[list[CaptionWord]]:
     """The word chunks `build_ass` shows for the clip, in source seconds,
-    for the review page's live preview (ADR 0031). The same words and the
-    same chunks; segments without word times give none."""
+    for the review page's live preview (ADR 0031). The same words, fixes
+    and chunks; segments without word times give none."""
     clip_start = _to_ms(candidate.start_seconds)
     clip_end = _to_ms(candidate.end_seconds)
     time_map = (
@@ -309,10 +343,13 @@ def caption_chunks(
     )
     chunks: list[list[CaptionWord]] = []
     for segment in transcript.segments:
-        words = list(_kept_words(segment.words, clip_start, clip_end, time_map))
+        words = list(_kept_words(segment.words, clip_start, clip_end, time_map, edits))
         for chunk in _chunks(words):
             chunks.append(
-                [CaptionWord(w.start / 1000, w.end / 1000, w.text) for w in chunk]
+                [
+                    CaptionWord(w.start / 1000, w.end / 1000, w.text, w.key)
+                    for w in chunk
+                ]
             )
     return chunks
 
@@ -333,6 +370,7 @@ def preview_layout(vertical: bool) -> dict[str, object]:
         "text_padding": text.padding,
         "text_top": list(text.top),
         "text_middle": list(text.middle),
+        "highlights": HIGHLIGHTS,
     }
 
 
@@ -343,6 +381,7 @@ def build_ass(
     vertical: bool,
     cuts: tuple[Cut, ...] = (),
     texts: tuple[OnScreenText, ...] = (),
+    edits: CaptionEdits | None = None,
 ) -> Captions:
     """Build styled ASS captions for the part of `transcript` inside the clip.
 
@@ -364,6 +403,10 @@ def build_ass(
     clamped to its length, and one starting past the end is dropped.
     `speech` says whether any caption came from the transcript.
 
+    `edits` fix or hide words, mark key words and set the highlight colour
+    (ADR 0017, caption editing amendment); segments without word times are
+    left as they are.
+
     The text is "" when no event remains. The caller decides what that means.
     """
     clip_start = _to_ms(candidate.start_seconds)
@@ -382,9 +425,10 @@ def build_ass(
                 events.append(event)
                 from_segments = True
             continue
-        words = _words_in_clip(segment.words, clip_start, clip_end, time_map)
+        words = _words_in_clip(segment.words, clip_start, clip_end, time_map, edits)
+        highlight = _colour_tag(edits.highlight) if edits else _HIGHLIGHT
         for chunk in _chunks(words):
-            events.extend(_word_events(chunk))
+            events.extend(_word_events(chunk, highlight))
     speech = bool(events)
     text_layout = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
     length = round(time_map.duration) if time_map else clip_end - clip_start
