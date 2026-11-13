@@ -78,6 +78,18 @@ planned to match them by title, length and date.
 - Lacy's own-accounts rule is checked by channel name; a channel renamed
   or spelled differently in the info file needs a line change.
 
+## Amended by relative paths for `posted` (V7 item 7f)
+
+- The maintainer named a clip by a relative path (from the repo, and from
+  the clips dir) and both were refused: only an absolute path or
+  `<stem>/<file>` worked.
+- A relative path is now tried from the current folder, then from the
+  clips dir; the first that is a file under the clips dir is used as an
+  absolute path would be. Otherwise it is `<stem>/<file>` as before. The
+  clip must still be in its folder's manifest, and the record is still
+  `<stem>/<file>`, so the queue and `posts.json` are unchanged. Manual
+  step Q1.
+
 ## Revisit when
 
 - Posting from the review page would save a step.

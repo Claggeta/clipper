@@ -2287,6 +2287,8 @@ uv run clipper queue --start 2026-11-12 --per-day 2
 uv run clipper posted <folder>/<file from the first row> https://youtube.com/shorts/<an id>
 uv run clipper queue --start 2026-11-12 --per-day 2
 uv run clipper queue --include-ok --out "$env:TEMP\q1-queue.md"
+uv run clipper posted data\clips\<channel>\<MM-DD-YYYY>\<stem>\<file from the second row> https://youtube.com/shorts/<another id>
+uv run clipper posted <channel>/<MM-DD-YYYY>/<stem>/<file from the third row> https://youtube.com/shorts/<a third id>
 Remove-Item Env:CLIPPER_POSTS_FILE; Remove-Item "$env:TEMP\q1-posts.json", "$env:TEMP\q1-queue.md"
 ```
 
@@ -2297,7 +2299,9 @@ and a caption block naming the marked people, with `#CORE` on the clip with
 two members, and `#Lacy` only on Lacy's own videos (elsewhere "Lacy (not
 from its channels)"). `posted` prints `Posted <folder>/<file>: <id> on
 <today>`, and the second queue no longer lists that clip. The last run adds
-the `ok` clips after the good ones.
+the `ok` clips after the good ones. The two relative-path `posted` runs
+(from the repo, then from the clips dir) each print `Posted
+<stem>/<file>: ...` (ADR 0028, relative paths amendment).
 
 ### Q2. Drafts filed by channel and day
 

@@ -364,7 +364,9 @@ and planned code:
   (committed); a posted clip leaves the queue, and the link serves 0027.
   Channel folders amendment (0019): drafts go to
   `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`; `posted` takes a full path
-  or `<stem>/<file>`.
+  or `<stem>/<file>`. Relative paths amendment (V7 7f): a path relative
+  to the current folder or the clips dir too, if it is a file under the
+  clips dir; the record stays `<stem>/<file>`.
 - `0029` — cuts: the review page proposes cutting pauses in speech (word
   gaps of `MIN_PAUSE_SECONDS = 0.6`, less `CUT_PADDING_SECONDS = 0.15` a
   side), each toggleable, Preview skipping them; Save stores `cuts`
@@ -1264,6 +1266,9 @@ in item 7 may land any time.
      overlaps its neighbour. ADR 0030 amendment, manual steps.~~ (done;
      `BorderStyle 4`, needs libass 0.17 or newer; RV13 step 7, RV14
      step 6)
+   - 7f. ~~`clipper posted` takes relative paths (added 2026-11-13, found
+     by the maintainer): from the current folder or the clips dir. ADR
+     0028 amendment, manual step.~~ (done; Q1 extended)
 8. Release notes and tag `v0.7.0`.
 
 Later, not scheduled:

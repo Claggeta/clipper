@@ -1356,8 +1356,8 @@ def posted(
     clip: Annotated[
         str,
         typer.Argument(
-            help="The clip file, as the queue lists it: <folder>/<file> under "
-            "the clips dir, or its full path.",
+            help="The clip file: its path (absolute, or from here or the "
+            "clips dir), or <folder>/<file> as the posts record names it.",
             show_default=False,
         ),
     ],
@@ -1404,10 +1404,18 @@ def posted(
 def _clip_key(clips_dir: Path, clip: str) -> str:
     """`<folder>/<file>` for a clip a drafts folder's manifest lists.
 
-    The clip is a full path under the clips dir, at any depth (ADR 0019), or
-    `<folder>/<file>` with the folder found by its name.
+    The clip is a path to a file under the clips dir, at any depth (ADR
+    0019): absolute, or relative to the current folder or to the clips dir,
+    tried in that order. Otherwise it is `<folder>/<file>` with the folder
+    found by its name.
     """
     path = Path(clip)
+    if not path.is_absolute():
+        for base in (Path.cwd(), clips_dir):
+            candidate = (base / path).resolve()
+            if candidate.is_file() and candidate.is_relative_to(clips_dir.resolve()):
+                path = candidate
+                break
     if path.is_absolute():
         try:
             path.resolve().relative_to(clips_dir.resolve())
@@ -1418,7 +1426,8 @@ def _clip_key(clips_dir: Path, clip: str) -> str:
         found = find_drafts_folder(clips_dir, path.parts[0])
     else:
         raise QueueError(
-            f"Name the clip by its full path or as <folder>/<file>, got {clip!r}"
+            "Name the clip by its path (absolute, or from here or the clips dir) "
+            f"or as <folder>/<file>, got {clip!r}"
         )
     folder, file = path.parent.name, path.name
     if found is None:
