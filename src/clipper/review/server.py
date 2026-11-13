@@ -25,6 +25,8 @@ from importlib.resources import files
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from pydantic import ValidationError
+
 from clipper.core.captions import caption_chunks, preview_layout
 from clipper.core.cuts import find_pauses
 from clipper.core.framing import plan_face_crop
@@ -34,8 +36,10 @@ from clipper.core.interfaces import (
     FrameExtractor,
     PeaksExtractor,
     ReviewFiles,
+    StoryWriter,
     TitleWriter,
 )
+from clipper.core.story import plan_story
 from clipper.domain.errors import (
     ClipperError,
     FrameError,
@@ -48,6 +52,7 @@ from clipper.domain.models import (
     ClipCandidate,
     LabeledVideo,
     ManifestClip,
+    MusicBed,
     RenderManifest,
     Transcript,
 )
@@ -63,8 +68,10 @@ from clipper.review.store import (
     parse_caption_edits,
     parse_combine,
     parse_save,
+    parse_story_beats,
     parse_thumbnail,
     parse_trash,
+    story_payload,
     text_payload,
     zoom_payload,
 )
@@ -90,6 +97,7 @@ _STATIC = {
     "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
     "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
     "/combine.js": ("combine.js", "text/javascript; charset=utf-8"),
+    "/story.js": ("story.js", "text/javascript; charset=utf-8"),
     "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
@@ -114,6 +122,9 @@ _ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash|thumbnail)")
 # A thumbnail the manifest lists: /thumbs/<file name> (ADR 0030).
 _THUMB_PATH = re.compile(r"/thumbs/([^/\\]+\.jpg)")
 _ADD_PATH = "/api/clips/add"
+# The folder's story (ADR 0033): plan it, keep edited beats, make it, or
+# save, trash, thumbnail or title it.
+_STORY_PATH = re.compile(r"/api/story(?:/(plan|beats|save|trash|thumbnail|suggest))?")
 # The folder's combined clip (ADR 0032): make it, or save, trash, thumbnail or
 # title it.
 _COMBINED_PATH = re.compile(r"/api/combined(?:/(save|trash|thumbnail|suggest))?")
@@ -156,6 +167,7 @@ class ReviewSession:
     music_dir: Path | None = None
     sfx_dir: Path | None = None
     title_writer: TitleWriter | None = None
+    story_writer: StoryWriter | None = None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -337,6 +349,7 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "layout": preview_layout(manifest.vertical),
         "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
         "combined": combined_payload(manifest.combined),
+        "story": story_payload(manifest.story),
     }
 
 
@@ -467,6 +480,9 @@ def _listed_thumbnails(store: ReviewStore) -> set[str]:
     combined = store.manifest.combined
     if combined is not None and combined.thumbnail is not None:
         names.add(combined.thumbnail)
+    story = store.manifest.story
+    if story is not None and story.thumbnail is not None:
+        names.add(story.thumbnail)
     return names
 
 
@@ -476,12 +492,63 @@ def _listed_files(store: ReviewStore) -> set[str]:
     names |= {v.file for clip in store.manifest.clips for v in clip.variants}
     if store.manifest.combined is not None:
         names.add(store.manifest.combined.file)
+    story = store.manifest.story
+    if story is not None and story.file is not None:
+        names.add(story.file)
     return names
+
+
+class StoryJob:
+    """The one background plan of a run's story (ADR 0033): its state
+    (`idle`, `running`, `done`, `failed`), the last progress line and any
+    error. The plan, when done, is kept in the manifest."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.state = "idle"
+        self.progress = ""
+        self.error: str | None = None
+
+    def start(self, session: ReviewSession, store: ReviewStore) -> bool:
+        """Start planning in a thread; False if a plan is already running.
+        Raises `ReviewError` when the run has no model or transcript."""
+        writer, transcript = session.story_writer, session.transcript
+        if writer is None or transcript is None:
+            raise ReviewError(
+                "Summarizing needs CLIPPER_LLM_MODEL and a folder with captions"
+            )
+        with self._lock:
+            if self.state == "running":
+                return False
+            self.state, self.progress, self.error = "running", "Starting", None
+
+        def run() -> None:
+            try:
+                beats = plan_story(transcript, writer, self._report)
+                store.save_story_plan(tuple(beats))
+            except (ClipperError, OSError) as exc:
+                with self._lock:
+                    self.state, self.error = "failed", str(exc)
+            else:
+                with self._lock:
+                    self.state, self.progress = "done", "Done"
+
+        threading.Thread(target=run, daemon=True).start()
+        return True
+
+    def _report(self, line: str) -> None:
+        with self._lock:
+            self.progress = line
+
+    def status(self) -> dict[str, object]:
+        with self._lock:
+            return {"state": self.state, "progress": self.progress, "error": self.error}
 
 
 def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
     video_type = mimetypes.guess_type(session.video.name)[0] or "video/mp4"
     store = make_store(session)
+    job = StoryJob()
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -497,6 +564,11 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     self._send_span_reply(pauses_payload, query)
                 elif path == "/api/words":
                     self._send_span_reply(words_payload, query)
+                elif path == "/api/story/status":
+                    self._send_json(
+                        HTTPStatus.OK,
+                        job.status() | {"story": story_payload(store.manifest.story)},
+                    )
                 elif path == "/api/audio":
                     self._send_json(
                         HTTPStatus.OK,
@@ -539,6 +611,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:
             path = self.path.split("?", 1)[0]
+            if (story := _STORY_PATH.fullmatch(path)) is not None:
+                self._post_story(story.group(1) or "make")
+                return
             if (combined := _COMBINED_PATH.fullmatch(path)) is not None:
                 self._post_combined(combined.group(1) or "make")
                 return
@@ -628,6 +703,63 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             except UnknownClip as exc:
                 self._send_error(HTTPStatus.NOT_FOUND, f"No clip ranked {exc}")
             except JudgingError as exc:
+                self._send_error(HTTPStatus.CONFLICT, str(exc))
+            except (ClipperError, OSError) as exc:
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, reply)
+
+        def _post_story(self, verb: str) -> None:
+            if not self._trusted():
+                self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
+                return
+            try:
+                data = self._read_json()
+                if not isinstance(data, dict):
+                    raise BadRequest("the body must be a JSON object")
+                reply: dict[str, object] | None
+                duration = session.duration_seconds
+                if verb == "plan":
+                    started = job.start(session, store)
+                    reply = job.status() | {"started": started}
+                elif verb == "beats":
+                    beats = parse_story_beats(data.get("beats"), duration)
+                    reply = story_payload(store.save_story_plan(beats))
+                elif verb == "make":
+                    beats = parse_story_beats(data.get("beats"), duration)
+                    music = data.get("music")
+                    bed = None if music is None else MusicBed.model_validate(music)
+                    reply = story_payload(store.render_story(beats, bed))
+                elif verb == "save":
+                    title = data.get("title")
+                    rating = data.get("rating")
+                    if title is not None and not isinstance(title, str):
+                        raise BadRequest("title must be text")
+                    if rating not in (None, "good", "ok"):
+                        raise BadRequest("the rating must be good or ok")
+                    reply = story_payload(
+                        store.save_story(
+                            title.strip() or None if title else None,
+                            rating if isinstance(rating, str) else None,
+                        )
+                    )
+                elif verb == "trash":
+                    store.trash_story()
+                    reply = {"removed": True}
+                elif verb == "thumbnail":
+                    request = parse_thumbnail(data, duration)
+                    reply = story_payload(
+                        store.story_thumbnail(request.at, request.text)
+                    )
+                else:
+                    suggested = store.suggest_story_title()
+                    reply = {"title": suggested.title, "hook": suggested.hook}
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except ValidationError as exc:
+                message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+                self._send_error(HTTPStatus.BAD_REQUEST, f"music: {message}")
+            except (JudgingError, ReviewError) as exc:
                 self._send_error(HTTPStatus.CONFLICT, str(exc))
             except (ClipperError, OSError) as exc:
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))

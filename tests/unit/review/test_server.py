@@ -3,6 +3,7 @@ import http.client
 import json
 import re
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +26,7 @@ from clipper.domain.errors import (
     ReviewError,
 )
 from clipper.domain.models import (
+    BeatChoice,
     ClipCandidate,
     FaceBox,
     FaceSample,
@@ -32,6 +34,7 @@ from clipper.domain.models import (
     ManifestClip,
     RenderManifest,
     Segment,
+    StoryNote,
     Transcript,
     Word,
 )
@@ -248,6 +251,7 @@ def _get(
         ("/frame.js", "text/javascript", b"hand_crops"),
         ("/audio.js", "text/javascript", b"/api/audio"),
         ("/combine.js", "text/javascript", b"/api/combined"),
+        ("/story.js", "text/javascript", b"/api/story"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -871,6 +875,7 @@ def test_the_page_scripts_declare_each_function_once() -> None:
             "frame.js",
             "audio.js",
             "combine.js",
+            "story.js",
             "preview.js",
         )
     )
@@ -1283,3 +1288,81 @@ def test_combined_writes_are_checked(base_url: str) -> None:
         headers={"Origin": "https://evil"},
     )
     assert status == 403
+
+
+# --- The story (ADR 0033) ---
+
+
+class FakeStoryWriter:
+    def note(self, text: str) -> StoryNote:
+        return StoryNote(
+            summary="Says hello.",
+            kind="start",
+            importance=0.9,
+            key_time="1:02",
+            key_line="Hello there.",
+        )
+
+    def beats(self, listing: str) -> list[BeatChoice]:
+        return [BeatChoice(part=1, card="Hello.", why="It starts.")]
+
+
+def _story_server(tmp_path: Path, writer: FakeStoryWriter | None) -> tuple[str, Any]:
+    session = dataclasses.replace(_session(tmp_path), story_writer=writer)
+    server = make_server(session, 0)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    return f"http://127.0.0.1:{server.server_address[1]}", server
+
+
+def test_a_story_is_planned_in_the_background_and_kept(tmp_path: Path) -> None:
+    url, server = _story_server(tmp_path, FakeStoryWriter())
+    try:
+        status, reply = _post(url, "/api/story/plan", {})
+        assert (status, reply["started"]) == (200, True)
+        for _ in range(200):
+            state = json.loads(_get(url + "/api/story/status")[2])
+            if state["state"] != "running":
+                break
+            time.sleep(0.01)
+        assert state["state"] == "done", state
+        assert state["story"]["beats"][0]["card"] == "Hello"
+        # The beat runs from the one segment's start, as long as it lasts.
+        assert (
+            state["story"]["beats"][0]["start"],
+            state["story"]["beats"][0]["end"],
+        ) == (
+            62.0,
+            70.0,
+        )
+        assert json.loads(_get(url + "/api/clips")[2])["story"]["file"] is None
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_a_story_is_made_served_and_trashed(tmp_path: Path) -> None:
+    url, server = _story_server(tmp_path, FakeStoryWriter())
+    try:
+        body = {"beats": [{"start": 62, "end": 70, "card": "Hello"}]}
+        status, reply = _post(url, "/api/story", body)
+        assert status == 200, reply
+        assert reply["file"] == "talk_summary.mp4"
+        assert _get(url + "/clips/talk_summary.mp4")[0] == 200
+        status, saved = _post(url, "/api/story/save", {"title": "All", "rating": "ok"})
+        assert (status, saved["rating"]) == (200, "ok")
+        assert _post(url, "/api/story/trash", {}) == (200, {"removed": True})
+        assert _get(url + "/clips/talk_summary.mp4")[0] == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_summarizing_needs_a_model(base_url: str) -> None:
+    status, reply = _post(base_url, "/api/story/plan", {})
+    assert status == 409
+    assert "CLIPPER_LLM_MODEL" in reply["error"]
+    assert _post(base_url, "/api/story/beats", {"beats": "x"})[0] == 400
+    assert _post(base_url, "/api/story/save", {"title": "x"})[0] == 409

@@ -10,6 +10,7 @@ from clipper.adapters.download.ytdlp import (
     YtDlpVideoInfoLookup,
 )
 from clipper.adapters.llm.ollama import OllamaClient
+from clipper.adapters.llm.story import OllamaStoryWriter
 from clipper.adapters.media.faces import (
     TRACKER_NAME,
     CachingFaceTracker,
@@ -38,11 +39,12 @@ from clipper.core.interfaces import (
     PeaksExtractor,
     Remuxer,
     ReviewFiles,
+    StoryWriter,
     TitleWriter,
     Transcriber,
     VideoInfoLookup,
 )
-from clipper.domain.errors import DetectionError, TitleError
+from clipper.domain.errors import DetectionError, StoryError, TitleError
 from clipper.review.server import ReviewSession
 from clipper.review.server import serve as serve_review
 
@@ -116,6 +118,13 @@ def build_review_files() -> ReviewFiles:
     return JsonReviewFiles()
 
 
+def build_story_writer(settings: Settings) -> StoryWriter:
+    """Compose the story writer, on the detector's model (ADR 0033)."""
+    if not settings.llm_model:
+        raise StoryError("Set CLIPPER_LLM_MODEL to an Ollama model name to summarize")
+    return OllamaStoryWriter(OllamaClient(settings.llm_url, settings.llm_model))
+
+
 def build_title_writer(settings: Settings) -> TitleWriter:
     """Compose the title writer, on the detector's model (ADR 0018)."""
     if not settings.llm_model:
@@ -159,6 +168,7 @@ class AppContext:
     face_tracker: Callable[[Settings], FaceTracker] = build_face_tracker
     review_files: Callable[[], ReviewFiles] = build_review_files
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
+    story_writer: Callable[[Settings], StoryWriter] = build_story_writer
     downloader: Callable[[Settings], Downloader] = build_downloader
     clip_lookup: Callable[[Settings], ClipLookup] = build_clip_lookup
     video_info: Callable[[Settings], VideoInfoLookup] = build_video_info

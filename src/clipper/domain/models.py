@@ -783,6 +783,22 @@ class StoryBeat(BaseModel):
         return self
 
 
+class Story(BaseModel):
+    """A VOD's story (ADR 0033): its beats, planned by the model and edited
+    in the review page, the music under them, and once rendered its file,
+    length, and the title, rating and thumbnail set in the page."""
+
+    model_config = ConfigDict(frozen=True)
+
+    beats: tuple[StoryBeat, ...] = Field(min_length=1)
+    music: MusicBed | None = None
+    file: str | None = None
+    duration_seconds: float | None = None
+    title: str | None = None
+    rating: Literal["good", "ok"] | None = None
+    thumbnail: str | None = None
+
+
 class RenderManifest(BaseModel):
     """What one `render` run wrote to a video's folder. See docs/decisions/0019.
 
@@ -790,7 +806,8 @@ class RenderManifest(BaseModel):
     `analysis` is the result JSON path as given on the command line.
     `styles` are the vertical styles rendered, in order (ADR 0025); empty for
     a landscape run or an older manifest. `combined` is the clips joined in
-    the review page, if made (ADR 0032).
+    the review page, if made (ADR 0032), and `story` the VOD's summary in
+    beats, planned and perhaps rendered (ADR 0033).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -807,6 +824,7 @@ class RenderManifest(BaseModel):
     combined: Combined | None = Field(
         default=None, validation_alias=AliasChoices("combined", "summary")
     )
+    story: Story | None = None
 
 
 def _parse_timestamp(value: object) -> float:

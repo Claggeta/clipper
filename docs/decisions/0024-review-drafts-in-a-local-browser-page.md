@@ -487,6 +487,14 @@ optional `music`) joins the clips into `<stem>_summary.mp4`, and
 `/api/clips` carries `summary`, and the summary file and thumbnail are
 served as listed names. Manual step RV25.
 
+## Amended by Summarize (ADR 0033, V7 item 9l-3)
+
+`/story.js`; `POST /api/story/plan` starts the background plan and `GET
+/api/story/status` reports it; `/api/story/beats` keeps edited beats;
+`POST /api/story` renders the summary; `/api/story/save`, `/trash`,
+`/thumbnail` and `/suggest`; `/api/clips` carries `story`. Manual step
+RV26.
+
 ## Related
 
 - 0011: render's failure policy

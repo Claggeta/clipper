@@ -112,6 +112,33 @@ key line and the beats rendered and joined with cards.
 - On That Damn Grass the committed code gave the spike's round 3: 9 beats,
   161 s, planned in 56 s.
 
+## Amended by the page PR (V7 item 9l-3)
+
+- A Summarize video button beside Combine opens a dialog; with no plan
+  it starts one: `POST /api/story/plan` runs `plan_story` in a thread
+  (one at a time, `StoryJob`), `GET /api/story/status` gives its state
+  and progress line, polled each second, and the plan is kept in
+  `RenderManifest.story` when done.
+- The beat rows: Play (in the dialog's own player on the source, since
+  the dialog covers the page's), the VOD time and length, the card,
+  start and end nudged by a second, Remove; Add beat at playhead (15 s),
+  Re-plan, music, the total. Edits are kept by `POST /api/story/beats`
+  0.8 s after the last change, so a reload keeps them.
+- Make summary (`POST /api/story`): each beat rendered from the source
+  in the folder's frame with captions when the folder has them, joined
+  with each card at the top for its first 2.5 s and the music; the
+  Summary entry and result view (play, title with Suggest, rating,
+  thumbnail, Edit beats, Trash) mirror Combine's. `/api/story/save`,
+  `/trash`, `/thumbnail` and `/suggest`; the file and thumbnail are
+  listed names.
+- `review` builds the story writer when a model is set
+  (`AppContext.story_writer`); without one the plan is a 409 naming
+  `CLIPPER_LLM_MODEL`.
+- Checked on That Damn Grass in headless Edge: planned 9 beats (2:40.6)
+  with progress, a nudge and a card edit kept, the beat played in the
+  dialog, rendered `DQP3pmyJX4o_summary.mp4` (161.7 s) with the edited
+  card burned in. Manual step RV26.
+
 ## Revisit when
 
 - Summaries of other niches (podcasts, talks) are wanted.

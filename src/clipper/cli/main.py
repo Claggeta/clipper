@@ -46,7 +46,7 @@ from clipper.core.channels import ABOUT_LIMIT, channel_about
 from clipper.core.config import Settings
 from clipper.core.evaluation import boundary_gaps, evaluate
 from clipper.core.framing import plan_face_crop
-from clipper.core.interfaces import TitleWriter
+from clipper.core.interfaces import StoryWriter, TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths, variant_file_name
@@ -74,6 +74,7 @@ from clipper.domain.errors import (
     QueueError,
     ReviewError,
     SourceListError,
+    StoryError,
     TitleError,
 )
 from clipper.domain.models import (
@@ -1260,6 +1261,7 @@ def review(
             music_dir=settings.music_dir,
             sfx_dir=settings.sfx_dir,
             title_writer=_review_title_writer(build, settings),
+            story_writer=_review_story_writer(build, settings),
         )
         build.serve(
             session,
@@ -1420,6 +1422,15 @@ def _review_title_writer(build: AppContext, settings: Settings) -> TitleWriter |
     try:
         return build.title_writer(settings)
     except TitleError:
+        return None
+
+
+def _review_story_writer(build: AppContext, settings: Settings) -> StoryWriter | None:
+    """The story writer for Summarize, or None when no model is set; the page
+    then says it cannot summarize (ADR 0033)."""
+    try:
+        return build.story_writer(settings)
+    except StoryError:
         return None
 
 

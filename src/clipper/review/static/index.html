@@ -20,7 +20,11 @@
     <nav class="sidebar" aria-label="Clips">
       <div class="sidebar-head">
         <button type="button" id="combine" title="Join the kept clips into one longer Short">Combine</button>
+        <button type="button" id="summarize" title="The stream's story in beats, picked by the local model">Summarize video</button>
       </div>
+      <button type="button" id="story-entry" class="combine-entry" hidden>
+        <span class="rank">▶</span><span class="name">Summary</span><span class="badge" data-state="combined">Summary</span><span class="span"></span>
+      </button>
       <button type="button" id="combine-entry" class="combine-entry" hidden>
         <span class="rank">+</span><span class="name">Combined clip</span><span class="badge" data-state="combined">Combined</span><span class="span"></span>
       </button>
@@ -187,6 +191,58 @@
     </div>
   </div>
   <audio id="music-player" loop preload="auto" hidden></audio>
+  <div id="story-dialog" class="keys-help" role="dialog" aria-label="Summary" hidden>
+    <div class="keys-card combine-card judge">
+      <div id="story-plan">
+        <h2>Summarize the video</h2>
+        <p class="muted">The local model reads the stream and picks its story in beats. Play, nudge or re-card them; edits are kept.</p>
+        <p id="story-progress" class="judge-notice" role="status"></p>
+        <video id="story-peek" class="story-peek" src="/video" controls preload="metadata" playsinline></video>
+        <div id="story-rows" class="story-rows"></div>
+        <div class="combine-bar">
+          <button type="button" id="story-add" title="A beat from the playhead">Add beat at playhead</button>
+          <button type="button" id="story-replan" title="Ask the model for a new plan">Re-plan</button>
+          <span id="story-total" class="muted"></span>
+        </div>
+        <div class="combine-bar">
+          <select id="story-music" aria-label="Music"></select>
+          <select id="story-level" aria-label="Music level">
+            <option value="-24">-24 dB</option><option value="-21">-21 dB</option><option value="-18" selected>-18 dB</option><option value="-15">-15 dB</option><option value="-12">-12 dB</option>
+          </select>
+          <label class="fade"><input type="checkbox" id="story-duck" checked> Lower under speech</label>
+        </div>
+        <div class="combine-bar">
+          <button type="button" id="story-make" class="primary">Make summary</button>
+          <button type="button" id="story-close">Close</button>
+        </div>
+      </div>
+      <div id="story-result" hidden>
+        <h2>Summary <span id="story-length" class="muted"></span></h2>
+        <video id="story-video" class="combine-video" controls preload="metadata" playsinline></video>
+        <label for="story-title">Title</label>
+        <div class="combine-bar">
+          <input id="story-title" type="text" maxlength="200" autocomplete="off">
+          <button type="button" id="story-suggest" title="Ask the local model, from the beats' words">Suggest</button>
+        </div>
+        <div id="story-rating" class="toggle-row" role="group" aria-label="Rating">
+          <button type="button" data-value="good">Good</button>
+          <button type="button" data-value="ok">OK</button>
+        </div>
+        <div class="combine-bar">
+          <input id="story-thumb-text" type="text" maxlength="120" autocomplete="off" placeholder="Thumbnail text (optional)">
+          <button type="button" id="story-thumb-make" title="The frame shown in the player">Make thumbnail</button>
+        </div>
+        <img id="story-thumb" class="thumb" alt="The summary's thumbnail" hidden>
+        <div class="combine-bar">
+          <button type="button" id="story-save" class="primary">Save title</button>
+          <button type="button" id="story-edit">Edit beats</button>
+          <button type="button" id="story-trash" class="danger">Trash summary</button>
+          <button type="button" onclick="document.getElementById('story-close').click()">Close</button>
+        </div>
+        <p id="story-result-notice" class="judge-notice" role="status"></p>
+      </div>
+    </div>
+  </div>
   <div id="combine-dialog" class="keys-help" role="dialog" aria-label="Combined clip" hidden>
     <div class="keys-card combine-card judge">
       <div id="combine-pick">
@@ -268,6 +324,7 @@
   <script src="/frame.js"></script>
   <script src="/audio.js"></script>
   <script src="/combine.js"></script>
+  <script src="/story.js"></script>
   <script src="/preview.js"></script>
 </body>
 </html>
