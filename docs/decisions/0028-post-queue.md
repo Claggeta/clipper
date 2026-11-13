@@ -101,6 +101,19 @@ planned to match them by title, length and date.
 - `posted` accepts the summary's file (`<stem>/<stem>_summary.mp4`, or
   its path), and a posted summary leaves the queue. Manual step Q3.
 
+## Amended by posting by title (V7 item 7g)
+
+- `posted` takes the clip's title as the queue shows it, besides a path
+  or `<folder>/<file>`: the argument is tried as a path first, as
+  before, and only then matched against the titles of every saved clip
+  and summary in every drafts folder, case and spaces aside, emoji and
+  punctuation kept, so a title copied from `queue.md` matches.
+- One match posts it, recorded as `<folder>/<file>` as before. Several
+  are refused, listing each `<folder>/<file>`; none is refused with up
+  to 3 titles that contain the text. A miss on something that looks
+  like a path (a `/`, a `\`, or `.mp4`) keeps the path's error.
+  Manual step Q1.
+
 ## Revisit when
 
 - Posting from the review page would save a step.

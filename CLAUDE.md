@@ -377,7 +377,9 @@ and planned code:
   `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`; `posted` takes a full path
   or `<stem>/<file>`. Summaries amendment (V7 9k-2): a rated summary is
   queued after its folder's clips with its clips' people, shown as
-  `summary`; `posted` takes its file. Relative paths amendment (V7 7f): a path relative
+  `summary`; `posted` takes its file. Title amendment (V7 7g): `posted`
+  also takes the title as the queue shows it, after trying a path; one
+  match only, else an error listing matches or close titles. Relative paths amendment (V7 7f): a path relative
   to the current folder or the clips dir too, if it is a file under the
   clips dir; the record stays `<stem>/<file>`.
 - `0029` — cuts: the review page proposes cutting pauses in speech (word
@@ -1354,6 +1356,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 7f. ~~`clipper posted` takes relative paths (added 2026-11-13, found
      by the maintainer): from the current folder or the clips dir. ADR
      0028 amendment, manual step.~~ (done; Q1 extended)
+   - 7g. ~~`clipper posted "<title>" <link>` (added 2026-11-13, the
+     maintainer's ask): the title as the queue shows it. ADR 0028
+     amendment, manual step.~~ (done; Q1 extended)
 8. Release notes and tag `v0.7.0`.
 9. The review editor (ADR 0031), before item 5, in PRs, each with a
    manual step:
