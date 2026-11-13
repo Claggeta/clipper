@@ -464,6 +464,15 @@ and planned code:
   no judged label; a dialog in `review` to make, title (Suggest from the
   local model), rate, thumbnail and trash it; past 180 s a warning;
   queued and posted like a clip. Manual steps RV25 and Q3.
+- `0033` — Summarize: a VOD's story in 8 to 10 beats from the whole
+  transcript by the local LLM: a note per 3-minute chunk, then the beats
+  (own-words cards), spans from the start of the thought to a pause or
+  sentence end, 15 to 25 s, fitted to 170 s (`core/story.py`); the beats
+  request with `num_ctx` 16384 and a check that Ollama read the whole
+  prompt (its default context silently dropped a long prompt's start);
+  edited and rendered in `review` (fit with captions, Combine's join) as
+  `<stem>_summary.mp4`, `RenderManifest.story`, queued like a clip.
+  Spike on two incremental-game VODs judged by the maintainer.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1408,9 +1417,18 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      telling a VOD's story in 6 to 10 beats picked from the whole
      transcript by the local LLM (notes per ~3-minute chunk, then the
      beats, then spans snapped to sentences and pauses), edited and
-     rendered in `review` with Combine's join. A spike first on an
-     incremental-game VOD (DQP3pmyJX4o, That Damn Grass, 80 min),
-     judged by the maintainer; may end in nothing. Then an ADR 0033.
+     rendered in `review` with Combine's join. ADR 0033, in PRs:
+     - 9l-1. ~~The spike and ADR 0033 (docs).~~ (done; three rounds on
+       That Damn Grass (80 min) and Moon Sweepers (2:45): beats 15 to
+       25 s, 8 to 10 spread across the stream, own-words cards; 9 beats
+       in 161 s and 8 in 148 s, 1.5 to 2.5 min per VOD; Ollama's default
+       context dropped the start of the 5,370-token story prompt, so the
+       beats request uses `num_ctx` 16384; the maintainer: "Those sound
+       good to me")
+     - 9l-2. The core (`core/story.py`), a `StoryWriter` and its Ollama
+       adapter, the client's context size and its check on tokens read.
+     - 9l-3. The page, server and render, with a manual step.
+     - 9l-4. Queue and `posted` for the summary.
 
 Later, not scheduled:
 
