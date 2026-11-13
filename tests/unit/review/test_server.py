@@ -226,6 +226,7 @@ def _get(
     [
         ("/", "text/html", b"<video"),
         ("/app.js", "text/javascript", b"/api/clips"),
+        ("/keys.js", "text/javascript", b"keydown"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -823,14 +824,23 @@ def test_the_payload_lists_each_clips_styles(tmp_path: Path) -> None:
     assert (plain["style"], plain["variants"]) == (None, [])
 
 
-def test_the_page_script_declares_each_function_once() -> None:
+def test_the_page_scripts_declare_each_function_once() -> None:
     # A second `function drawMarks` silently replaced the strip's, so the
-    # handles stopped drawing (V6 4a); JavaScript does not complain.
+    # handles stopped drawing (V6 4a); JavaScript does not complain. The
+    # scripts share one global scope (ADR 0031), so all are checked together.
     from importlib.resources import files
 
-    script = (files("clipper.review") / "static" / "app.js").read_text("utf-8")
+    static = files("clipper.review") / "static"
+    script = "\n".join(
+        (static / name).read_text("utf-8") for name in ("app.js", "keys.js")
+    )
     names = re.findall(r"^(?:async )?function (\w+)\(", script, re.MULTILINE)
     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
+    # A top-level `const` or `let` declared twice stops the later script.
+    bindings = re.findall(r"^(?:const|let) (\w+)", script, re.MULTILINE)
+    assert len(bindings) == len(set(bindings)), sorted(
+        n for n in bindings if bindings.count(n) > 1
+    )
 
 
 def test_pauses_are_served_for_a_span(base_url: str) -> None:
