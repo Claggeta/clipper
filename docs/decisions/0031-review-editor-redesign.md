@@ -165,6 +165,37 @@ asked for a chat box that turns a described edit into the page's edits.
   if that clip is still shown.
 - Checked in headless Edge with real key presses; manual step RV18.
 
+## Amended by the precision PR (V7 item 9d)
+
+- **Waveform**: `PeaksExtractor` in `core/interfaces.py`,
+  `FfmpegPeaksExtractor` in `adapters/media/peaks.py` (ffmpeg decodes
+  the first audio stream to mono 16-bit samples at 2 kHz in a temporary
+  file beside the output, then the loudest sample per 50 ms is kept as a
+  byte, 20 per second); `AppContext.peaks`. The server makes it on the
+  first `/peaks/<video key>.bin`, one request at a time, through a
+  `.part` file, cached under `<cache dir>/peaks/<stem>-<size>.bin`; a
+  failure is a 500 with its message and caches nothing. Measured on
+  v2924392099 (4:39:40): 336 KB, 118 s the first time (the estimate was
+  30 to 60 s; reading the whole file is most of it), instant once
+  cached. The page fetches it once, says "Waveform loading…" meanwhile,
+  and draws the view in a lane under the frames with a square-root scale
+  against the 99.5th percentile level.
+- **Words**: `/api/words` for the view (or around the span when the view
+  is over 30 min), plus 60 s either side, fetched once per stretch; a
+  lane under the waveform shows them at 1 s a frame or closer.
+- **Snapping**: the start handle and Set start move to the nearest word
+  start, the end handle and Set end to the nearest word end, a cut's
+  start (Cut in, a drag) to a word end and its end (Cut out) to a word
+  start, each only within 0.3 s. "Snap to words" turns it off (local
+  storage); Alt held while dragging places a handle or cut freely. The
+  keys and buttons have no Alt, so the toggle covers them. Without word
+  times nothing snaps.
+- **Zoom**: 0.25 and 0.5 s per frame before 1 s; their frames are made
+  at quarter seconds. Clicks and drags work on the lanes as on the
+  frames (one `#track` element holds them).
+- The page code is in `static/precision.js`. Checked in headless Edge on
+  v2924392099; manual step RV19.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

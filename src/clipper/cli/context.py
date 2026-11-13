@@ -18,6 +18,7 @@ from clipper.adapters.media.faces import (
 from clipper.adapters.media.ffmpeg import FfmpegAudioExtractor
 from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
+from clipper.adapters.media.peaks import FfmpegPeaksExtractor
 from clipper.adapters.media.remux import FfmpegRemuxer
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.adapters.results.review_files import JsonReviewFiles
@@ -34,6 +35,7 @@ from clipper.core.interfaces import (
     FaceTracker,
     FrameExtractor,
     MediaProbe,
+    PeaksExtractor,
     Remuxer,
     ReviewFiles,
     TitleWriter,
@@ -104,6 +106,11 @@ def build_frames() -> FrameExtractor:
     return FfmpegFrameExtractor()
 
 
+def build_peaks() -> PeaksExtractor:
+    """Compose the audio levels reader for the review page's waveform."""
+    return FfmpegPeaksExtractor()
+
+
 def build_review_files() -> ReviewFiles:
     """Compose the review page's label and manifest files (ADR 0024)."""
     return JsonReviewFiles()
@@ -148,6 +155,7 @@ class AppContext:
     renderer: Callable[[Settings], ClipRenderer] = build_renderer
     probe: Callable[[], MediaProbe] = build_probe
     frames: Callable[[], FrameExtractor] = build_frames
+    peaks: Callable[[], PeaksExtractor] = build_peaks
     face_tracker: Callable[[Settings], FaceTracker] = build_face_tracker
     review_files: Callable[[], ReviewFiles] = build_review_files
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer

@@ -10,6 +10,8 @@
 const player = document.getElementById("player");
 const list = document.getElementById("clips");
 const strip = document.getElementById("strip");
+// The frames and the lanes under them: a click seeks, a drag cuts.
+const track = document.getElementById("track");
 const tiles = document.getElementById("tiles");
 const titleBox = document.getElementById("title-box");
 const noteBox = document.getElementById("note-box");
@@ -22,8 +24,9 @@ const ratingBox = document.getElementById("rating");
 const peopleBox = document.getElementById("people");
 
 // Seconds per frame in the strip, from zoomed in to zoomed out. Fixed
-// steps keep frames on a grid, so views share cached frames.
-const STEPS = [1, 2, 5, 10, 15, 30, 60];
+// steps keep frames on a grid, so views share cached frames; the server
+// makes frames at quarter seconds for the closest two (ADR 0031).
+const STEPS = [0.25, 0.5, 1, 2, 5, 10, 15, 30, 60];
 const TILE_WIDTH = 96;
 // The shortest span the handles allow, in seconds.
 const MIN_SPAN = 0.5;
@@ -162,17 +165,19 @@ function drawStrip() {
     tile.className = "tile";
     if (second < duration) {
       const image = document.createElement("img");
+      // `30`, or `30.25` for a quarter second.
       image.src = `/frames/${framesKey}/${second}.jpg`;
       image.alt = "";
       image.addEventListener("error", () => image.remove());
       const label = document.createElement("span");
-      label.textContent = fmt(second);
+      label.textContent = view.step < 1 ? fmtTenths(second) : fmt(second);
       tile.append(image, label);
     }
     tiles.append(tile);
   }
   text("scale", `${view.step} s per frame`);
   drawMarks();
+  drawLanes();
 }
 
 function drawMarks() {
@@ -754,7 +759,7 @@ function timeAt(clientX) {
   return view.start + fraction * (viewEnd() - view.start);
 }
 
-tiles.addEventListener("click", (event) => {
+track.addEventListener("click", (event) => {
   if (dragged) {
     // The click that ends a drag is not a seek.
     dragged = false;
@@ -777,9 +782,9 @@ function viewTimeAt(clientX) {
   return clamp(timeAt(clientX), Math.max(view.start, 0), Math.min(viewEnd(), duration));
 }
 
-tiles.addEventListener("dragstart", (event) => event.preventDefault());
+track.addEventListener("dragstart", (event) => event.preventDefault());
 
-tiles.addEventListener("pointerdown", (event) => {
+track.addEventListener("pointerdown", (event) => {
   dragged = false;
   if (!current || event.button !== 0) {
     return;
@@ -787,37 +792,43 @@ tiles.addEventListener("pointerdown", (event) => {
   const fromX = event.clientX;
   const from = viewTimeAt(fromX);
   let dragging = false;
-  tiles.setPointerCapture(event.pointerId);
-  const range = (clientX) => {
-    const to = viewTimeAt(clientX);
-    return [Math.min(from, to), Math.max(from, to)];
+  track.setPointerCapture(event.pointerId);
+  // A cut starts at the end of a word and ends at the start of the next
+  // (ADR 0031); Alt places it freely.
+  const range = (moveEvent) => {
+    const to = viewTimeAt(moveEvent.clientX);
+    const free = moveEvent.altKey;
+    return [
+      snap(Math.min(from, to), "end", free),
+      snap(Math.max(from, to), "start", free),
+    ];
   };
   const onMove = (moveEvent) => {
     if (!dragging && Math.abs(moveEvent.clientX - fromX) < DRAG_PX) {
       return;
     }
     dragging = true;
-    const [start, end] = range(moveEvent.clientX);
+    const [start, end] = range(moveEvent);
     cutDrag.hidden = false;
     cutDrag.style.left = `${percent(start)}%`;
     cutDrag.style.width = `${percent(end) - percent(start)}%`;
   };
   const onUp = (upEvent) => {
-    tiles.removeEventListener("pointermove", onMove);
-    tiles.removeEventListener("pointerup", onUp);
-    tiles.removeEventListener("pointercancel", onUp);
+    track.removeEventListener("pointermove", onMove);
+    track.removeEventListener("pointerup", onUp);
+    track.removeEventListener("pointercancel", onUp);
     cutDrag.hidden = true;
     if (dragging) {
       dragged = true;
       if (upEvent.type === "pointerup") {
-        const [start, end] = range(upEvent.clientX);
+        const [start, end] = range(upEvent);
         addManualCut(round(start), round(end));
       }
     }
   };
-  tiles.addEventListener("pointermove", onMove);
-  tiles.addEventListener("pointerup", onUp);
-  tiles.addEventListener("pointercancel", onUp);
+  track.addEventListener("pointermove", onMove);
+  track.addEventListener("pointerup", onUp);
+  track.addEventListener("pointercancel", onUp);
 });
 
 // --- The handles ---
@@ -844,7 +855,7 @@ function dragHandle(handle, move) {
         setViewStart(view.start + view.step);
         drawStrip();
       }
-      const seconds = move(timeAt(moveEvent.clientX));
+      const seconds = move(timeAt(moveEvent.clientX), moveEvent.altKey);
       player.currentTime = seconds;
       drawMarks();
     };
@@ -859,12 +870,14 @@ function dragHandle(handle, move) {
   });
 }
 
-dragHandle(document.getElementById("handle-start"), (seconds) => {
-  setStart(seconds);
+// The start snaps to a word's start and the end to a word's end (ADR
+// 0031); Alt places them freely.
+dragHandle(document.getElementById("handle-start"), (seconds, free) => {
+  setStart(snap(seconds, "start", free));
   return span.start;
 });
-dragHandle(document.getElementById("handle-end"), (seconds) => {
-  setEnd(seconds);
+dragHandle(document.getElementById("handle-end"), (seconds, free) => {
+  setEnd(snap(seconds, "end", free));
   return span.end;
 });
 
@@ -873,7 +886,7 @@ function notice(message) {
 }
 
 document.getElementById("set-start").addEventListener("click", () => {
-  const seconds = player.currentTime;
+  const seconds = snap(player.currentTime, "start");
   if (seconds > span.end - MIN_SPAN) {
     notice("The start must be before the end.");
     return;
@@ -885,7 +898,7 @@ document.getElementById("set-start").addEventListener("click", () => {
 });
 
 document.getElementById("set-end").addEventListener("click", () => {
-  const seconds = player.currentTime;
+  const seconds = snap(player.currentTime, "end");
   if (seconds < span.start + MIN_SPAN) {
     notice("The end must be after the start.");
     return;
@@ -956,7 +969,7 @@ function markCutIn() {
   if (!current) {
     return;
   }
-  const seconds = round(player.currentTime);
+  const seconds = round(snap(player.currentTime, "end"));
   if (seconds <= span.start || seconds >= span.end) {
     notice("A cut must start inside the span; move the start instead.");
     return;
@@ -975,7 +988,7 @@ function markCutOut() {
     return;
   }
   const start = cutIn.seconds;
-  const end = round(player.currentTime);
+  const end = round(snap(player.currentTime, "start"));
   if (end < start + MIN_CUT) {
     notice("Cut out must be after Cut in.");
     return;
@@ -1442,4 +1455,5 @@ async function load() {
   }
 }
 
-load();
+// precision.js waits on this for the video's key before its waveform.
+const loaded = load();

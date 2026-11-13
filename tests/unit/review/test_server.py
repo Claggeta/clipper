@@ -16,7 +16,7 @@ from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.adapters.results.labels_json import load_labels
 from clipper.adapters.results.manifest_json import load_manifest
 from clipper.adapters.results.review_files import JsonReviewFiles
-from clipper.domain.errors import ClipperError, FrameError, ReviewError
+from clipper.domain.errors import ClipperError, FrameError, PeaksError, ReviewError
 from clipper.domain.models import (
     ClipCandidate,
     ManifestClip,
@@ -30,12 +30,15 @@ from clipper.review.server import (
     ReviewSession,
     UnsatisfiableRange,
     cached_frame,
+    cached_peaks,
     clips_payload,
     frames_folder,
     make_server,
     make_store,
     parse_range,
     pauses_payload,
+    peaks_file,
+    words_payload,
 )
 
 # Constructed manifest and video bytes, not the output of a real run.
@@ -227,6 +230,7 @@ def _get(
         ("/", "text/html", b"<video"),
         ("/app.js", "text/javascript", b"/api/clips"),
         ("/keys.js", "text/javascript", b"keydown"),
+        ("/precision.js", "text/javascript", b"/api/words"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -309,7 +313,8 @@ def test_a_second_request_reads_the_cache(base_url: str, frames: FakeFrames) -> 
 @pytest.mark.parametrize(
     "path",
     ["/frames/talk-1024/600.jpg", "/frames/talk-1024/-1.jpg",
-     "/frames/talk-1024/1.5.jpg", "/frames/talk-1024/abc.jpg",
+     "/frames/talk-1024/1.3.jpg", "/frames/talk-1024/1.50.jpg",
+     "/frames/talk-1024/599.75.jpg.x", "/frames/talk-1024/abc.jpg",
      "/frames/talk-1024/12.png", "/frames/talk-1024/12345678.jpg",
      "/frames/talk-1024/", "/frames/12.jpg",
      # Another video's frame: the browser must not get one for this video.
@@ -832,7 +837,8 @@ def test_the_page_scripts_declare_each_function_once() -> None:
 
     static = files("clipper.review") / "static"
     script = "\n".join(
-        (static / name).read_text("utf-8") for name in ("app.js", "keys.js")
+        (static / name).read_text("utf-8")
+        for name in ("app.js", "keys.js", "precision.js")
     )
     names = re.findall(r"^(?:async )?function (\w+)\(", script, re.MULTILINE)
     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
@@ -877,6 +883,135 @@ def test_pauses_payload_finds_word_gaps(tmp_path: Path) -> None:
     assert pauses_payload(session, "start=60&end=90") == {"cuts": [[62.65, 64.85]]}
     with pytest.raises(ReviewError, match="no transcript"):
         pauses_payload(dataclasses.replace(session, transcript=None), "start=60&end=90")
+
+
+def test_quarter_second_frames_are_made_and_named_apart(
+    base_url: str, frames: FakeFrames, tmp_path: Path
+) -> None:
+    status, _, body = _get(base_url + "/frames/talk-1024/30.25.jpg")
+    assert (status, body) == (200, b"frame 30.25")
+    assert frames.calls[-1][1] == 30.25
+    assert _get(base_url + "/frames/talk-1024/30.5.jpg")[2] == b"frame 30.5"
+    # Whole seconds keep their old names, so cached frames stay valid.
+    _get(base_url + "/frames/talk-1024/30.jpg")
+    names = sorted(
+        p.name for p in (tmp_path / "cache" / "frames" / "talk-1024").iterdir()
+    )
+    assert names == ["30.25.jpg", "30.5.jpg", "30.jpg"]
+
+
+class FakePeaks:
+    """Writes the given levels, or fails."""
+
+    def __init__(self, levels: bytes = b"\x00\x10\xff", error: bool = False) -> None:
+        self.levels = levels
+        self.error = error
+        self.calls = 0
+
+    def extract(self, video_path: Path, output_path: Path) -> Path:
+        self.calls += 1
+        if self.error:
+            raise PeaksError("ffmpeg failed (exit 1): no audio")
+        output_path.write_bytes(self.levels)
+        return output_path
+
+
+def _peaks_session(tmp_path: Path, peaks: FakePeaks) -> ReviewSession:
+    path = tmp_path / "cache" / "peaks" / "talk-1024.bin"
+    path.parent.mkdir(parents=True)
+    return dataclasses.replace(_session(tmp_path), peaks=peaks, peaks_path=path)
+
+
+def test_peaks_are_made_once_then_read_from_the_cache(tmp_path: Path) -> None:
+    peaks = FakePeaks()
+    session = _peaks_session(tmp_path, peaks)
+    assert cached_peaks(session) == b"\x00\x10\xff"
+    assert cached_peaks(session) == b"\x00\x10\xff"
+    assert peaks.calls == 1
+    assert [p.name for p in (tmp_path / "cache" / "peaks").iterdir()] == [
+        "talk-1024.bin"
+    ]
+
+
+def test_failed_peaks_leave_nothing_cached(tmp_path: Path) -> None:
+    session = _peaks_session(tmp_path, FakePeaks(error=True))
+    with pytest.raises(PeaksError, match="no audio"):
+        cached_peaks(session)
+    assert list((tmp_path / "cache" / "peaks").iterdir()) == []
+    with pytest.raises(PeaksError, match="No waveform"):
+        cached_peaks(_session(tmp_path))
+
+
+def test_peaks_are_served_for_this_video_only(tmp_path: Path) -> None:
+    server = make_server(_peaks_session(tmp_path, FakePeaks()), 0)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        status, headers, body = _get(url + "/peaks/talk-1024.bin")
+        assert (status, body) == (200, b"\x00\x10\xff")
+        assert headers["Content-Type"] == "application/octet-stream"
+        assert _get(url + "/peaks/other-999.bin")[0] == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_without_a_peaks_reader_the_waveform_fails_plainly(base_url: str) -> None:
+    status, _, body = _get(base_url + "/peaks/talk-1024.bin")
+    assert (status, body) == (500, b"No waveform for this run")
+
+
+def test_peaks_file_is_named_like_the_frames_folder(tmp_path: Path) -> None:
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(VIDEO)
+    assert peaks_file(tmp_path / "cache", video) == (
+        tmp_path / "cache" / "peaks" / f"talk-{len(VIDEO)}.bin"
+    )
+
+
+def test_words_payload_gives_timed_words_in_the_span(tmp_path: Path) -> None:
+    worded = Transcript(
+        segments=(
+            Segment(
+                start_seconds=62.0,
+                end_seconds=66.0,
+                text="Hello there.",
+                words=(
+                    Word(start_seconds=62.0, end_seconds=62.5, text=" Hello"),
+                    Word(start_seconds=65.0, end_seconds=66.0, text=" there."),
+                ),
+            ),
+            Segment(start_seconds=70.0, end_seconds=72.0, text="No word times."),
+        )
+    )
+    session = dataclasses.replace(_session(tmp_path), transcript=worded)
+    assert words_payload(session, "start=60&end=90") == {
+        "words": [[62.0, 62.5, "Hello"], [65.0, 66.0, "there."]]
+    }
+    assert words_payload(session, "start=64&end=65.5") == {
+        "words": [[65.0, 66.0, "there."]]
+    }
+    with pytest.raises(ReviewError, match="no transcript"):
+        words_payload(dataclasses.replace(session, transcript=None), "start=60&end=90")
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["", "?start=60", "?start=x&end=90", "?start=90&end=60", "?start=0&end=700"],
+)
+def test_a_bad_words_span_is_refused(base_url: str, query: str) -> None:
+    status, _, _ = _get(base_url + "/api/words" + query)
+    assert status == 400
+
+
+def test_words_are_served_for_a_span(base_url: str) -> None:
+    status, _, body = _get(base_url + "/api/words?start=60&end=90")
+    assert status == 200
+    # The one segment has no word times.
+    assert json.loads(body) == {"words": []}
 
 
 def test_a_thumbnail_is_made_listed_and_served(base_url: str) -> None:

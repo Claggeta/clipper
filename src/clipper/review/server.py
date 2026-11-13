@@ -3,9 +3,10 @@
 The server binds to the loopback address only and serves a fixed set of
 paths: the page's own files, the clips as JSON, the source video with HTTP
 range requests so the browser can seek in it, and cached still frames for
-the film strip, and the pauses in speech inside a span (ADR 0029). Two
-POST paths save or trash a clip; they answer only the page itself (see
-`_trusted`).
+the film strip, the pauses in speech inside a span (ADR 0029), and the
+audio levels and word times for trimming (ADR 0031). POST paths save,
+trash or make a thumbnail of a clip; they answer only the page itself
+(see `_trusted`).
 """
 
 import contextlib
@@ -28,9 +29,16 @@ from clipper.core.interfaces import (
     ClipRenderer,
     FaceTracker,
     FrameExtractor,
+    PeaksExtractor,
     ReviewFiles,
 )
-from clipper.domain.errors import ClipperError, FrameError, JudgingError, ReviewError
+from clipper.domain.errors import (
+    ClipperError,
+    FrameError,
+    JudgingError,
+    PeaksError,
+    ReviewError,
+)
 from clipper.domain.models import (
     LabeledVideo,
     ManifestClip,
@@ -64,13 +72,17 @@ _STATIC = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
+    "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
-# A film strip frame, at a whole second: /frames/<video key>/<second>.jpg.
-# The key names the video (its cache folder), so the browser, which keeps
-# frames by URL, never shows one VOD's frame in another's strip: every run
-# is served from the same address.
-_FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7})\.jpg")
+# A film strip frame, at a whole or quarter second (ADR 0031):
+# /frames/<video key>/<second>.jpg, or <second>.25, .5 or .75. The key
+# names the video (its cache folder), so the browser, which keeps frames by
+# URL, never shows one VOD's frame in another's strip: every run is served
+# from the same address.
+_FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7}(?:\.25|\.5|\.75)?)\.jpg")
+# The video's audio levels for the waveform: /peaks/<video key>.bin.
+_PEAKS_PATH = re.compile(r"/peaks/([^/]+)\.bin")
 # A rendered draft listed in the manifest: /clips/<file name> (ADR 0025).
 _CLIP_PATH = re.compile(r"/clips/([^/\\]+\.mp4)")
 # Frames never change for a given video, so the browser may keep them.
@@ -94,7 +106,8 @@ class ReviewSession:
     (None when the folder has no captions); a `face` re-render uses
     `face_tracker` and `frame_size`, the video's width and height (ADR 0025).
     `people` are the names the page offers to mark as on screen (ADR 0024,
-    rating amendment).
+    rating amendment). `peaks` writes the waveform's levels to `peaks_path`
+    once, on the first request (ADR 0031); without it there is none.
     """
 
     folder: Path
@@ -111,6 +124,8 @@ class ReviewSession:
     face_tracker: FaceTracker | None = None
     frame_size: tuple[int, int] | None = None
     people: tuple[str, ...] = ()
+    peaks: PeaksExtractor | None = None
+    peaks_path: Path | None = None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -118,12 +133,22 @@ def frames_folder(cache_dir: Path, video: Path) -> Path:
     return cache_dir / "frames" / f"{video.stem}-{video.stat().st_size}"
 
 
+def peaks_file(cache_dir: Path, video: Path) -> Path:
+    """Where one video's audio levels are cached, named as its frames are."""
+    return cache_dir / "peaks" / f"{video.stem}-{video.stat().st_size}.bin"
+
+
 def frames_key(session: ReviewSession) -> str:
     """The video's part of a frame URL: its cache folder's name."""
     return session.frames_dir.name
 
 
-def cached_frame(session: ReviewSession, second: int) -> Path:
+def _frame_name(seconds: float) -> str:
+    """`12` for a whole second, as before quarter seconds; else `12.25`."""
+    return str(int(seconds)) if float(seconds).is_integer() else f"{seconds:g}"
+
+
+def cached_frame(session: ReviewSession, second: float) -> Path:
     """The frame at `second`, made once and then read from the cache.
 
     The extractor writes to a name unique to the thread, then the file is
@@ -131,10 +156,11 @@ def cached_frame(session: ReviewSession, second: int) -> Path:
     On Windows the rename fails while another request reads the frame; the
     frame is there, so that is not an error.
     """
-    path = session.frames_dir / f"{second}.jpg"
+    name = _frame_name(second)
+    path = session.frames_dir / f"{name}.jpg"
     if path.is_file():
         return path
-    temp = path.with_name(f"{second}.{threading.get_ident()}.part.jpg")
+    temp = path.with_name(f"{name}.{threading.get_ident()}.part.jpg")
     try:
         session.frames.extract(session.video, float(second), temp)
         try:
@@ -145,6 +171,30 @@ def cached_frame(session: ReviewSession, second: int) -> Path:
     finally:
         temp.unlink(missing_ok=True)
     return path
+
+
+_PEAKS_LOCK = threading.Lock()
+
+
+def cached_peaks(session: ReviewSession) -> bytes:
+    """The video's audio levels, made once and then read from the cache.
+
+    One request makes them at a time (a long VOD takes tens of seconds);
+    another waits and then reads the file. Written through a `.part` file
+    and renamed into place. Raises `PeaksError` when the session has none.
+    """
+    if session.peaks is None or session.peaks_path is None:
+        raise PeaksError("No waveform for this run")
+    path = session.peaks_path
+    with _PEAKS_LOCK:
+        if not path.is_file():
+            temp = path.with_name(f"{path.stem}.part.bin")
+            try:
+                session.peaks.extract(session.video, temp)
+                os.replace(temp, path)
+            finally:
+                temp.unlink(missing_ok=True)
+    return path.read_bytes()
 
 
 class UnsatisfiableRange(Exception):
@@ -251,10 +301,8 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
     }
 
 
-def pauses_payload(session: ReviewSession, query: str) -> dict[str, object]:
-    """The proposed cuts for the pauses in speech inside `?start=&end=`, in
-    source seconds (ADR 0029). Raises `BadRequest` for a bad span and
-    `ReviewError` when the folder has no transcript."""
+def _span_query(session: ReviewSession, query: str) -> tuple[float, float]:
+    """`?start=&end=` in seconds, inside the video; else `BadRequest`."""
     values = parse_qs(query)
     try:
         start = float(values["start"][0])
@@ -263,10 +311,36 @@ def pauses_payload(session: ReviewSession, query: str) -> dict[str, object]:
         raise BadRequest("give start and end in seconds") from exc
     if not 0 <= start < end <= session.duration_seconds:
         raise BadRequest("the span must be inside the video")
+    return start, end
+
+
+def pauses_payload(session: ReviewSession, query: str) -> dict[str, object]:
+    """The proposed cuts for the pauses in speech inside `?start=&end=`, in
+    source seconds (ADR 0029). Raises `BadRequest` for a bad span and
+    `ReviewError` when the folder has no transcript."""
+    start, end = _span_query(session, query)
     if session.transcript is None:
         raise ReviewError("This folder has no transcript to find pauses in")
     cuts = find_pauses(session.transcript, start, end)
     return {"cuts": [list(cut) for cut in cuts]}
+
+
+def words_payload(session: ReviewSession, query: str) -> dict[str, object]:
+    """The words with times that overlap `?start=&end=`, as `[start, end,
+    text]` in source seconds, for snapping and the words lane (ADR 0031).
+    Segments without word times give none. Raises `BadRequest` for a bad
+    span and `ReviewError` when the folder has no transcript."""
+    start, end = _span_query(session, query)
+    if session.transcript is None:
+        raise ReviewError("This folder has no transcript to snap to")
+    words = [
+        [word.start_seconds, word.end_seconds, word.text.strip()]
+        for segment in session.transcript.segments
+        if segment.end_seconds > start and segment.start_seconds < end
+        for word in segment.words
+        if word.end_seconds > start and word.start_seconds < end
+    ]
+    return {"words": words}
 
 
 def _listed_thumbnails(store: ReviewStore) -> set[str]:
@@ -296,7 +370,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 elif path == "/api/clips":
                     self._send_json(HTTPStatus.OK, clips_payload(session, store))
                 elif path == "/api/pauses":
-                    self._send_pauses(query)
+                    self._send_span_reply(pauses_payload, query)
+                elif path == "/api/words":
+                    self._send_span_reply(words_payload, query)
                 elif path == "/video":
                     self._send_file(session.video, video_type)
                 elif (draft := _CLIP_PATH.fullmatch(path)) and draft.group(
@@ -310,7 +386,11 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 elif (frame := _FRAME_PATH.fullmatch(path)) and frame.group(
                     1
                 ) == frames_key(session):
-                    self._send_frame(int(frame.group(2)))
+                    self._send_frame(float(frame.group(2)))
+                elif (peaks := _PEAKS_PATH.fullmatch(path)) and peaks.group(
+                    1
+                ) == frames_key(session):
+                    self._send_peaks()
                 else:
                     self._not_found()
             except ConnectionError:
@@ -365,9 +445,13 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             else:
                 self._send_json(HTTPStatus.OK, reply)
 
-        def _send_pauses(self, query: str) -> None:
+        def _send_span_reply(
+            self,
+            payload: Callable[[ReviewSession, str], dict[str, object]],
+            query: str,
+        ) -> None:
             try:
-                reply = pauses_payload(session, query)
+                reply = payload(session, query)
             except BadRequest as exc:
                 self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             except ReviewError as exc:
@@ -432,7 +516,18 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
         def _not_found(self) -> None:
             self._send(HTTPStatus.NOT_FOUND, "text/plain", b"Not found")
 
-        def _send_frame(self, second: int) -> None:
+        def _send_peaks(self) -> None:
+            try:
+                body = cached_peaks(session)
+            except (PeaksError, OSError) as exc:
+                message = str(exc).encode("utf-8")
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, "text/plain", message)
+                return
+            self._send(
+                HTTPStatus.OK, "application/octet-stream", body, cache=_FRAME_CACHE
+            )
+
+        def _send_frame(self, second: float) -> None:
             if second >= session.duration_seconds:
                 self._not_found()
                 return

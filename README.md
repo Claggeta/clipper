@@ -230,7 +230,9 @@ a moment no draft proposed. The page fits one screen: the clip list (☰ hides
 it), the source or draft player, an inspector with Clip, Text and Frame tabs,
 and the film strip across the bottom. Most actions have a key (`?` lists
 them), and after Save or Trash the page moves on to the next clip without a
-verdict. Ctrl+C stops the server. See
+verdict. A waveform and the words sit under the film strip, and handles and
+cuts snap to word edges (the first waveform of a long VOD takes a couple of
+minutes). Ctrl+C stops the server. See
 [ADR 0024](docs/decisions/0024-review-drafts-in-a-local-browser-page.md),
 [0029](docs/decisions/0029-cut-pauses-in-review.md),
 [0030](docs/decisions/0030-on-screen-text-and-thumbnails.md) and

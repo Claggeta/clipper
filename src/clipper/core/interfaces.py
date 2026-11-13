@@ -44,6 +44,19 @@ class FrameExtractor(Protocol):
 
 
 @runtime_checkable
+class PeaksExtractor(Protocol):
+    """Writes a video's audio levels for the review page's waveform.
+
+    One byte per `1 / PEAKS_PER_SECOND` s, the loudest sample in it scaled
+    to 0 to 255, to `output_path`; creates its parent directory, returns
+    `output_path`, and raises `PeaksError` on failure (see
+    docs/decisions/0031, precision amendment).
+    """
+
+    def extract(self, video_path: Path, output_path: Path) -> Path: ...
+
+
+@runtime_checkable
 class ReviewFiles(Protocol):
     """Reads and writes what the review page judges (docs/decisions/0024).
 

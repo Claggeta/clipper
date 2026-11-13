@@ -22,6 +22,10 @@ class FrameError(ClipperError):
     """Raised when a still frame cannot be taken from a video."""
 
 
+class PeaksError(ClipperError):
+    """Raised when a video's audio levels cannot be read for the waveform."""
+
+
 class AnalysisResultError(ClipperError):
     """Raised when a saved analysis result cannot be loaded or does not match."""
 
