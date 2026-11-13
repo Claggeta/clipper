@@ -2888,6 +2888,40 @@ amendment (V7 item 3a). Same scratch copy and labels dir as RV12.
 
 Then delete the scratch folders.
 
+### RV17. The editor layout
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s layout (V7
+item 9b). Same scratch copy and labels dir as RV12. Run it with the
+browser window at 1600x900 or larger, then again narrower than 1200 px.
+
+1. Open the page. Pass: the clip list on the left, the player in the
+   middle with `Source` pressed and `Draft` greyed out, "Choose a clip."
+   on the right; the page does not scroll.
+2. Choose a clip with a draft. Pass: the inspector shows `Clip` (title,
+   hook, times, title and notes boxes, rating, people), Save and Trash at
+   its foot; the film strip and its buttons run across the bottom; still
+   no page scroll.
+3. Press `Draft`. Pass: the 9:16 draft replaces the source player and
+   plays. Press `+5 s`. Pass: back to the source, 5 s on. Press `Preview
+   span` from the draft. Pass: the source shows and plays the span.
+4. Open `Text`, press `Add text`, show the draft. Pass: the text is drawn
+   over the draft, `Unsaved` shows on the `Clip` tab. Make a thumbnail.
+   Pass: as RV14 step 2.
+5. Open `Frame` on a clip with both styles. Pass: `Fit` and `Face`
+   buttons; picking one changes the draft. On a clip with one style:
+   "This clip has one style."; on a trashed clip, "No draft yet."
+6. Trim, cut (`[` and `]`, a drag on the strip), Save, Trash and
+   `Add clip here` as RV8, RV9 and RV16. Pass: each works as before from
+   its new place; cut errors show beside the strip's buttons.
+7. Press `☰`. Pass: the clip list hides and the player widens; press it
+   again to bring it back. Leave `Frame` open, hide the list, reload.
+   Pass: `Frame` is open and the list hidden; press `☰` to show it.
+8. Make the window narrower than 1200 px. Pass: the list, player,
+   inspector and timeline stack and the page scrolls, with no sideways
+   scroll; everything in steps 2 to 6 still works.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

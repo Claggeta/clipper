@@ -410,6 +410,10 @@ and planned code:
   An assistant (a chat box turning a request into the page's edits via
   the local LLM, applied unsaved) comes last, after a spike; no hosted
   model. Amends 0024; later items amend 0016, 0017, 0025, 0029, 0030.
+  Layout amendment (9b): a CSS grid, `Source`/`Draft` switch until 9e,
+  `Clip`, `Text` and `Frame` tabs, trim and cut buttons in the timeline
+  bar, tab and hidden list in local storage, stacked below 1200 px;
+  manual step RV17.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1304,8 +1308,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
 9. The review editor (ADR 0031), before item 5, in PRs, each with a
    manual step:
    - 9a. ~~ADR 0031, the scope and a layout mock (one docs PR).~~ (done)
-   - 9b. Layout: clip list, preview, inspector tabs and timeline on one
-     screen; no behaviour change.
+   - 9b. ~~Layout: clip list, preview, inspector tabs and timeline on one
+     screen; no behaviour change.~~ (done; `Source`/`Draft` switch until
+     9e, three tabs, manual step RV17)
    - 9c. Keys: play, J/K/L, frame step, start and end, cuts, rating,
      Save, Trash, next and previous, auto-advance, a `?` list.
    - 9d. Precision: a waveform from cached ffmpeg peaks, frame stepping,

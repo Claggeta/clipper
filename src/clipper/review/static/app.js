@@ -3,7 +3,8 @@
 // clip with its title and notes (3c), re-rendered on Save (3d), and add
 // clips no draft proposed (3e). A keeper gets a rating and who is on screen
 // (rating amendment); pauses can be cut out, or any range marked by hand
-// (ADR 0029), and text added on screen (ADR 0030).
+// (ADR 0029), and text added on screen (ADR 0030). Laid out on one screen
+// with inspector tabs and a timeline (ADR 0031).
 "use strict";
 
 const player = document.getElementById("player");
@@ -669,8 +670,12 @@ function chosenStyle(clip) {
 
 function drawDraft(clip) {
   const options = draftsOf(clip);
-  draftView.hidden = options.length === 0;
+  hasDraft = options.length > 0;
+  drawScreen();
   styleBox.replaceChildren();
+  const none = document.getElementById("styles-none");
+  none.hidden = options.length > 1;
+  none.textContent = options.length ? "This clip has one style." : "No draft yet.";
   if (!options.length) {
     draft.removeAttribute("src");
     draft.load();
@@ -1319,6 +1324,105 @@ window.addEventListener("resize", () => {
     drawStrip();
   }
 });
+
+// --- The layout (ADR 0031): the player shown, the tab, the clip list ---
+
+const editor = document.getElementById("editor");
+const LAYOUT_KEY = "clipper-review-layout";
+const TABS = ["clip", "text", "frame"];
+let screen = "source"; // or "draft", when the clip has one
+let hasDraft = false;
+
+// The tab and whether the list is hidden, remembered in this browser only;
+// the page works the same without them.
+function readLayout() {
+  const fallback = { tab: "clip", listHidden: false };
+  try {
+    const kept = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "{}");
+    return {
+      tab: TABS.includes(kept.tab) ? kept.tab : fallback.tab,
+      listHidden: kept.listHidden === true,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+const layout = readLayout();
+
+function keepLayout() {
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+  } catch {
+    // Storage is blocked; the layout is simply not remembered.
+  }
+}
+
+function drawScreen() {
+  const showDraft = screen === "draft" && hasDraft;
+  player.hidden = showDraft;
+  draftView.hidden = !showDraft;
+  const draftButton = document.getElementById("show-draft");
+  draftButton.disabled = !hasDraft;
+  draftButton.setAttribute("aria-pressed", String(showDraft));
+  document.getElementById("show-source").setAttribute("aria-pressed", String(!showDraft));
+}
+
+// Only the player shown plays.
+function showScreen(name) {
+  screen = name;
+  (name === "draft" ? player : draft).pause();
+  drawScreen();
+  if (name === "draft") {
+    drawDraftTexts();
+  }
+}
+
+document.getElementById("show-source").addEventListener("click", () => showScreen("source"));
+document.getElementById("show-draft").addEventListener("click", () => showScreen("draft"));
+
+// Preview span and the step buttons play or move the source, so show it.
+player.addEventListener("play", () => {
+  if (screen !== "source") {
+    showScreen("source");
+  }
+});
+
+for (const button of document.querySelectorAll("[data-step], #add")) {
+  button.addEventListener("click", () => showScreen("source"));
+}
+
+function showTab(name) {
+  for (const tab of document.querySelectorAll("[data-tab]")) {
+    tab.setAttribute("aria-selected", String(tab.dataset.tab === name));
+  }
+  for (const panel of document.querySelectorAll("[data-panel]")) {
+    panel.hidden = panel.dataset.panel !== name;
+  }
+  layout.tab = name;
+  keepLayout();
+}
+
+for (const tab of document.querySelectorAll("[data-tab]")) {
+  tab.addEventListener("click", () => showTab(tab.dataset.tab));
+}
+
+function drawList() {
+  editor.classList.toggle("list-hidden", layout.listHidden);
+  document
+    .getElementById("toggle-list")
+    .setAttribute("aria-pressed", String(!layout.listHidden));
+}
+
+document.getElementById("toggle-list").addEventListener("click", () => {
+  layout.listHidden = !layout.listHidden;
+  keepLayout();
+  drawList();
+});
+
+showTab(layout.tab);
+drawList();
+drawScreen();
 
 async function load() {
   const response = await fetch("/api/clips");

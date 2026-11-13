@@ -120,6 +120,28 @@ asked for a chat box that turns a described edit into the page's edits.
   compare them.
 - Clips saved before an edit type exists simply lack its fields.
 
+## Amended by the layout PR (V7 item 9b)
+
+- The four regions in a CSS grid (list 280 px, inspector 380 px, the
+  player between, the timeline across the bottom); `#details` uses
+  `display: contents` so the inspector and timeline join the grid when a
+  clip is chosen. Below 1200 px wide the regions stack and the page
+  scrolls.
+- Until the live preview (9e), the centre shows the source player or
+  the rendered draft, switched by `Source` and `Draft`; Preview span, the
+  step buttons and Add clip switch back to the source. `Draft` is greyed
+  out for a clip with no file.
+- Three tabs so far: `Clip` (title, hook, times, title and notes,
+  rating, people), `Text` (on-screen text, thumbnail) and `Frame`
+  (style); the others come with their items. Save and Trash sit under
+  every tab. The trim and cut buttons and their notice moved into the
+  timeline bar.
+- The tab and the hidden list are kept in the browser's local storage,
+  read and written in `try`, and the page works without it.
+- Every element ID is kept, and `app.js` stays one file; no server
+  change. Checked in headless Edge at 1600x900 (no page scroll) and
+  1000x800 (stacked); manual step RV17.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

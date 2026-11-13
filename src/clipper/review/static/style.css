@@ -16,22 +16,62 @@
 [hidden] { display: none !important; }
 
 body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
   margin: 0;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+button {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--accent); }
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:disabled:hover { border-color: var(--line); }
+
+button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #111;
+  font-weight: 600;
+}
+
 .bar {
   display: flex;
-  align-items: baseline;
-  gap: 16px;
-  padding: 12px 20px;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
 
 .bar h1 { margin: 0; font-size: 16px; font-weight: 600; }
+
+.bar .icon { min-width: 0; padding: 2px 9px; }
+
+.bar .icon[aria-pressed="true"] { color: var(--text); border-color: var(--line); }
 
 .muted { color: var(--muted); }
 
@@ -45,13 +85,27 @@ body {
   font-size: 12px;
 }
 
-.layout {
+/* The editor (ADR 0031): the clip list, the player and the inspector side
+   by side, the timeline across the bottom. */
+.editor {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  height: calc(100vh - 49px);
+  grid-template-columns: 280px minmax(0, 1fr) 380px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "list stage inspector"
+    "timeline timeline timeline";
+  min-height: 0;
 }
 
+.editor.list-hidden { grid-template-columns: 0 minmax(0, 1fr) 380px; }
+
+.editor.list-hidden .sidebar { display: none; }
+
+/* Its children take part in the editor's grid. */
+.details { display: contents; }
+
 .sidebar {
+  grid-area: list;
   overflow-y: auto;
   border-right: 1px solid var(--line);
   background: var(--panel);
@@ -68,10 +122,8 @@ body {
   border: 1px solid transparent;
   border-radius: 8px;
   background: none;
-  color: inherit;
-  font: inherit;
   text-align: left;
-  cursor: pointer;
+  font-variant-numeric: normal;
 }
 
 .clips button:hover { background: var(--raised); }
@@ -124,30 +176,28 @@ body {
 
 .clips .failed { color: var(--error); }
 
-.main {
-  overflow-y: auto;
-  padding: 20px;
+/* The player: the source or the rendered draft, with the step buttons. */
+.stage {
+  grid-area: stage;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 16px;
 }
 
-video {
-  display: block;
-  width: 100%;
-  max-height: 62vh;
-  background: #000;
-  border-radius: 8px;
-}
-
-.steps,
-.strip-bar,
-.trim-actions {
+.screen-switch,
+.steps {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  justify-content: center;
   gap: 6px;
-  margin-top: 10px;
 }
 
-.steps { justify-content: center; }
+.screen-switch button { min-width: 80px; }
+
+.steps button { min-width: 60px; }
 
 .steps .add {
   margin-left: 12px;
@@ -155,34 +205,269 @@ video {
   color: var(--accent);
 }
 
-.strip-bar { margin-top: 16px; }
+.screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+}
 
-.strip-bar .muted { margin-left: auto; font-size: 12px; }
+#player {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: 8px;
+}
 
-.steps button,
-.strip-bar button,
-.trim-actions button {
-  min-width: 60px;
-  padding: 6px 10px;
+.draft-view {
+  display: flex;
+  justify-content: center;
+  height: 100%;
+}
+
+/* On-screen texts (ADR 0030) are previewed over the draft, sized by the
+   frame's width. */
+.draft-frame {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 9 / 16;
+  container-type: size;
+}
+
+.draft-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: 6px;
+}
+
+.draft-texts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.draft-text {
+  position: absolute;
+  left: 50%;
+  max-width: 85%;
+  padding: 0.6cqw 1.6cqw;
+  transform: translateX(-50%);
+  background: rgb(0 0 0 / 0.5);
+  color: #fff;
+  font: 700 7.8cqw/1.15 Arial, sans-serif;
+  text-align: center;
+}
+
+.draft-text.top { top: 15.6%; }
+
+.draft-text.middle { top: 50%; transform: translate(-50%, -50%); }
+
+.empty {
+  grid-area: inspector;
+  margin: 0;
+  padding: 20px;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* The inspector: tabs, one panel at a time, Save and Trash always shown. */
+.inspector {
+  grid-area: inspector;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+  flex: 1;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.panel {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.panel h2 { margin: 0; font-size: 17px; }
+
+.panel p { margin: 0; }
+
+.inspector-foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.judge label,
+.judge .field-label { color: var(--muted); font-size: 12px; }
+
+.judge-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.toggle-row button { padding: 6px 12px; }
+
+.judge input,
+.judge textarea,
+.judge select {
+  width: 100%;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--raised);
+  background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
 }
 
-.steps button:hover,
-.strip-bar button:hover,
-.trim-actions button:hover { border-color: var(--accent); }
+.judge textarea { resize: vertical; }
 
-.trim-actions .primary {
-  background: var(--accent);
+.judge input:focus,
+.judge textarea:focus,
+.judge select:focus {
+  outline: none;
   border-color: var(--accent);
-  color: #111;
+}
+
+.judge-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.judge-actions button {
+  flex: 1;
+  padding: 8px 14px;
   font-weight: 600;
 }
+
+.judge-notice {
+  min-height: 1.45em;
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.judge-notice.error { color: var(--error); }
+
+.judge-actions .danger:hover,
+.judge-actions .danger.armed {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.judge-actions .danger.armed { background: rgb(255 107 107 / 0.12); }
+
+.judge input:disabled,
+.judge textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.warn { color: var(--error); }
+
+.accent { color: var(--accent); }
+
+.times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 4px 0 6px;
+}
+
+.times dt { color: var(--muted); font-size: 12px; }
+
+.times dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.error { color: var(--error); }
+
+.texts {
+  display: grid;
+  gap: 6px;
+}
+
+.text-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+/* The text box takes its own line in the narrow inspector. */
+.text-row > :first-child { grid-column: 1 / -1; }
+
+/* Thumbnails (ADR 0030). */
+.thumb-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
+.thumb-row input { grid-column: 1 / -1; }
+
+.thumb {
+  height: 240px;
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #000;
+}
+
+/* The timeline: strip controls, then the film strip. */
+.timeline {
+  grid-area: timeline;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.strip-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.strip-bar .sep {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.strip-bar .scale { margin-left: auto; font-size: 12px; }
 
 /* The film strip: frames, then the dimmed outside, the span, the playhead
    and the two handles on top. Only the handles take the pointer, so a
@@ -334,225 +619,13 @@ video {
   background: rgb(0 0 0 / 0.5);
 }
 
-.judge {
-  display: grid;
-  gap: 6px;
-  max-width: 640px;
-  margin-top: 16px;
-}
-
-.judge label,
-.judge .field-label { color: var(--muted); font-size: 12px; }
-
-.judge-field {
-  display: grid;
-  gap: 6px;
-}
-
-.toggle-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.toggle-row button {
-  padding: 6px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--raised);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.toggle-row button[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.judge input,
-.judge textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-}
-
-.judge textarea { resize: vertical; }
-
-.judge input:focus,
-.judge textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.judge-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.judge-actions button {
-  min-width: 96px;
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--raised);
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.judge-notice {
-  min-height: 1.45em;
-  margin: 2px 0 0;
-  color: var(--muted);
-}
-
-.judge-notice.error { color: var(--error); }
-
-.judge-actions .primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #111;
-}
-
-.judge-actions .danger:hover,
-.judge-actions .danger.armed {
-  border-color: var(--error);
-  color: var(--error);
-}
-
-.judge-actions .danger.armed { background: rgb(255 107 107 / 0.12); }
-
-.judge-actions button:disabled,
-.judge input:disabled,
-.judge textarea:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.warn { color: var(--error); }
-
-.accent { color: var(--accent); }
-
-.details h2 { margin: 16px 0 4px; font-size: 18px; }
-
-.details p { margin: 0 0 12px; }
-
-.times {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  margin: 0;
-}
-
-.times dt { color: var(--muted); font-size: 12px; }
-
-.times dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.error { color: var(--error); }
-
-@media (max-width: 720px) {
-  .layout { grid-template-columns: 1fr; height: auto; }
-  .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
-}
-
-/* The rendered draft and its styles (ADR 0025). */
-.draft-view {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  margin: 12px 0;
-}
-
-.draft-view video {
-  width: auto;
-  height: 320px;
-  aspect-ratio: 9 / 16;
-  border-radius: 6px;
-}
-
-.draft-side {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.style-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.style-buttons button[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* On-screen texts (ADR 0030): rows to edit them, and a preview of unsaved
-   ones over the draft at about where they will burn in. */
-.texts {
-  display: grid;
-  gap: 6px;
-}
-
-.text-row {
-  display: grid;
-  grid-template-columns: 1fr 72px 72px 96px auto;
-  gap: 6px;
-  align-items: center;
-}
-
-.draft-frame {
-  position: relative;
-  container-type: inline-size;
-}
-
-.draft-texts {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.draft-text {
-  position: absolute;
-  left: 50%;
-  max-width: 85%;
-  padding: 0.6cqw 1.6cqw;
-  transform: translateX(-50%);
-  background: rgb(0 0 0 / 0.5);
-  color: #fff;
-  font: 700 7.8cqw/1.15 Arial, sans-serif;
-  text-align: center;
-}
-
-.draft-text.top { top: 15.6%; }
-
-.draft-text.middle { top: 50%; transform: translate(-50%, -50%); }
-
-@media (max-width: 720px) {
-  .text-row { grid-template-columns: 1fr 1fr; }
-}
-
-/* Thumbnails (ADR 0030). */
-.thumb-row {
-  display: grid;
-  grid-template-columns: 1fr 96px auto;
-  gap: 6px;
-}
-
-.thumb {
-  height: 240px;
-  aspect-ratio: 9 / 16;
-  object-fit: contain;
-  border-radius: 6px;
-  background: #000;
+/* Narrow windows: the regions stack and the page scrolls. */
+@media (max-width: 1199px) {
+  body { display: block; height: auto; overflow: visible; }
+  .editor { display: block; }
+  .sidebar { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  #player { height: auto; max-height: 62vh; }
+  .draft-frame { height: 480px; }
+  .inspector { border-left: 0; }
+  .empty { border-left: 0; }
 }
