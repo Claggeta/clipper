@@ -396,6 +396,20 @@ and planned code:
   One box amendment (V7 7e): `BorderStyle 4`, one box behind a wrapped
   text (per-line boxes overlapped darker), outline colour clear; needs
   libass 0.17 or newer.
+- `0031` — the review page becomes a one-screen editor: clip list,
+  a live 9:16 preview, an inspector with Clip, Captions, Text, Frame,
+  Audio and Assist tabs, and a timeline of tracks (frames, waveform,
+  cuts, texts, zooms, audio); mock in `docs/mockups/review-editor.html`.
+  Plain HTML/CSS/JS, no build step or dependencies (0024). Keys for every
+  frequent action; precision aids (waveform peaks, frame step, snapping
+  to word edges); the live preview is close, Save's re-render exact. New
+  edits (caption fixes and key words, text style and free position,
+  zooms and hand crops, volume, music and sound effects from
+  `data/music/` and `data/sfx/`) are stored on label and manifest and
+  re-rendered in the one encode, each settled by its own amendment.
+  An assistant (a chat box turning a request into the page's edits via
+  the local LLM, applied unsaved) comes last, after a spike; no hosted
+  model. Amends 0024; later items amend 0016, 0017, 0025, 0029, 0030.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -507,9 +521,11 @@ Input: the same sources and drafts folders as V6, and the maintainer's
 edits in `review`. Output: drafts picked by a finer LLM score if it
 measures better, a `facecam` vertical style for streams with a facecam
 box if a spike finds the box reliably, and a review page that saves
-neighbouring keepers and takes cuts marked by hand. Interface: changes to
-`review`, the LLM prompt, `render`/`drafts` styles, and small fixes from
-"Parked".
+neighbouring keepers, takes cuts marked by hand, and (item 9, ADR 0031)
+becomes a one-screen editor with a live preview, keys, precision aids,
+caption, text, zoom and audio edits, and maybe a local-LLM assistant.
+Interface: changes to `review`, the LLM prompt, `render`/`drafts`
+styles, and small fixes from "Parked".
 
 Every picking change is measured as in V5 and V6: per VOD at top 10
 against the judged labels, keepers and rejects, keepers cut short and end
@@ -521,7 +537,9 @@ after an export), rerunning the ranker spike (the judged labels have not
 grown since it: 144 labels and 90 rejected spans on 17 VODs), speaker
 detection, audio or frame embeddings, posting or uploads, the YouTube or
 Twitch APIs, hosted or paid models, the movies/TV niche, a URL box in the
-review page, channel watching or scheduling, a database, user accounts.
+review page, channel watching or scheduling, a database, user accounts,
+a JavaScript framework or build step for the page, downloaded or paid
+music and sound effects.
 
 ## Maintainer's goals
 
@@ -594,6 +612,18 @@ From the V7 interview on 2026-11-12:
 - In `review`: save a span that overlaps another clip's label by less than
   the hit rule, and mark cuts by hand, at the playhead and on the strip.
 - The small Parked fixes ride along, each its own PR.
+
+From the review editor questions on 2026-11-13:
+
+- Everything offered slows review down: layout and scrolling, trimming
+  precision, clicks per clip, and not seeing the result before Save.
+- Every editing option offered would be used on most clips: caption
+  editing, text styling, zoom and reframing, audio.
+- A full redesign of the page, still plain JavaScript; before the finer
+  LLM score.
+- A chat box in the page to describe edits and have them made, with the
+  edits the page has. Free only: the local LLM, not Claude through a
+  paid API.
 
 ## Current state
 
@@ -1218,8 +1248,9 @@ titles naming the person and titles kept unedited.
 ## V7 list
 
 Each item is one PR, and each code item states its design and waits for
-confirmation first. Review first, then picking, then framing; the fixes
-in item 7 may land any time.
+confirmation first. Review first (items 2, 3 and 9), then picking, then
+framing; the fixes in item 7 may land any time. Item 9 was added on
+2026-11-13 and goes before item 5.
 
 1. ADRs and scope (one docs PR): the V7 scope, goals and list. ADRs come
    with each item as amendments.
@@ -1270,6 +1301,29 @@ in item 7 may land any time.
      by the maintainer): from the current folder or the clips dir. ADR
      0028 amendment, manual step.~~ (done; Q1 extended)
 8. Release notes and tag `v0.7.0`.
+9. The review editor (ADR 0031), before item 5, in PRs, each with a
+   manual step:
+   - 9a. ~~ADR 0031, the scope and a layout mock (one docs PR).~~ (done)
+   - 9b. Layout: clip list, preview, inspector tabs and timeline on one
+     screen; no behaviour change.
+   - 9c. Keys: play, J/K/L, frame step, start and end, cuts, rating,
+     Save, Trash, next and previous, auto-advance, a `?` list.
+   - 9d. Precision: a waveform from cached ffmpeg peaks, frame stepping,
+     snapping to word edges, timeline zoom below a second.
+   - 9e. Live preview: the span through its cuts, framed as the style,
+     with captions, texts and zooms drawn by the browser.
+   - 9f. Caption editing: fix a word's text (time kept), key words and a
+     highlight colour. ADR 0017 amendment.
+   - 9g. Text styling: colour, box or outline, size, fade-in, free
+     position by dragging. ADR 0030 amendment.
+   - 9h. Zoom and reframing: punch-ins over a range, a crop set by hand.
+     ADR 0016 and 0025 amendments.
+   - 9i. Audio: clip volume, a music bed lowered under speech, sound
+     effects, from local `data/music/` and `data/sfx/`.
+   - 9j. Assistant: a spike first on requests the maintainer writes (the
+     local LLM turning them into the page's edits), then an Assist tab
+     if it is right often enough. ADR 0014 and 0031 amendments. May end
+     in nothing.
 
 Later, not scheduled:
 

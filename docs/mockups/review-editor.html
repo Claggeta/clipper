@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review Editor Mock</title>
+  <!-- A static layout mock for ADR 0031, not the page. Open it in a
+       browser; the inspector tabs switch, nothing else works. -->
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #161a20;
+      --raised: #1d222a;
+      --line: #2a303a;
+      --text: #e6e8eb;
+      --muted: #8b93a1;
+      --accent: #f5c518;
+      --error: #ff6b6b;
+      --good: #5ad18a;
+      --blue: #7cc4ff;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 44px 1fr 252px;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    button {
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--raised);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 600; }
+    button.on { border-color: var(--accent); color: var(--accent); }
+    kbd {
+      padding: 0 4px;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      color: var(--muted);
+      font: 11px ui-monospace, monospace;
+    }
+    .muted { color: var(--muted); }
+
+    /* Top bar */
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .bar h1 { margin: 0; font-size: 15px; }
+    .bar .progress { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+    .meter { width: 140px; height: 6px; border-radius: 3px; background: var(--raised); overflow: hidden; }
+    .meter span { display: block; width: 40%; height: 100%; background: var(--good); }
+
+    /* Middle row */
+    .work {
+      display: grid;
+      grid-template-columns: 250px 1fr 360px;
+      min-height: 0;
+    }
+    .clips {
+      overflow-y: auto;
+      padding: 6px;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .clip {
+      display: grid;
+      grid-template-columns: 22px 1fr auto;
+      gap: 0 6px;
+      padding: 8px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .clip:hover { background: var(--raised); }
+    .clip.current { background: var(--raised); border-color: var(--accent); }
+    .clip .rank { grid-row: span 2; color: var(--accent); font-weight: 600; }
+    .clip .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .clip .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    .clip .meta { grid-column: 2 / 4; color: var(--muted); font-size: 11px; }
+    .b-post { color: var(--good); }
+    .b-fix { color: var(--accent); }
+    .b-trash { color: var(--muted); }
+    .b-new { color: var(--text); }
+
+    .stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 0;
+      padding: 12px;
+    }
+    .phone {
+      position: relative;
+      height: calc(100% - 52px);
+      max-height: 640px;
+      aspect-ratio: 9 / 16;
+      overflow: hidden;
+      border-radius: 10px;
+      background:
+        radial-gradient(circle at 50% 42%, #c98e6a 0 9%, transparent 10%),
+        radial-gradient(ellipse at 50% 70%, #3a5b8c 0 22%, transparent 23%),
+        linear-gradient(#24324a, #101724);
+      box-shadow: 0 0 0 1px var(--line);
+      container-type: inline-size;
+    }
+    .phone .hook {
+      position: absolute;
+      top: 15.6%;
+      left: 50%;
+      max-width: 85%;
+      padding: 1.2cqw 2cqw;
+      transform: translateX(-50%);
+      background: rgb(0 0 0 / 0.5);
+      font: 700 7.4cqw/1.15 Arial, sans-serif;
+      text-align: center;
+    }
+    .phone .caption {
+      position: absolute;
+      bottom: 21%;
+      left: 0;
+      right: 0;
+      font: 800 7.4cqw/1.1 Arial, sans-serif;
+      text-align: center;
+      text-shadow: 0 0 0.6cqw #000, 0 0 0.6cqw #000, 0 0 0.6cqw #000;
+    }
+    .phone .caption b { color: #ffff00; }
+    .phone .tag {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgb(0 0 0 / 0.6);
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .transport { display: flex; align-items: center; gap: 6px; }
+    .transport .time { min-width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
+
+    /* Inspector */
+    .inspector {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .tabs { display: flex; border-bottom: 1px solid var(--line); }
+    .tabs button {
+      flex: 1;
+      padding: 10px 0;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: none;
+      color: var(--muted);
+    }
+    .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+    .panel { display: none; overflow-y: auto; padding: 12px 14px; }
+    .panel.shown { display: grid; align-content: start; gap: 8px; }
+    .panel label, .panel .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .panel input, .panel textarea, .panel select {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .words { display: flex; flex-wrap: wrap; gap: 4px; }
+    .words span {
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--raised);
+    }
+    .words span.key { border-color: #ffff00; color: #ffff00; }
+    .words span.edited { border-style: dashed; border-color: var(--accent); }
+    .card { padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); display: grid; gap: 6px; }
+    .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: inline-block; }
+    .chat { display: grid; gap: 8px; }
+    .msg { padding: 8px 10px; border-radius: 8px; background: var(--raised); }
+    .msg.me { background: #2a2a1a; border: 1px solid #4a4420; }
+    .msg ul { margin: 4px 0 0; padding-left: 18px; }
+    .actions {
+      display: flex;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--line);
+    }
+    .actions button { flex: 1; padding: 8px; font-weight: 600; }
+    .actions .danger:hover { border-color: var(--error); color: var(--error); }
+
+    /* Timeline */
+    .timeline {
+      display: grid;
+      grid-template-rows: 30px 1fr;
+      border-top: 1px solid var(--line);
+      background: var(--panel);
+      min-height: 0;
+    }
+    .tl-bar { display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+    .tl-bar .muted { margin-left: auto; }
+    .tracks {
+      position: relative;
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      grid-auto-rows: min-content;
+      overflow: hidden;
+    }
+    .tname { padding: 0 8px; color: var(--muted); font-size: 11px; display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+    .lane { position: relative; border-bottom: 1px solid var(--line); }
+    .lane.frames { height: 50px; display: flex; }
+    .lane.frames i {
+      flex: 1;
+      border-right: 1px solid #000;
+      background: linear-gradient(160deg, #2b3b55, #182233 60%, #3a2c24);
+    }
+    .lane.frames i:nth-child(3n) { background: linear-gradient(160deg, #34485f, #1a2638 55%, #4a372c); }
+    .lane.wave { height: 34px; }
+    .lane.wave svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .lane.small { height: 24px; }
+    .item {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      padding: 0 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      line-height: 18px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .item.cut { background: repeating-linear-gradient(135deg, rgb(255 107 107 / 0.75) 0 4px, rgb(0 0 0 / 0.7) 4px 8px); }
+    .item.cut.manual { background: repeating-linear-gradient(135deg, rgb(245 197 24 / 0.75) 0 4px, rgb(0 0 0 / 0.7) 4px 8px); }
+    .item.text { background: #2f4a6b; border: 1px solid var(--blue); }
+    .item.zoom { background: #3b2f5c; border: 1px solid #b59cff; }
+    .item.music { background: #23432f; border: 1px solid var(--good); }
+    .item.sfx { background: #4a3a1c; border: 1px solid var(--accent); }
+    .dim { position: absolute; top: 0; bottom: 0; background: rgb(0 0 0 / 0.6); pointer-events: none; }
+    .span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-top: 3px solid var(--accent);
+      border-bottom: 3px solid var(--accent);
+      pointer-events: none;
+    }
+    .handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 12px;
+      margin-left: -6px;
+      border-radius: 3px;
+      background: var(--accent);
+    }
+    .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 3px #000; }
+    .overlay { position: absolute; top: 0; bottom: 0; left: 70px; right: 0; pointer-events: none; }
+    .overlay .handle { pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <h1>Clipper Review</h1>
+    <span class="muted">v2924392099 · adapt · 11-11-2026</span>
+    <span class="muted">fit · captions · titles</span>
+    <div class="progress">
+      <span class="muted">4 of 10 judged</span>
+      <div class="meter"><span></span></div>
+      <button title="Keys">? Keys</button>
+    </div>
+  </header>
+
+  <div class="work">
+    <nav class="clips" aria-label="Clips">
+      <div class="clip"><span class="rank">1</span><span class="name">Adapt's Pirate Token Plan 🏴‍☠️</span><span class="badge b-post">post</span><span class="meta">2:00:28 · 45 s · Good</span></div>
+      <div class="clip"><span class="rank">2</span><span class="name">Chat Roasts the Loadout 😂</span><span class="badge b-trash">trashed</span><span class="meta">0:41:10 · 38 s</span></div>
+      <div class="clip current"><span class="rank">3</span><span class="name">Jason Puts Adapt's Life at Risk 🚗</span><span class="badge b-fix">fix</span><span class="meta">1:22:16 · 38 s → 41 s · Good</span></div>
+      <div class="clip"><span class="rank">4</span><span class="name">The Worst Drop of the Night 💀</span><span class="badge b-post">post</span><span class="meta">2:41:02 · 52 s · OK</span></div>
+      <div class="clip"><span class="rank">5</span><span class="name">Ron Calls In Mid-Match 📞</span><span class="badge b-new">new</span><span class="meta">3:05:44 · 44 s</span></div>
+      <div class="clip"><span class="rank">6</span><span class="name">Nobody Saw That Coming 😳</span><span class="badge b-new">new</span><span class="meta">3:30:19 · 61 s</span></div>
+      <div class="clip"><span class="rank">7</span><span class="name">The Bet Goes Wrong 💸</span><span class="badge b-new">new</span><span class="meta">4:02:51 · 29 s</span></div>
+      <div class="clip"><span class="rank">8</span><span class="name">Adapt Rates the Fans' Fits 👕</span><span class="badge b-new">new</span><span class="meta">4:20:07 · 47 s</span></div>
+    </nav>
+
+    <main class="stage">
+      <div class="phone">
+        <span class="tag">live preview · fit</span>
+        <div class="hook">Jason puts Adapt's life at risk</div>
+        <div class="caption">BRO WATCH <b>THE</b> ROAD</div>
+      </div>
+      <div class="transport">
+        <button title="Back a frame ( , )">‹</button>
+        <button title="J">−5 s</button>
+        <button class="primary" title="Space or K">Play</button>
+        <button title="L">+5 s</button>
+        <button title="Forward a frame ( . )">›</button>
+        <span class="time">0:12.4 / 0:41.0</span>
+        <button title="Show the rendered draft instead">Draft</button>
+      </div>
+    </main>
+
+    <aside class="inspector">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="clip">Clip</button>
+        <button role="tab" aria-selected="false" data-tab="captions">Captions</button>
+        <button role="tab" aria-selected="false" data-tab="text">Text</button>
+        <button role="tab" aria-selected="false" data-tab="frame">Frame</button>
+        <button role="tab" aria-selected="false" data-tab="audio">Audio</button>
+        <button role="tab" aria-selected="false" data-tab="assist">Assist</button>
+      </div>
+
+      <section class="panel shown" data-panel="clip">
+        <label for="t">Title</label>
+        <input id="t" value="Jason Puts Adapt's Life at Risk Behind the Wheel 🚗😱">
+        <label for="n">Notes</label>
+        <textarea id="n" rows="2">Ends early, kept the scream.</textarea>
+        <span class="label">Rating</span>
+        <div class="row"><button class="on">Good <kbd>1</kbd></button><button>OK <kbd>2</kbd></button></div>
+        <span class="label">On screen</span>
+        <div class="row"><button class="on">Adapt</button><button class="on">JasonTheWeen</button><button>Ron</button><button>Lacy</button></div>
+        <span class="label">Span</span>
+        <div class="row muted">1:22:16.0 → 1:22:57.0 · 41.0 s · draft 1:22:16–1:22:54 · 2 cuts (3.1 s)</div>
+        <div class="row"><button>Set start <kbd>I</kbd></button><button>Set end <kbd>O</kbd></button><button>Cut silence</button><button>Reset</button></div>
+      </section>
+
+      <section class="panel" data-panel="captions">
+        <span class="label">Words in view (click to fix, right-click to mark key)</span>
+        <div class="words">
+          <span>bro</span><span>watch</span><span class="key">the</span><span class="edited">road</span><span>you're</span><span>gonna</span><span class="key">kill</span><span>us</span><span>Jason</span><span>slow</span><span>down</span>
+        </div>
+        <div class="card"><span class="muted">"rode" → "road" · time kept 0:03.1–0:03.4</span></div>
+        <span class="label">Highlight colour</span>
+        <div class="row"><span class="swatch" style="background:#ffff00;border-color:#fff"></span><span class="swatch" style="background:#5ad18a"></span><span class="swatch" style="background:#ff6b6b"></span><span class="swatch" style="background:#7cc4ff"></span></div>
+      </section>
+
+      <section class="panel" data-panel="text">
+        <div class="card">
+          <input value="Jason puts Adapt's life at risk">
+          <div class="row"><span class="muted">0.0 → 3.0 s</span><span class="swatch" style="background:#fff"></span><select style="width:auto"><option>Box</option><option>Outline</option></select><select style="width:auto"><option>Large</option><option>Medium</option></select><select style="width:auto"><option>Fade in</option><option>None</option></select></div>
+          <span class="muted">Drag it on the preview to move it.</span>
+        </div>
+        <button>Add text <kbd>T</kbd></button>
+        <span class="label">Thumbnail</span>
+        <div class="row"><input placeholder="Text on it (optional)" style="flex:1"><button>Make</button></div>
+      </section>
+
+      <section class="panel" data-panel="frame">
+        <span class="label">Style</span>
+        <div class="row"><button class="on">Fit</button><button>Face</button><button>Facecam</button></div>
+        <span class="label">Zooms</span>
+        <div class="card"><span>0:08.0 → 0:11.5 · 1.4× on the driver</span><span class="muted">Drag the box on the preview to set the centre.</span></div>
+        <button>Add zoom at playhead <kbd>Z</kbd></button>
+        <span class="label">Crop</span>
+        <div class="row"><button>Set crop by hand from here</button></div>
+        <span class="label">Source</span>
+        <div class="row"><button>Show the source player</button></div>
+      </section>
+
+      <section class="panel" data-panel="audio">
+        <span class="label">Clip volume</span>
+        <input type="range" min="-12" max="12" value="3">
+        <span class="label">Music (data/music)</span>
+        <div class="row"><select style="flex:1"><option>chill-beat-02.mp3</option><option>None</option></select></div>
+        <div class="row muted">−18 dB, lowered under speech</div>
+        <span class="label">Sound effects (data/sfx)</span>
+        <div class="card"><span>0:05.2 · vine-boom.wav</span></div>
+        <button>Add effect at playhead</button>
+      </section>
+
+      <section class="panel" data-panel="assist">
+        <div class="chat">
+          <div class="msg me">Start 2 s earlier, cut where he says "uh anyway", and put "Bro is NOT ok" in the middle from 5 to 8 s.</div>
+          <div class="msg">Proposed edits (unsaved):
+            <ul>
+              <li>Start 1:22:16.0 → 1:22:14.0</li>
+              <li>Cut 0:21.3–0:22.0 ("uh anyway")</li>
+              <li>Text "Bro is NOT ok", middle, 5.0–8.0 s</li>
+            </ul>
+            <div class="row" style="margin-top:6px"><button class="primary">Apply</button><button>Discard</button></div>
+          </div>
+          <textarea rows="2" placeholder="Describe an edit… (local model)"></textarea>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button class="primary">Save <kbd>S</kbd></button>
+        <button class="danger">Trash <kbd>Del</kbd></button>
+        <button>Next <kbd>N</kbd></button>
+      </div>
+    </aside>
+  </div>
+
+  <section class="timeline">
+    <div class="tl-bar">
+      <button>−</button><button>+</button><button>Fit span</button>
+      <button class="on">Snap to words</button>
+      <button>Cut in <kbd>[</kbd></button><button>Cut out <kbd>]</kbd></button>
+      <span class="muted">1 s per tile · drag on frames to cut</span>
+    </div>
+    <div class="tracks">
+      <div class="tname">Frames</div><div class="lane frames"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="tname">Audio</div>
+      <div class="lane wave">
+        <svg viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true">
+          <path fill="#5a6577" d="M0 10 L4 7 L8 12 L12 4 L16 15 L20 6 L24 13 L28 9 L32 3 L36 17 L40 8 L44 11 L48 5 L52 14 L56 9 L60 10 L64 9.5 L68 10 L72 10.5 L76 6 L80 15 L84 2 L88 18 L92 4 L96 16 L100 7 L104 12 L108 3 L112 17 L116 6 L120 13 L124 9 L128 10 L132 9.6 L136 10 L140 5 L144 14 L148 8 L152 12 L156 4 L160 16 L164 7 L168 12 L172 9 L176 11 L180 6 L184 14 L188 9 L192 11 L196 10 L200 10 Z"/>
+        </svg>
+      </div>
+      <div class="tname">Cuts</div><div class="lane small"><span class="item cut" style="left:30%;width:3%"></span><span class="item cut manual" style="left:61%;width:4%"></span></div>
+      <div class="tname">Text</div><div class="lane small"><span class="item text" style="left:12%;width:13%">Jason puts Adapt's life…</span><span class="item text" style="left:34%;width:11%">Bro is NOT ok</span></div>
+      <div class="tname">Zoom</div><div class="lane small"><span class="item zoom" style="left:27%;width:12%">1.4×</span></div>
+      <div class="tname">Music</div><div class="lane small"><span class="item music" style="left:12%;width:76%">chill-beat-02 · ducked</span></div>
+      <div class="tname">SFX</div><div class="lane small"><span class="item sfx" style="left:22%;width:3%">boom</span></div>
+      <div class="overlay">
+        <div class="dim" style="left:0;width:12%"></div>
+        <div class="dim" style="left:88%;right:0"></div>
+        <div class="span" style="left:12%;width:76%"></div>
+        <div class="handle" style="left:12%"></div>
+        <div class="handle" style="left:88%"></div>
+        <div class="playhead" style="left:41%"></div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    for (const tab of document.querySelectorAll("[data-tab]")) {
+      tab.addEventListener("click", () => {
+        for (const t of document.querySelectorAll("[data-tab]")) {
+          t.setAttribute("aria-selected", String(t === tab));
+        }
+        for (const p of document.querySelectorAll("[data-panel]")) {
+          p.classList.toggle("shown", p.dataset.panel === tab.dataset.tab);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
