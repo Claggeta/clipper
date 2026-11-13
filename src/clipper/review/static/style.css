@@ -7,6 +7,7 @@
   --muted: #8b93a1;
   --accent: #f5c518;
   --error: #ff6b6b;
+  --wave: #6f7c90;
   color-scheme: dark;
 }
 
@@ -474,7 +475,6 @@ button[aria-pressed="true"] {
    click anywhere else reaches the frames and seeks. */
 .strip {
   position: relative;
-  height: 72px;
   margin-top: 8px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -484,10 +484,43 @@ button[aria-pressed="true"] {
   touch-action: none;
 }
 
+.track { cursor: pointer; }
+
 .tiles {
   display: flex;
-  height: 100%;
-  cursor: pointer;
+  height: 72px;
+}
+
+/* The waveform and the words under the frames (ADR 0031). */
+.wave {
+  display: block;
+  width: 100%;
+  height: 28px;
+  border-top: 1px solid #000;
+  background: #0b0d11;
+}
+
+.words-lane {
+  position: relative;
+  height: 20px;
+  overflow: hidden;
+  border-top: 1px solid #000;
+  background: #0b0d11;
+}
+
+.word {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  min-width: 2px;
+  overflow: hidden;
+  padding: 0 3px;
+  border-left: 1px solid var(--line);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .tile {

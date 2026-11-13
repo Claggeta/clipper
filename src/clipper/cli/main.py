@@ -92,6 +92,7 @@ from clipper.review.server import (
     MAX_START_SECONDS,
     ReviewSession,
     frames_folder,
+    peaks_file,
 )
 
 app = typer.Typer(help="Find clip-worthy moments in long-form video.")
@@ -1251,6 +1252,8 @@ def review(
             if info.width is not None and info.height is not None
             else None,
             people=load_people(settings.people_file),
+            peaks=build.peaks(),
+            peaks_path=peaks_file(settings.cache_dir, video),
         )
         build.serve(
             session,

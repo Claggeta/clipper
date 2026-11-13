@@ -263,7 +263,8 @@ and planned code:
   pause at the range's end also broke Play), with -15 to +15 s step
   buttons; `range_start`/`range_end` stay as 3b's starting strip view.
   Item 3b amendment: a `FrameExtractor` Protocol and ffmpeg adapter (`-ss`
-  before `-i`, 72 px JPEG), `/frames/<second>.jpg` cached per video under
+  before `-i`, 72 px JPEG), `/frames/<second>.jpg` (quarter seconds too
+  since V7 9d) cached per video under
   `<cache dir>/frames/`; a strip at fixed 1 to 60 s steps with zoom and pan;
   handles dragged or set from the playhead; Preview span; manual steps RV5
   and RV6. Item 3c amendment: Save writes a `post` or `fix` label to
@@ -416,6 +417,11 @@ and planned code:
   manual step RV17. Keys amendment (9c): `static/keys.js`, keys press
   the page's buttons, nothing while typing, move on to the next clip
   without a verdict after Save or Trash (a box turns it off); RV18.
+  Precision amendment (9d): a `PeaksExtractor` (ffmpeg, 20 levels a
+  second, cached under `<cache dir>/peaks/`, 118 s the first time on a
+  4:39 VOD), `/api/words`, waveform and words lanes, snapping to word
+  edges within 0.3 s (a toggle, Alt while dragging), 0.25 and 0.5 s a
+  frame with quarter-second frames; `static/precision.js`; RV19.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1316,8 +1322,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9c. ~~Keys: play, J/K/L, frame step, start and end, cuts, rating,
      Save, Trash, next and previous, auto-advance, a `?` list.~~ (done;
      `static/keys.js`, manual step RV18)
-   - 9d. Precision: a waveform from cached ffmpeg peaks, frame stepping,
-     snapping to word edges, timeline zoom below a second.
+   - 9d. ~~Precision: a waveform from cached ffmpeg peaks, frame stepping,
+     snapping to word edges, timeline zoom below a second.~~ (done;
+     frame stepping came with 9c; manual step RV19)
    - 9e. Live preview: the span through its cuts, framed as the style,
      with captions, texts and zooms drawn by the browser.
    - 9f. Caption editing: fix a word's text (time kept), key words and a

@@ -435,6 +435,16 @@ moment: in V6 item 4 two keepers overlapping saved ones by 11 and 13 s
 could not be saved. Asking first for every overlap was not chosen, since
 the hit rule already says when two spans are one moment. Manual step RV15.
 
+## Amended by trimming precision (ADR 0031, V7 item 9d)
+
+The fixed paths gain `/precision.js` (and `/keys.js`, 9c), `GET
+/peaks/<video key>.bin` (the waveform's levels, made once by a
+`PeaksExtractor` and cached under `<cache dir>/peaks/`) and `GET
+/api/words?start=&end=` (word times in a span, 409 without a
+transcript, as `/api/pauses`). Frame paths also take quarter seconds,
+`<second>.25`, `.5` or `.75`; whole seconds keep their names. Manual step
+RV19.
+
 ## Related
 
 - 0011: render's failure policy

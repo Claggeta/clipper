@@ -2959,6 +2959,38 @@ least two clips not yet judged.
 
 Then delete the scratch folders.
 
+### RV19. Waveform, words and snapping
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s precision
+amendment (V7 item 9d). Same scratch copy and labels dir as RV12, with a
+VOD whose waveform is not cached yet (delete its file under
+`data\cache\peaks\` to start over).
+
+1. Open the page and choose a clip. Pass: under the frames a lane says
+   "Waveform loading…"; within a few minutes (about 2 on a 4.5-hour VOD)
+   a waveform appears, louder where people talk or shout. Reload. Pass:
+   the waveform is there at once.
+2. Press `Zoom in` until `0.25 s per frame`. Pass: frames four to a
+   second, each a little later than the last (labels with tenths), and a
+   lane of words under the waveform lined up with the speech.
+3. With `Snap to words` pressed, drag the start handle slowly near a
+   word. Pass: it jumps to the word's start within about 0.3 s and moves
+   freely between words. Hold Alt and drag. Pass: it moves freely.
+4. Put the playhead just after a word starts and press `I`. Pass: the
+   start lands on the word's start, not the playhead. Do the same near a
+   word's end with `O`.
+5. Press `[` just after a word ends and `]` just before a later word
+   starts. Pass: the cut runs from the first word's end to the later
+   word's start. Drag across the waveform lane. Pass: a cut, snapped the
+   same way.
+6. Press `Snap to words` to turn it off and repeat step 4. Pass: the
+   start is the playhead's time. Reload. Pass: still off.
+7. Click on the waveform lane. Pass: the playhead moves there.
+8. Save a clip whose start or end snapped. Pass: the draft starts on the
+   word, not mid-word.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |
