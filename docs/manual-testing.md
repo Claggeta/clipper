@@ -2289,6 +2289,8 @@ uv run clipper queue --start 2026-11-12 --per-day 2
 uv run clipper queue --include-ok --out "$env:TEMP\q1-queue.md"
 uv run clipper posted data\clips\<channel>\<MM-DD-YYYY>\<stem>\<file from the second row> https://youtube.com/shorts/<another id>
 uv run clipper posted <channel>/<MM-DD-YYYY>/<stem>/<file from the third row> https://youtube.com/shorts/<a third id>
+uv run clipper posted "<the fourth row's title, copied from queue.md>" https://youtube.com/shorts/<a fourth id>
+uv run clipper posted "<a word from a title>" https://youtube.com/shorts/<a fifth id>
 Remove-Item Env:CLIPPER_POSTS_FILE; Remove-Item "$env:TEMP\q1-posts.json", "$env:TEMP\q1-queue.md"
 ```
 
@@ -2301,7 +2303,9 @@ from its channels)"). `posted` prints `Posted <folder>/<file>: <id> on
 <today>`, and the second queue no longer lists that clip. The last run adds
 the `ok` clips after the good ones. The two relative-path `posted` runs
 (from the repo, then from the clips dir) each print `Posted
-<stem>/<file>: ...` (ADR 0028, relative paths amendment).
+<stem>/<file>: ...` (ADR 0028, relative paths amendment). The title run
+posts the fourth clip the same way; the single word is refused with
+"No saved clip is titled ..." and the close titles (title amendment).
 
 ### Q2. Drafts filed by channel and day
 

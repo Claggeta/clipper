@@ -283,3 +283,53 @@ def test_a_posted_summary_leaves_the_queue(env: Env) -> None:
     assert result.exit_code == 0, result.output
     assert "Posted v1/v1_summary.mp4" in result.output
     assert "all of it" not in env.run("queue").output
+
+
+# --- Posting by title (ADR 0028, title amendment) ---
+
+
+def test_posted_finds_a_clip_by_its_title_case_and_spaces_aside(env: Env) -> None:
+    env.folder("v1", ["good", "good"])
+    result = env.run("posted", "  V1  TITLE 2 ", "https://youtu.be/abcDEF12345")
+    assert result.exit_code == 0, result.output
+    assert "Posted v1/v1_2.mp4" in result.output
+    assert [p.clip for p in load_posts(env.posts).posts] == ["v1/v1_2.mp4"]
+
+
+def test_posted_finds_a_summary_by_its_title(env: Env) -> None:
+    folder = env.folder("v1", ["good"])
+    _summarize(folder, "good", ranks=(1,))
+    result = env.run("posted", "v1 all of it", "https://youtu.be/abcDEF12345")
+    assert result.exit_code == 0, result.output
+    assert "Posted v1/v1_summary.mp4" in result.output
+
+
+def test_posted_by_an_unknown_title_suggests_close_ones(env: Env) -> None:
+    env.folder("v1", ["good", "good"])
+    result = env.run("posted", "title", "https://youtu.be/abcDEF12345")
+    output = " ".join(result.output.split())
+    assert result.exit_code == 1
+    assert "No saved clip is titled 'title'" in output
+    assert "Close titles: v1 title 1; v1 title 2." in output
+    assert not env.posts.exists()
+
+
+def test_posted_refuses_a_title_two_clips_share(env: Env) -> None:
+    env.folder("v1", ["good"])
+    env.folder("v2", ["good"])
+    folder = env.clips / "v2"
+    manifest = load_manifest(folder)
+    clips = tuple(c.model_copy(update={"title": "v1 title 1"}) for c in manifest.clips)
+    save_manifest(manifest.model_copy(update={"clips": clips}), folder)
+    result = env.run("posted", "v1 title 1", "https://youtu.be/abcDEF12345")
+    output = " ".join(result.output.split())
+    assert result.exit_code == 1
+    assert "2 saved clips are titled 'v1 title 1'" in output
+    assert "v1/v1_1.mp4" in output and "v2/v2_1.mp4" in output
+    assert not env.posts.exists()
+
+
+def test_a_path_like_miss_keeps_the_path_error(env: Env) -> None:
+    env.folder("v1", ["good"])
+    result = env.run("posted", "v9/v9_1.mp4", "https://youtu.be/abcDEF12345")
+    assert "no drafts folder v9" in " ".join(result.output.split())

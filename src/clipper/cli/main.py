@@ -25,6 +25,7 @@ from clipper.adapters.results.labels_json import (
 from clipper.adapters.results.manifest_json import (
     check_manifest_source,
     find_drafts_folder,
+    find_drafts_folders,
     load_manifest,
     save_manifest,
 )
@@ -53,9 +54,11 @@ from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.posting import (
     build_queue,
     clip_key,
+    match_title,
     queue_markdown,
     record_post,
     schedule,
+    titled_clips,
 )
 from clipper.core.sources import (
     parse_source_list,
@@ -1362,8 +1365,9 @@ def posted(
     clip: Annotated[
         str,
         typer.Argument(
-            help="The clip file: its path (absolute, or from here or the "
-            "clips dir), or <folder>/<file> as the posts record names it.",
+            help="The clip: its title as the queue shows it, its path "
+            "(absolute, or from here or the clips dir), or <folder>/<file> "
+            "as the posts record names it.",
             show_default=False,
         ),
     ],
@@ -1387,7 +1391,10 @@ def posted(
     """
     settings = Settings()
     try:
-        key = _clip_key(settings.clips_dir, clip)
+        try:
+            key = _clip_key(settings.clips_dir, clip)
+        except QueueError as path_error:
+            key = _titled_key(settings.clips_dir, clip, path_error)
         source = parse_video_url(url)
         if source.platform != "youtube":
             raise QueueError(f"Not a YouTube link: {url}")
@@ -1414,6 +1421,34 @@ def _summary_title_writer(build: AppContext, settings: Settings) -> TitleWriter 
         return build.title_writer(settings)
     except TitleError:
         return None
+
+
+def _titled_key(clips_dir: Path, title: str, path_error: QueueError) -> str:
+    """The posts key of the one saved clip or summary with this title (ADR
+    0028, title amendment). Something that looks like a path gets the path's
+    error; no match or several are an error that says what to do."""
+    folders: list[tuple[str, RenderManifest]] = []
+    for folder in find_drafts_folders(clips_dir):
+        try:
+            folders.append((folder.name, load_manifest(folder)))
+        except ClipperError:
+            continue
+    exact, close = match_title(titled_clips(folders), title)
+    if len(exact) == 1:
+        return exact[0]
+    if exact:
+        listed = ", ".join(exact)
+        raise QueueError(
+            f"{len(exact)} saved clips are titled {title!r}: {listed}; "
+            "post one by its <folder>/<file>"
+        )
+    if "/" in title or "\\" in title or title.lower().endswith(".mp4"):
+        raise path_error
+    hint = f" Close titles: {'; '.join(close)}." if close else ""
+    raise QueueError(
+        f"No saved clip is titled {title!r}; copy the title from `clipper "
+        f"queue`, or give the clip's path.{hint}"
+    )
 
 
 def _clip_key(clips_dir: Path, clip: str) -> str:

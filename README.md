@@ -245,7 +245,7 @@ minutes). Ctrl+C stops the server. See
 
 ```powershell
 uv run clipper queue
-uv run clipper posted "<video name>/<clip file>" "https://youtube.com/shorts/<id>"
+uv run clipper posted "<the title from the queue>" "https://youtube.com/shorts/<id>"
 ```
 
 `queue` lists the saved clips rated `good` and not yet posted, one drafts
@@ -254,7 +254,8 @@ folder after another (newest first), two a day from today (`--per-day`,
 `<clips dir>/queue.md` with each clip's file, thumbnail, title and caption
 ready to copy, the people marked in review and the campaigns from
 `data/campaigns.txt` it qualifies for. `posted` records a clip's YouTube
-link in `data/posts.json`, and it leaves the queue. See
+link in `data/posts.json`, and it leaves the queue; name the clip by its
+title as the queue shows it, or by `<video name>/<clip file>` or its path. See
 [ADR 0028](docs/decisions/0028-post-queue.md).
 
 ### Evaluating detectors

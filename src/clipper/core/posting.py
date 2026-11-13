@@ -145,6 +145,46 @@ def clip_key(folder: str, file: str) -> str:
     return f"{folder}/{file}"
 
 
+# How many near titles a failed title lookup suggests (ADR 0028).
+CLOSE_TITLES = 3
+
+
+def _title_text(title: str) -> str:
+    """A title as compared: case folded, spaces collapsed; emoji and
+    punctuation kept, so a title copied from the queue matches exactly."""
+    return " ".join(title.casefold().split())
+
+
+def titled_clips(
+    folders: Sequence[tuple[str, RenderManifest]],
+) -> list[tuple[str, str]]:
+    """Every saved clip and summary with a title, as (title, posts key), for
+    `posted` by title (ADR 0028, title amendment)."""
+    titled: list[tuple[str, str]] = []
+    for name, manifest in folders:
+        for clip in sorted(manifest.clips, key=lambda c: c.rank):
+            if clip.reviewed == "saved" and clip.file is not None and clip.title:
+                titled.append((clip.title, clip_key(name, clip.file)))
+        summary = manifest.summary
+        if summary is not None and summary.title:
+            titled.append((summary.title, clip_key(name, summary.file)))
+    return titled
+
+
+def match_title(
+    titled: Sequence[tuple[str, str]], title: str
+) -> tuple[list[str], list[str]]:
+    """The posts keys of the clips with exactly this title (case and spaces
+    aside), and, when there are none, up to `CLOSE_TITLES` titles that
+    contain the text."""
+    wanted = _title_text(title)
+    exact = [key for text, key in titled if _title_text(text) == wanted]
+    if exact or not wanted:
+        return exact, []
+    close = [text for text, _ in titled if wanted in _title_text(text)]
+    return [], close[:CLOSE_TITLES]
+
+
 def build_queue(
     folders: Sequence[DraftsFolder],
     campaigns: Sequence[Campaign],
