@@ -3021,6 +3021,31 @@ with a clip that has both `fit` and `face` drafts.
 
 Then delete the scratch folders.
 
+### RV21. Caption editing
+
+Covers [ADR 0017](decisions/0017-word-timestamps-and-styled-captions.md)'s
+caption editing amendment (V7 item 9f). Same scratch copy and labels dir
+as RV12, on a folder with captions.
+
+1. Choose a clip and open `Captions`. Pass: the span's words as chips in
+   boxes of up to three, one box per caption chunk, and five colour
+   swatches with yellow pressed.
+2. Click a misheard word, type the fix and press Enter. Pass: the chip
+   shows the fix, underlined; hovering says what it was; `Unsaved`
+   shows; the preview shows the fix at that word's time.
+3. Click a filler word, clear it and press Enter. Pass: the chip is
+   struck through and the preview leaves the word out.
+4. Right-click a word (or Tab to it and press K). Pass: it turns the
+   highlight colour and stays coloured while its chunk shows in the
+   preview; K did not start playback.
+5. Pick pink. Pass: the key word and the spoken word turn pink in the
+   preview.
+6. Save. Pass: "re-rendered"; the draft has the fix, no filler word, and
+   pink highlights. Reload: the chips keep the edits, `Unsaved` hidden.
+7. Press Reset. Pass: the chips are as transcribed, in yellow.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

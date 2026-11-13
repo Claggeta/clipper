@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from clipper.domain.models import (
+    CaptionEdits,
     ClipCandidate,
     ClipInfo,
     ClipLink,
@@ -18,6 +19,7 @@ from clipper.domain.models import (
     Transcript,
     VideoSource,
     Word,
+    WordFix,
     format_timestamp,
 )
 
@@ -690,3 +692,42 @@ def test_a_clips_file_is_its_first_variant() -> None:
     with pytest.raises(ValueError, match="first variant"):
         ManifestClip(**base, reasons=("x",), file="a.face.mp4", variants=(fit, face))
     assert ManifestClip(**base, reasons=("x",), file="a.mp4").variants == ()
+
+
+# --- Caption edits (ADR 0017, caption editing amendment) ---
+
+
+def test_caption_edits_tidy_fixes_and_say_when_they_change_nothing() -> None:
+    edits = CaptionEdits.model_validate(
+        {"fixes": [{"start_seconds": 1.5, "text": "  going   to "}], "keys": [2.0]}
+    )
+    assert edits.fixes[0].text == "going to"
+    assert not edits.empty
+    assert CaptionEdits().empty
+    assert not CaptionEdits(highlight="green").empty
+    # Empty text hides the word.
+    assert WordFix(start_seconds=1.0, text=" ").text == ""
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        ({"fixes": [{"start_seconds": 1, "text": "x" * 41}]}, "at most 40"),
+        (
+            {
+                "fixes": [
+                    {"start_seconds": 1, "text": "a"},
+                    {"start_seconds": 1.0, "text": "b"},
+                ]
+            },
+            "fixed twice",
+        ),
+        ({"keys": [2.0, 2.0]}, "given twice"),
+        ({"keys": [-1.0]}, "number of seconds"),
+        ({"highlight": "purple"}, "Input should be"),
+        ({"fixes": [{"start_seconds": 1, "text": "a", "extra": 1}]}, "Extra inputs"),
+    ],
+)
+def test_bad_caption_edits_are_refused(data: dict[str, object], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        CaptionEdits.model_validate(data)

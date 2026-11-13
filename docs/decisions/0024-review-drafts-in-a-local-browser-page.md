@@ -454,6 +454,12 @@ face style's crop, through the run's face tracker; 409 without one, 500
 with the message if tracking fails). `/api/clips` carries the burn-in's
 sizes as `layout`. Manual step RV20.
 
+## Amended by caption editing (ADR 0017 and 0031, V7 item 9f)
+
+`/captions.js`; Save takes `caption_edits` (word fixes, key words and a
+highlight colour) and stores them on the judged label and manifest clip;
+`/api/captions` takes `&edits=` as JSON. Manual step RV21.
+
 ## Related
 
 - 0011: render's failure policy

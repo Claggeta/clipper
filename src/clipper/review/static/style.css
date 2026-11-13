@@ -474,6 +474,59 @@ button[aria-pressed="true"] {
 /* The text box takes its own line in the narrow inspector. */
 .text-row > :first-child { grid-column: 1 / -1; }
 
+/* Caption words (ADR 0017, caption editing amendment): one group per
+   chunk; fixed words underlined, hidden ones struck through, key words in
+   the clip's colour. */
+.caption-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.chunk {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.word-chip {
+  padding: 2px 6px;
+  font-size: 13px;
+}
+
+.word-chip.fixed { text-decoration: underline dotted var(--accent); }
+
+.word-chip.hidden-word {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.word-chip.unshown { opacity: 0.45; }
+
+.word-chip.key {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+.word-box {
+  width: 9em;
+  padding: 2px 6px;
+}
+
+.swatch {
+  width: 28px;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+}
+
+.swatch[aria-pressed="true"] { border-color: #fff; }
+
 /* Thumbnails (ADR 0030). */
 .thumb-row {
   display: grid;

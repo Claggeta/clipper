@@ -4,14 +4,12 @@
 // width over a blurred copy) or face (the crop a re-render would use);
 // with the word captions and on-screen texts drawn at their burn-in
 // sizes. Close, not exact: Save's re-render is the result. Loaded after
-// app.js, keys.js and precision.js.
+// app.js, keys.js, precision.js and captions.js.
 "use strict";
 
 const previewCanvas = document.getElementById("preview-canvas");
 const previewTime = document.getElementById("preview-time");
 const previewNote = document.getElementById("preview-note");
-// The active word's colour in the burn-in (captions.py's _HIGHLIGHT).
-const HIGHLIGHT = "#ffff00";
 // Wait this long after an edit before fetching new captions, in ms.
 const CAPTIONS_WAIT_MS = 300;
 // libass sizes a font by its line height, about 1.15 em for Arial, where
@@ -21,10 +19,11 @@ const ASS_FONT_SCALE = 0.87;
 const BLUR_SHRINK = 24;
 
 const blurCanvas = document.createElement("canvas");
-let captionChunks = []; // [[start, end, text], ...] per chunk, source seconds
+// [[start, end, text, key], ...] per chunk, source seconds
+let captionChunks = [];
 let captionsKey = "";
 let captionsWanted = "";
-let captionsChanged = 0;
+let captionsEditedAt = 0;
 let captionsPending = false;
 let crop = null; // {width, height, points} for the face style, or null
 let cropFrame = null; // the source frame size the crop is in
@@ -41,13 +40,15 @@ function cutsQuery() {
 }
 
 function spanKey() {
-  return `${current.key}|${span.start}|${span.end}|${cutsQuery()}`;
+  return `${current.key}|${span.start}|${span.end}|${cutsQuery()}|${captionEditsQuery(current)}`;
 }
 
 async function fetchCaptions(key) {
   captionsPending = true;
   const cuts = cutsQuery();
-  const query = `start=${span.start}&end=${span.end}${cuts ? `&cuts=${cuts}` : ""}`;
+  const query =
+    `start=${span.start}&end=${span.end}${cuts ? `&cuts=${cuts}` : ""}` +
+    captionEditsQuery(current);
   try {
     const response = await fetch(`/api/captions?${query}`);
     const data = await response.json().catch(() => ({}));
@@ -94,8 +95,8 @@ function refreshData() {
   if (burnsCaptions && key !== captionsKey && !captionsPending) {
     if (key !== captionsWanted) {
       captionsWanted = key;
-      captionsChanged = performance.now();
-    } else if (performance.now() - captionsChanged >= CAPTIONS_WAIT_MS) {
+      captionsEditedAt = performance.now();
+    } else if (performance.now() - captionsEditedAt >= CAPTIONS_WAIT_MS) {
       fetchCaptions(key);
     }
   }
@@ -250,7 +251,12 @@ function drawCaptions(context, width, height, seconds) {
   context.lineJoin = "round";
   context.lineWidth = previewLayout.caption_outline * 2 * scale;
   context.strokeStyle = "#000";
-  const words = chunk.map(([, , text], index) => ({ text, active: index === active }));
+  // The active word and key words take the clip's colour (ADR 0017).
+  const colour = previewLayout.highlights[editsOf(current).highlight];
+  const words = chunk.map(([, , text, key], index) => ({
+    text,
+    lit: index === active || key,
+  }));
   const lines = wrapWords(context, words, width - previewLayout.caption_margin_h * 2 * scale);
   const space = context.measureText(" ").width;
   let baseline = height - previewLayout.caption_margin_v * scale - (lines.length - 1) * size;
@@ -259,7 +265,7 @@ function drawCaptions(context, width, height, seconds) {
     let x = (width - lineWidth) / 2;
     for (const word of line) {
       context.strokeText(word.text, x, baseline);
-      context.fillStyle = word.active ? HIGHLIGHT : "#fff";
+      context.fillStyle = word.lit ? colour : "#fff";
       context.fillText(word.text, x, baseline);
       x += context.measureText(word.text).width + space;
     }

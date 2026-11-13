@@ -228,7 +228,7 @@ from the playhead's frame. Save writes a judged label to
 changed; Trash deletes it and records a rejected span; "Add clip here" saves
 a moment no draft proposed. The page fits one screen: the clip list (☰ hides
 it), a live 9:16 preview of the clip (cuts skipped, framed, captions and text
-drawn) beside the source and draft players, an inspector with Clip, Text and
+drawn) beside the source and draft players, an inspector with Clip, Captions (fix, hide or highlight words), Text and
 Frame tabs,
 and the film strip across the bottom. Most actions have a key (`?` lists
 them), and after Save or Trash the page moves on to the next clip without a

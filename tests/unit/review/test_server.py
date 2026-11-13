@@ -4,6 +4,7 @@ import json
 import re
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
@@ -243,6 +244,7 @@ def _get(
         ("/keys.js", "text/javascript", b"keydown"),
         ("/precision.js", "text/javascript", b"/api/words"),
         ("/preview.js", "text/javascript", b"/api/captions"),
+        ("/captions.js", "text/javascript", b"caption_edits"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -391,6 +393,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "people": [],
         "cuts": [],
         "texts": [],
+        "caption_edits": None,
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -565,6 +568,7 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "people": [],
         "cuts": [],
         "texts": [],
+        "caption_edits": None,
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
@@ -850,15 +854,15 @@ def test_the_page_scripts_declare_each_function_once() -> None:
     static = files("clipper.review") / "static"
     script = "\n".join(
         (static / name).read_text("utf-8")
-        for name in ("app.js", "keys.js", "precision.js", "preview.js")
+        for name in ("app.js", "keys.js", "precision.js", "captions.js", "preview.js")
     )
-    names = re.findall(r"^(?:async )?function (\w+)\(", script, re.MULTILINE)
-    assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
-    # A top-level `const` or `let` declared twice stops the later script.
-    bindings = re.findall(r"^(?:const|let) (\w+)", script, re.MULTILINE)
-    assert len(bindings) == len(set(bindings)), sorted(
-        n for n in bindings if bindings.count(n) > 1
+    # A top-level `const` or `let` named like any other top-level name, a
+    # function's too, stops the later script.
+    names = re.findall(
+        r"^(?:(?:async )?function (\w+)\(|(?:const|let) (\w+))", script, re.MULTILINE
     )
+    flat = [function or binding for function, binding in names]
+    assert len(flat) == len(set(flat)), sorted(n for n in flat if flat.count(n) > 1)
 
 
 def test_pauses_are_served_for_a_span(base_url: str) -> None:
@@ -1070,11 +1074,14 @@ _WORDED = Transcript(
 def test_captions_payload_gives_the_burn_in_chunks(tmp_path: Path) -> None:
     session = dataclasses.replace(_session(tmp_path), transcript=_WORDED)
     assert captions_payload(session, "start=60&end=90") == {
-        "chunks": [[[62.0, 62.4, "One"], [62.5, 62.9, "two."]], [[63.2, 63.6, "Three"]]]
+        "chunks": [
+            [[62.0, 62.4, "One", False], [62.5, 62.9, "two.", False]],
+            [[63.2, 63.6, "Three", False]],
+        ]
     }
     # A word starting inside a cut is not shown, as in the burn-in.
     assert captions_payload(session, "start=60&end=90&cuts=62.45:63.0") == {
-        "chunks": [[[62.0, 62.4, "One"], [63.2, 63.6, "Three"]]]
+        "chunks": [[[62.0, 62.4, "One", False], [63.2, 63.6, "Three", False]]]
     }
     with pytest.raises(ReviewError, match="no captions"):
         captions_payload(
@@ -1163,3 +1170,20 @@ def test_a_failed_face_track_is_a_server_error_with_its_message(
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_captions_payload_applies_caption_edits(tmp_path: Path) -> None:
+    session = dataclasses.replace(_session(tmp_path), transcript=_WORDED)
+    edits = urllib.parse.quote(
+        json.dumps({"fixes": [{"start_seconds": 62.5, "text": ""}], "keys": [63.2]})
+    )
+    assert captions_payload(session, f"start=60&end=90&edits={edits}") == {
+        "chunks": [[[62.0, 62.4, "One", False], [63.2, 63.6, "Three", True]]]
+    }
+
+
+@pytest.mark.parametrize("edits", ["{", '{"highlight":"purple"}', "[1]"])
+def test_bad_preview_edits_are_refused(base_url: str, edits: str) -> None:
+    query = urllib.parse.quote(edits)
+    status, _, _ = _get(base_url + f"/api/captions?start=60&end=90&edits={query}")
+    assert status == 400

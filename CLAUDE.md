@@ -135,6 +135,9 @@ and planned code:
   segment-level decision; its burn-in mechanism stands. Item 4 amendment:
   `build_ass`, chunks of up to 3 words, one event per word with the active
   word yellow, 1080x1920 or 1920x1080 canvas, style chosen from frames.
+  Caption editing amendment (V7 9f): `CaptionEdits` on the manifest clip
+  and judged label, word fixes and hidden words by start time, key words,
+  a highlight colour of five, applied before chunking.
 - `0018` — `render --titles`: a `TitleWriter` Protocol and an Ollama adapter
   reusing `OllamaClient` write a title and hook per clip to the manifest. A
   title failure is that clip's failure; no fallback. Built through the context
@@ -427,6 +430,9 @@ and planned code:
   from `/api/crop`), captions from `/api/captions` (`caption_chunks`,
   pulled out of `build_ass` unchanged; fonts at 0.87 for libass sizing),
   on-screen texts at clip time; `static/preview.js`; RV20.
+  Caption editing amendment (9f): a Captions tab of word chips by chunk,
+  fixes, hidden words, key words and a highlight colour (`CaptionEdits`,
+  ADR 0017 amendment), previewed and burned; `static/captions.js`; RV21.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1333,8 +1339,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9e. ~~Live preview: the span through its cuts, framed as the style,
      with captions, texts and zooms drawn by the browser.~~ (done; zooms
      join with 9h; manual step RV20)
-   - 9f. Caption editing: fix a word's text (time kept), key words and a
-     highlight colour. ADR 0017 amendment.
+   - 9f. ~~Caption editing: fix a word's text (time kept), key words and a
+     highlight colour. ADR 0017 amendment.~~ (done; hidden words too;
+     manual step RV21)
    - 9g. Text styling: colour, box or outline, size, fade-in, free
      position by dragging. ADR 0030 amendment.
    - 9h. Zoom and reframing: punch-ins over a range, a crop set by hand.

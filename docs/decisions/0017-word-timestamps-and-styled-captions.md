@@ -190,6 +190,29 @@ as expected after the re-split.
   wrapped to two lines.
 - Arial, Arial Black and Impact all rendered by name on this build.
 
+## Amended by caption editing (V7 item 9f, ADR 0031)
+
+- The maintainer edits a clip's word captions in the review page's
+  Captions tab: a word's text fixed (up to 40 characters, more than one
+  word allowed, its time kept), a word hidden (empty text), key words
+  shown in the highlight colour throughout their chunk, and that colour
+  per clip, one of yellow (the original), green, cyan, pink and orange.
+- `CaptionEdits` (`fixes` of `WordFix` by the word's source start,
+  `keys` by start, `highlight`) on `ManifestClip.caption_edits` and the
+  judged label, None when the captions are as transcribed. Words are
+  matched by start time to the millisecond; an edit matching no word
+  (after a new transcription) changes nothing.
+- `build_ass(..., edits=)` applies them before chunking, so a hidden word
+  or a fix ending in `.`, `?` or `!` moves chunk boundaries the same way
+  in the burn-in, the preview (`caption_chunks`, `/api/captions?edits=`)
+  and the page's chips. Without edits, or with empty ones, the output is
+  unchanged (the yellow tag is the same `{\\c&H0000FFFF&}`). Segments
+  without word times are not edited.
+- Save sends `caption_edits`; it re-renders when they changed and the
+  folder burns captions. Checked on v2924392099: a fixed word, a hidden
+  word and a pink key word burned into the re-rendered draft. Manual
+  step RV21.
+
 ## Revisit when
 
 - Word times are visibly off on real clips. Then compare a larger Whisper

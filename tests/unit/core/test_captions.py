@@ -1,4 +1,5 @@
 from clipper.core.captions import (
+    HIGHLIGHTS,
     Captions,
     CaptionWord,
     build_ass,
@@ -7,6 +8,7 @@ from clipper.core.captions import (
     preview_layout,
 )
 from clipper.domain.models import (
+    CaptionEdits,
     ClipCandidate,
     OnScreenText,
     Segment,
@@ -400,3 +402,65 @@ def test_preview_layout_names_the_burn_in_sizes() -> None:
     assert (vertical["caption_size"], vertical["caption_margin_v"]) == (80, 420)
     assert (vertical["text_size"], vertical["text_top"]) == (84, [540, 300])
     assert preview_layout(False)["height"] == 1080
+
+
+# --- Caption edits (ADR 0017, caption editing amendment) ---
+
+
+def _edits(**fields: object) -> CaptionEdits:
+    return CaptionEdits.model_validate(fields)
+
+
+def test_without_edits_or_with_empty_ones_the_captions_are_unchanged() -> None:
+    seg = _wseg((10.0, 10.4, "one"), (10.5, 10.9, "two."))
+    plain = build_ass(_t(seg), _c(10.0, 20.0), vertical=True)
+    assert build_ass(_t(seg), _c(10.0, 20.0), vertical=True, edits=_edits()) == plain
+
+
+def test_a_fixed_word_keeps_its_time_and_a_cleared_one_is_hidden() -> None:
+    seg = _wseg((10.0, 10.4, "gonna"), (10.5, 10.9, "uh"), (11.0, 11.4, "win."))
+    edits = _edits(
+        fixes=[
+            {"start_seconds": 10.0, "text": "going to"},
+            {"start_seconds": 10.5, "text": ""},
+        ]
+    )
+    events = _events(build_ass(_t(seg), _c(10.0, 20.0), vertical=True, edits=edits))
+    assert events == [
+        "0:00:00.00,0:00:01.00,{\\c&H0000FFFF&}going to{\\r} win.",
+        "0:00:01.00,0:00:01.40,going to {\\c&H0000FFFF&}win.{\\r}",
+    ]
+
+
+def test_a_fix_ending_a_sentence_ends_the_chunk_there() -> None:
+    seg = _wseg((10.0, 10.4, "one"), (10.5, 10.9, "two"), (11.0, 11.4, "three"))
+    edits = _edits(fixes=[{"start_seconds": 10.0, "text": "One."}])
+    chunks = caption_chunks(_t(seg), _c(10.0, 20.0), edits=edits)
+    assert [[w.text for w in chunk] for chunk in chunks] == [["One."], ["two", "three"]]
+
+
+def test_key_words_stay_in_the_chosen_colour_through_their_chunk() -> None:
+    seg = _wseg((10.0, 10.4, "a"), (10.5, 10.9, "big"), (11.0, 11.4, "win"))
+    edits = _edits(keys=[10.5], highlight="green")
+    events = _events(build_ass(_t(seg), _c(10.0, 20.0), vertical=True, edits=edits))
+    green = "{\\c&H0076E600&}"
+    assert events == [
+        f"0:00:00.00,0:00:00.50,{green}a{{\\r}} {green}big{{\\r}} win",
+        f"0:00:00.50,0:00:01.00,a {green}big{{\\r}} win",
+        f"0:00:01.00,0:00:01.40,a {green}big{{\\r}} {green}win{{\\r}}",
+    ]
+    [chunk] = caption_chunks(_t(seg), _c(10.0, 20.0), edits=edits)
+    assert [w.key for w in chunk] == [False, True, False]
+
+
+def test_fixes_that_match_no_word_change_nothing() -> None:
+    seg = _wseg((10.0, 10.4, "one"))
+    edits = _edits(fixes=[{"start_seconds": 10.001, "text": "x"}], keys=[15.0])
+    assert _events(build_ass(_t(seg), _c(10.0, 20.0), vertical=True, edits=edits)) == [
+        "0:00:00.00,0:00:00.40,{\\c&H0000FFFF&}one{\\r}"
+    ]
+
+
+def test_the_preview_layout_lists_the_highlight_colours() -> None:
+    assert preview_layout(True)["highlights"] == HIGHLIGHTS
+    assert HIGHLIGHTS["yellow"] == "#FFFF00"

@@ -33,6 +33,7 @@ from clipper.core.judging import (
 from clipper.core.naming import clip_file_name, variant_file_name
 from clipper.domain.errors import ClipperError, JudgingError, ReviewError
 from clipper.domain.models import (
+    CaptionEdits,
     ClipCandidate,
     ClipVariant,
     CropPath,
@@ -83,6 +84,8 @@ class SaveRequest:
     cuts: tuple[Cut, ...] = ()
     # Lines burned over the clip (ADR 0030).
     texts: tuple[OnScreenText, ...] = ()
+    # Word fixes, key words and colour; None for the transcript's (ADR 0017).
+    caption_edits: CaptionEdits | None = None
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -113,7 +116,8 @@ def parse_save(
     list, kept in that list's order. Cuts are `[start, end]` pairs in order,
     apart and strictly inside the span (ADR 0029). Texts are objects of
     `text`, `start`, `end` (seconds of the finished clip) and `place`
-    (ADR 0030).
+    (ADR 0030). Caption edits are `fixes` of `start_seconds` and `text`,
+    `keys` and a `highlight` (ADR 0017); none at all is None.
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -148,8 +152,34 @@ def parse_save(
         raise BadRequest(str(exc)) from exc
     texts = _texts(data.get("texts", []))
     return SaveRequest(
-        start, end, title, _text(data, "note"), style, rating, chosen, cuts, texts
+        start,
+        end,
+        title,
+        _text(data, "note"),
+        style,
+        rating,
+        chosen,
+        cuts,
+        texts,
+        parse_caption_edits(data.get("caption_edits")),
     )
+
+
+def parse_caption_edits(value: object) -> CaptionEdits | None:
+    """Caption edits from a request, or None when absent or changing
+    nothing. Raises `BadRequest` for anything the model refuses."""
+    if value is None:
+        return None
+    try:
+        edits = CaptionEdits.model_validate(value)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        where = ".".join(str(part) for part in first["loc"])
+        message = first["msg"].removeprefix("Value error, ")
+        raise BadRequest(
+            f"caption_edits: {where}: {message}".replace(": :", ":")
+        ) from exc
+    return None if edits.empty else edits
 
 
 def _texts(value: object) -> tuple[OnScreenText, ...]:
@@ -225,6 +255,11 @@ def parse_thumbnail(data: object, duration: float) -> ThumbnailRequest:
         message = exc.errors()[0]["msg"].removeprefix("Value error, ")
         raise BadRequest(f"text: {message}") from exc
     return ThumbnailRequest(at, text, style)
+
+
+def edits_payload(edits: CaptionEdits | None) -> dict[str, object] | None:
+    """Caption edits as the page sends and reads them, or None."""
+    return None if edits is None else edits.model_dump()
 
 
 def thumbnail_name(clip_file: str) -> str:
@@ -313,6 +348,7 @@ class ReviewStore:
                     "people": list(label.people),
                     "cuts": [[c.start_seconds, c.end_seconds] for c in label.cuts],
                     "texts": [text_payload(t) for t in label.texts],
+                    "caption_edits": edits_payload(label.caption_edits),
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -363,6 +399,7 @@ class ReviewStore:
             or not same_span((clip.start_seconds, clip.end_seconds), span)
             or not _same_cuts(clip.cuts, request.cuts)
             or clip.texts != request.texts
+            or (self.manifest.captions and clip.caption_edits != request.caption_edits)
         )
         candidate = ClipCandidate(
             start_seconds=request.start,
@@ -388,6 +425,7 @@ class ReviewStore:
             request.people,
             request.cuts,
             request.texts,
+            request.caption_edits,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -395,13 +433,20 @@ class ReviewStore:
         changes: dict[str, object] = {
             "reviewed": "saved",
             "title": request.title,
+            "caption_edits": request.caption_edits,
             **_first_write(clip),
         }
         render_error = warning = None
         if needs_render:
             try:
                 changes |= self._rerender(
-                    clip, candidate, name, style, request.cuts, request.texts
+                    clip,
+                    candidate,
+                    name,
+                    style,
+                    request.cuts,
+                    request.texts,
+                    request.caption_edits,
                 )
             except ClipperError as exc:
                 render_error = str(exc)
@@ -463,6 +508,7 @@ class ReviewStore:
         style: str | None,
         cuts: tuple[Cut, ...] = (),
         texts: tuple[OnScreenText, ...] = (),
+        caption_edits: CaptionEdits | None = None,
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
@@ -486,6 +532,7 @@ class ReviewStore:
                 vertical=manifest.vertical,
                 cuts=cuts,
                 texts=texts,
+                edits=caption_edits,
             )
             ass = built.text
             if built.speech:

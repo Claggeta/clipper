@@ -7,6 +7,7 @@ from clipper.adapters.results.labels_json import load_labels
 from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.domain.errors import JudgingError, ReviewError
 from clipper.domain.models import (
+    CaptionEdits,
     ClipCandidate,
     ClipVariant,
     ManifestClip,
@@ -16,7 +17,13 @@ from clipper.domain.models import (
     Transcript,
     Word,
 )
-from clipper.review.store import RenderInputs, ReviewStore, SaveRequest
+from clipper.review.store import (
+    BadRequest,
+    RenderInputs,
+    ReviewStore,
+    SaveRequest,
+    parse_caption_edits,
+)
 
 # Constructed manifest and transcript, not the output of a real run.
 
@@ -834,3 +841,51 @@ def test_thumbnail_bodies_are_checked() -> None:
     assert thumbnail_name("talk_000010-000040.face.mp4") == (
         "talk_000010-000040.thumb.jpg"
     )
+
+
+# --- Caption edits (ADR 0017, caption editing amendment) ---
+
+
+def test_caption_edits_are_saved_and_burned_and_re_render_only_on_change(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    env.save(1, 10.0, 40.0)
+    edits = CaptionEdits.model_validate(
+        {"fixes": [{"start_seconds": 12.0, "text": "Hi"}], "keys": [12.7]}
+    )
+    calls = len(env.renderer.calls)
+
+    saved = env.store.save(1, SaveRequest(10.0, 40.0, None, None, caption_edits=edits))
+    assert len(env.renderer.calls) == calls + 1
+    assert "Hi{\\r}" in str(env.renderer.captions[-1])
+    assert "Hello" not in str(env.renderer.captions[-1])
+    assert saved.clip.caption_edits == edits
+    [label] = load_labels(env.labels_path).labels
+    assert label.caption_edits == edits
+
+    env.store.save(1, SaveRequest(10.0, 40.0, None, None, caption_edits=edits))
+    assert len(env.renderer.calls) == calls + 1
+    cleared = env.store.save(1, SaveRequest(10.0, 40.0, None, None))
+    assert len(env.renderer.calls) == calls + 2
+    assert cleared.clip.caption_edits is None
+
+
+def test_without_captions_edits_are_kept_but_render_nothing(tmp_path: Path) -> None:
+    env = Env(tmp_path, captions=False)
+    env.save(1, 10.0, 40.0)
+    calls = len(env.renderer.calls)
+    edits = CaptionEdits(highlight="pink")
+    saved = env.store.save(1, SaveRequest(10.0, 40.0, None, None, caption_edits=edits))
+    assert len(env.renderer.calls) == calls
+    assert saved.clip.caption_edits == edits
+
+
+def test_parse_caption_edits_checks_and_drops_empty_ones() -> None:
+    assert parse_caption_edits(None) is None
+    assert parse_caption_edits({"fixes": [], "keys": [], "highlight": "yellow"}) is None
+    assert parse_caption_edits({"highlight": "cyan"}) == CaptionEdits(highlight="cyan")
+    with pytest.raises(BadRequest, match="caption_edits: highlight"):
+        parse_caption_edits({"highlight": "purple"})
+    with pytest.raises(BadRequest, match="caption_edits"):
+        parse_caption_edits([1, 2])
