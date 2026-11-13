@@ -422,6 +422,11 @@ and planned code:
   4:39 VOD), `/api/words`, waveform and words lanes, snapping to word
   edges within 0.3 s (a toggle, Alt while dragging), 0.25 and 0.5 s a
   frame with quarter-second frames; `static/precision.js`; RV19.
+  Live preview amendment (9e): Preview, Source and Draft views; a canvas
+  drawn from the source player (fit with blurred fill, or the face crop
+  from `/api/crop`), captions from `/api/captions` (`caption_chunks`,
+  pulled out of `build_ass` unchanged; fonts at 0.87 for libass sizing),
+  on-screen texts at clip time; `static/preview.js`; RV20.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1325,8 +1330,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9d. ~~Precision: a waveform from cached ffmpeg peaks, frame stepping,
      snapping to word edges, timeline zoom below a second.~~ (done;
      frame stepping came with 9c; manual step RV19)
-   - 9e. Live preview: the span through its cuts, framed as the style,
-     with captions, texts and zooms drawn by the browser.
+   - 9e. ~~Live preview: the span through its cuts, framed as the style,
+     with captions, texts and zooms drawn by the browser.~~ (done; zooms
+     join with 9h; manual step RV20)
    - 9f. Caption editing: fix a word's text (time kept), key words and a
      highlight colour. ADR 0017 amendment.
    - 9g. Text styling: colour, box or outline, size, fade-in, free

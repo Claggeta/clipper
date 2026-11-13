@@ -4,7 +4,8 @@ The server binds to the loopback address only and serves a fixed set of
 paths: the page's own files, the clips as JSON, the source video with HTTP
 range requests so the browser can seek in it, and cached still frames for
 the film strip, the pauses in speech inside a span (ADR 0029), and the
-audio levels and word times for trimming (ADR 0031). POST paths save,
+audio levels, word times, caption chunks and face crop for trimming and
+the live preview (ADR 0031). POST paths save,
 trash or make a thumbnail of a clip; they answer only the page itself
 (see `_trusted`).
 """
@@ -24,7 +25,9 @@ from importlib.resources import files
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from clipper.core.captions import caption_chunks, preview_layout
 from clipper.core.cuts import find_pauses
+from clipper.core.framing import plan_face_crop
 from clipper.core.interfaces import (
     ClipRenderer,
     FaceTracker,
@@ -40,6 +43,7 @@ from clipper.domain.errors import (
     ReviewError,
 )
 from clipper.domain.models import (
+    ClipCandidate,
     LabeledVideo,
     ManifestClip,
     RenderManifest,
@@ -73,6 +77,7 @@ _STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
     "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
+    "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 # A film strip frame, at a whole or quarter second (ADR 0031):
@@ -297,6 +302,7 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "duration": session.duration_seconds,
         "frames_key": frames_key(session),
         "people": list(session.people),
+        "layout": preview_layout(manifest.vertical),
         "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
     }
 
@@ -323,6 +329,68 @@ def pauses_payload(session: ReviewSession, query: str) -> dict[str, object]:
         raise ReviewError("This folder has no transcript to find pauses in")
     cuts = find_pauses(session.transcript, start, end)
     return {"cuts": [list(cut) for cut in cuts]}
+
+
+def _cuts_query(
+    query: str, start: float, end: float
+) -> tuple[tuple[float, float], ...]:
+    """`&cuts=a:b,c:d` in source seconds, each inside the span and in order;
+    none when absent. Raises `BadRequest` otherwise."""
+    text = parse_qs(query).get("cuts", [""])[0]
+    if not text:
+        return ()
+    try:
+        cuts = tuple(
+            (float(a), float(b))
+            for a, b in (part.split(":") for part in text.split(","))
+        )
+    except ValueError as exc:
+        raise BadRequest("give cuts as start:end pairs, comma separated") from exc
+    previous = start
+    for cut_start, cut_end in cuts:
+        if not previous < cut_start < cut_end < end:
+            raise BadRequest("cuts must be in order and inside the span")
+        previous = cut_end
+    return cuts
+
+
+def captions_payload(session: ReviewSession, query: str) -> dict[str, object]:
+    """The caption chunks `build_ass` would burn into `?start=&end=` with
+    `&cuts=`, in source seconds, for the live preview (ADR 0031). Raises
+    `BadRequest` for a bad span or cuts and `ReviewError` without a
+    transcript."""
+    start, end = _span_query(session, query)
+    cuts = _cuts_query(query, start, end)
+    if session.transcript is None:
+        raise ReviewError("This folder has no captions to preview")
+    candidate = ClipCandidate(
+        start_seconds=start, end_seconds=end, score=0.0, reasons=("preview",)
+    )
+    chunks = caption_chunks(session.transcript, candidate, cuts)
+    return {"chunks": [[list(word) for word in chunk] for chunk in chunks]}
+
+
+def crop_payload(session: ReviewSession, query: str) -> dict[str, object]:
+    """The face style's crop for `?start=&end=`, as a re-render would frame
+    it (ADR 0025), with times from the span's start; `crop` is None, with a
+    note, when no face is found. Tracking a new span takes a while; it is
+    cached. Raises `BadRequest` for a bad span and `ReviewError` when the
+    run has no face tracker or frame size."""
+    start, end = _span_query(session, query)
+    if session.face_tracker is None or session.frame_size is None:
+        raise ReviewError("This run cannot find faces to frame")
+    track = session.face_tracker.track(session.video, start, end)
+    crop = plan_face_crop(track, *session.frame_size)
+    if crop is None:
+        return {"crop": None, "note": "No face in this span; it is framed as fit."}
+    return {
+        "crop": {
+            "width": crop.width,
+            "height": crop.height,
+            "points": [list(point) for point in crop.points],
+        },
+        "frame": list(session.frame_size),
+    }
 
 
 def words_payload(session: ReviewSession, query: str) -> dict[str, object]:
@@ -373,6 +441,10 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     self._send_span_reply(pauses_payload, query)
                 elif path == "/api/words":
                     self._send_span_reply(words_payload, query)
+                elif path == "/api/captions":
+                    self._send_span_reply(captions_payload, query)
+                elif path == "/api/crop":
+                    self._send_span_reply(crop_payload, query)
                 elif path == "/video":
                     self._send_file(session.video, video_type)
                 elif (draft := _CLIP_PATH.fullmatch(path)) and draft.group(
@@ -456,6 +528,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             except ReviewError as exc:
                 self._send_error(HTTPStatus.CONFLICT, str(exc))
+            except ClipperError as exc:
+                # Face tracking can fail (ADR 0025); say why.
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
             else:
                 self._send_json(HTTPStatus.OK, reply)
 

@@ -24,6 +24,10 @@ function shownPlayer() {
 }
 
 function playOrPause() {
+  if (shownScreen() === "preview") {
+    togglePreviewPlay();
+    return;
+  }
   const video = shownPlayer();
   if (video.paused) {
     video.play().catch(() => {});
@@ -51,11 +55,12 @@ function rate(value) {
   ratingBox.querySelector(`[data-value="${value}"]`).click();
 }
 
-// As the Source and Draft buttons: nothing to switch to without a draft.
+// Through Preview, Source and Draft, skipping the draft when there is none.
 function toggleScreen() {
-  if (hasDraft) {
-    showScreen(screen === "draft" ? "source" : "draft");
-  }
+  const order = ["preview", "source", "draft"].filter(
+    (name) => name !== "draft" || hasDraft,
+  );
+  showScreen(order[(order.indexOf(shownScreen()) + 1) % order.length]);
 }
 
 // The clips in list order.

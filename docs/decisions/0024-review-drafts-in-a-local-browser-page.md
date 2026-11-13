@@ -445,6 +445,15 @@ transcript, as `/api/pauses`). Frame paths also take quarter seconds,
 `<second>.25`, `.5` or `.75`; whole seconds keep their names. Manual step
 RV19.
 
+## Amended by the live preview (ADR 0031, V7 item 9e)
+
+`/preview.js`, `GET /api/captions?start=&end=&cuts=a:b,...` (the caption
+chunks the burn-in would show, 409 without a transcript, 400 for cuts
+out of order or outside the span) and `GET /api/crop?start=&end=` (the
+face style's crop, through the run's face tracker; 409 without one, 500
+with the message if tracking fails). `/api/clips` carries the burn-in's
+sizes as `layout`. Manual step RV20.
+
 ## Related
 
 - 0011: render's failure policy

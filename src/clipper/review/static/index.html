@@ -22,11 +22,17 @@
     </nav>
     <main class="stage">
       <div class="screen-switch" role="group" aria-label="Show">
+        <button type="button" id="show-preview" aria-pressed="false" title="The clip as it will look: cuts skipped, framed, with captions and text">Preview</button>
         <button type="button" id="show-source" aria-pressed="true" title="The whole source video">Source</button>
         <button type="button" id="show-draft" aria-pressed="false" title="The rendered draft">Draft</button>
       </div>
       <div class="screen">
         <video id="player" src="/video" controls preload="metadata"></video>
+        <div id="preview-view" class="preview-view" hidden>
+          <canvas id="preview-canvas" class="preview-canvas" title="Click to play or pause the span"></canvas>
+          <span id="preview-time" class="preview-time"></span>
+          <span id="preview-note" class="preview-note" hidden></span>
+        </div>
         <div id="draft-view" class="draft-view" hidden>
           <div class="draft-frame">
             <video id="draft" controls preload="metadata" playsinline></video>
@@ -167,7 +173,7 @@
         <dt><kbd>Delete</kbd></dt><dd>Trash (twice to confirm)</dd>
         <dt><kbd>↓</kbd> <kbd>N</kbd></dt><dd>Next clip</dd>
         <dt><kbd>↑</kbd> <kbd>Shift</kbd>+<kbd>N</kbd></dt><dd>Previous clip</dd>
-        <dt><kbd>D</kbd></dt><dd>Source or draft</dd>
+        <dt><kbd>D</kbd></dt><dd>Preview, source or draft</dd>
         <dt><kbd>A</kbd></dt><dd>Add clip here</dd>
         <dt><kbd>T</kbd></dt><dd>Add text</dd>
         <dt><kbd>?</kbd></dt><dd>This list (<kbd>Esc</kbd> closes it)</dd>
@@ -179,5 +185,6 @@
   <script src="/app.js"></script>
   <script src="/keys.js"></script>
   <script src="/precision.js"></script>
+  <script src="/preview.js"></script>
 </body>
 </html>

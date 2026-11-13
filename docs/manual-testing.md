@@ -2991,6 +2991,36 @@ VOD whose waveform is not cached yet (delete its file under
 
 Then delete the scratch folders.
 
+### RV20. Live preview
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s live
+preview amendment (V7 item 9e). Same scratch copy and labels dir as RV12,
+with a clip that has both `fit` and `face` drafts.
+
+1. Choose a clip. Pass: `Preview` is pressed and a 9:16 frame shows the
+   clip's first moment: the picture across the width over a blurred
+   copy, and a label `0.0 / <length> s`.
+2. Press `Space` (or click the frame). Pass: the span plays with sound,
+   captions appear word by word with the spoken word yellow, and it stops
+   at the end handle. Press `D` until `Draft` and play the draft at the
+   same moment. Pass: the captions are the same words, about the same
+   size and place.
+3. Mark a cut by hand inside the span and play over it. Pass: the
+   preview jumps over it, the label's length drops by the cut, and a
+   word inside the cut does not show in the captions.
+4. Add an on-screen text `Wait for it...` from 2 to 5 s in the middle.
+   Pass: it shows in the preview from 2 to 5 s of the label's time, on a
+   half-dark box, without a Save.
+5. Pick `Face` on the `Frame` tab. Pass: "Tracking faces…" shows for a
+   while on a new span (seconds to a minute), then the preview is the
+   full-height crop on the face, matching the face draft. `Fit` goes back.
+6. Move the playhead outside the span. Pass: the label says "Outside the
+   span"; `Space` plays from the start handle.
+7. Choose `Source`. Pass: the whole video with its controls, as before.
+   On a folder made without `--vertical`, Preview is 16:9.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |
