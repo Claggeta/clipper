@@ -55,11 +55,13 @@ from clipper.review.store import (
     ReviewStore,
     UnknownClip,
     edits_payload,
+    hand_payload,
     parse_caption_edits,
     parse_save,
     parse_thumbnail,
     parse_trash,
     text_payload,
+    zoom_payload,
 )
 
 HOST = "127.0.0.1"
@@ -80,6 +82,7 @@ _STATIC = {
     "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
     "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
     "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
+    "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
     "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
@@ -291,6 +294,8 @@ def clip_payload(
         "texts": [text_payload(text) for text in clip.texts],
         "thumbnail": clip.thumbnail,
         "caption_edits": edits_payload(clip.caption_edits),
+        "zooms": [zoom_payload(zoom) for zoom in clip.zooms],
+        "hand_crops": [hand_payload(hand) for hand in clip.hand_crops],
         "judgment": store.judgment(clip),
     }
 

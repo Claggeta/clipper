@@ -465,6 +465,13 @@ highlight colour) and stores them on the judged label and manifest clip;
 Save's texts may carry `colour`, `look`, `size`, `fade`, `x` and `y`;
 the page's texts and `/api/clips` carry them back. Manual step RV22.
 
+## Amended by zooms and hand crops (ADR 0016, 0025 and 0031, V7 item 9h)
+
+`/frame.js`; Save takes `zooms` (`start`, `end`, `scale`, `x`, `y`,
+`smooth`) and `hand_crops` (`start`, `end`, `x`) in source seconds,
+refused in a landscape folder (409); both are stored on the judged label
+and manifest clip and re-render on change. Manual step RV23.
+
 ## Related
 
 - 0011: render's failure policy

@@ -7,6 +7,7 @@ from clipper.domain.models import (
     ClipTitle,
     CropPath,
     FaceTrack,
+    HandCropPlan,
     LabeledVideo,
     MediaInfo,
     RenderedClip,
@@ -14,6 +15,7 @@ from clipper.domain.models import (
     Transcript,
     VideoInfo,
     VideoSource,
+    Zoom,
 )
 
 
@@ -106,6 +108,11 @@ class ClipRenderer(Protocol):
     `cuts` are source-time ranges strictly inside the candidate's span to
     leave out, in order (ADR 0029); the kept parts are joined in the same
     encode. Captions and crop times are then times in the cut clip.
+
+    `zooms` are punch-ins on the 9:16 frame, before captions, in the cut
+    clip's seconds (ADR 0016, zoom amendment); `hand` the fit style's
+    hand-placed windows (ADR 0025, hand crop amendment). Both need the
+    vertical frame.
     """
 
     def render(
@@ -118,6 +125,8 @@ class ClipRenderer(Protocol):
         vertical: bool = False,
         crop: CropPath | None = None,
         cuts: tuple[tuple[float, float], ...] = (),
+        zooms: tuple[Zoom, ...] = (),
+        hand: HandCropPlan | None = None,
     ) -> RenderedClip: ...
 
     def still(

@@ -10,12 +10,14 @@ from clipper.domain.models import (
     CaptionEdits,
     ClipCandidate,
     ClipVariant,
+    HandCrop,
     ManifestClip,
     OnScreenText,
     RenderManifest,
     Segment,
     Transcript,
     Word,
+    Zoom,
 )
 from clipper.review.store import (
     BadRequest,
@@ -963,3 +965,93 @@ def test_an_unstyled_text_is_written_as_before(tmp_path: Path) -> None:
     written = env.labels_path.read_text(encoding="utf-8")
     assert '"place": "top"' in written
     assert "colour" not in written
+
+
+# --- Zooms and hand crops (ADR 0016 and 0025 amendments) ---
+
+
+def _zoom_body(**extra: object) -> dict[str, object]:
+    return {
+        "start": 10.0,
+        "end": 40.0,
+        "zooms": [{"start": 12.0, "end": 14.0, "scale": 1.5, "x": 0.4, "smooth": True}],
+        "hand_crops": [{"start": 20.0, "end": 25.0, "x": 0.3}],
+        **extra,
+    }
+
+
+def test_zooms_and_hand_crops_are_parsed_and_checked() -> None:
+    from clipper.review.store import parse_save
+
+    request = parse_save(_zoom_body(), 600.0)
+    assert request.zooms == (
+        Zoom(start_seconds=12.0, end_seconds=14.0, scale=1.5, x=0.4, smooth=True),
+    )
+    assert request.hand_crops == (
+        HandCrop(start_seconds=20.0, end_seconds=25.0, x=0.3),
+    )
+    for zooms, message in [
+        ([{"start": 5.0, "end": 14.0}], "inside the span"),
+        (
+            [{"start": 12.0, "end": 14.0}, {"start": 13.0, "end": 15.0}],
+            "in order, apart",
+        ),
+        ([{"start": 12.0, "end": 14.0, "scale": 3}], "zoom:"),
+        ("x", "list of at most 10"),
+    ]:
+        with pytest.raises(BadRequest, match=message):
+            parse_save(_zoom_body(zooms=zooms), 600.0)
+
+
+def test_zooms_and_hand_crops_re_render_in_the_cut_clips_time(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.store._render = RenderInputs(
+        tmp_path / "talk.mp4", env.renderer, TRANSCRIPT, frame_size=(1920, 1080)
+    )
+    zoom = Zoom(start_seconds=12.0, end_seconds=14.0, scale=1.5)
+    hand = HandCrop(start_seconds=20.0, end_seconds=25.0, x=0.5)
+    saved = env.store.save(
+        1,
+        SaveRequest(
+            10.0,
+            40.0,
+            None,
+            None,
+            cuts=((15.0, 18.0),),
+            zooms=(zoom,),
+            hand_crops=(hand,),
+        ),
+    )
+    # From the clip's start; the hand crop after the 3 s cut moves 3 s earlier.
+    assert env.renderer.zooms[-1] == (
+        zoom.model_copy(update={"start_seconds": 2.0, "end_seconds": 4.0}),
+    )
+    plan = env.renderer.hands[-1]
+    assert plan is not None
+    assert plan.ranges == ((7.0, 12.0),)
+    assert (saved.clip.zooms, saved.clip.hand_crops) == ((zoom,), (hand,))
+    [label] = load_labels(env.labels_path).labels
+    assert (label.zooms, label.hand_crops) == ((zoom,), (hand,))
+    calls = len(env.renderer.calls)
+    env.store.save(
+        1,
+        SaveRequest(
+            10.0,
+            40.0,
+            None,
+            None,
+            cuts=((15.0, 18.0),),
+            zooms=(zoom,),
+            hand_crops=(hand,),
+        ),
+    )
+    assert len(env.renderer.calls) == calls
+
+
+def test_zooms_in_a_landscape_folder_are_refused(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.store.manifest = env.store.manifest.model_copy(update={"vertical": False})
+    zoom = Zoom(start_seconds=12.0, end_seconds=14.0)
+    with pytest.raises(JudgingError, match="vertical drafts folder"):
+        env.store.save(1, SaveRequest(10.0, 40.0, None, None, zooms=(zoom,)))
+    assert not env.labels_path.exists()

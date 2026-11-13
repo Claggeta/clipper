@@ -127,7 +127,9 @@ and planned code:
   width and centred on a blurred copy of itself (amended: the original centre
   crop cut off too much and was replaced before release). One re-encode path;
   the vertical frame first, then captions. Off by default. Amends 0007 and
-  0011.
+  0011. Zoom amendment (V7 9h): punch-ins over source-time stretches,
+  1.1 to 2.0x, a centre, cut-in or smooth, by per-frame `scale` and a
+  `crop` whose offsets are expressions of `t`; vertical only.
 - `0017` — word timestamps (`Segment.words`, default empty) and styled ASS
   captions from one pure builder that replaces `build_srt`. The transcriber's
   name gains `+words`, so old cache entries are re-transcribed. Segments
@@ -324,7 +326,9 @@ and planned code:
   Several styles amendment (13d): `drafts --style` (repeatable, default
   fit and face), the face file `<stem>.face.mp4` beside the fit one, one
   title per clip, manifest `styles` and per-clip `variants` (0019, 0022);
-  a clip without a face still renders in fit. Style switch amendment
+  a clip without a face still renders in fit. Hand crop amendment (V7
+  9h): a 9:16 window centred by hand over a stretch, merged into the face
+  path or laid over the fit with `overlay=enable`. Style switch amendment
   (13e): the review page plays the draft (`/clips/<file>`, listed names
   only) with a button per style; Save keeps one style, re-rendering in it
   if the span moved (face tracking in `review`), deletes the other, and
@@ -439,6 +443,9 @@ and planned code:
   Text styling amendment (9g): colour, box or outline, size, fade and a
   dragged position per text (ADR 0030 amendment); preview lines balanced
   as libass wraps them; RV22.
+  Zoom and reframing amendment (9h): zooms and hand crops in the Frame
+  tab, bars under the strip with draggable ends, drawn and panned on the
+  preview (ADR 0016 and 0025 amendments); `static/frame.js`; RV23.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1351,8 +1358,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9g. ~~Text styling: colour, box or outline, size, fade-in, free
      position by dragging. ADR 0030 amendment.~~ (done; manual step
      RV22)
-   - 9h. Zoom and reframing: punch-ins over a range, a crop set by hand.
-     ADR 0016 and 0025 amendments.
+   - 9h. ~~Zoom and reframing: punch-ins over a range, a crop set by hand.
+     ADR 0016 and 0025 amendments.~~ (done; vertical only; 8 s render
+     2.4 to 2.8 s with both; manual step RV23)
    - 9i. Audio: clip volume, a music bed lowered under speech, sound
      effects, from local `data/music/` and `data/sfx/`.
    - 9j. Assistant: a spike first on requests the maintainer writes (the

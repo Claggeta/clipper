@@ -114,6 +114,27 @@ burned-in subtitle lost both ends. Nothing had been released with it.
   largest face, decided in ADR 0025. Decision 3 holds for both: one
   re-encode, the vertical frame first, then captions.
 
+## Amended by zooms (V7 item 9h, ADR 0031)
+
+- A clip may carry punch-in zooms, made in the review page: a stretch in
+  source seconds (like cuts, so it stays on the moment), a scale of 1.1
+  to 2.0 (default 1.3; past 2.0 1080p source upscaled goes soft), a
+  centre `x`, `y` as fractions of the frame, and a cut-in or a `smooth`
+  0.3 s ease in and out (half a short zoom). At most 10, in order and
+  apart, inside the span; `Zoom` on the manifest clip and judged label.
+- Rendered on the 9:16 frame after it is made (fit, face or a hand crop)
+  and before captions, so captions and texts never zoom: `scale` with
+  `eval=frame` to `1080*Z` by `1920*Z`, then `crop=1080:1920` at
+  `1080*(Z-1)*x`, `1920*(Z-1)*y`. The crop offsets are expressions of
+  `t`, not `iw`, which `crop` reads once (checked on ffmpeg 9.0.2: with
+  `iw` the zoom stuck to the left edge). Zooms do not overlap, so each sum
+  has one term at a time. Times move to the cut clip through the time
+  map; a zoom inside a cut is left out.
+- Vertical folders only; a Save with zooms in a landscape folder is
+  refused (409). Without zooms the filter is unchanged.
+- Measured on v2924392099, 8 s rendered vertical: 2.4 s plain, 2.8 s with
+  a smooth zoom and a hand crop. Manual step RV23.
+
 ## Revisit when
 
 - Real clips lose their subject often enough to matter. That is the case for

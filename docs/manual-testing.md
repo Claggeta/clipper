@@ -3070,6 +3070,34 @@ styling amendment (V7 item 9g). Same scratch copy and labels dir as RV12.
 
 Then delete the scratch folders.
 
+### RV23. Zooms and hand crops
+
+Covers [ADR 0016](decisions/0016-vertical-centre-crop.md)'s zoom and
+[ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)'s hand
+crop amendments (V7 item 9h). Same scratch copy and labels dir as RV12,
+in a vertical folder.
+
+1. Choose a clip, open `Frame`, put the playhead 2 s in and press `Add
+   zoom at playhead`. Pass: a row `2`, `4`, `1.3×`; a purple bar under
+   the strip; `Unsaved`; between 2 and 4 s the preview is zoomed in.
+2. Drag on the preview inside the zoom. Pass: the zoomed picture follows
+   the pointer; playback does not start.
+3. Tick `Smooth`, pick `1.5×`, play over it. Pass: the zoom eases in and
+   out instead of cutting.
+4. Put the playhead 6 s in and press `Crop by hand from here`. Pass: a
+   green bar; from 6 to 9 s the preview is a full-height window; drag on
+   the preview moves it left and right; the row's centre changes.
+5. Zoom the strip in and drag a bar's end. Pass: the stretch grows or
+   shrinks, not past its neighbour or the span; no cut is made.
+6. Save. Pass: "re-rendered"; the draft zooms and crops where the
+   preview did, captions and texts not zoomed.
+7. Reload and choose the clip. Pass: the rows and bars are back,
+   `Unsaved` hidden. `Reset` clears them.
+8. In a folder made without `--vertical`, the two buttons are greyed out
+   with a note.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

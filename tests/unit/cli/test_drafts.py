@@ -23,12 +23,14 @@ from clipper.domain.models import (
     FaceBox,
     FaceSample,
     FaceTrack,
+    HandCropPlan,
     MediaInfo,
     RenderedClip,
     RenderManifest,
     Transcript,
     VideoInfo,
     VideoSource,
+    Zoom,
 )
 
 # Everything here is a fake or constructed: nothing downloads, transcribes,
@@ -445,6 +447,8 @@ class FaceFailingRenderer(FakeClipRenderer):
         vertical: bool = False,
         crop: CropPath | None = None,
         cuts: tuple[tuple[float, float], ...] = (),
+        zooms: tuple[Zoom, ...] = (),
+        hand: HandCropPlan | None = None,
     ) -> RenderedClip:
         if crop is not None:
             raise ClipRenderError("[face] crop failed")

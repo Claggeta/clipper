@@ -550,6 +550,58 @@ button[aria-pressed="true"] {
 
 .swatch[aria-pressed="true"] { border-color: #fff; }
 
+/* Zooms and hand crops (ADR 0016 and 0025 amendments): rows in the
+   Frame tab and bars under the strip whose ends drag. */
+.ranges {
+  display: grid;
+  gap: 6px;
+}
+
+.range-row {
+  display: grid;
+  grid-template-columns: 64px 64px minmax(84px, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.frame-lane {
+  position: relative;
+  height: 20px;
+  border-top: 1px solid #000;
+  background: #0b0d11;
+}
+
+.frame-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  min-width: 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.frame-bar.zoom { background: #3b2f5c; border: 1px solid #b59cff; }
+
+.frame-bar.hand { background: #23432f; border: 1px solid #5ad18a; }
+
+.frame-bar .grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: rgb(255 255 255 / 0.35);
+  cursor: ew-resize;
+}
+
+.frame-bar .grip.start { left: 0; }
+
+.frame-bar .grip.end { right: 0; }
+
 /* Thumbnails (ADR 0030). */
 .thumb-row {
   display: grid;

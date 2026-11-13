@@ -426,6 +426,66 @@ class CaptionEdits(BaseModel):
         return not self.fixes and not self.keys and self.highlight == "yellow"
 
 
+# Punch-in zooms (ADR 0016, zoom amendment, V7 9h): at most this much, as
+# 1080p source upscaled further goes soft.
+ZOOM_MIN = 1.1
+ZOOM_MAX = 2.0
+# Zooms or hand crops per clip, at most.
+MAX_ZOOMS = 10
+MAX_HAND_CROPS = 10
+
+
+class Zoom(BaseModel):
+    """A punch-in over a stretch of the clip, in source seconds like cuts
+    (ADR 0016, zoom amendment): the frame scaled by `scale` around a centre
+    `x`, `y` (fractions of the frame), at once or `smooth`ly eased."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    end_seconds: float = Field(allow_inf_nan=False)
+    scale: float = Field(default=1.3, ge=ZOOM_MIN, le=ZOOM_MAX)
+    x: float = Field(default=0.5, ge=0, le=1)
+    y: float = Field(default=0.5, ge=0, le=1)
+    smooth: bool = False
+
+    @model_validator(mode="after")
+    def _ends_after_start(self) -> "Zoom":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("a zoom must end after it starts")
+        return self
+
+
+class HandCrop(BaseModel):
+    """A full-height 9:16 window placed by hand over a stretch of the clip,
+    in source seconds, centred at `x` (a fraction of the source width), in
+    place of the fit or the face track there (ADR 0025, hand crop
+    amendment)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    end_seconds: float = Field(allow_inf_nan=False)
+    x: float = Field(default=0.5, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _ends_after_start(self) -> "HandCrop":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("a hand crop must end after it starts")
+        return self
+
+
+class HandCropPlan(BaseModel):
+    """What the renderer needs for hand crops in the fit style: the windows
+    as a crop path in the cut clip's seconds, and the stretches they show
+    in (ADR 0025, hand crop amendment)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: CropPath
+    ranges: tuple[tuple[float, float], ...] = Field(min_length=1)
+
+
 class ClipVariant(BaseModel):
     """One rendered style of a clip: the style and its file name in the folder.
 
@@ -475,6 +535,8 @@ class ManifestClip(BaseModel):
     name of its thumbnail image in the folder, if one was made.
     `caption_edits` are its word fixes, key words and colour (ADR 0017,
     caption editing amendment), None when the captions are as transcribed.
+    `zooms` and `hand_crops` are its punch-ins and hand-placed windows
+    (ADR 0016 and 0025 amendments), in source seconds.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -499,6 +561,8 @@ class ManifestClip(BaseModel):
     texts: tuple[OnScreenText, ...] = ()
     thumbnail: str | None = None
     caption_edits: CaptionEdits | None = None
+    zooms: tuple[Zoom, ...] = ()
+    hand_crops: tuple[HandCrop, ...] = ()
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":
@@ -625,7 +689,8 @@ class Label(Span):
     0024, rating amendment). `cuts` are the ranges left out of the clip, in
     order and inside its span (ADR 0029), and `texts` the lines burned over
     it (ADR 0030). `caption_edits` are its caption fixes, key words and
-    colour (ADR 0017, caption editing amendment).
+    colour (ADR 0017, caption editing amendment). `zooms` and `hand_crops`
+    are its punch-ins and hand-placed windows (ADR 0016 and 0025).
     """
 
     note: str | None = None
@@ -637,6 +702,8 @@ class Label(Span):
     cuts: tuple[Span, ...] = ()
     texts: tuple[OnScreenText, ...] = ()
     caption_edits: CaptionEdits | None = None
+    zooms: tuple[Zoom, ...] = ()
+    hand_crops: tuple[HandCrop, ...] = ()
 
     @field_validator("people")
     @classmethod

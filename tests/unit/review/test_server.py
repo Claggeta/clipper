@@ -245,6 +245,7 @@ def _get(
         ("/precision.js", "text/javascript", b"/api/words"),
         ("/preview.js", "text/javascript", b"/api/captions"),
         ("/captions.js", "text/javascript", b"caption_edits"),
+        ("/frame.js", "text/javascript", b"hand_crops"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -394,6 +395,8 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "cuts": [],
         "texts": [],
         "caption_edits": None,
+        "zooms": [],
+        "hand_crops": [],
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -569,6 +572,8 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "cuts": [],
         "texts": [],
         "caption_edits": None,
+        "zooms": [],
+        "hand_crops": [],
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
@@ -854,7 +859,14 @@ def test_the_page_scripts_declare_each_function_once() -> None:
     static = files("clipper.review") / "static"
     script = "\n".join(
         (static / name).read_text("utf-8")
-        for name in ("app.js", "keys.js", "precision.js", "captions.js", "preview.js")
+        for name in (
+            "app.js",
+            "keys.js",
+            "precision.js",
+            "captions.js",
+            "frame.js",
+            "preview.js",
+        )
     )
     # A top-level `const` or `let` named like any other top-level name, a
     # function's too, stops the later script.
