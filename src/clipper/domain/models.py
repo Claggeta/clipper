@@ -677,13 +677,59 @@ class ManifestClip(BaseModel):
         return self.draft_start_seconds, self.draft_end_seconds
 
 
+# A summary of a VOD's clips (ADR 0032, V7 9k): YouTube Shorts run up to
+# about this long, so past it the page warns; a label card is one line.
+SUMMARY_LIMIT_SECONDS = 180.0
+SUMMARY_LABEL_LIMIT = 60
+
+
+class SummaryPart(BaseModel):
+    """One clip in a summary, by rank, with an optional label card shown
+    at its start ("Hour 3")."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    rank: int = Field(ge=1)
+    label: str = ""
+
+    @field_validator("label")
+    @classmethod
+    def _one_short_line(cls, value: str) -> str:
+        label = value.strip()
+        if "\n" in label or "\r" in label:
+            raise ValueError("a label card must be one line")
+        if len(label) > SUMMARY_LABEL_LIMIT:
+            raise ValueError(
+                f"a label card must be at most {SUMMARY_LABEL_LIMIT} characters"
+            )
+        return label
+
+
+class Summary(BaseModel):
+    """A VOD's kept clips joined into one longer Short (ADR 0032): its file
+    in the drafts folder, the clips in VOD order with their cards, the
+    music under it, its length, and the title, rating and thumbnail set in
+    the review page. Not a moment, so no judged label."""
+
+    model_config = ConfigDict(frozen=True)
+
+    file: str
+    parts: tuple[SummaryPart, ...] = Field(min_length=1)
+    music: MusicBed | None = None
+    duration_seconds: float = Field(gt=0)
+    title: str | None = None
+    rating: Literal["good", "ok"] | None = None
+    thumbnail: str | None = None
+
+
 class RenderManifest(BaseModel):
     """What one `render` run wrote to a video's folder. See docs/decisions/0019.
 
     `vertical`, `captions` and `titles` are the flags the run was given.
     `analysis` is the result JSON path as given on the command line.
     `styles` are the vertical styles rendered, in order (ADR 0025); empty for
-    a landscape run or an older manifest.
+    a landscape run or an older manifest. `summary` is the clips joined in
+    the review page, if made (ADR 0032).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -696,6 +742,7 @@ class RenderManifest(BaseModel):
     titles: bool
     clips: tuple[ManifestClip, ...]
     styles: tuple[VerticalStyleName, ...] = ()
+    summary: Summary | None = None
 
 
 def _parse_timestamp(value: object) -> float:

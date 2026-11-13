@@ -655,3 +655,50 @@ def test_no_audio_edits_keep_todays_command(
     command = _audio_command(video, tmp_path, monkeypatch, AudioMix())
     assert "-filter_complex" not in command
     assert "0:a:0?" in command
+
+
+# --- Joining clips into a summary (ADR 0032) ---
+
+
+def test_join_concatenates_the_clips_with_cards_and_music(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _CropRun(monkeypatch)
+    a, b, bed = tmp_path / "a.mp4", tmp_path / "b.mp4", tmp_path / "bed.mp3"
+    for path in (a, b):
+        path.write_bytes(b"clip")
+
+    FfmpegClipRenderer().join(
+        [a, b], tmp_path / "s.mp4", _ASS, audio=AudioMix(music=bed), length=60.0
+    )
+
+    command = run.commands[0]
+    assert command[command.index("-i") : command.index("-filter_complex")] == [
+        "-i", str(a.resolve()), "-i", str(b.resolve()),
+        "-stream_loop", "-1", "-i", str(bed.resolve()),
+    ]  # fmt: skip
+    graph = command[command.index("-filter_complex") + 1]
+    assert graph.startswith(
+        "[0:v:0]setsar=1[v0];[1:v:0]setsar=1[v1];"
+        "[v0][0:a:0][v1][1:a:0]concat=n=2:v=1:a=1[vj][aj];"
+        "[vj]subtitles=clip.ass:charenc=UTF-8[vout];"
+        "[aj]volume=0.0dB,asplit=2[voice][key];[2:a]volume=-18.0dB,"
+        "afade=t=out:st=59.000:d=1.0[bed]"
+    )
+    assert run.files[0] == {"clip.ass": _ASS.encode("utf-8")}
+
+
+def test_join_without_cards_or_music_passes_the_joined_clip_through(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _CropRun(monkeypatch)
+    a = tmp_path / "a.mp4"
+    a.write_bytes(b"clip")
+    FfmpegClipRenderer().join([a], tmp_path / "s.mp4")
+    graph = run.commands[0][run.commands[0].index("-filter_complex") + 1]
+    assert graph.endswith("[vj]null[vout];[aj]anull[aout]")
+
+
+def test_join_refuses_a_missing_clip(tmp_path: Path) -> None:
+    with pytest.raises(ClipRenderError, match="not found"):
+        FfmpegClipRenderer().join([tmp_path / "gone.mp4"], tmp_path / "s.mp4")

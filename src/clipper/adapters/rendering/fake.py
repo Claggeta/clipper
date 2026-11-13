@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from clipper.domain.errors import ClipRenderError
@@ -34,6 +34,10 @@ class FakeClipRenderer:
         self.audio: list[AudioMix | None] = []
         self.stills: list[tuple[float, Path, str | None, bool, CropPath | None]] = []
         self.fail_stills = False
+        self.joins: list[
+            tuple[tuple[Path, ...], Path, str | None, AudioMix | None, float]
+        ] = []
+        self.fail_joins = False
 
     def render(
         self,
@@ -62,6 +66,22 @@ class FakeClipRenderer:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(b"fake clip")
         return RenderedClip(candidate=candidate, path=output_path)
+
+    def join(
+        self,
+        clips: Sequence[Path],
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        audio: AudioMix | None = None,
+        length: float = 0.0,
+    ) -> Path:
+        self.joins.append((tuple(clips), output_path, captions, audio, length))
+        if self.fail_joins:
+            raise ClipRenderError(f"Fake join failed for {output_path.name}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"fake summary")
+        return output_path
 
     def still(
         self,

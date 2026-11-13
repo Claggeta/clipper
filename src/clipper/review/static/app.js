@@ -44,6 +44,8 @@ let duration = 0;
 let burnsCaptions = false;
 let isVertical = true;
 let previewLayout = null;
+// The folder's summary, if made (ADR 0032).
+let folderSummary = null;
 // Names this video in frame URLs, so the browser's cache of frames never
 // mixes VODs (every run is served from the same address).
 let framesKey = "";
@@ -1599,6 +1601,7 @@ async function load() {
   burnsCaptions = Boolean(data.captions);
   isVertical = Boolean(data.vertical);
   previewLayout = data.layout;
+  folderSummary = data.summary || null;
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {
     if (data[name]) {

@@ -34,6 +34,7 @@ from clipper.core.interfaces import (
     FrameExtractor,
     PeaksExtractor,
     ReviewFiles,
+    TitleWriter,
 )
 from clipper.domain.errors import (
     ClipperError,
@@ -60,8 +61,10 @@ from clipper.review.store import (
     hand_payload,
     parse_caption_edits,
     parse_save,
+    parse_summary,
     parse_thumbnail,
     parse_trash,
+    summary_payload,
     text_payload,
     zoom_payload,
 )
@@ -86,6 +89,7 @@ _STATIC = {
     "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
     "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
     "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
+    "/summary.js": ("summary.js", "text/javascript; charset=utf-8"),
     "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
@@ -110,6 +114,9 @@ _ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash|thumbnail)")
 # A thumbnail the manifest lists: /thumbs/<file name> (ADR 0030).
 _THUMB_PATH = re.compile(r"/thumbs/([^/\\]+\.jpg)")
 _ADD_PATH = "/api/clips/add"
+# The folder's summary (ADR 0032): make it, or save, trash, thumbnail or
+# title it.
+_SUMMARY_PATH = re.compile(r"/api/summary(?:/(save|trash|thumbnail|suggest))?")
 _MAX_BODY = 64 * 1024
 # A refused body is read and dropped up to this size before the reply.
 _MAX_DRAIN = 1024 * 1024
@@ -148,6 +155,7 @@ class ReviewSession:
     peaks_path: Path | None = None
     music_dir: Path | None = None
     sfx_dir: Path | None = None
+    title_writer: TitleWriter | None = None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -269,6 +277,7 @@ def make_store(session: ReviewSession) -> ReviewStore:
             session.frame_size,
             session.music_dir,
             session.sfx_dir,
+            session.title_writer,
         ),
     )
 
@@ -327,6 +336,7 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "people": list(session.people),
         "layout": preview_layout(manifest.vertical),
         "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
+        "summary": summary_payload(manifest.summary),
     }
 
 
@@ -453,13 +463,19 @@ def audio_files(folder: Path | None) -> list[str]:
 
 def _listed_thumbnails(store: ReviewStore) -> set[str]:
     """The thumbnails the manifest lists, which are all the page may fetch."""
-    return {c.thumbnail for c in store.manifest.clips if c.thumbnail is not None}
+    names = {c.thumbnail for c in store.manifest.clips if c.thumbnail is not None}
+    summary = store.manifest.summary
+    if summary is not None and summary.thumbnail is not None:
+        names.add(summary.thumbnail)
+    return names
 
 
 def _listed_files(store: ReviewStore) -> set[str]:
     """The draft files the manifest lists, which are all the page may fetch."""
     names = {clip.file for clip in store.manifest.clips if clip.file is not None}
     names |= {v.file for clip in store.manifest.clips for v in clip.variants}
+    if store.manifest.summary is not None:
+        names.add(store.manifest.summary.file)
     return names
 
 
@@ -523,6 +539,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:
             path = self.path.split("?", 1)[0]
+            if (summary := _SUMMARY_PATH.fullmatch(path)) is not None:
+                self._post_summary(summary.group(1) or "make")
+                return
             action = _ACTION_PATH.fullmatch(path)
             if path == _ADD_PATH:
                 rank, verb = 0, "add"
@@ -562,6 +581,52 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             except UnknownClip:
                 self._send_error(HTTPStatus.NOT_FOUND, f"No clip ranked {rank}")
+            except JudgingError as exc:
+                self._send_error(HTTPStatus.CONFLICT, str(exc))
+            except (ClipperError, OSError) as exc:
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, reply)
+
+        def _post_summary(self, verb: str) -> None:
+            if not self._trusted():
+                self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
+                return
+            try:
+                data = self._read_json()
+                if not isinstance(data, dict):
+                    raise BadRequest("the body must be a JSON object")
+                reply: dict[str, object] | None
+                if verb == "make":
+                    reply = summary_payload(store.summarize(parse_summary(data)))
+                elif verb == "save":
+                    title = data.get("title")
+                    rating = data.get("rating")
+                    if title is not None and not isinstance(title, str):
+                        raise BadRequest("title must be text")
+                    if rating not in (None, "good", "ok"):
+                        raise BadRequest("the rating must be good or ok")
+                    reply = summary_payload(
+                        store.save_summary(
+                            title.strip() or None if title else None,
+                            rating if isinstance(rating, str) else None,
+                        )
+                    )
+                elif verb == "trash":
+                    store.trash_summary()
+                    reply = {"removed": True}
+                elif verb == "thumbnail":
+                    request = parse_thumbnail(data, session.duration_seconds)
+                    reply = summary_payload(
+                        store.summary_thumbnail(request.at, request.text)
+                    )
+                else:
+                    suggested = store.suggest_summary_title()
+                    reply = {"title": suggested.title, "hook": suggested.hook}
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except UnknownClip as exc:
+                self._send_error(HTTPStatus.NOT_FOUND, f"No clip ranked {exc}")
             except JudgingError as exc:
                 self._send_error(HTTPStatus.CONFLICT, str(exc))
             except (ClipperError, OSError) as exc:

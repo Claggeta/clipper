@@ -924,6 +924,77 @@ kbd {
   font: 12px ui-monospace, monospace;
 }
 
+/* Summarize (ADR 0032): a button and an entry above the clip list, and a
+   dialog to pick the clips and handle the result. */
+.sidebar-head { padding: 8px 8px 0; }
+
+.sidebar-head button { width: 100%; }
+
+.summary-entry {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 2px 8px;
+  width: calc(100% - 16px);
+  margin: 8px 8px 0;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--raised);
+  text-align: left;
+  font-variant-numeric: normal;
+}
+
+.summary-entry .rank { grid-row: span 2; color: var(--accent); font-weight: 600; }
+
+.summary-entry .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.summary-entry .badge { color: var(--accent); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+
+.summary-entry .span { grid-column: 2 / 4; color: var(--muted); font-size: 12px; }
+
+.summary-card { width: min(760px, calc(100vw - 32px)); }
+
+.summary-rows {
+  display: grid;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 8px 0;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto 180px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.judge .summary-row input[type="checkbox"] { width: auto; }
+
+.summary-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.summary-flag { font-size: 12px; }
+
+.summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.summary-bar select,
+.summary-bar input[type="text"] { width: auto; flex: 1; }
+
+.summary-video {
+  display: block;
+  height: 46vh;
+  aspect-ratio: 9 / 16;
+  margin: 8px auto;
+  background: #000;
+  border-radius: 6px;
+}
+
 /* Narrow windows: the regions stack and the page scrolls. */
 @media (max-width: 1199px) {
   body { display: block; height: auto; overflow: visible; }
