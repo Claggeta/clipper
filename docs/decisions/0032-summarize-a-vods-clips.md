@@ -74,6 +74,16 @@ captions, text, framing, zooms, audio) and re-renders it (0024, 0029,
 - Decision 8's second PR: summaries in `queue` and `posted`, as the ADR
   0028 amendment describes. Manual step Q3.
 
+## Amended by the rename to Combine (2026-11-13)
+
+- The maintainer wanted "Summarize" to mean a summary of the video, the
+  episode's story told in short beats from across the VOD, not the kept
+  clips joined. This feature is renamed **Combine**: the button, dialog
+  and entry, the file `<stem>_combined.mp4`, the manifest's `combined`
+  (an older `summary` key still loads), `/api/combined`, the queue's
+  `combined` place and the code's names. Nothing else changed. A new
+  Summarize is a separate decision, after a spike.
+
 ## Revisit when
 
 - The plain summary leaves gaps the maintainer wants filled.

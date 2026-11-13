@@ -44,6 +44,8 @@ from clipper.domain.models import (
     ClipCandidate,
     ClipTitle,
     ClipVariant,
+    Combined,
+    CombinedPart,
     CropPath,
     HandCrop,
     LabeledVideo,
@@ -52,8 +54,6 @@ from clipper.domain.models import (
     MusicBed,
     OnScreenText,
     RenderManifest,
-    Summary,
-    SummaryPart,
     Transcript,
     Zoom,
 )
@@ -74,8 +74,8 @@ MAX_ZOOMS = 10
 MAX_HAND_CROPS = 10
 # A text's look, sent by the page when set (ADR 0030, styling amendment).
 _TEXT_LOOK = ("colour", "look", "size", "fade", "x", "y")
-# A summary's label card shows this long at its clip's start (ADR 0032).
-SUMMARY_CARD_SECONDS = 2.5
+# A combined clip's label card shows this long at its clip's start (ADR 0032).
+CARD_SECONDS = 2.5
 # A thumbnail's text is shown from time 0 of its one frame; any length will do.
 THUMBNAIL_TEXT_SECONDS = 10.0
 # No speech, for texts alone in a folder without captions.
@@ -382,16 +382,16 @@ def edits_payload(edits: CaptionEdits | None) -> dict[str, object] | None:
 
 
 @dataclass(frozen=True)
-class SummaryRequest:
+class CombineRequest:
     """The clips to join, by rank with their label cards, and the music
     under them (ADR 0032)."""
 
-    parts: tuple[SummaryPart, ...]
+    parts: tuple[CombinedPart, ...]
     music: MusicBed | None = None
 
 
-def parse_summary(data: object) -> SummaryRequest:
-    """Check a Summarize body: `parts` of `rank` and `label`, at least one,
+def parse_combine(data: object) -> CombineRequest:
+    """Check a Combine body: `parts` of `rank` and `label`, at least one,
     each clip once, and an optional `music` as for a clip's audio."""
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -399,34 +399,34 @@ def parse_summary(data: object) -> SummaryRequest:
     if not isinstance(parts, list) or not parts:
         raise BadRequest("parts must be a list of at least one clip")
     try:
-        checked = tuple(SummaryPart.model_validate(part) for part in parts)
+        checked = tuple(CombinedPart.model_validate(part) for part in parts)
         music = data.get("music")
         bed = None if music is None else MusicBed.model_validate(music)
     except ValidationError as exc:
         message = exc.errors()[0]["msg"].removeprefix("Value error, ")
-        raise BadRequest(f"summary: {message}") from exc
+        raise BadRequest(f"combined: {message}") from exc
     if len({part.rank for part in checked}) != len(checked):
-        raise BadRequest("a clip is in the summary twice")
-    return SummaryRequest(checked, bed)
+        raise BadRequest("a clip is in the combined clip twice")
+    return CombineRequest(checked, bed)
 
 
-def summary_name(manifest: RenderManifest) -> str:
-    """`<stem>_summary.mp4`, one per drafts folder (ADR 0032)."""
-    return f"{Path(manifest.source).stem}_summary.mp4"
+def combined_name(manifest: RenderManifest) -> str:
+    """`<stem>_combined.mp4`, one per drafts folder (ADR 0032)."""
+    return f"{Path(manifest.source).stem}_combined.mp4"
 
 
-def summary_payload(summary: Summary | None) -> dict[str, object] | None:
-    """The summary as the page shows it, or None."""
-    if summary is None:
+def combined_payload(combined: Combined | None) -> dict[str, object] | None:
+    """The combined clip as the page shows it, or None."""
+    if combined is None:
         return None
     return {
-        "file": summary.file,
-        "parts": [part.model_dump() for part in summary.parts],
-        "music": None if summary.music is None else summary.music.model_dump(),
-        "duration": summary.duration_seconds,
-        "title": summary.title,
-        "rating": summary.rating,
-        "thumbnail": summary.thumbnail,
+        "file": combined.file,
+        "parts": [part.model_dump() for part in combined.parts],
+        "music": None if combined.music is None else combined.music.model_dump(),
+        "duration": combined.duration_seconds,
+        "title": combined.title,
+        "rating": combined.rating,
+        "thumbnail": combined.thumbnail,
     }
 
 
@@ -475,7 +475,7 @@ class RenderInputs:
     # Where the maintainer's music and sound effects are (ADR 0007).
     music_dir: Path | None = None
     sfx_dir: Path | None = None
-    # Suggests a summary's title; None without a model (ADR 0032).
+    # Suggests a combined clip's title; None without a model (ADR 0032).
     title_writer: TitleWriter | None = None
 
 
@@ -915,25 +915,25 @@ class ReviewStore:
             self.manifest = manifest
             return self._clip(rank), note
 
-    # --- The summary (ADR 0032) ---
+    # --- The combined clip (ADR 0032) ---
 
-    def _set_summary(self, summary: Summary | None) -> None:
-        manifest = self.manifest.model_copy(update={"summary": summary})
+    def _set_combined(self, combined: Combined | None) -> None:
+        manifest = self.manifest.model_copy(update={"combined": combined})
         self._files.save_manifest(manifest, self._folder)
         self.manifest = manifest
 
-    def _summary(self) -> Summary:
-        if self.manifest.summary is None:
-            raise JudgingError("Make the summary first")
-        return self.manifest.summary
+    def _combined(self) -> Combined:
+        if self.manifest.combined is None:
+            raise JudgingError("Make the combined clip first")
+        return self.manifest.combined
 
-    def summarize(self, request: SummaryRequest) -> Summary:
+    def combine(self, request: CombineRequest) -> Combined:
         """Join the chosen clips' files, in VOD order, with label cards at
-        their starts and the music under them, into the folder's summary,
+        their starts and the music under them, into the folder's combined clip,
         replacing any earlier one; its title and rating stay, its thumbnail
         goes. Raises `JudgingError` for a clip without a file."""
         with self._lock:
-            chosen: list[tuple[ManifestClip, SummaryPart]] = []
+            chosen: list[tuple[ManifestClip, CombinedPart]] = []
             for part in request.parts:
                 clip = self._clip(part.rank)
                 if clip.file is None or clip.reviewed == "trashed":
@@ -950,7 +950,7 @@ class ReviewStore:
                         OnScreenText(
                             text=part.label,
                             start_seconds=offset,
-                            end_seconds=offset + min(SUMMARY_CARD_SECONDS, length),
+                            end_seconds=offset + min(CARD_SECONDS, length),
                             place="middle",
                         )
                     )
@@ -963,7 +963,7 @@ class ReviewStore:
                         start_seconds=0.0,
                         end_seconds=offset,
                         score=0.0,
-                        reasons=("summary",),
+                        reasons=("combined",),
                     ),
                     vertical=self.manifest.vertical,
                     texts=tuple(texts),
@@ -978,7 +978,7 @@ class ReviewStore:
                     music_level_db=request.music.level_db,
                     duck=request.music.duck,
                 )
-            name = summary_name(self.manifest)
+            name = combined_name(self.manifest)
             target = self._folder / name
             temp = target.with_name(f"{target.stem}.part.mp4")
             try:
@@ -995,10 +995,10 @@ class ReviewStore:
                     raise ReviewError(f"Cannot replace {name}: {exc}") from exc
             finally:
                 temp.unlink(missing_ok=True)
-            old = self.manifest.summary
+            old = self.manifest.combined
             if old is not None and old.thumbnail is not None:
                 (self._folder / old.thumbnail).unlink(missing_ok=True)
-            summary = Summary(
+            combined = Combined(
                 file=name,
                 parts=tuple(part for _, part in chosen),
                 music=request.music,
@@ -1006,34 +1006,34 @@ class ReviewStore:
                 title=old.title if old else None,
                 rating=old.rating if old else None,
             )
-            self._set_summary(summary)
-            return summary
+            self._set_combined(combined)
+            return combined
 
-    def save_summary(self, title: str | None, rating: str | None) -> Summary:
-        """The summary's title and rating, without a re-render."""
+    def save_combined(self, title: str | None, rating: str | None) -> Combined:
+        """The combined clip's title and rating, without a re-render."""
         with self._lock:
-            summary = self._summary().model_copy(
+            combined = self._combined().model_copy(
                 update={"title": title, "rating": rating}
             )
-            self._set_summary(summary)
-            return summary
+            self._set_combined(combined)
+            return combined
 
-    def trash_summary(self) -> None:
-        """Delete the summary's file and thumbnail and forget it."""
+    def trash_combined(self) -> None:
+        """Delete the combined clip's file and thumbnail and forget it."""
         with self._lock:
-            summary = self._summary()
-            for name in (summary.file, summary.thumbnail):
+            combined = self._combined()
+            for name in (combined.file, combined.thumbnail):
                 if name is not None and Path(name).name == name:
                     (self._folder / name).unlink(missing_ok=True)
-            self._set_summary(None)
+            self._set_combined(None)
 
-    def summary_thumbnail(self, at: float, text: OnScreenText | None) -> Summary:
-        """A thumbnail from the summary's own frame at `at` seconds, with
-        optional text, as `<stem>_summary.thumb.jpg` (ADR 0030, 0032)."""
+    def combined_thumbnail(self, at: float, text: OnScreenText | None) -> Combined:
+        """A thumbnail from the combined clip's own frame at `at` seconds, with
+        optional text, as `<stem>_combined.thumb.jpg` (ADR 0030, 0032)."""
         with self._lock:
-            summary = self._summary()
-            if not 0 <= at < summary.duration_seconds:
-                raise BadRequest("the moment must be inside the summary")
+            combined = self._combined()
+            if not 0 <= at < combined.duration_seconds:
+                raise BadRequest("the moment must be inside the combined clip")
             ass = None
             if text is not None:
                 ass = build_ass(
@@ -1047,32 +1047,32 @@ class ReviewStore:
                     vertical=self.manifest.vertical,
                     texts=(text,),
                 ).text
-            name = thumbnail_name(summary.file)
+            name = thumbnail_name(combined.file)
             target = self._folder / name
             temp = target.with_name(f"{target.stem}.part.jpg")
             try:
                 self._render.renderer.still(
-                    self._folder / summary.file, at, temp, captions=ass
+                    self._folder / combined.file, at, temp, captions=ass
                 )
                 os.replace(temp, target)
             finally:
                 temp.unlink(missing_ok=True)
-            summary = summary.model_copy(update={"thumbnail": name})
-            self._set_summary(summary)
-            return summary
+            combined = combined.model_copy(update={"thumbnail": name})
+            self._set_combined(combined)
+            return combined
 
-    def suggest_summary_title(self) -> ClipTitle:
-        """A title and hook from the local model, given the summary's clips'
+    def suggest_combined_title(self) -> ClipTitle:
+        """A title and hook from the local model, given the combined clip's clips'
         words in order (ADR 0018, 0032). Raises `ReviewError` without a
         model or transcript."""
-        summary = self._summary()
+        combined = self._combined()
         writer, transcript = self._render.title_writer, self._render.transcript
         if writer is None or transcript is None:
             raise ReviewError(
                 "Suggesting a title needs CLIPPER_LLM_MODEL and a folder with captions"
             )
         words = []
-        for part in summary.parts:
+        for part in combined.parts:
             clip = self._clip(part.rank)
             words.append(
                 clip_text(
@@ -1081,7 +1081,7 @@ class ReviewStore:
                         start_seconds=clip.start_seconds,
                         end_seconds=clip.end_seconds,
                         score=0.0,
-                        reasons=("summary",),
+                        reasons=("combined",),
                     ),
                 )
             )

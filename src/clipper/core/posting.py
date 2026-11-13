@@ -131,13 +131,13 @@ class QueueItem:
     eligible: Eligibility
     # Its thumbnail beside it, under the clips dir, if one was made (ADR 0030).
     thumbnail: Path | None = None
-    # The folder's summary rather than one clip (ADR 0032); its rank is 0.
-    summary: bool = False
+    # The folder's combined clip rather than one clip (ADR 0032); its rank is 0.
+    combined: bool = False
 
     @property
     def place(self) -> str:
-        """`#<rank>`, or `summary`, after the video's name."""
-        return "summary" if self.summary else f"#{self.rank}"
+        """`#<rank>`, or `combined`, after the video's name."""
+        return "combined" if self.combined else f"#{self.rank}"
 
 
 def clip_key(folder: str, file: str) -> str:
@@ -158,16 +158,16 @@ def _title_text(title: str) -> str:
 def titled_clips(
     folders: Sequence[tuple[str, RenderManifest]],
 ) -> list[tuple[str, str]]:
-    """Every saved clip and summary with a title, as (title, posts key), for
+    """Every saved clip and combined clip with a title, as (title, posts key), for
     `posted` by title (ADR 0028, title amendment)."""
     titled: list[tuple[str, str]] = []
     for name, manifest in folders:
         for clip in sorted(manifest.clips, key=lambda c: c.rank):
             if clip.reviewed == "saved" and clip.file is not None and clip.title:
                 titled.append((clip.title, clip_key(name, clip.file)))
-        summary = manifest.summary
-        if summary is not None and summary.title:
-            titled.append((summary.title, clip_key(name, summary.file)))
+        combined = manifest.combined
+        if combined is not None and combined.title:
+            titled.append((combined.title, clip_key(name, combined.file)))
     return titled
 
 
@@ -197,7 +197,7 @@ def build_queue(
     `folders` come newest first; the queue takes each folder's next clip in
     rank order, round and round, so two clips of one video are never next to
     each other while another video has clips left. Good clips come before ok
-    ones. A folder's summary, rated the same, comes after its clips (ADR
+    ones. A folder's combined clip, rated the same, comes after its clips (ADR
     0032).
     """
     posted = {post.clip for post in posts.posts}
@@ -244,28 +244,28 @@ def _waiting(
                 thumbnail=place / clip.thumbnail if clip.thumbnail else None,
             )
         )
-    summary = folder.manifest.summary
-    if summary is not None and summary.rating == rating:
-        key = clip_key(folder.name, summary.file)
+    combined = folder.manifest.combined
+    if combined is not None and combined.rating == rating:
+        key = clip_key(folder.name, combined.file)
         if key not in posted:
-            items.append(_summary_item(folder, campaigns, labels, key, rating))
+            items.append(_combined_item(folder, campaigns, labels, key, rating))
     return items
 
 
-def _summary_item(
+def _combined_item(
     folder: DraftsFolder,
     campaigns: Sequence[Campaign],
     labels: Sequence[Label],
     key: str,
     rating: str,
 ) -> QueueItem:
-    """The folder's summary as a queue item: on screen, everyone marked on
+    """The folder's combined clip as a queue item: on screen, everyone marked on
     its clips, in order, so its campaigns follow theirs (ADR 0032)."""
-    summary = folder.manifest.summary
-    assert summary is not None
+    combined = folder.manifest.combined
+    assert combined is not None
     clips = {clip.rank: clip for clip in folder.manifest.clips}
     people: list[str] = []
-    for part in summary.parts:
+    for part in combined.parts:
         clip = clips.get(part.rank)
         label = (
             None
@@ -279,15 +279,15 @@ def _summary_item(
     return QueueItem(
         clip=key,
         folder=folder.name,
-        path=place / summary.file,
+        path=place / combined.file,
         rank=0,
-        title=summary.title,
+        title=combined.title,
         hook=None,
         rating=rating,
         people=tuple(people),
         eligible=eligibility(campaigns, people, folder.channel),
-        thumbnail=place / summary.thumbnail if summary.thumbnail else None,
-        summary=True,
+        thumbnail=place / combined.thumbnail if combined.thumbnail else None,
+        combined=True,
     )
 
 

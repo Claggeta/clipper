@@ -657,7 +657,7 @@ def test_no_audio_edits_keep_todays_command(
     assert "0:a:0?" in command
 
 
-# --- Joining clips into a summary (ADR 0032) ---
+# --- Joining clips into a combined (ADR 0032) ---
 
 
 def test_join_concatenates_the_clips_with_cards_and_music(

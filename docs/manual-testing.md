@@ -2328,25 +2328,25 @@ MM-DD-YYYY>\<id>`, the channel as in `<id>.info.json`; the second with
 `...\Local\<today>\test_input`; the third reuses the first folder (no
 second `<id>` folder). `queue` runs without error.
 
-### Q3. Summaries in the queue
+### Q3. Combined clips in the queue
 
-Covers [ADR 0028](decisions/0028-post-queue.md)'s summaries amendment (V7
-item 9k-2), with a folder whose summary was made in `review` (RV25):
+Covers [ADR 0028](decisions/0028-post-queue.md)'s combined clips amendment (V7
+item 9k-2), with a folder whose combined clip was made in `review` (RV25):
 
 ```powershell
 $env:CLIPPER_POSTS_FILE = "$env:TEMP\q3-posts.json"
 uv run clipper queue --start 2026-11-12 --per-day 4
-uv run clipper posted <stem>/<stem>_summary.mp4 https://youtube.com/shorts/<an id>
+uv run clipper posted <stem>/<stem>_combined.mp4 https://youtube.com/shorts/<an id>
 uv run clipper queue --start 2026-11-12 --per-day 4
 Remove-Item Env:CLIPPER_POSTS_FILE; Remove-Item "$env:TEMP\q3-posts.json"
 ```
 
-Pass: with the summary rated `Good`, the first queue lists it after its
-folder's clips, `summary` in the Clip column; in `queue.md` its heading
-ends `summary`, its title and caption name everyone marked on its clips
+Pass: with the combined clip rated `Good`, the first queue lists it after its
+folder's clips, `combined` in the Clip column; in `queue.md` its heading
+ends `combined`, its title and caption name everyone marked on its clips
 with their campaigns' hashtags, and its thumbnail is listed. Rated `OK`
 it shows only with `--include-ok`. `posted` prints `Posted
-<stem>/<stem>_summary.mp4`, and the second queue no longer lists it.
+<stem>/<stem>_combined.mp4`, and the second queue no longer lists it.
 
 ## Labels from Twitch clips
 
@@ -3150,30 +3150,30 @@ music file you may post in `data\music\` and a short sound effect in
 
 Then delete the scratch folders.
 
-### RV25. Summarize
+### RV25. Combine
 
 Covers [ADR 0032](decisions/0032-summarize-a-vods-clips.md) (V7 item 9k).
 Same scratch copy and labels dir as RV12, with at least two saved clips.
 
-1. Press `Summarize`. Pass: a dialog listing the saved and untrashed
+1. Press `Combine`. Pass: a dialog listing the saved and untrashed
    clips in VOD order, saved ones ticked, each with its length; the
    total at the bottom. A clip with unsaved edits says so.
 2. Press `Hour N cards`. Pass: each card says the clip's hour in the VOD.
    Untick clips until the total passes 3 minutes and back. Pass: the
    total turns the warning colour past 3:00.
-3. Pick a music file and press `Make summary`. Pass: "Rendering …";
-   then the result with the summary playing: the clips in order, each
+3. Pick a music file and press `Make combined clip`. Pass: "Rendering …";
+   then the result with the combined clip playing: the clips in order, each
    card for its first 2.5 s, captions and edits as in the drafts, music
-   under it dipping under speech. A `Summary` entry appears above the
+   under it dipping under speech. A `Combined clip` entry appears above the
    clip list.
 4. Type a title (or press `Suggest` with Ollama running) and press
    `Good`. Pass: the entry shows the title and rating.
 5. Pause on a frame and `Make thumbnail` with text. Pass: the image shows
-   under the row; `<stem>_summary.thumb.jpg` is in the folder.
+   under the row; `<stem>_combined.thumb.jpg` is in the folder.
 6. Press `Remake`, change the clips and make it again. Pass: the title
    and rating stay, the thumbnail is gone.
 7. Reload. Pass: the entry is still there and opens the result. Press
-   `Trash summary` twice. Pass: the entry and the files are gone.
+   `Trash combined clip` twice. Pass: the entry and the files are gone.
 
 Then delete the scratch folders.
 

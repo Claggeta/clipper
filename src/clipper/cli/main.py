@@ -1259,7 +1259,7 @@ def review(
             peaks_path=peaks_file(settings.cache_dir, video),
             music_dir=settings.music_dir,
             sfx_dir=settings.sfx_dir,
-            title_writer=_summary_title_writer(build, settings),
+            title_writer=_review_title_writer(build, settings),
         )
         build.serve(
             session,
@@ -1414,8 +1414,8 @@ def posted(
     )
 
 
-def _summary_title_writer(build: AppContext, settings: Settings) -> TitleWriter | None:
-    """The title writer for a summary's suggested title, or None when no
+def _review_title_writer(build: AppContext, settings: Settings) -> TitleWriter | None:
+    """The title writer for a combined clip's suggested title, or None when no
     model is set; the page then says it cannot suggest (ADR 0032)."""
     try:
         return build.title_writer(settings)
@@ -1424,7 +1424,7 @@ def _summary_title_writer(build: AppContext, settings: Settings) -> TitleWriter 
 
 
 def _titled_key(clips_dir: Path, title: str, path_error: QueueError) -> str:
-    """The posts key of the one saved clip or summary with this title (ADR
+    """The posts key of the one saved clip or combined clip with this title (ADR
     0028, title amendment). Something that looks like a path gets the path's
     error; no match or several are an error that says what to do."""
     folders: list[tuple[str, RenderManifest]] = []
@@ -1486,9 +1486,9 @@ def _clip_key(clips_dir: Path, clip: str) -> str:
         manifest = load_manifest(found)
     except ClipperError as exc:
         raise QueueError(f"{clip}: {exc}") from exc
-    summary = manifest.summary
+    combined = manifest.combined
     if not any(c.file == file for c in manifest.clips) and not (
-        summary is not None and summary.file == file
+        combined is not None and combined.file == file
     ):
         raise QueueError(f"{folder}'s manifest lists no clip {file}")
     return clip_key(folder, file)

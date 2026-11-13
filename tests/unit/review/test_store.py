@@ -26,7 +26,7 @@ from clipper.review.store import (
     ReviewStore,
     SaveRequest,
     parse_caption_edits,
-    parse_summary,
+    parse_combine,
 )
 
 # Constructed manifest and transcript, not the output of a real run.
@@ -1157,10 +1157,10 @@ def test_parse_audio_checks_effects_are_inside_the_span() -> None:
         parse_audio({"gain_db": 40}, 10, 40)
 
 
-# --- Summaries (ADR 0032) ---
+# --- Combined clips (ADR 0032) ---
 
 
-def _summary_env(tmp_path: Path) -> Env:
+def _combined_env(tmp_path: Path) -> Env:
     clips = (
         _clip(1, 300.0, 330.0, "talk_3.mp4"),
         _clip(2, 100.0, 140.0, "talk_1.mp4").model_copy(
@@ -1180,68 +1180,68 @@ def _summary_env(tmp_path: Path) -> Env:
     return env
 
 
-def test_a_summary_joins_the_clips_in_vod_order_with_cards_and_music(
+def test_a_combined_joins_the_clips_in_vod_order_with_cards_and_music(
     tmp_path: Path,
 ) -> None:
-    env = _summary_env(tmp_path)
-    request = parse_summary(
+    env = _combined_env(tmp_path)
+    request = parse_combine(
         {
             "parts": [{"rank": 1, "label": "Hour 5"}, {"rank": 2, "label": "Hour 1"}],
             "music": {"file": "chill.mp3"},
         }
     )
-    summary = env.store.summarize(request)
+    combined = env.store.combine(request)
 
     [(clips, output, ass, audio, length)] = env.renderer.joins
     # Clip 2 (100 s in the VOD) first; its 5 s cut makes it 35 s long.
     assert [path.name for path in clips] == ["talk_1.mp4", "talk_3.mp4"]
-    assert output.name == "talk_summary.part.mp4"
+    assert output.name == "talk_combined.part.mp4"
     assert length == 65.0
     assert ass is not None
     assert "0:00:00.00,0:00:02.50" in ass and "Hour 1" in ass
     assert "0:00:35.00,0:00:37.50" in ass and "Hour 5" in ass
     assert audio is not None and audio.music == tmp_path / "music" / "chill.mp3"
-    assert summary.file == "talk_summary.mp4"
-    assert [part.rank for part in summary.parts] == [2, 1]
-    assert (env.folder / "talk_summary.mp4").is_file()
-    assert env.store.manifest.summary == summary
+    assert combined.file == "talk_combined.mp4"
+    assert [part.rank for part in combined.parts] == [2, 1]
+    assert (env.folder / "talk_combined.mp4").is_file()
+    assert env.store.manifest.combined == combined
 
 
-def test_a_trashed_clip_cannot_go_in_a_summary(tmp_path: Path) -> None:
-    env = _summary_env(tmp_path)
+def test_a_trashed_clip_cannot_go_in_a_combined(tmp_path: Path) -> None:
+    env = _combined_env(tmp_path)
     with pytest.raises(JudgingError, match="Clip 3 has no file"):
-        env.store.summarize(parse_summary({"parts": [{"rank": 3}]}))
+        env.store.combine(parse_combine({"parts": [{"rank": 3}]}))
     assert env.renderer.joins == []
 
 
-def test_a_new_summary_keeps_the_title_and_rating_and_drops_the_thumbnail(
+def test_a_new_combined_keeps_the_title_and_rating_and_drops_the_thumbnail(
     tmp_path: Path,
 ) -> None:
-    env = _summary_env(tmp_path)
-    env.store.summarize(parse_summary({"parts": [{"rank": 1}]}))
-    env.store.save_summary("Ron's whole grind", "good")
-    thumbed = env.store.summary_thumbnail(1.0, None)
-    assert thumbed.thumbnail == "talk_summary.thumb.jpg"
-    assert (env.folder / "talk_summary.thumb.jpg").is_file()
-    again = env.store.summarize(parse_summary({"parts": [{"rank": 2}]}))
+    env = _combined_env(tmp_path)
+    env.store.combine(parse_combine({"parts": [{"rank": 1}]}))
+    env.store.save_combined("Ron's whole grind", "good")
+    thumbed = env.store.combined_thumbnail(1.0, None)
+    assert thumbed.thumbnail == "talk_combined.thumb.jpg"
+    assert (env.folder / "talk_combined.thumb.jpg").is_file()
+    again = env.store.combine(parse_combine({"parts": [{"rank": 2}]}))
     assert (again.title, again.rating, again.thumbnail) == (
         "Ron's whole grind",
         "good",
         None,
     )
-    assert not (env.folder / "talk_summary.thumb.jpg").exists()
-    env.store.trash_summary()
-    assert env.store.manifest.summary is None
-    assert not (env.folder / "talk_summary.mp4").exists()
-    with pytest.raises(JudgingError, match="Make the summary first"):
-        env.store.save_summary(None, None)
+    assert not (env.folder / "talk_combined.thumb.jpg").exists()
+    env.store.trash_combined()
+    assert env.store.manifest.combined is None
+    assert not (env.folder / "talk_combined.mp4").exists()
+    with pytest.raises(JudgingError, match="Make the combined clip first"):
+        env.store.save_combined(None, None)
 
 
-def test_a_summary_title_needs_a_model(tmp_path: Path) -> None:
-    env = _summary_env(tmp_path)
-    env.store.summarize(parse_summary({"parts": [{"rank": 2}]}))
+def test_a_combined_title_needs_a_model(tmp_path: Path) -> None:
+    env = _combined_env(tmp_path)
+    env.store.combine(parse_combine({"parts": [{"rank": 2}]}))
     with pytest.raises(ReviewError, match="CLIPPER_LLM_MODEL"):
-        env.store.suggest_summary_title()
+        env.store.suggest_combined_title()
 
 
 @pytest.mark.parametrize(
@@ -1249,11 +1249,11 @@ def test_a_summary_title_needs_a_model(tmp_path: Path) -> None:
     [
         ({"parts": []}, "at least one"),
         ({"parts": [{"rank": 1}, {"rank": 1}]}, "twice"),
-        ({"parts": [{"rank": 0}]}, "summary:"),
-        ({"parts": [{"rank": 1}], "music": {"file": "a.txt"}}, "summary:"),
+        ({"parts": [{"rank": 0}]}, "combined:"),
+        ({"parts": [{"rank": 1}], "music": {"file": "a.txt"}}, "combined:"),
         ([], "JSON object"),
     ],
 )
-def test_bad_summary_bodies_are_refused(body: object, message: str) -> None:
+def test_bad_combined_bodies_are_refused(body: object, message: str) -> None:
     with pytest.raises(BadRequest, match=message):
-        parse_summary(body)
+        parse_combine(body)

@@ -375,9 +375,9 @@ and planned code:
   (committed); a posted clip leaves the queue, and the link serves 0027.
   Channel folders amendment (0019): drafts go to
   `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`; `posted` takes a full path
-  or `<stem>/<file>`. Summaries amendment (V7 9k-2): a rated summary is
-  queued after its folder's clips with its clips' people, shown as
-  `summary`; `posted` takes its file. Title amendment (V7 7g): `posted`
+  or `<stem>/<file>`. Combined clips amendment (V7 9k-2): a rated
+  combined clip is queued after its folder's clips with its clips'
+  people, shown as `combined`; `posted` takes its file. Title amendment (V7 7g): `posted`
   also takes the title as the queue shows it, after trying a path; one
   match only, else an error listing matches or close titles. Relative paths amendment (V7 7f): a path relative
   to the current folder or the clips dir too, if it is a file under the
@@ -456,13 +456,14 @@ and planned code:
   Audio amendment (9i): an Audio tab of clip volume, music and sound
   effects from `data/music/` and `data/sfx/`, previewed through the
   browser's audio engine (ADR 0007 amendment); `static/audio.js`; RV24.
-- `0032` — Summarize: a VOD's saved clips joined in VOD order into
-  `<stem>_summary.mp4` by `ClipRenderer.join` (`concat`, label cards as
-  on-screen texts, music as a clip's), one more encode; its own
-  `RenderManifest.summary` (parts, music, length, title, rating,
-  thumbnail), no judged label; a dialog in `review` to make, title
-  (Suggest from the local model), rate, thumbnail and trash it; past
-  180 s a warning. Queue and `posted` in a second PR. Manual step RV25.
+- `0032` — Combine (first called Summarize, renamed 2026-11-13): a VOD's
+  saved clips joined in VOD order into `<stem>_combined.mp4` by
+  `ClipRenderer.join` (`concat`, label cards as on-screen texts, music as
+  a clip's), one more encode; its own `RenderManifest.combined` (parts,
+  music, length, title, rating, thumbnail; an old `summary` key loads),
+  no judged label; a dialog in `review` to make, title (Suggest from the
+  local model), rate, thumbnail and trash it; past 180 s a warning;
+  queued and posted like a clip. Manual steps RV25 and Q3.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1391,15 +1392,25 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      local LLM turning them into the page's edits), then an Assist tab
      if it is right often enough. ADR 0014 and 0031 amendments. May end
      in nothing.
-   - 9k. Summarize (added 2026-11-13, the maintainer's choice): a button in
-     `review` that joins a VOD's kept clips, as edited, in VOD order into
-     one longer Short (`<stem>_summary.mp4`), with optional label cards
+   - 9k. Combine, first called Summarize (added 2026-11-13, the
+     maintainer's choice; renamed the same day): a button in `review`
+     that joins a VOD's kept clips, as edited, in VOD order into one
+     longer Short (`<stem>_combined.mp4`), with optional label cards
      between them, a length warning past the Shorts limit, and its own
      manifest entry to title, rate and queue. ADR 0032, in two PRs:
      - 9k-1. ~~The summary: dialog, join, manifest entry, title, rating,
        thumbnail, trash.~~ (done; manual step RV25)
      - 9k-2. ~~Queue and `posted` for the summary (ADR 0028 amendment).~~
        (done; manual step Q3)
+     - 9k-3. ~~Rename to Combine (the button, file, manifest field and
+       code), so Summarize can mean the episode's story.~~ (done)
+   - 9l. Summarize (added 2026-11-13, the maintainer's choice): a Short
+     telling a VOD's story in 6 to 10 beats picked from the whole
+     transcript by the local LLM (notes per ~3-minute chunk, then the
+     beats, then spans snapped to sentences and pauses), edited and
+     rendered in `review` with Combine's join. A spike first on an
+     incremental-game VOD (DQP3pmyJX4o, That Damn Grass, 80 min),
+     judged by the maintainer; may end in nothing. Then an ADR 0033.
 
 Later, not scheduled:
 
