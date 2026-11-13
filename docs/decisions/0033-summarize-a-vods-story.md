@@ -139,6 +139,12 @@ key line and the beats rendered and joined with cards.
   dialog, rendered `DQP3pmyJX4o_summary.mp4` (161.7 s) with the edited
   card burned in. Manual step RV26.
 
+## Amended by the queue PR (V7 item 9l-4)
+
+- Decision 6, as the ADR 0028 amendment describes: queued when rated,
+  with the people of the clips its beats overlap; `posted` by title or
+  file.
+
 ## Revisit when
 
 - Summaries of other niches (podcasts, talks) are wanted.

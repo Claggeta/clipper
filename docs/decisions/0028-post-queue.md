@@ -114,6 +114,15 @@ planned to match them by title, length and date.
   like a path (a `/`, a `\`, or `.mp4`) keeps the path's error.
   Manual step Q1.
 
+## Amended by summaries (V7 item 9l-4, ADR 0033)
+
+- A folder's rendered summary rated `good` (or `ok` with `--include-ok`)
+  joins the queue after its clips and combined clip, shown as `summary`.
+  Its people are everyone marked on the saved clips its beats overlap,
+  in VOD order, so campaigns follow where clips say who is there. A
+  queue item's `kind` is `clip`, `combined` or `summary`.
+- `posted` takes the summary's title or file. Manual step Q3.
+
 ## Revisit when
 
 - Posting from the review page would save a step.

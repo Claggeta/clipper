@@ -16,6 +16,8 @@ from clipper.domain.models import (
     LabeledVideo,
     ManifestClip,
     RenderManifest,
+    Story,
+    StoryBeat,
 )
 
 # Constructed drafts folders, labels and campaigns, not real runs.
@@ -333,3 +335,45 @@ def test_a_path_like_miss_keeps_the_path_error(env: Env) -> None:
     env.folder("v1", ["good"])
     result = env.run("posted", "v9/v9_1.mp4", "https://youtu.be/abcDEF12345")
     assert "no drafts folder v9" in " ".join(result.output.split())
+
+
+# --- Summaries (ADR 0033) ---
+
+
+def _story(folder: Path, rating: Literal["good", "ok"] | None) -> None:
+    manifest = load_manifest(folder)
+    story = Story(
+        beats=(
+            StoryBeat(start_seconds=55.0, end_seconds=75.0, card="Start"),
+            StoryBeat(start_seconds=300.0, end_seconds=320.0, card="End"),
+        ),
+        file=f"{folder.name}_summary.mp4",
+        duration_seconds=40.0,
+        title=f"{folder.name} the whole story",
+        rating=rating,
+    )
+    save_manifest(manifest.model_copy(update={"story": story}), folder)
+
+
+def test_a_rated_summary_is_queued_with_the_people_of_the_clips_it_overlaps(
+    env: Env,
+) -> None:
+    folder = env.folder("v1", ["good", "good"])
+    _story(folder, "good")
+    result = env.run("queue", "--start", "2026-11-12", "--per-day", "3")
+    assert result.exit_code == 0, result.output
+    page = (env.clips / "queue.md").read_text(encoding="utf-8")
+    assert "## 3. 2026-11-12: v1 summary" in page
+    # The first beat overlaps clip 1 (1:00-1:30), marked with Ron and Lacy.
+    assert "v1 the whole story With Ron and Lacy. #CORE #Shorts" in page
+
+
+def test_an_unrated_summary_waits_and_a_posted_one_leaves(env: Env) -> None:
+    folder = env.folder("v1", ["good"])
+    _story(folder, None)
+    assert "whole story" not in env.run("queue").output
+    _story(folder, "good")
+    result = env.run("posted", "v1 the whole story", "https://youtu.be/abcDEF12345")
+    assert result.exit_code == 0, result.output
+    assert "Posted v1/v1_summary.mp4" in result.output
+    assert "whole story" not in env.run("queue").output

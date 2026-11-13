@@ -377,7 +377,9 @@ and planned code:
   `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`; `posted` takes a full path
   or `<stem>/<file>`. Combined clips amendment (V7 9k-2): a rated
   combined clip is queued after its folder's clips with its clips'
-  people, shown as `combined`; `posted` takes its file. Title amendment (V7 7g): `posted`
+  people, shown as `combined`; `posted` takes its file. A rated summary
+  (0033) the same, as `summary`, with the people of the clips its beats
+  overlap. Title amendment (V7 7g): `posted`
   also takes the title as the queue shows it, after trying a path; one
   match only, else an error listing matches or close titles. Relative paths amendment (V7 7f): a path relative
   to the current folder or the clips dir too, if it is a file under the
@@ -1434,7 +1436,8 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      - 9l-3. ~~The page, server and render, with a manual step.~~ (done;
        a background plan with progress, the beat editor with its own
        player, kept edits, render and the Summary entry; RV26)
-     - 9l-4. Queue and `posted` for the summary.
+     - 9l-4. ~~Queue and `posted` for the summary.~~ (done; the people
+       of the clips its beats overlap; Q3 extended)
 
 Later, not scheduled:
 
