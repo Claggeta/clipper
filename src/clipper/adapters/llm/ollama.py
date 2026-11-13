@@ -9,6 +9,12 @@ from clipper.domain.errors import LlmError
 TIMEOUT_SECONDS = 120.0
 # Requested with temperature 0 for repeatability on one setup (ADR 0015).
 SEED = 0
+# A long prompt's size before sending, as a rough count of characters per
+# token; refused past this share of the context it asks for (ADR 0033).
+CHARS_PER_TOKEN = 3.0
+CONTEXT_FILL = 0.9
+# A reply whose prompt read this close to the window filled it.
+CONTEXT_MARGIN = 32
 # Enough of an unexpected body to recognise it, not a whole HTML page.
 _BODY_LIMIT = 300
 
@@ -34,8 +40,31 @@ class OllamaClient:
         self._model = model
         self._timeout = timeout_seconds
 
-    def generate(self, system: str, prompt: str, schema: dict[str, object]) -> str:
-        """Return the model's reply, constrained to `schema`, as raw text."""
+    def generate(
+        self,
+        system: str,
+        prompt: str,
+        schema: dict[str, object],
+        num_ctx: int | None = None,
+    ) -> str:
+        """Return the model's reply, constrained to `schema`, as raw text.
+
+        `num_ctx` asks for a context window of that many tokens, for a long
+        prompt (ADR 0033); Ollama's default silently drops the start of a
+        prompt longer than its window. With it, a prompt estimated to fill
+        most of the window is refused before sending, and a reply whose
+        prompt filled the window is an error, as its start was likely
+        dropped. Without it, Ollama's defaults stand, as before.
+        """
+        options: dict[str, object] = {"temperature": 0, "seed": SEED}
+        if num_ctx is not None:
+            estimate = (len(system) + len(prompt)) / CHARS_PER_TOKEN
+            if estimate > num_ctx * CONTEXT_FILL:
+                raise LlmError(
+                    f"The prompt is about {estimate:.0f} tokens, too long for a "
+                    f"{num_ctx}-token context"
+                )
+            options["num_ctx"] = num_ctx
         payload = {
             "model": self._model,
             "system": system,
@@ -45,7 +74,7 @@ class OllamaClient:
             # A thinking model otherwise reasons before the JSON, and can run out
             # of context before writing it (ADR 0014, 7c amendment).
             "think": False,
-            "options": {"temperature": 0, "seed": SEED},
+            "options": options,
         }
         request = urllib.request.Request(
             f"{self._url}/api/generate",
@@ -68,7 +97,7 @@ class OllamaClient:
             raise LlmError(self._timed_out()) from exc
         except OSError as exc:
             raise LlmError(f"Request to Ollama at {self._url} failed: {exc}") from exc
-        return self._reply(body)
+        return self._reply(body, num_ctx)
 
     def _timed_out(self) -> str:
         return (
@@ -95,7 +124,7 @@ class OllamaClient:
             message += f". Is the model pulled? (`ollama pull {self._model}`)"
         return message
 
-    def _reply(self, body: bytes) -> str:
+    def _reply(self, body: bytes, num_ctx: int | None = None) -> str:
         text = body.decode("utf-8", errors="replace")
         try:
             data = json.loads(text)
@@ -106,5 +135,15 @@ class OllamaClient:
             raise LlmError(
                 f"Unexpected response from Ollama at {self._url}: "
                 f"{text.strip()[:_BODY_LIMIT]!r}"
+            )
+        read = data.get("prompt_eval_count") if isinstance(data, dict) else None
+        if (
+            num_ctx is not None
+            and isinstance(read, int)
+            and read >= num_ctx - CONTEXT_MARGIN
+        ):
+            raise LlmError(
+                f"Ollama read {read} prompt tokens, filling its {num_ctx}-token "
+                "context, so the prompt's start was likely dropped"
             )
         return reply

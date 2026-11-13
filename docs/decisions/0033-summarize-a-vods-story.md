@@ -97,6 +97,21 @@ key line and the beats rendered and joined with cards.
 - Beats render in the fit style only; no face style, zooms or per-beat
   audio, though the whole may have music.
 
+## Amended by the core PR (V7 item 9l-2)
+
+- `core/story.py` (`plan_story`, `beat_span`, `fit_beats`, the
+  chunking and listings), `StoryNote`, `BeatChoice` and `StoryBeat` in
+  the domain, a `StoryWriter` Protocol, `OllamaStoryWriter` in
+  `adapters/llm/story.py` and `StoryError`.
+- The check on the prompt, as built: Ollama reports the tokens it read,
+  not the tokens sent, so `OllamaClient.generate(..., num_ctx=)` refuses a
+  prompt estimated (3 characters a token) at over 90% of the window
+  before sending, and fails a reply whose read count is within 32 tokens
+  of the window, as its start was likely dropped. Without `num_ctx`
+  nothing changes.
+- On That Damn Grass the committed code gave the spike's round 3: 9 beats,
+  161 s, planned in 56 s.
+
 ## Revisit when
 
 - Summaries of other niches (podcasts, talks) are wanted.

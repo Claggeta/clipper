@@ -325,6 +325,12 @@ raised `DetectionError`, which titles re-raised as `TitleError`.
 - The Parked `done_reason` note (a reply cut off at the length limit
   reads as `not a valid score ... (got '')`) is not part of this move.
 
+## Amended by the story core (V7 item 9l-2, ADR 0033)
+
+The shared client takes an optional `num_ctx` for a long prompt (the
+story's beats request), with checks that the prompt fits; detection and
+titles do not pass it, so their requests are unchanged.
+
 ## Related
 
 - 0012: evaluation

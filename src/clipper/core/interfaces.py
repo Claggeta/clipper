@@ -4,6 +4,7 @@ from typing import Protocol, runtime_checkable
 
 from clipper.domain.models import (
     AudioMix,
+    BeatChoice,
     ClipCandidate,
     ClipInfo,
     ClipTitle,
@@ -14,6 +15,7 @@ from clipper.domain.models import (
     MediaInfo,
     RenderedClip,
     RenderManifest,
+    StoryNote,
     Transcript,
     VideoInfo,
     VideoSource,
@@ -58,6 +60,19 @@ class PeaksExtractor(Protocol):
     """
 
     def extract(self, video_path: Path, output_path: Path) -> Path: ...
+
+
+@runtime_checkable
+class StoryWriter(Protocol):
+    """Notes and beats for a VOD's story from a model (docs/decisions/0033).
+
+    `note` reads one chunk of the transcript, each line with its `[m:ss]`;
+    `beats` picks parts from the notes' listing. Both raise `StoryError`.
+    """
+
+    def note(self, text: str) -> StoryNote: ...
+
+    def beats(self, listing: str) -> list[BeatChoice]: ...
 
 
 @runtime_checkable
