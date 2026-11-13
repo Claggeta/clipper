@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Literal
 
 from clipper.core.judging import is_own_label
 from clipper.core.sources import ABOUT_SEPARATOR
@@ -131,13 +132,14 @@ class QueueItem:
     eligible: Eligibility
     # Its thumbnail beside it, under the clips dir, if one was made (ADR 0030).
     thumbnail: Path | None = None
-    # The folder's combined clip rather than one clip (ADR 0032); its rank is 0.
-    combined: bool = False
+    # One clip, or the folder's combined clip (ADR 0032) or summary (ADR
+    # 0033), whose rank is 0.
+    kind: Literal["clip", "combined", "summary"] = "clip"
 
     @property
     def place(self) -> str:
-        """`#<rank>`, or `combined`, after the video's name."""
-        return "combined" if self.combined else f"#{self.rank}"
+        """`#<rank>`, `combined` or `summary`, after the video's name."""
+        return f"#{self.rank}" if self.kind == "clip" else self.kind
 
 
 def clip_key(folder: str, file: str) -> str:
@@ -158,8 +160,8 @@ def _title_text(title: str) -> str:
 def titled_clips(
     folders: Sequence[tuple[str, RenderManifest]],
 ) -> list[tuple[str, str]]:
-    """Every saved clip and combined clip with a title, as (title, posts key), for
-    `posted` by title (ADR 0028, title amendment)."""
+    """Every saved clip, combined clip and summary with a title, as (title,
+    posts key), for `posted` by title (ADR 0028, title amendment)."""
     titled: list[tuple[str, str]] = []
     for name, manifest in folders:
         for clip in sorted(manifest.clips, key=lambda c: c.rank):
@@ -168,6 +170,9 @@ def titled_clips(
         combined = manifest.combined
         if combined is not None and combined.title:
             titled.append((combined.title, clip_key(name, combined.file)))
+        story = manifest.story
+        if story is not None and story.file is not None and story.title:
+            titled.append((story.title, clip_key(name, story.file)))
     return titled
 
 
@@ -197,8 +202,8 @@ def build_queue(
     `folders` come newest first; the queue takes each folder's next clip in
     rank order, round and round, so two clips of one video are never next to
     each other while another video has clips left. Good clips come before ok
-    ones. A folder's combined clip, rated the same, comes after its clips (ADR
-    0032).
+    ones. A folder's combined clip (ADR 0032) and summary (ADR 0033), rated
+    the same, come after its clips.
     """
     posted = {post.clip for post in posts.posts}
     ratings = ("good", "ok") if include_ok else ("good",)
@@ -249,6 +254,11 @@ def _waiting(
         key = clip_key(folder.name, combined.file)
         if key not in posted:
             items.append(_combined_item(folder, campaigns, labels, key, rating))
+    story = folder.manifest.story
+    if story is not None and story.file is not None and story.rating == rating:
+        key = clip_key(folder.name, story.file)
+        if key not in posted:
+            items.append(_summary_item(folder, campaigns, labels, key, rating))
     return items
 
 
@@ -287,7 +297,45 @@ def _combined_item(
         people=tuple(people),
         eligible=eligibility(campaigns, people, folder.channel),
         thumbnail=place / combined.thumbnail if combined.thumbnail else None,
-        combined=True,
+        kind="combined",
+    )
+
+
+def _summary_item(
+    folder: DraftsFolder,
+    campaigns: Sequence[Campaign],
+    labels: Sequence[Label],
+    key: str,
+    rating: str,
+) -> QueueItem:
+    """The folder's summary as a queue item (ADR 0033): on screen, everyone
+    marked on the saved clips its beats overlap, in VOD order, so campaigns
+    follow where the clips say who is there."""
+    story = folder.manifest.story
+    assert story is not None and story.file is not None
+    people: list[str] = []
+    for label in sorted(labels, key=lambda x: x.start_seconds):
+        overlaps = any(
+            beat.start_seconds < label.end_seconds
+            and label.start_seconds < beat.end_seconds
+            for beat in story.beats
+        )
+        for name in label.people if overlaps else ():
+            if name not in people:
+                people.append(name)
+    place = folder.location or Path(folder.name)
+    return QueueItem(
+        clip=key,
+        folder=folder.name,
+        path=place / story.file,
+        rank=0,
+        title=story.title,
+        hook=None,
+        rating=rating,
+        people=tuple(people),
+        eligible=eligibility(campaigns, people, folder.channel),
+        thumbnail=place / story.thumbnail if story.thumbnail else None,
+        kind="summary",
     )
 
 

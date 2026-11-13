@@ -2347,6 +2347,9 @@ ends `combined`, its title and caption name everyone marked on its clips
 with their campaigns' hashtags, and its thumbnail is listed. Rated `OK`
 it shows only with `--include-ok`. `posted` prints `Posted
 <stem>/<stem>_combined.mp4`, and the second queue no longer lists it.
+A summary made in RV26 and rated `Good` is listed the same way as
+`summary`, with the people marked on the clips its beats overlap, and
+`posted "<its title>" <link>` takes it out.
 
 ## Labels from Twitch clips
 

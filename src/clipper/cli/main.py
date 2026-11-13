@@ -1497,9 +1497,9 @@ def _clip_key(clips_dir: Path, clip: str) -> str:
         manifest = load_manifest(found)
     except ClipperError as exc:
         raise QueueError(f"{clip}: {exc}") from exc
-    combined = manifest.combined
-    if not any(c.file == file for c in manifest.clips) and not (
-        combined is not None and combined.file == file
-    ):
+    joined = {
+        f.file for f in (manifest.combined, manifest.story) if f is not None and f.file
+    }
+    if not any(c.file == file for c in manifest.clips) and file not in joined:
         raise QueueError(f"{folder}'s manifest lists no clip {file}")
     return clip_key(folder, file)
