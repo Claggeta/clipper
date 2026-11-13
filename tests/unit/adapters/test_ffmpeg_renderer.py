@@ -7,7 +7,7 @@ from clipper.adapters.rendering.ffmpeg import _VERTICAL_FILTER, FfmpegClipRender
 from clipper.core.framing import hand_crop_plan
 from clipper.core.interfaces import ClipRenderer
 from clipper.domain.errors import ClipRenderError
-from clipper.domain.models import ClipCandidate, CropPath, Zoom
+from clipper.domain.models import AudioMix, ClipCandidate, CropPath, MixEffect, Zoom
 
 _CANDIDATE = ClipCandidate(
     start_seconds=32.5, end_seconds=73.25, score=0.5, reasons=("pace",)
@@ -566,3 +566,92 @@ def test_zooms_need_the_vertical_frame(video: Path, tmp_path: Path) -> None:
         FfmpegClipRenderer().render(
             video, _CANDIDATE, tmp_path / "c.mp4", zooms=(zoom,)
         )
+
+
+# --- Clip audio (ADR 0007, audio amendment) ---
+
+
+def _audio_command(
+    video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    audio: AudioMix,
+    **kw: object,
+) -> list[str]:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+    FfmpegClipRenderer().render(
+        video,
+        _CANDIDATE,
+        tmp_path / "c.mp4",
+        vertical=True,
+        audio=audio,
+        **kw,  # type: ignore[arg-type]
+    )
+    return captured[0]
+
+
+def test_music_and_an_effect_are_mixed_from_their_own_inputs(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bed, boom = tmp_path / "bed.mp3", tmp_path / "boom.wav"
+    audio = AudioMix(
+        gain_db=3.0,
+        music=bed,
+        music_level_db=-18.0,
+        effects=(MixEffect(path=boom, at_seconds=2.5, level_db=-3.0),),
+    )
+    command = _audio_command(video, tmp_path, monkeypatch, audio)
+    # The music loops; both follow the video, before the output length.
+    i = command.index(str(video))
+    assert command[i + 1 : i + 7] == [
+        "-stream_loop", "-1", "-i", str(bed.resolve()), "-i", str(boom.resolve())
+    ]  # fmt: skip
+    assert command[i + 7 : i + 9] == ["-t", "40.750"]
+    assert command[command.index("-filter_complex") + 1] == (
+        "[0:a:0]volume=3.0dB,asplit=2[voice][key];"
+        "[1:a]volume=-18.0dB,afade=t=out:st=39.750:d=1.0[bed];"
+        "[bed][key]sidechaincompress=threshold=0.01:ratio=10:attack=20:release=400[music];"
+        "[2:a]adelay=2500:all=1,volume=-3.0dB[fx0];"
+        "[voice][music][fx0]amix=inputs=3:normalize=0:duration=first[aout]"
+    )
+    graph_at = command.index("-filter_complex")
+    assert command[graph_at + 2 : graph_at + 4] == ["-map", "[aout]"]
+    assert "-af" not in command and "0:a:0?" not in command
+
+
+def test_a_gain_alone_needs_no_mix_inputs_and_music_may_skip_ducking(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command = _audio_command(video, tmp_path, monkeypatch, AudioMix(gain_db=-6.0))
+    assert command[command.index("-filter_complex") + 1] == "[0:a:0]volume=-6.0dB[aout]"
+    assert command.count("-i") == 1
+    undocked = _audio_command(
+        video, tmp_path, monkeypatch, AudioMix(music=tmp_path / "bed.mp3", duck=False)
+    )
+    graph = undocked[undocked.index("-filter_complex") + 1]
+    assert "sidechaincompress" not in graph and "[voice][music]amix=inputs=2" in graph
+
+
+def test_with_cuts_the_mix_takes_the_cut_filter_and_the_length_moves_to_the_input(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cuts = ((40.0, 45.0),)
+    command = _audio_command(
+        video, tmp_path, monkeypatch, AudioMix(music=tmp_path / "bed.mp3"), cuts=cuts
+    )
+    graph = command[command.index("-filter_complex") + 1]
+    assert graph.startswith(
+        "[0:a:0]aselect='not(between(t,7.500,12.500))',asetpts=N/SR/TB,volume=0.0dB"
+    )
+    # 40.75 s less the 5 s cut: the music fades over the last second.
+    assert "afade=t=out:st=34.750" in graph
+    assert command.index("-t") < command.index(str(video))
+
+
+def test_no_audio_edits_keep_todays_command(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command = _audio_command(video, tmp_path, monkeypatch, AudioMix())
+    assert "-filter_complex" not in command
+    assert "0:a:0?" in command

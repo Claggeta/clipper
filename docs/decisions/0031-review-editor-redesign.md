@@ -269,6 +269,20 @@ asked for a chat box that turns a described edit into the page's edits.
   zoom's centre, else the hand window, the picture following the
   pointer. Manual step RV23.
 
+## Amended by the audio PR (V7 item 9i)
+
+- An Audio tab (`static/audio.js`): clip volume, a music file with its
+  level and "Lower under speech", and sound effects at the playhead with
+  their level, from `GET /api/audio`'s lists; markers for the effects
+  in a lane under the strip.
+- The preview routes the source player and the music through the
+  browser's audio engine, made and resumed on the first pointer or key
+  press (a context that never starts would silence the player): the
+  clip's gain past 100%, the music in step with the finished clip's time,
+  faded at the end and dipped 11.6 dB during the transcript's words (the
+  burn-in ducks on the real sound), and each effect as the playhead
+  passes it. Manual step RV24.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

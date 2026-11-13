@@ -38,13 +38,16 @@ from clipper.core.judging import (
 from clipper.core.naming import clip_file_name, variant_file_name
 from clipper.domain.errors import ClipperError, JudgingError, ReviewError
 from clipper.domain.models import (
+    AudioMix,
     CaptionEdits,
+    ClipAudio,
     ClipCandidate,
     ClipVariant,
     CropPath,
     HandCrop,
     LabeledVideo,
     ManifestClip,
+    MixEffect,
     OnScreenText,
     RenderManifest,
     Transcript,
@@ -101,6 +104,8 @@ class SaveRequest:
     # Punch-ins and hand-placed windows, in source seconds (ADR 0016, 0025).
     zooms: tuple[Zoom, ...] = ()
     hand_crops: tuple[HandCrop, ...] = ()
+    # Volume, music and sound effects; None when as cut (ADR 0007).
+    audio: ClipAudio | None = None
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -135,7 +140,9 @@ def parse_save(
     `keys` and a `highlight` (ADR 0017); none at all is None. Zooms are
     `start`, `end`, `scale`, `x`, `y`, `smooth`, and hand crops `start`,
     `end`, `x`, in source seconds, each list in order, apart and inside the
-    span (ADR 0016 and 0025 amendments).
+    span (ADR 0016 and 0025 amendments). Audio is `gain_db`, `music`
+    (`file`, `level_db`, `duck`) and `effects` (`file`, `at_seconds` inside
+    the span, `level_db`) (ADR 0007, audio amendment).
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -189,7 +196,25 @@ def parse_save(
             start,
             end,
         ),
+        parse_audio(data.get("audio"), start, end),
     )
+
+
+def parse_audio(value: object, start: float, end: float) -> ClipAudio | None:
+    """A clip's audio edits from a request, effects inside the span; None
+    when absent or changing nothing. Raises `BadRequest` otherwise."""
+    if value is None:
+        return None
+    try:
+        audio = ClipAudio.model_validate(value)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        where = ".".join(str(part) for part in first["loc"]) or "audio"
+        message = first["msg"].removeprefix("Value error, ")
+        raise BadRequest(f"audio: {where}: {message}") from exc
+    if any(not start <= effect.at_seconds < end for effect in audio.effects):
+        raise BadRequest("audio: sound effects must be inside the span")
+    return None if audio.empty else audio
 
 
 def _ranged[T: (Zoom, HandCrop)](
@@ -340,6 +365,11 @@ def hand_payload(hand: HandCrop) -> dict[str, object]:
     return {"start": hand.start_seconds, "end": hand.end_seconds, "x": hand.x}
 
 
+def audio_payload(audio: ClipAudio | None) -> dict[str, object] | None:
+    """A clip's audio edits as the page sends and reads them, or None."""
+    return None if audio is None else audio.model_dump()
+
+
 def edits_payload(edits: CaptionEdits | None) -> dict[str, object] | None:
     """Caption edits as the page sends and reads them, or None."""
     return None if edits is None else edits.model_dump()
@@ -387,6 +417,9 @@ class RenderInputs:
     transcript: Transcript | None
     face_tracker: FaceTracker | None = None
     frame_size: tuple[int, int] | None = None
+    # Where the maintainer's music and sound effects are (ADR 0007).
+    music_dir: Path | None = None
+    sfx_dir: Path | None = None
 
 
 class ReviewStore:
@@ -434,6 +467,7 @@ class ReviewStore:
                     "caption_edits": edits_payload(label.caption_edits),
                     "zooms": [zoom_payload(z) for z in label.zooms],
                     "hand_crops": [hand_payload(h) for h in label.hand_crops],
+                    "audio": audio_payload(label.audio),
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -487,7 +521,9 @@ class ReviewStore:
             or (self.manifest.captions and clip.caption_edits != request.caption_edits)
             or clip.zooms != request.zooms
             or clip.hand_crops != request.hand_crops
+            or clip.audio != request.audio
         )
+        self._check_audio(request.audio)
         if (request.zooms or request.hand_crops) and not self.manifest.vertical:
             raise JudgingError("Zooms and hand crops need a vertical drafts folder")
         candidate = ClipCandidate(
@@ -517,6 +553,7 @@ class ReviewStore:
             request.caption_edits,
             request.zooms,
             request.hand_crops,
+            request.audio,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -540,6 +577,7 @@ class ReviewStore:
                     request.caption_edits,
                     request.zooms,
                     request.hand_crops,
+                    request.audio,
                 )
             except ClipperError as exc:
                 render_error = str(exc)
@@ -561,6 +599,49 @@ class ReviewStore:
         self._files.save_manifest(manifest, self._folder)
         self.manifest = manifest
         return SaveResult(self._clip(clip.rank), render_error, warning)
+
+    def _audio_path(self, folder: Path | None, name: str, what: str) -> Path:
+        path = (folder or Path()) / name
+        if folder is None or not path.is_file():
+            raise JudgingError(f"No {what} file {name} in {folder}")
+        return path
+
+    def _check_audio(self, audio: ClipAudio | None) -> None:
+        """Refuse a Save whose music or sound effects are not in their
+        folders, before anything is written (ADR 0007, audio amendment)."""
+        if audio is None:
+            return
+        if audio.music is not None:
+            self._audio_path(self._render.music_dir, audio.music.file, "music")
+        for effect in audio.effects:
+            self._audio_path(self._render.sfx_dir, effect.file, "sound effect")
+
+    def _mix(self, audio: ClipAudio | None, time_map: TimeMap) -> AudioMix | None:
+        """The renderer's mix: files resolved, effects at their times in the
+        cut clip; one inside a cut is left out."""
+        if audio is None:
+            return None
+        effects = tuple(
+            MixEffect(
+                path=self._audio_path(
+                    self._render.sfx_dir, effect.file, "sound effect"
+                ),
+                at_seconds=at,
+                level_db=effect.level_db,
+            )
+            for effect in audio.effects
+            if (at := time_map.output(effect.at_seconds)) is not None
+        )
+        music = audio.music
+        return AudioMix(
+            gain_db=audio.gain_db,
+            music=None
+            if music is None
+            else self._audio_path(self._render.music_dir, music.file, "music"),
+            music_level_db=music.level_db if music else -18.0,
+            duck=music.duck if music else True,
+            effects=effects,
+        )
 
     def _check_name(self, clip: ManifestClip, name: str) -> None:
         for other in self.manifest.clips:
@@ -604,6 +685,7 @@ class ReviewStore:
         caption_edits: CaptionEdits | None = None,
         zooms: tuple[Zoom, ...] = (),
         hand_crops: tuple[HandCrop, ...] = (),
+        audio: ClipAudio | None = None,
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
@@ -667,6 +749,7 @@ class ReviewStore:
                 cuts=cuts,
                 zooms=clip_zooms,
                 hand=hand,
+                audio=self._mix(audio, time_map),
             )
             try:
                 os.replace(temp, target)
@@ -687,6 +770,7 @@ class ReviewStore:
             "texts": texts,
             "zooms": zooms,
             "hand_crops": hand_crops,
+            "audio": audio,
         }
 
     def _delete_others(self, clip: ManifestClip, keep: str, done: str) -> str | None:

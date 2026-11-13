@@ -246,6 +246,7 @@ def _get(
         ("/preview.js", "text/javascript", b"/api/captions"),
         ("/captions.js", "text/javascript", b"caption_edits"),
         ("/frame.js", "text/javascript", b"hand_crops"),
+        ("/audio.js", "text/javascript", b"/api/audio"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -397,6 +398,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "caption_edits": None,
         "zooms": [],
         "hand_crops": [],
+        "audio": None,
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -574,6 +576,7 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "caption_edits": None,
         "zooms": [],
         "hand_crops": [],
+        "audio": None,
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
@@ -865,6 +868,7 @@ def test_the_page_scripts_declare_each_function_once() -> None:
             "precision.js",
             "captions.js",
             "frame.js",
+            "audio.js",
             "preview.js",
         )
     )
@@ -1199,3 +1203,44 @@ def test_bad_preview_edits_are_refused(base_url: str, edits: str) -> None:
     query = urllib.parse.quote(edits)
     status, _, _ = _get(base_url + f"/api/captions?start=60&end=90&edits={query}")
     assert status == 400
+
+
+# --- Clip audio files (ADR 0007, audio amendment) ---
+
+
+def test_audio_files_are_listed_and_only_listed_ones_served(tmp_path: Path) -> None:
+    music, sfx = tmp_path / "music", tmp_path / "sfx"
+    music.mkdir()
+    sfx.mkdir()
+    (music / "chill.mp3").write_bytes(b"mp3 bytes")
+    (music / "notes.txt").write_bytes(b"not audio")
+    (sfx / "boom.wav").write_bytes(b"wav bytes")
+    session = dataclasses.replace(_session(tmp_path), music_dir=music, sfx_dir=sfx)
+    server = make_server(session, 0)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        assert json.loads(_get(url + "/api/audio")[2]) == {
+            "music": ["chill.mp3"],
+            "sfx": ["boom.wav"],
+        }
+        status, headers, body = _get(url + "/music/chill.mp3")
+        assert (status, body) == (200, b"mp3 bytes")
+        assert headers["Content-Type"] == "audio/mpeg"
+        assert _get(url + "/sfx/boom.wav")[2] == b"wav bytes"
+        for path in [
+            "/music/notes.txt",
+            "/music/boom.wav",
+            "/sfx/..%2Fmusic%2Fchill.mp3",
+        ]:
+            assert _get(url + path)[0] == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_without_audio_folders_nothing_is_listed(base_url: str) -> None:
+    assert json.loads(_get(base_url + "/api/audio")[2]) == {"music": [], "sfx": []}

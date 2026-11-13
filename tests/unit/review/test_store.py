@@ -8,6 +8,7 @@ from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.domain.errors import JudgingError, ReviewError
 from clipper.domain.models import (
     CaptionEdits,
+    ClipAudio,
     ClipCandidate,
     ClipVariant,
     HandCrop,
@@ -1055,3 +1056,101 @@ def test_zooms_in_a_landscape_folder_are_refused(tmp_path: Path) -> None:
     with pytest.raises(JudgingError, match="vertical drafts folder"):
         env.store.save(1, SaveRequest(10.0, 40.0, None, None, zooms=(zoom,)))
     assert not env.labels_path.exists()
+
+
+# --- Clip audio (ADR 0007, audio amendment) ---
+
+
+def _audio_env(tmp_path: Path) -> Env:
+    env = Env(tmp_path)
+    music, sfx = tmp_path / "music", tmp_path / "sfx"
+    music.mkdir()
+    sfx.mkdir()
+    (music / "chill.mp3").write_bytes(b"mp3")
+    (sfx / "boom.wav").write_bytes(b"wav")
+    env.store._render = RenderInputs(
+        tmp_path / "talk.mp4", env.renderer, TRANSCRIPT, music_dir=music, sfx_dir=sfx
+    )
+    return env
+
+
+def _audio(**fields: object) -> ClipAudio:
+    return ClipAudio.model_validate(
+        {
+            "gain_db": 2,
+            "music": {"file": "chill.mp3", "level_db": -20},
+            "effects": [{"file": "boom.wav", "at_seconds": 20.0}],
+            **fields,
+        }
+    )
+
+
+def test_audio_is_saved_and_mixed_with_effects_in_the_cut_clips_time(
+    tmp_path: Path,
+) -> None:
+    env = _audio_env(tmp_path)
+    audio = _audio()
+    saved = env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, cuts=((12.0, 15.0),), audio=audio)
+    )
+    mix = env.renderer.audio[-1]
+    assert mix is not None
+    assert (mix.gain_db, mix.music, mix.music_level_db, mix.duck) == (
+        2.0,
+        tmp_path / "music" / "chill.mp3",
+        -20.0,
+        True,
+    )
+    # 20 s is 10 s into the clip, less the 3 s cut.
+    assert [(e.path.name, e.at_seconds) for e in mix.effects] == [("boom.wav", 7.0)]
+    assert saved.clip.audio == audio
+    [label] = load_labels(env.labels_path).labels
+    assert label.audio == audio
+    calls = len(env.renderer.calls)
+    env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, cuts=((12.0, 15.0),), audio=audio)
+    )
+    assert len(env.renderer.calls) == calls
+
+
+def test_an_effect_inside_a_cut_is_left_out(tmp_path: Path) -> None:
+    env = _audio_env(tmp_path)
+    env.store.save(
+        1,
+        SaveRequest(
+            10.0,
+            40.0,
+            None,
+            None,
+            cuts=((19.0, 22.0),),
+            audio=_audio(music=None),
+        ),
+    )
+    mix = env.renderer.audio[-1]
+    assert mix is not None and mix.effects == ()
+
+
+def test_missing_audio_files_refuse_the_save_before_anything_is_written(
+    tmp_path: Path,
+) -> None:
+    env = _audio_env(tmp_path)
+    with pytest.raises(JudgingError, match="No music file gone.mp3"):
+        env.store.save(
+            1,
+            SaveRequest(
+                10.0, 40.0, None, None, audio=_audio(music={"file": "gone.mp3"})
+            ),
+        )
+    assert not env.labels_path.exists()
+
+
+def test_parse_audio_checks_effects_are_inside_the_span() -> None:
+    from clipper.review.store import parse_audio
+
+    assert parse_audio(None, 10, 40) is None
+    assert parse_audio({"gain_db": 0}, 10, 40) is None
+    assert parse_audio({"gain_db": 3}, 10, 40) == ClipAudio(gain_db=3)
+    with pytest.raises(BadRequest, match="inside the span"):
+        parse_audio({"effects": [{"file": "b.wav", "at_seconds": 50}]}, 10, 40)
+    with pytest.raises(BadRequest, match="audio: gain_db"):
+        parse_audio({"gain_db": 40}, 10, 40)

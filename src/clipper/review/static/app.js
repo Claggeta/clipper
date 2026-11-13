@@ -205,6 +205,7 @@ function drawMarks() {
   // and hand crop bars follow the view.
   scheduleEditor();
   drawFrameLane();
+  drawAudioLane();
 }
 
 function drawTimes() {
@@ -644,6 +645,7 @@ function drawUnsaved() {
     !sameTexts(sentTexts(current), savedTexts(current)) ||
     !sameCaptionEdits(sentCaptionEdits(current), savedCaptionEdits(current)) ||
     !sameFrame(current) ||
+    !sameAudio(current) ||
     titleBox.value.trim() !== saved.title ||
     noteBox.value.trim() !== saved.note;
   document.getElementById("unsaved").hidden = !changed;
@@ -847,6 +849,7 @@ function select(clip, button) {
   drawThumb(clip);
   resetCaptionEditor(clip);
   resetFrameEditor(clip);
+  resetAudioEditor(clip);
   player.currentTime = span.start;
   fit();
 }
@@ -1030,6 +1033,7 @@ document.getElementById("reset").addEventListener("click", () => {
   drawDraftTexts();
   resetCaptionEditor(current, true);
   resetFrameEditor(current, true);
+  resetAudioEditor(current, true);
   notice("");
   fit();
 });
@@ -1174,7 +1178,8 @@ function rendersOnSave(clip) {
     !sameCuts(activeCuts(), clip.cuts || []) ||
     !sameTexts(sentTexts(clip), clip.texts || []) ||
     (burnsCaptions && !sameCaptionEdits(sentCaptionEdits(clip), clip.caption_edits || null)) ||
-    !sameFrame(clip)
+    !sameFrame(clip) ||
+    !sameAudio(clip)
   );
 }
 
@@ -1212,6 +1217,7 @@ function judged(clip, reply) {
   textEdits.delete(clip.key);
   captionEdits.delete(clip.key);
   frameEdits.delete(clip.key);
+  audioEdits.delete(clip.key);
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
@@ -1224,6 +1230,7 @@ function judged(clip, reply) {
     drawThumb(clip);
     resetCaptionEditor(clip);
     resetFrameEditor(clip);
+    resetAudioEditor(clip);
     drawUnsaved();
   }
 }
@@ -1251,6 +1258,7 @@ saveButton.addEventListener("click", async () => {
       caption_edits: sentCaptionEdits(clip),
       zooms: sentZooms(clip),
       hand_crops: sentHands(clip),
+      audio: sentAudio(clip),
     });
     clip.isNew = false;
     judged(clip, reply);
@@ -1459,7 +1467,7 @@ window.addEventListener("resize", () => {
 const editor = document.getElementById("editor");
 const previewView = document.getElementById("preview-view");
 const LAYOUT_KEY = "clipper-review-layout";
-const TABS = ["clip", "captions", "text", "frame"];
+const TABS = ["clip", "captions", "text", "frame", "audio"];
 // "preview" (the clip as it will look, ADR 0031 item 9e), "source" or
 // "draft"; with no clip chosen the source shows.
 let screen = "preview";

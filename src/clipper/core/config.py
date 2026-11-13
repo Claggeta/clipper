@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     channels_file: Path = Path("data/channels.txt")
     # Names the review page offers as on screen (ADR 0024, rating amendment).
     people_file: Path = Path("data/people.txt")
+    # Music and sound effect files the maintainer adds for clips; nothing
+    # is downloaded (ADR 0007, audio amendment).
+    music_dir: Path = Path("data/music")
+    sfx_dir: Path = Path("data/sfx")
     # The post queue's campaigns and posts record (ADR 0028).
     campaigns_file: Path = Path("data/campaigns.txt")
     posts_file: Path = Path("data/posts.json")

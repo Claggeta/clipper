@@ -602,6 +602,52 @@ button[aria-pressed="true"] {
 
 .frame-bar .grip.end { right: 0; }
 
+/* Clip audio (ADR 0007, audio amendment). */
+.audio-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.judge .audio-field {
+  display: grid;
+  gap: 4px;
+}
+
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio-row input[type="range"] { flex: 1; padding: 0; }
+
+.audio-row select { width: auto; }
+
+.effect-row {
+  display: grid;
+  grid-template-columns: 1fr 64px 84px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.audio-lane {
+  position: relative;
+  height: 14px;
+  border-top: 1px solid #000;
+  background: #0b0d11;
+}
+
+.effect-mark {
+  position: absolute;
+  top: 2px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
 /* Thumbnails (ADR 0030). */
 .thumb-row {
   display: grid;

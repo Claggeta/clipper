@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from clipper.domain.models import (
     CaptionEdits,
+    ClipAudio,
     ClipCandidate,
     ClipInfo,
     ClipLink,
@@ -15,9 +16,11 @@ from clipper.domain.models import (
     LabeledVideo,
     ManifestClip,
     MediaInfo,
+    MusicBed,
     OnScreenText,
     RenderedClip,
     Segment,
+    SoundEffect,
     Transcript,
     VideoSource,
     Word,
@@ -809,3 +812,33 @@ def test_bad_zooms_and_hand_crops_are_refused(
 ) -> None:
     with pytest.raises(ValidationError, match=message):
         model.model_validate(data)
+
+
+# --- Clip audio (ADR 0007, audio amendment) ---
+
+
+def test_clip_audio_defaults_and_empty() -> None:
+    assert ClipAudio().empty
+    assert not ClipAudio(gain_db=2).empty
+    music = MusicBed(file="chill.mp3")
+    assert (music.level_db, music.duck) == (-18.0, True)
+    assert SoundEffect(file="boom.wav", at_seconds=3).level_db == 0.0
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        ({"gain_db": 13}, "less than or equal to 12"),
+        ({"music": {"file": "../secret.mp3"}}, "plain file name"),
+        ({"music": {"file": "notes.txt"}}, "must be one of"),
+        ({"music": {"file": "a.mp3", "level_db": 3}}, "less than or equal to 0"),
+        (
+            {"effects": [{"file": "a.wav", "at_seconds": -1}]},
+            "greater than or equal to 0",
+        ),
+        ({"effects": [{"file": "a.wav", "at_seconds": 1}] * 11}, "at most 10"),
+    ],
+)
+def test_bad_clip_audio_is_refused(data: dict[str, object], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        ClipAudio.model_validate(data)
