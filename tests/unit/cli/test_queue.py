@@ -1,15 +1,22 @@
 import json
 from datetime import date
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from typer.testing import CliRunner, Result
 
 from clipper.adapters.results.labels_json import save_labels
-from clipper.adapters.results.manifest_json import save_manifest
+from clipper.adapters.results.manifest_json import load_manifest, save_manifest
 from clipper.adapters.results.posting_files import load_posts
 from clipper.cli.main import app
-from clipper.domain.models import LabeledVideo, ManifestClip, RenderManifest
+from clipper.domain.models import (
+    LabeledVideo,
+    ManifestClip,
+    RenderManifest,
+    Summary,
+    SummaryPart,
+)
 
 # Constructed drafts folders, labels and campaigns, not real runs.
 
@@ -226,3 +233,53 @@ def test_posted_names_a_missing_folder(env: Env) -> None:
     result = env.run("posted", "v9/v9_1.mp4", "https://youtu.be/abcDEF12345")
     assert result.exit_code == 1
     assert "no drafts folder v9" in " ".join(result.output.split())
+
+
+# --- Summaries (ADR 0032) ---
+
+
+def _summarize(
+    folder: Path, rating: Literal["good", "ok"] | None, ranks: tuple[int, ...] = (1, 2)
+) -> None:
+    manifest = load_manifest(folder)
+    summary = Summary(
+        file=f"{folder.name}_summary.mp4",
+        parts=tuple(SummaryPart(rank=rank) for rank in ranks),
+        duration_seconds=60.0,
+        title=f"{folder.name} all of it",
+        rating=rating,
+        thumbnail=f"{folder.name}_summary.thumb.jpg",
+    )
+    save_manifest(manifest.model_copy(update={"summary": summary}), folder)
+
+
+def test_a_good_summary_is_queued_after_its_clips_with_their_people(env: Env) -> None:
+    folder = env.folder("v1", ["good", "good"])
+    _summarize(folder, "good")
+    result = env.run("queue", "--start", "2026-11-12", "--per-day", "3")
+    assert result.exit_code == 0, result.output
+    assert "v1 all of it" in result.output
+    page = (env.clips / "queue.md").read_text(encoding="utf-8")
+    assert "## 3. 2026-11-12: v1 summary" in page
+    # Clip 1 has Ron and Lacy marked, so the summary fits CORE; with no hook
+    # the caption opens with the title, as for any clip without one.
+    assert "v1 all of it With Ron and Lacy. #CORE #Shorts" in page
+    assert "v1_summary.thumb.jpg" in page
+
+
+def test_an_ok_or_unrated_summary_waits(env: Env) -> None:
+    folder = env.folder("v1", ["good"])
+    _summarize(folder, "ok")
+    assert "all of it" not in env.run("queue").output
+    assert "all of it" in env.run("queue", "--include-ok").output
+    _summarize(folder, None)
+    assert "all of it" not in env.run("queue", "--include-ok").output
+
+
+def test_a_posted_summary_leaves_the_queue(env: Env) -> None:
+    folder = env.folder("v1", ["good"])
+    _summarize(folder, "good", ranks=(1,))
+    result = env.run("posted", "v1/v1_summary.mp4", "https://youtu.be/abcDEF12345")
+    assert result.exit_code == 0, result.output
+    assert "Posted v1/v1_summary.mp4" in result.output
+    assert "all of it" not in env.run("queue").output

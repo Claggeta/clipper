@@ -375,7 +375,9 @@ and planned code:
   (committed); a posted clip leaves the queue, and the link serves 0027.
   Channel folders amendment (0019): drafts go to
   `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`; `posted` takes a full path
-  or `<stem>/<file>`. Relative paths amendment (V7 7f): a path relative
+  or `<stem>/<file>`. Summaries amendment (V7 9k-2): a rated summary is
+  queued after its folder's clips with its clips' people, shown as
+  `summary`; `posted` takes its file. Relative paths amendment (V7 7f): a path relative
   to the current folder or the clips dir too, if it is a file under the
   clips dir; the record stays `<stem>/<file>`.
 - `0029` — cuts: the review page proposes cutting pauses in speech (word
@@ -1391,7 +1393,8 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      manifest entry to title, rate and queue. ADR 0032, in two PRs:
      - 9k-1. ~~The summary: dialog, join, manifest entry, title, rating,
        thumbnail, trash.~~ (done; manual step RV25)
-     - 9k-2. Queue and `posted` for the summary (ADR 0028 amendment).
+     - 9k-2. ~~Queue and `posted` for the summary (ADR 0028 amendment).~~
+       (done; manual step Q3)
 
 Later, not scheduled:
 

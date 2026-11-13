@@ -2324,6 +2324,26 @@ MM-DD-YYYY>\<id>`, the channel as in `<id>.info.json`; the second with
 `...\Local\<today>\test_input`; the third reuses the first folder (no
 second `<id>` folder). `queue` runs without error.
 
+### Q3. Summaries in the queue
+
+Covers [ADR 0028](decisions/0028-post-queue.md)'s summaries amendment (V7
+item 9k-2), with a folder whose summary was made in `review` (RV25):
+
+```powershell
+$env:CLIPPER_POSTS_FILE = "$env:TEMP\q3-posts.json"
+uv run clipper queue --start 2026-11-12 --per-day 4
+uv run clipper posted <stem>/<stem>_summary.mp4 https://youtube.com/shorts/<an id>
+uv run clipper queue --start 2026-11-12 --per-day 4
+Remove-Item Env:CLIPPER_POSTS_FILE; Remove-Item "$env:TEMP\q3-posts.json"
+```
+
+Pass: with the summary rated `Good`, the first queue lists it after its
+folder's clips, `summary` in the Clip column; in `queue.md` its heading
+ends `summary`, its title and caption name everyone marked on its clips
+with their campaigns' hashtags, and its thumbnail is listed. Rated `OK`
+it shows only with `--include-ok`. `posted` prints `Posted
+<stem>/<stem>_summary.mp4`, and the second queue no longer lists it.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`
