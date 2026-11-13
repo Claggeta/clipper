@@ -67,6 +67,38 @@ the implementing PR and recorded in the code, not here.
 - The renderer refuses an output path equal to the input, because `-y` would
   destroy the source.
 
+## Amended by clip audio (V7 item 9i, ADR 0031)
+
+- A clip may carry audio edits, made in the review page: its own volume
+  (-12 to +12 dB), a music bed (a file from `data/music/`,
+  `CLIPPER_MUSIC_DIR`, at -30 to 0 dB, default -18, looped and faded out
+  over the last second, lowered under speech by default) and up to 10
+  sound effects (files from `data/sfx/`, `CLIPPER_SFX_DIR`, at a moment
+  of the source, -20 to +6 dB). The maintainer adds the files, which
+  must be ones they may post; nothing is downloaded or bought. Both
+  folders are under `data/`, so not committed. `ClipAudio` on the
+  manifest clip and judged label.
+- Still one encode: the music (`-stream_loop -1`) and effects are extra
+  inputs after the video, before the output length, and a
+  `-filter_complex` mixes the audio while `-vf` keeps the video (checked
+  on ffmpeg 9.0.2): the clip's sound through the cut filter and
+  `volume`, the music through `volume`, `afade` and a `sidechaincompress`
+  keyed on the clip's sound, each effect through `adelay` and `volume`,
+  then `amix` with `normalize=0` as long as the clip. Effect times move
+  to the cut clip; one inside a cut is left out. Without audio edits the
+  command is unchanged.
+- Ducking set on v2924392099 with a -18 dB bed under 8 s of talk:
+  threshold 0.05 and ratio 8 lowered the music 2.6 dB (mean -39.5 to
+  -42.1), 0.01 and 10 by 11.6 dB (to -51.1), 0.005 and 20 by 19 dB;
+  0.01 and 10 kept, as constants in the renderer to change by ear. A
+  10 s clip with a cut, gain, ducked music and an effect rendered in
+  2.5 s.
+- A mix needs the source's audio stream: a source without one fails
+  with ffmpeg's "matches no streams" (the design said music without
+  ducking; the probe does not report audio streams). Every VOD tried
+  has audio. Save refuses a music or effect file not in its folder
+  (409). Manual step RV24.
+
 ## Revisit when
 
 - Render time on long clips becomes a problem. Stream copy becomes an opt-in

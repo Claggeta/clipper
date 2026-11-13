@@ -472,6 +472,13 @@ the page's texts and `/api/clips` carry them back. Manual step RV22.
 refused in a landscape folder (409); both are stored on the judged label
 and manifest clip and re-render on change. Manual step RV23.
 
+## Amended by clip audio (ADR 0007 and 0031, V7 item 9i)
+
+`/audio.js`, `GET /api/audio` (the audio files in the music and sound
+effect folders) and `/music/<name>` and `/sfx/<name>` (listed names
+only). Save takes `audio` (`gain_db`, `music`, `effects`) and refuses a
+file not in its folder (409). Manual step RV24.
+
 ## Related
 
 - 0011: render's failure policy

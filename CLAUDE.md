@@ -55,7 +55,10 @@ and planned code:
   doubles. Its private factories were replaced by the context object in 0013's
   item 4b amendment.
 - `0007` — clips are re-encoded (`libx264`, `aac`, `yuv420p`), one code path.
-  No stream copy.
+  No stream copy. Audio amendment (V7 9i): clip volume, a looped music
+  bed ducked by `sidechaincompress` (threshold 0.01, ratio 10: -11.6 dB
+  under speech) and sound effects by `adelay`, mixed in the same encode
+  from the maintainer's own files; needs the source's audio stream.
 - `0008` — clips go to `data/clips/` (`CLIPPER_CLIPS_DIR`) as
   `<stem>_<HHMMSS>-<HHMMSS>.mp4`. Overwrite on collision, but fail within one
   run if two candidates get the same name.
@@ -446,6 +449,9 @@ and planned code:
   Zoom and reframing amendment (9h): zooms and hand crops in the Frame
   tab, bars under the strip with draggable ends, drawn and panned on the
   preview (ADR 0016 and 0025 amendments); `static/frame.js`; RV23.
+  Audio amendment (9i): an Audio tab of clip volume, music and sound
+  effects from `data/music/` and `data/sfx/`, previewed through the
+  browser's audio engine (ADR 0007 amendment); `static/audio.js`; RV24.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1364,8 +1370,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9h. ~~Zoom and reframing: punch-ins over a range, a crop set by hand.
      ADR 0016 and 0025 amendments.~~ (done; vertical only; 8 s render
      2.4 to 2.8 s with both; manual step RV23)
-   - 9i. Audio: clip volume, a music bed lowered under speech, sound
-     effects, from local `data/music/` and `data/sfx/`.
+   - 9i. ~~Audio: clip volume, a music bed lowered under speech, sound
+     effects, from local `data/music/` and `data/sfx/`.~~ (done; manual
+     step RV24)
    - 9j. Assistant: a spike first on requests the maintainer writes (the
      local LLM turning them into the page's edits), then an Assist tab
      if it is right often enough. ADR 0014 and 0031 amendments. May end

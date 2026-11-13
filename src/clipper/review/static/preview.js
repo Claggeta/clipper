@@ -4,7 +4,7 @@
 // width over a blurred copy) or face (the crop a re-render would use);
 // with the word captions and on-screen texts drawn at their burn-in
 // sizes. Close, not exact: Save's re-render is the result. Loaded after
-// app.js, keys.js, precision.js, captions.js and frame.js.
+// app.js, keys.js, precision.js, captions.js, frame.js and audio.js.
 "use strict";
 
 const previewCanvas = document.getElementById("preview-canvas");
@@ -426,6 +426,7 @@ function drawPreview() {
 // Draws every frame while the preview shows; cheap at the shown size.
 function previewLoop() {
   drawPreview();
+  syncPreviewAudio();
   previewFrame = shownScreen() === "preview" ? requestAnimationFrame(previewLoop) : 0;
 }
 

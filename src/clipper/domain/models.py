@@ -486,6 +486,85 @@ class HandCropPlan(BaseModel):
     ranges: tuple[tuple[float, float], ...] = Field(min_length=1)
 
 
+# Clip audio (ADR 0007, audio amendment, V7 9i): the clip's own volume, a
+# music bed and sound effects, from files the maintainer adds.
+GAIN_LIMIT_DB = 12.0
+MAX_EFFECTS = 10
+AUDIO_SUFFIXES = (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac")
+
+
+def _audio_file(name: str) -> str:
+    if Path(name).name != name or not name.strip():
+        raise ValueError("an audio file must be a plain file name")
+    if Path(name).suffix.lower() not in AUDIO_SUFFIXES:
+        raise ValueError(f"an audio file must be one of {', '.join(AUDIO_SUFFIXES)}")
+    return name
+
+
+class MusicBed(BaseModel):
+    """A music file under the clip, looped and faded out at the end, at
+    `level_db`, lowered under speech when `duck`."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    file: str
+    level_db: float = Field(default=-18.0, ge=-30, le=0)
+    duck: bool = True
+
+    _file = field_validator("file")(_audio_file)
+
+
+class SoundEffect(BaseModel):
+    """A sound effect file at a moment of the source, at `level_db`."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    file: str
+    at_seconds: float = Field(ge=0, allow_inf_nan=False)
+    level_db: float = Field(default=0.0, ge=-20, le=6)
+
+    _file = field_validator("file")(_audio_file)
+
+
+class ClipAudio(BaseModel):
+    """A clip's audio edits (ADR 0007, audio amendment): its own volume in
+    dB, a music bed, and sound effects in source seconds."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    gain_db: float = Field(default=0.0, ge=-GAIN_LIMIT_DB, le=GAIN_LIMIT_DB)
+    music: MusicBed | None = None
+    effects: tuple[SoundEffect, ...] = Field(default=(), max_length=MAX_EFFECTS)
+
+    @property
+    def empty(self) -> bool:
+        """True when the clip's audio is as cut, alone."""
+        return self.gain_db == 0 and self.music is None and not self.effects
+
+
+class MixEffect(BaseModel):
+    """A sound effect for the renderer: its file and its time in the cut clip."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: Path
+    at_seconds: float = Field(ge=0)
+    level_db: float
+
+
+class AudioMix(BaseModel):
+    """What the renderer mixes (ADR 0007, audio amendment): files resolved,
+    effect times in the cut clip's seconds."""
+
+    model_config = ConfigDict(frozen=True)
+
+    gain_db: float = 0.0
+    music: Path | None = None
+    music_level_db: float = -18.0
+    duck: bool = True
+    effects: tuple[MixEffect, ...] = ()
+
+
 class ClipVariant(BaseModel):
     """One rendered style of a clip: the style and its file name in the folder.
 
@@ -536,7 +615,9 @@ class ManifestClip(BaseModel):
     `caption_edits` are its word fixes, key words and colour (ADR 0017,
     caption editing amendment), None when the captions are as transcribed.
     `zooms` and `hand_crops` are its punch-ins and hand-placed windows
-    (ADR 0016 and 0025 amendments), in source seconds.
+    (ADR 0016 and 0025 amendments), in source seconds. `audio` is its
+    volume, music and sound effects (ADR 0007, audio amendment), None when
+    as cut.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -563,6 +644,7 @@ class ManifestClip(BaseModel):
     caption_edits: CaptionEdits | None = None
     zooms: tuple[Zoom, ...] = ()
     hand_crops: tuple[HandCrop, ...] = ()
+    audio: ClipAudio | None = None
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":
@@ -690,7 +772,8 @@ class Label(Span):
     order and inside its span (ADR 0029), and `texts` the lines burned over
     it (ADR 0030). `caption_edits` are its caption fixes, key words and
     colour (ADR 0017, caption editing amendment). `zooms` and `hand_crops`
-    are its punch-ins and hand-placed windows (ADR 0016 and 0025).
+    are its punch-ins and hand-placed windows (ADR 0016 and 0025), and
+    `audio` its volume, music and sound effects (ADR 0007).
     """
 
     note: str | None = None
@@ -704,6 +787,7 @@ class Label(Span):
     caption_edits: CaptionEdits | None = None
     zooms: tuple[Zoom, ...] = ()
     hand_crops: tuple[HandCrop, ...] = ()
+    audio: ClipAudio | None = None
 
     @field_validator("people")
     @classmethod

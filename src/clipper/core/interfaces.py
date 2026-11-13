@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from clipper.domain.models import (
+    AudioMix,
     ClipCandidate,
     ClipInfo,
     ClipTitle,
@@ -112,7 +113,8 @@ class ClipRenderer(Protocol):
     `zooms` are punch-ins on the 9:16 frame, before captions, in the cut
     clip's seconds (ADR 0016, zoom amendment); `hand` the fit style's
     hand-placed windows (ADR 0025, hand crop amendment). Both need the
-    vertical frame.
+    vertical frame. `audio` is the clip's volume, music and sound effects,
+    effect times in the cut clip's seconds (ADR 0007, audio amendment).
     """
 
     def render(
@@ -127,6 +129,7 @@ class ClipRenderer(Protocol):
         cuts: tuple[tuple[float, float], ...] = (),
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
+        audio: AudioMix | None = None,
     ) -> RenderedClip: ...
 
     def still(

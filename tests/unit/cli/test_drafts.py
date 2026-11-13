@@ -17,6 +17,7 @@ from clipper.domain.errors import (
     TranscriptionError,
 )
 from clipper.domain.models import (
+    AudioMix,
     ClipCandidate,
     ClipTitle,
     CropPath,
@@ -449,6 +450,7 @@ class FaceFailingRenderer(FakeClipRenderer):
         cuts: tuple[tuple[float, float], ...] = (),
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
+        audio: AudioMix | None = None,
     ) -> RenderedClip:
         if crop is not None:
             raise ClipRenderError("[face] crop failed")

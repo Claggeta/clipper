@@ -3,6 +3,7 @@ from pathlib import Path
 
 from clipper.domain.errors import ClipRenderError
 from clipper.domain.models import (
+    AudioMix,
     ClipCandidate,
     CropPath,
     HandCropPlan,
@@ -16,8 +17,8 @@ class FakeClipRenderer:
 
     The file is not a video. Calls are recorded in `calls`, the captions of
     each call in `captions`, its `vertical` flag in `vertical`, its crop
-    path in `crops`, its cuts in `cuts`, its zooms in `zooms` and its hand
-    crops in `hands`. Candidates
+    path in `crops`, its cuts in `cuts`, its zooms in `zooms`, its hand
+    crops in `hands` and its audio mix in `audio`. Candidates
     in `fail_on` raise ClipRenderError and write nothing.
     """
 
@@ -30,6 +31,7 @@ class FakeClipRenderer:
         self.cuts: list[tuple[tuple[float, float], ...]] = []
         self.zooms: list[tuple[Zoom, ...]] = []
         self.hands: list[HandCropPlan | None] = []
+        self.audio: list[AudioMix | None] = []
         self.stills: list[tuple[float, Path, str | None, bool, CropPath | None]] = []
         self.fail_stills = False
 
@@ -45,8 +47,10 @@ class FakeClipRenderer:
         cuts: tuple[tuple[float, float], ...] = (),
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
+        audio: AudioMix | None = None,
     ) -> RenderedClip:
         self.calls.append((video_path, candidate, output_path))
+        self.audio.append(audio)
         self.zooms.append(zooms)
         self.hands.append(hand)
         self.cuts.append(cuts)

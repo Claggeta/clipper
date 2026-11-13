@@ -6,6 +6,7 @@ from clipper.adapters.media._process import format_failure, run_tool
 from clipper.core.cuts import check_cuts
 from clipper.domain.errors import ClipRenderError
 from clipper.domain.models import (
+    AudioMix,
     ClipCandidate,
     CropPath,
     HandCropPlan,
@@ -130,6 +131,75 @@ def _hand_commands(hand: HandCropPlan) -> str:
     )
 
 
+# ADR 0007, audio amendment. The music dips under the clip's own sound by a
+# sidechain compressor keyed on it. Set on v2924392099: a bed at -18 dB fell
+# 11.6 dB under speech (mean -39.5 to -51.1 dB); threshold 0.05 and ratio 8
+# dipped it 2.6 dB, 0.005 and 20 nearly 19 dB.
+DUCK_THRESHOLD = 0.01
+DUCK_RATIO = 10
+DUCK_ATTACK_MS = 20
+DUCK_RELEASE_MS = 400
+MUSIC_FADE_SECONDS = 1.0
+
+
+def _mix_graph(audio: AudioMix, length: float, cut_filter: str | None) -> str:
+    """ADR 0007, audio amendment. The clip's own sound (cut, then at its
+    gain), the music looped from input 1 at its level and faded out at the
+    end, ducked under the clip's sound, and each sound effect delayed to
+    its moment, mixed without normalising, as long as the clip."""
+    voice = (
+        f"[0:a:0]{cut_filter + ',' if cut_filter else ''}volume={audio.gain_db:.1f}dB"
+    )
+    parts: list[str] = []
+    mixed: list[str] = ["[voice]"]
+    first_effect = 1
+    if audio.music is not None:
+        parts.append(voice + (",asplit=2[voice][key]" if audio.duck else "[voice]"))
+        fade = _seconds(max(length - MUSIC_FADE_SECONDS, 0.0))
+        bed = (
+            f"[1:a]volume={audio.music_level_db:.1f}dB,"
+            f"afade=t=out:st={fade}:d={MUSIC_FADE_SECONDS:.1f}"
+        )
+        if audio.duck:
+            parts.append(bed + "[bed]")
+            parts.append(
+                f"[bed][key]sidechaincompress=threshold={DUCK_THRESHOLD}:"
+                f"ratio={DUCK_RATIO}:attack={DUCK_ATTACK_MS}:"
+                f"release={DUCK_RELEASE_MS}[music]"
+            )
+        else:
+            parts.append(bed + "[music]")
+        mixed.append("[music]")
+        first_effect = 2
+    else:
+        parts.append(voice + "[voice]")
+    for n, effect in enumerate(audio.effects):
+        delay = round(effect.at_seconds * 1000)
+        parts.append(
+            f"[{first_effect + n}:a]adelay={delay}:all=1,"
+            f"volume={effect.level_db:.1f}dB[fx{n}]"
+        )
+        mixed.append(f"[fx{n}]")
+    if len(mixed) == 1:
+        parts[-1] = parts[-1].removesuffix("[voice]") + "[aout]"
+    else:
+        parts.append(
+            "".join(mixed)
+            + f"amix=inputs={len(mixed)}:normalize=0:duration=first[aout]"
+        )
+    return ";".join(parts)
+
+
+def _mix_inputs(audio: AudioMix) -> list[str]:
+    """The music, looped, then each sound effect, as ffmpeg inputs."""
+    inputs: list[str] = []
+    if audio.music is not None:
+        inputs += ["-stream_loop", "-1", "-i", str(audio.music.resolve())]
+    for effect in audio.effects:
+        inputs += ["-i", str(effect.path.resolve())]
+    return inputs
+
+
 def _cut_filters(
     candidate: ClipCandidate, cuts: tuple[tuple[float, float], ...]
 ) -> tuple[str, str]:
@@ -175,6 +245,7 @@ class FfmpegClipRenderer:
         cuts: tuple[tuple[float, float], ...] = (),
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
+        audio: AudioMix | None = None,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -214,6 +285,15 @@ class FfmpegClipRenderer:
             filters.append(_SUBTITLES_FILTER)
             files[_CAPTIONS_NAME] = captions.encode("utf-8")
         video_filter = ",".join(filters) or None
+        # The clip's audio edits replace the cut's audio filter with a graph
+        # over the music and effect inputs (ADR 0007, audio amendment).
+        mix = None
+        extra: list[str] = []
+        if audio is not None and audio != AudioMix():
+            length = candidate.duration_seconds - sum(b - a for a, b in cuts)
+            mix = _mix_graph(audio, length, audio_filter)
+            extra = _mix_inputs(audio)
+            audio_filter = None
         if not files:
             self._cut(
                 video_path,
@@ -221,6 +301,9 @@ class FfmpegClipRenderer:
                 output_path,
                 video_filter=video_filter,
                 audio_filter=audio_filter,
+                cut=bool(cuts),
+                mix=mix,
+                extra_inputs=extra,
             )
         else:
             with tempfile.TemporaryDirectory(
@@ -237,6 +320,9 @@ class FfmpegClipRenderer:
                     cwd=Path(folder),
                     video_filter=video_filter,
                     audio_filter=audio_filter,
+                    cut=bool(cuts),
+                    mix=mix,
+                    extra_inputs=extra,
                 )
         return RenderedClip(candidate=candidate, path=output_path)
 
@@ -305,12 +391,20 @@ class FfmpegClipRenderer:
         cwd: Path | None = None,
         video_filter: str | None = None,
         audio_filter: str | None = None,
+        cut: bool = False,
+        mix: str | None = None,
+        extra_inputs: list[str] | None = None,
     ) -> None:
         # With cuts the length goes on the input: as an output limit, ffmpeg
         # would read past the span's end to make up the frames `select`
         # dropped (ADR 0029).
         duration = ["-t", _seconds(candidate.duration_seconds)]
-        on_input = audio_filter is not None
+        on_input = cut or audio_filter is not None
+        # A mix's own inputs follow the video, before any output option, and
+        # its graph's output is the audio (ADR 0007, audio amendment).
+        audio_map = (
+            ["-filter_complex", mix, "-map", "[aout]"] if mix else ["-map", "0:a:0?"]
+        )
         args = [
             "-hide_banner",
             "-loglevel",
@@ -322,13 +416,14 @@ class FfmpegClipRenderer:
             *(duration if on_input else []),
             "-i",
             str(video_path),
+            *(extra_inputs or []),
             *([] if on_input else duration),
             # Video is required. Audio is the first stream only, the one the
-            # transcriber heard, and optional so a silent source still renders.
+            # transcriber heard, and optional so a silent source still renders
+            # (not with a mix, whose graph needs it).
             "-map",
             "0:v:0",
-            "-map",
-            "0:a:0?",
+            *audio_map,
             *(["-vf", video_filter] if video_filter else []),
             *(["-af", audio_filter] if audio_filter else []),
             "-c:v",

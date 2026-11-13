@@ -1254,6 +1254,8 @@ def review(
             people=load_people(settings.people_file),
             peaks=build.peaks(),
             peaks_path=peaks_file(settings.cache_dir, video),
+            music_dir=settings.music_dir,
+            sfx_dir=settings.sfx_dir,
         )
         build.serve(
             session,

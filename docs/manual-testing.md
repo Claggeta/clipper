@@ -3098,6 +3098,34 @@ in a vertical folder.
 
 Then delete the scratch folders.
 
+### RV24. Clip audio
+
+Covers [ADR 0007](decisions/0007-cut-clips-by-re-encoding.md)'s audio
+amendment (V7 item 9i). Same scratch copy and labels dir as RV12. Put a
+music file you may post in `data\music\` and a short sound effect in
+`data\sfx\` first.
+
+1. Choose a clip and open `Audio`. Pass: a `Clip volume` slider at
+   `0 dB`, `Music` listing your file, `Add effect at playhead`, and a note
+   naming the folders. With both folders empty the note says where to
+   put files.
+2. Set the volume to `+6 dB` and play the preview. Pass: louder than
+   before; `Source` plays at the normal level.
+3. Pick the music. Pass: it plays under the preview, quieter while
+   people talk, and stops when the preview pauses; `Lower under speech`
+   off keeps it level.
+4. Put the playhead on a moment, press `Add effect at playhead`. Pass: a
+   marker under the strip; the effect plays when the preview passes it.
+5. Save. Pass: "re-rendered"; the draft has the louder voice, the music
+   dipping under speech and fading out at the end, and the effect at its
+   moment.
+6. Rename the music file in `data\music\` and Save again with another
+   change. Pass: refused, naming the missing file; nothing re-renders.
+7. Reload and choose the clip. Pass: the tab shows the saved audio,
+   `Unsaved` hidden. `Reset` clears it.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

@@ -43,6 +43,7 @@ from clipper.domain.errors import (
     ReviewError,
 )
 from clipper.domain.models import (
+    AUDIO_SUFFIXES,
     ClipCandidate,
     LabeledVideo,
     ManifestClip,
@@ -54,6 +55,7 @@ from clipper.review.store import (
     RenderInputs,
     ReviewStore,
     UnknownClip,
+    audio_payload,
     edits_payload,
     hand_payload,
     parse_caption_edits,
@@ -83,6 +85,7 @@ _STATIC = {
     "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
     "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
     "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
+    "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
     "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
@@ -92,6 +95,9 @@ _STATIC = {
 # URL, never shows one VOD's frame in another's strip: every run is served
 # from the same address.
 _FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7}(?:\.25|\.5|\.75)?)\.jpg")
+# The maintainer's audio files, for the page to play: /music/<name> and
+# /sfx/<name>, listed names only (ADR 0007, audio amendment).
+_AUDIO_PATH = re.compile(r"/(music|sfx)/([^/\\]+)")
 # The video's audio levels for the waveform: /peaks/<video key>.bin.
 _PEAKS_PATH = re.compile(r"/peaks/([^/]+)\.bin")
 # A rendered draft listed in the manifest: /clips/<file name> (ADR 0025).
@@ -119,6 +125,7 @@ class ReviewSession:
     `people` are the names the page offers to mark as on screen (ADR 0024,
     rating amendment). `peaks` writes the waveform's levels to `peaks_path`
     once, on the first request (ADR 0031); without it there is none.
+    `music_dir` and `sfx_dir` hold the maintainer's audio files (ADR 0007).
     """
 
     folder: Path
@@ -137,6 +144,8 @@ class ReviewSession:
     people: tuple[str, ...] = ()
     peaks: PeaksExtractor | None = None
     peaks_path: Path | None = None
+    music_dir: Path | None = None
+    sfx_dir: Path | None = None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -256,6 +265,8 @@ def make_store(session: ReviewSession) -> ReviewStore:
             session.transcript,
             session.face_tracker,
             session.frame_size,
+            session.music_dir,
+            session.sfx_dir,
         ),
     )
 
@@ -296,6 +307,7 @@ def clip_payload(
         "caption_edits": edits_payload(clip.caption_edits),
         "zooms": [zoom_payload(zoom) for zoom in clip.zooms],
         "hand_crops": [hand_payload(hand) for hand in clip.hand_crops],
+        "audio": audio_payload(clip.audio),
         "judgment": store.judgment(clip),
     }
 
@@ -425,6 +437,18 @@ def words_payload(session: ReviewSession, query: str) -> dict[str, object]:
     return {"words": words}
 
 
+def audio_files(folder: Path | None) -> list[str]:
+    """The audio files in a folder, by name, which are all the page may
+    pick or fetch (ADR 0007, audio amendment)."""
+    if folder is None or not folder.is_dir():
+        return []
+    return sorted(
+        path.name
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in AUDIO_SUFFIXES
+    )
+
+
 def _listed_thumbnails(store: ReviewStore) -> set[str]:
     """The thumbnails the manifest lists, which are all the page may fetch."""
     return {c.thumbnail for c in store.manifest.clips if c.thumbnail is not None}
@@ -455,6 +479,18 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     self._send_span_reply(pauses_payload, query)
                 elif path == "/api/words":
                     self._send_span_reply(words_payload, query)
+                elif path == "/api/audio":
+                    self._send_json(
+                        HTTPStatus.OK,
+                        {
+                            "music": audio_files(session.music_dir),
+                            "sfx": audio_files(session.sfx_dir),
+                        },
+                    )
+                elif (sound := _AUDIO_PATH.fullmatch(path)) and self._send_audio(
+                    sound.group(1), sound.group(2)
+                ):
+                    pass
                 elif path == "/api/captions":
                     self._send_span_reply(captions_payload, query)
                 elif path == "/api/crop":
@@ -604,6 +640,15 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
 
         def _not_found(self) -> None:
             self._send(HTTPStatus.NOT_FOUND, "text/plain", b"Not found")
+
+        def _send_audio(self, kind: str, name: str) -> bool:
+            """Send a listed music or sound effect file; False if not listed."""
+            folder = session.music_dir if kind == "music" else session.sfx_dir
+            if folder is None or name not in audio_files(folder):
+                return False
+            content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+            self._send_file(folder / name, content_type)
+            return True
 
         def _send_peaks(self) -> None:
             try:
