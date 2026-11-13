@@ -8,16 +8,31 @@
 </head>
 <body>
   <header class="bar">
+    <button type="button" id="toggle-list" class="icon" title="Show or hide the clip list" aria-pressed="true">☰</button>
     <h1>Clipper Review</h1>
     <span id="source" class="muted"></span>
     <span id="flags" class="flags"></span>
   </header>
-  <div class="layout">
+  <!-- One screen (ADR 0031): the clip list, the player, the inspector and
+       the timeline. Below about 1200 px wide they stack. -->
+  <div id="editor" class="editor">
     <nav class="sidebar" aria-label="Clips">
       <ol id="clips" class="clips"></ol>
     </nav>
-    <main class="main">
-      <video id="player" src="/video" controls preload="metadata"></video>
+    <main class="stage">
+      <div class="screen-switch" role="group" aria-label="Show">
+        <button type="button" id="show-source" aria-pressed="true" title="The whole source video">Source</button>
+        <button type="button" id="show-draft" aria-pressed="false" title="The rendered draft">Draft</button>
+      </div>
+      <div class="screen">
+        <video id="player" src="/video" controls preload="metadata"></video>
+        <div id="draft-view" class="draft-view" hidden>
+          <div class="draft-frame">
+            <video id="draft" controls preload="metadata" playsinline></video>
+            <div id="draft-texts" class="draft-texts"></div>
+          </div>
+        </div>
+      </div>
       <div class="steps" aria-label="Step">
         <button type="button" data-step="-15">−15 s</button>
         <button type="button" data-step="-5">−5 s</button>
@@ -27,59 +42,26 @@
         <button type="button" data-step="15">+15 s</button>
         <button type="button" id="add" class="add" title="A new clip from the playhead">Add clip here</button>
       </div>
-      <section id="details" class="details" hidden>
-        <div class="strip-bar">
-          <button type="button" id="pan-back" title="Earlier">‹</button>
-          <button type="button" id="zoom-out">Zoom out</button>
-          <button type="button" id="zoom-in">Zoom in</button>
-          <button type="button" id="fit">Fit clip</button>
-          <button type="button" id="pan-on" title="Later">›</button>
-          <span id="scale" class="muted"></span>
+    </main>
+    <p id="empty" class="empty muted">Choose a clip.</p>
+    <div id="details" class="details" hidden>
+      <form class="inspector judge" onsubmit="return false">
+        <div class="tabs" role="tablist" aria-label="Inspector">
+          <button type="button" role="tab" id="tab-clip" data-tab="clip" aria-selected="true" aria-controls="panel-clip">Clip</button>
+          <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Text</button>
+          <button type="button" role="tab" id="tab-frame" data-tab="frame" aria-selected="false" aria-controls="panel-frame">Frame</button>
         </div>
-        <div id="strip" class="strip">
-          <div id="tiles" class="tiles"></div>
-          <div id="cuts" class="cuts"></div>
-          <div id="cut-in" class="cut-in" hidden></div>
-          <div id="cut-drag" class="cut manual cut-drag" hidden></div>
-          <div id="dim-before" class="dim before"></div>
-          <div id="dim-after" class="dim after"></div>
-          <div id="selection" class="selection"></div>
-          <div id="playhead" class="playhead"></div>
-          <div id="handle-start" class="handle" title="Start"></div>
-          <div id="handle-end" class="handle" title="End"></div>
-        </div>
-        <div class="trim-actions">
-          <button type="button" id="set-start">Set start</button>
-          <button type="button" id="set-end">Set end</button>
-          <button type="button" id="preview" class="primary">Preview span</button>
-          <button type="button" id="reset">Reset</button>
-          <button type="button" id="cut-silence" title="Cut the pauses in speech inside the span">Cut silence</button>
-          <button type="button" id="cut-in-button" title="Start a cut at the playhead ( [ )">Cut in</button>
-          <button type="button" id="cut-out-button" title="End the cut at the playhead ( ] ); Esc drops it">Cut out</button>
-          <button type="button" id="clear-cuts">Clear cuts</button>
-          <span id="trim-notice" class="error"></span>
-        </div>
-        <div id="draft-view" class="draft-view" hidden>
-          <div class="draft-frame">
-            <video id="draft" controls preload="metadata" playsinline></video>
-            <div id="draft-texts" class="draft-texts"></div>
-          </div>
-          <div class="draft-side">
-            <span class="muted">Draft</span>
-            <div id="styles" class="style-buttons" role="group" aria-label="Style"></div>
-          </div>
-        </div>
-        <h2 id="title"></h2>
-        <p id="hook" class="muted"></p>
-        <dl class="times">
-          <div><dt>Draft</dt><dd id="clip-span"></dd></div>
-          <div><dt>Start</dt><dd id="edit-start"></dd></div>
-          <div><dt>End</dt><dd id="edit-end"></dd></div>
-          <div><dt>Length</dt><dd id="edit-length"></dd></div>
-          <div id="unsaved" hidden><dt>&nbsp;</dt><dd class="accent">Unsaved</dd></div>
-        </dl>
-        <p id="error" class="error" hidden></p>
-        <form class="judge" onsubmit="return false">
+        <section id="panel-clip" class="panel" role="tabpanel" data-panel="clip" aria-labelledby="tab-clip">
+          <h2 id="title"></h2>
+          <p id="hook" class="muted"></p>
+          <dl class="times">
+            <div><dt>Draft</dt><dd id="clip-span"></dd></div>
+            <div><dt>Start</dt><dd id="edit-start"></dd></div>
+            <div><dt>End</dt><dd id="edit-end"></dd></div>
+            <div><dt>Length</dt><dd id="edit-length"></dd></div>
+            <div id="unsaved" hidden><dt>&nbsp;</dt><dd class="accent">Unsaved</dd></div>
+          </dl>
+          <p id="error" class="error" hidden></p>
           <label for="title-box">Title</label>
           <input id="title-box" type="text" maxlength="200" autocomplete="off">
           <label for="note-box">Notes</label>
@@ -93,6 +75,8 @@
             <span class="field-label" id="people-label">On screen</span>
             <div id="people" class="toggle-row" role="group" aria-labelledby="people-label"></div>
           </div>
+        </section>
+        <section id="panel-text" class="panel" role="tabpanel" data-panel="text" aria-labelledby="tab-text" hidden>
           <div class="judge-field">
             <span class="field-label">On-screen text <span class="muted">(seconds of the finished clip)</span></span>
             <div id="texts" class="texts"></div>
@@ -111,15 +95,54 @@
             <img id="thumb" class="thumb" alt="The clip's thumbnail" hidden>
             <p id="thumb-notice" class="judge-notice" role="status"></p>
           </div>
+        </section>
+        <section id="panel-frame" class="panel" role="tabpanel" data-panel="frame" aria-labelledby="tab-frame" hidden>
+          <span class="field-label">Style</span>
+          <div id="styles" class="toggle-row" role="group" aria-label="Style"></div>
+          <p id="styles-none" class="muted">This clip has one style.</p>
+        </section>
+        <div class="inspector-foot">
           <div class="judge-actions">
             <button type="button" id="save" class="primary">Save</button>
             <button type="button" id="trash" class="danger">Trash</button>
           </div>
           <p id="judge-notice" class="judge-notice" role="status"></p>
-        </form>
+        </div>
+      </form>
+      <section class="timeline" aria-label="Timeline">
+        <div class="strip-bar">
+          <button type="button" id="pan-back" title="Earlier">‹</button>
+          <button type="button" id="zoom-out">Zoom out</button>
+          <button type="button" id="zoom-in">Zoom in</button>
+          <button type="button" id="fit">Fit clip</button>
+          <button type="button" id="pan-on" title="Later">›</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" id="set-start">Set start</button>
+          <button type="button" id="set-end">Set end</button>
+          <button type="button" id="preview" class="primary">Preview span</button>
+          <button type="button" id="reset">Reset</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" id="cut-silence" title="Cut the pauses in speech inside the span">Cut silence</button>
+          <button type="button" id="cut-in-button" title="Start a cut at the playhead ( [ )">Cut in</button>
+          <button type="button" id="cut-out-button" title="End the cut at the playhead ( ] ); Esc drops it">Cut out</button>
+          <button type="button" id="clear-cuts">Clear cuts</button>
+          <span id="trim-notice" class="error"></span>
+          <span id="scale" class="muted scale"></span>
+        </div>
+        <div id="strip" class="strip">
+          <div id="tiles" class="tiles"></div>
+          <div id="cuts" class="cuts"></div>
+          <div id="cut-in" class="cut-in" hidden></div>
+          <div id="cut-drag" class="cut manual cut-drag" hidden></div>
+          <div id="dim-before" class="dim before"></div>
+          <div id="dim-after" class="dim after"></div>
+          <div id="selection" class="selection"></div>
+          <div id="playhead" class="playhead"></div>
+          <div id="handle-start" class="handle" title="Start"></div>
+          <div id="handle-end" class="handle" title="End"></div>
+        </div>
       </section>
-      <p id="empty" class="muted">Choose a clip.</p>
-    </main>
+    </div>
   </div>
   <script src="/app.js"></script>
 </body>
