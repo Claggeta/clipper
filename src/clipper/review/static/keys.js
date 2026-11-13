@@ -166,7 +166,10 @@ const PAGE_KEYS = {
 
 document.addEventListener("keydown", (event) => {
   // The combined clip dialog has its own Esc; the page's keys wait (ADR 0032).
-  if (!document.getElementById("combine-dialog").hidden) {
+  if (
+    !document.getElementById("combine-dialog").hidden ||
+    !document.getElementById("story-dialog").hidden
+  ) {
     return;
   }
   const key = event.key.toLowerCase();

@@ -3177,6 +3177,36 @@ Same scratch copy and labels dir as RV12, with at least two saved clips.
 
 Then delete the scratch folders.
 
+### RV26. Summarize
+
+Covers [ADR 0033](decisions/0033-summarize-a-vods-story.md) (V7 item
+9l-3). Needs Ollama running with `CLIPPER_LLM_MODEL` set, and a drafts
+folder of a long stream, ideally an incremental game, with captions.
+
+1. Press `Summarize video`. Pass: a dialog with "Reading the stream:
+   note 1 of N…", counting up, then "Choosing the story…"; within a few
+   minutes (about 1 minute for 80 min of stream) 8 to 10 beat rows in
+   time order with cards that describe them, and the total.
+2. Press `Play` on a beat. Pass: it plays in the dialog's player from
+   its start and stops at its end; the button says `Stop` meanwhile.
+3. Nudge a beat's end with `▶`, edit a card, close the dialog and
+   reload. Pass: opening it again shows the nudged end and the new card.
+4. Press `Add beat at playhead` after moving the dialog's player.
+   Pass: a 15 s beat there; on an existing beat it is refused. `Remove`
+   drops a beat.
+5. Pick music and press `Make summary`. Pass: "Rendering …"; then the
+   summary plays: the beats in order, each card at the top for its first
+   seconds, captions, the music under it. A `Summary` entry appears
+   above the clip list.
+6. Title it (or `Suggest`), rate it `Good`, make a thumbnail. Pass: the
+   entry shows the title and rating; `<stem>_summary.thumb.jpg` is in
+   the folder.
+7. `Edit beats`, `Re-plan`. Pass: new beats from the model.
+   `Trash summary` twice. Pass: the entry, files and plan are gone.
+8. With `CLIPPER_LLM_MODEL` empty, `Summarize video` says it needs it.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

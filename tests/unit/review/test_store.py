@@ -13,9 +13,11 @@ from clipper.domain.models import (
     ClipVariant,
     HandCrop,
     ManifestClip,
+    MusicBed,
     OnScreenText,
     RenderManifest,
     Segment,
+    StoryBeat,
     Transcript,
     Word,
     Zoom,
@@ -27,6 +29,7 @@ from clipper.review.store import (
     SaveRequest,
     parse_caption_edits,
     parse_combine,
+    parse_story_beats,
 )
 
 # Constructed manifest and transcript, not the output of a real run.
@@ -1257,3 +1260,80 @@ def test_a_combined_title_needs_a_model(tmp_path: Path) -> None:
 def test_bad_combined_bodies_are_refused(body: object, message: str) -> None:
     with pytest.raises(BadRequest, match=message):
         parse_combine(body)
+
+
+# --- The story (ADR 0033) ---
+
+
+def _beats(*spans: tuple[float, float, str]) -> tuple[StoryBeat, ...]:
+    return tuple(
+        StoryBeat(start_seconds=a, end_seconds=b, card=card) for a, b, card in spans
+    )
+
+
+def test_a_story_plan_is_kept_and_edited_before_any_render(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    plan = env.store.save_story_plan(_beats((10.0, 30.0, "Start")))
+    assert (plan.file, plan.beats[0].card) == (None, "Start")
+    edited = env.store.save_story_plan(_beats((12.0, 30.0, "Begin")))
+    assert edited.beats[0].start_seconds == 12.0
+    with pytest.raises(JudgingError, match="Make the summary first"):
+        env.store.save_story("t", None)
+
+
+def test_a_story_renders_each_beat_and_joins_them_with_top_cards(
+    tmp_path: Path,
+) -> None:
+    env = _combined_env(tmp_path)
+    beats = _beats((10.0, 30.0, "Nail clippers"), (100.0, 115.0, ""))
+    story = env.store.render_story(beats, MusicBed(file="chill.mp3"))
+
+    # Each beat cut from the source, with captions on the vertical frame.
+    rendered = [call[1] for call in env.renderer.calls[-2:]]
+    assert [(c.start_seconds, c.end_seconds) for c in rendered] == [
+        (10, 30),
+        (100, 115),
+    ]
+    assert env.renderer.vertical[-2:] == [True, True]
+    [(parts, output, cards, audio, length)] = env.renderer.joins
+    assert len(parts) == 2 and output.name == "talk_summary.part.mp4"
+    assert length == 35.0
+    assert cards is not None and "Nail clippers" in cards and "\\an8" in cards
+    assert audio is not None and audio.music == tmp_path / "music" / "chill.mp3"
+    assert (story.file, story.duration_seconds) == ("talk_summary.mp4", 35.0)
+    assert (env.folder / "talk_summary.mp4").is_file()
+
+
+def test_a_rendered_story_is_titled_thumbnailed_and_trashed(tmp_path: Path) -> None:
+    env = _combined_env(tmp_path)
+    env.store.render_story(_beats((10.0, 30.0, "Go")), None)
+    saved = env.store.save_story("The whole grind", "good")
+    assert (saved.title, saved.rating) == ("The whole grind", "good")
+    thumbed = env.store.story_thumbnail(2.0, None)
+    assert thumbed.thumbnail == "talk_summary.thumb.jpg"
+    again = env.store.render_story(_beats((40.0, 60.0, "Again")), None)
+    assert (again.title, again.rating, again.thumbnail) == (
+        "The whole grind",
+        "good",
+        None,
+    )
+    env.store.trash_story()
+    assert env.store.manifest.story is None
+    assert not (env.folder / "talk_summary.mp4").exists()
+    with pytest.raises(JudgingError, match="Plan the story first"):
+        env.store.trash_story()
+
+
+@pytest.mark.parametrize(
+    ("beats", "message"),
+    [
+        ([], "at least one"),
+        ([{"start": 10, "end": 5}], "end after it starts"),
+        ([{"start": 10, "end": 700}], "inside the video"),
+        ([{"start": 10, "end": 30}, {"start": 20, "end": 40}], "overlap"),
+        ([{"start": 10, "end": 30, "card": "x" * 61}], "at most 60"),
+    ],
+)
+def test_bad_beats_are_refused(beats: object, message: str) -> None:
+    with pytest.raises(BadRequest, match=message):
+        parse_story_beats(beats, 600.0)

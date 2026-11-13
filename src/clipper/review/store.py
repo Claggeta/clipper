@@ -9,7 +9,9 @@ See docs/decisions/0024 (item 3c and 3d amendments).
 import logging
 import math
 import os
+import tempfile
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -54,6 +56,8 @@ from clipper.domain.models import (
     MusicBed,
     OnScreenText,
     RenderManifest,
+    Story,
+    StoryBeat,
     Transcript,
     Zoom,
 )
@@ -427,6 +431,63 @@ def combined_payload(combined: Combined | None) -> dict[str, object] | None:
         "title": combined.title,
         "rating": combined.rating,
         "thumbnail": combined.thumbnail,
+    }
+
+
+def story_name(manifest: RenderManifest) -> str:
+    """`<stem>_summary.mp4`, the folder's story (ADR 0033)."""
+    return f"{Path(manifest.source).stem}_summary.mp4"
+
+
+def parse_story_beats(value: object, duration: float) -> tuple[StoryBeat, ...]:
+    """Beats from a request: `start`, `end` (inside the video) and `card`,
+    at least one, in order and apart."""
+    if not isinstance(value, list) or not value:
+        raise BadRequest("beats must be a list of at least one")
+    beats: list[StoryBeat] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise BadRequest("each beat must be an object")
+        try:
+            beat = StoryBeat(
+                start_seconds=_seconds(item, "start"),
+                end_seconds=_seconds(item, "end"),
+                card=str(item.get("card") or ""),
+                why=str(item.get("why") or ""),
+            )
+        except ValidationError as exc:
+            message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+            raise BadRequest(f"beat: {message}") from exc
+        if beat.end_seconds > duration:
+            raise BadRequest("beats must be inside the video")
+        beats.append(beat)
+    beats.sort(key=lambda b: b.start_seconds)
+    for before, after in zip(beats, beats[1:], strict=False):
+        if after.start_seconds < before.end_seconds:
+            raise BadRequest("beats must not overlap")
+    return tuple(beats)
+
+
+def story_payload(story: Story | None) -> dict[str, object] | None:
+    """The story as the page shows it, or None."""
+    if story is None:
+        return None
+    return {
+        "beats": [
+            {
+                "start": b.start_seconds,
+                "end": b.end_seconds,
+                "card": b.card,
+                "why": b.why,
+            }
+            for b in story.beats
+        ],
+        "music": None if story.music is None else story.music.model_dump(),
+        "file": story.file,
+        "duration": story.duration_seconds,
+        "title": story.title,
+        "rating": story.rating,
+        "thumbnail": story.thumbnail,
     }
 
 
@@ -1034,58 +1095,235 @@ class ReviewStore:
             combined = self._combined()
             if not 0 <= at < combined.duration_seconds:
                 raise BadRequest("the moment must be inside the combined clip")
-            ass = None
-            if text is not None:
-                ass = build_ass(
-                    _SILENT,
-                    ClipCandidate(
-                        start_seconds=0.0,
-                        end_seconds=THUMBNAIL_TEXT_SECONDS,
-                        score=0.0,
-                        reasons=("thumbnail",),
-                    ),
-                    vertical=self.manifest.vertical,
-                    texts=(text,),
-                ).text
-            name = thumbnail_name(combined.file)
-            target = self._folder / name
-            temp = target.with_name(f"{target.stem}.part.jpg")
-            try:
-                self._render.renderer.still(
-                    self._folder / combined.file, at, temp, captions=ass
-                )
-                os.replace(temp, target)
-            finally:
-                temp.unlink(missing_ok=True)
+            ass = self._thumbnail_text(text)
+            name = self._own_frame(combined.file, at, ass)
             combined = combined.model_copy(update={"thumbnail": name})
             self._set_combined(combined)
             return combined
+
+    def _thumbnail_text(self, text: OnScreenText | None) -> str | None:
+        """A thumbnail's text as ASS, or None (ADR 0030)."""
+        if text is None:
+            return None
+        return build_ass(
+            _SILENT,
+            ClipCandidate(
+                start_seconds=0.0,
+                end_seconds=THUMBNAIL_TEXT_SECONDS,
+                score=0.0,
+                reasons=("thumbnail",),
+            ),
+            vertical=self.manifest.vertical,
+            texts=(text,),
+        ).text
+
+    def _own_frame(self, file: str, at: float, ass: str | None) -> str:
+        """`<file stem>.thumb.jpg` from a joined file's own frame at `at`."""
+        name = thumbnail_name(file)
+        target = self._folder / name
+        temp = target.with_name(f"{target.stem}.part.jpg")
+        try:
+            self._render.renderer.still(self._folder / file, at, temp, captions=ass)
+            os.replace(temp, target)
+        finally:
+            temp.unlink(missing_ok=True)
+        return name
+
+    def _words(self, spans: Sequence[tuple[float, float]], what: str) -> str:
+        """The words spoken in the spans, in order, for a suggested title."""
+        writer, transcript = self._render.title_writer, self._render.transcript
+        if writer is None or transcript is None:
+            raise ReviewError(
+                "Suggesting a title needs CLIPPER_LLM_MODEL and a folder with captions"
+            )
+        words = [
+            clip_text(
+                transcript,
+                ClipCandidate(
+                    start_seconds=start, end_seconds=end, score=0.0, reasons=(what,)
+                ),
+            )
+            for start, end in spans
+        ]
+        return " ".join(w for w in words if w)
+
+    # --- The story (ADR 0033) ---
+
+    def _set_story(self, story: Story | None) -> None:
+        manifest = self.manifest.model_copy(update={"story": story})
+        self._files.save_manifest(manifest, self._folder)
+        self.manifest = manifest
+
+    def _story(self) -> Story:
+        if self.manifest.story is None:
+            raise JudgingError("Plan the story first")
+        return self.manifest.story
+
+    def save_story_plan(self, beats: tuple[StoryBeat, ...]) -> Story:
+        """Keep the beats, planned or edited, before any render; the rest of
+        the story stays."""
+        with self._lock:
+            old = self.manifest.story
+            story = (
+                old.model_copy(update={"beats": beats})
+                if old is not None
+                else Story(beats=beats)
+            )
+            self._set_story(story)
+            return story
+
+    def render_story(
+        self, beats: tuple[StoryBeat, ...], music: MusicBed | None
+    ) -> Story:
+        """Cut each beat from the source in the folder's framing (fit, with
+        captions when the folder has them), join them with each card at the
+        top for its first seconds and the music under them, as
+        `<stem>_summary.mp4`. The title and rating stay, the thumbnail goes."""
+        with self._lock:
+            mix = None
+            if music is not None:
+                path = self._audio_path(self._render.music_dir, music.file, "music")
+                mix = AudioMix(
+                    music=path, music_level_db=music.level_db, duck=music.duck
+                )
+            captioned = self.manifest.captions and self._render.transcript is not None
+            name = story_name(self.manifest)
+            target = self._folder / name
+            temp = target.with_name(f"{target.stem}.part.mp4")
+            texts: list[OnScreenText] = []
+            offset = 0.0
+            with tempfile.TemporaryDirectory(
+                prefix="clipper-story-", ignore_cleanup_errors=True
+            ) as folder:
+                parts: list[Path] = []
+                for index, beat in enumerate(beats):
+                    candidate = ClipCandidate(
+                        start_seconds=beat.start_seconds,
+                        end_seconds=beat.end_seconds,
+                        score=0.0,
+                        reasons=("story",),
+                    )
+                    ass = ""
+                    if captioned and self._render.transcript is not None:
+                        ass = build_ass(
+                            self._render.transcript,
+                            candidate,
+                            vertical=self.manifest.vertical,
+                        ).text
+                    part = Path(folder) / f"beat{index:02d}.mp4"
+                    self._render.renderer.render(
+                        self._render.video,
+                        candidate,
+                        part,
+                        captions=ass or None,
+                        vertical=self.manifest.vertical,
+                    )
+                    parts.append(part)
+                    length = beat.end_seconds - beat.start_seconds
+                    if beat.card:
+                        texts.append(
+                            OnScreenText(
+                                text=beat.card,
+                                start_seconds=offset,
+                                end_seconds=offset + min(CARD_SECONDS, length),
+                                place="top",
+                            )
+                        )
+                    offset += length
+                cards = None
+                if texts:
+                    cards = build_ass(
+                        _SILENT,
+                        ClipCandidate(
+                            start_seconds=0.0,
+                            end_seconds=offset,
+                            score=0.0,
+                            reasons=("story",),
+                        ),
+                        vertical=self.manifest.vertical,
+                        texts=tuple(texts),
+                    ).text
+                try:
+                    self._render.renderer.join(
+                        parts, temp, cards, audio=mix, length=offset
+                    )
+                    try:
+                        os.replace(temp, target)
+                    except OSError as exc:
+                        raise ReviewError(f"Cannot replace {name}: {exc}") from exc
+                finally:
+                    temp.unlink(missing_ok=True)
+            old = self.manifest.story
+            if old is not None and old.thumbnail is not None:
+                (self._folder / old.thumbnail).unlink(missing_ok=True)
+            story = Story(
+                beats=beats,
+                music=music,
+                file=name,
+                duration_seconds=offset,
+                title=old.title if old else None,
+                rating=old.rating if old else None,
+            )
+            self._set_story(story)
+            return story
+
+    def _rendered_story(self) -> Story:
+        story = self._story()
+        if story.file is None or story.duration_seconds is None:
+            raise JudgingError("Make the summary first")
+        return story
+
+    def save_story(self, title: str | None, rating: str | None) -> Story:
+        """The summary's title and rating, without a re-render."""
+        with self._lock:
+            story = self._rendered_story().model_copy(
+                update={"title": title, "rating": rating}
+            )
+            self._set_story(story)
+            return story
+
+    def trash_story(self) -> None:
+        """Delete the summary's file and thumbnail and forget its plan."""
+        with self._lock:
+            story = self._story()
+            for name in (story.file, story.thumbnail):
+                if name is not None and Path(name).name == name:
+                    (self._folder / name).unlink(missing_ok=True)
+            self._set_story(None)
+
+    def story_thumbnail(self, at: float, text: OnScreenText | None) -> Story:
+        """A thumbnail from the summary's own frame at `at` seconds."""
+        with self._lock:
+            story = self._rendered_story()
+            assert story.file is not None and story.duration_seconds is not None
+            if not 0 <= at < story.duration_seconds:
+                raise BadRequest("the moment must be inside the summary")
+            name = self._own_frame(story.file, at, self._thumbnail_text(text))
+            story = story.model_copy(update={"thumbnail": name})
+            self._set_story(story)
+            return story
+
+    def suggest_story_title(self) -> ClipTitle:
+        """A title and hook from the local model, given the beats' words."""
+        story = self._story()
+        spans = [(b.start_seconds, b.end_seconds) for b in story.beats]
+        writer = self._render.title_writer
+        text = self._words(spans, "story")
+        assert writer is not None
+        return writer.write(text)
 
     def suggest_combined_title(self) -> ClipTitle:
         """A title and hook from the local model, given the combined clip's clips'
         words in order (ADR 0018, 0032). Raises `ReviewError` without a
         model or transcript."""
         combined = self._combined()
-        writer, transcript = self._render.title_writer, self._render.transcript
-        if writer is None or transcript is None:
-            raise ReviewError(
-                "Suggesting a title needs CLIPPER_LLM_MODEL and a folder with captions"
-            )
-        words = []
-        for part in combined.parts:
-            clip = self._clip(part.rank)
-            words.append(
-                clip_text(
-                    transcript,
-                    ClipCandidate(
-                        start_seconds=clip.start_seconds,
-                        end_seconds=clip.end_seconds,
-                        score=0.0,
-                        reasons=("combined",),
-                    ),
-                )
-            )
-        return writer.write(" ".join(w for w in words if w))
+        clips = [self._clip(part.rank) for part in combined.parts]
+        text = self._words(
+            [(c.start_seconds, c.end_seconds) for c in clips], "combined"
+        )
+        writer = self._render.title_writer
+        assert writer is not None
+        return writer.write(text)
 
     def trash(self, rank: int, note: str | None) -> ManifestClip | None:
         """Write a rejected span, delete the clip's file, then mark it trashed.

@@ -472,7 +472,10 @@ and planned code:
   prompt (its default context silently dropped a long prompt's start);
   edited and rendered in `review` (fit with captions, Combine's join) as
   `<stem>_summary.mp4`, `RenderManifest.story`, queued like a clip.
-  Spike on two incremental-game VODs judged by the maintainer.
+  Spike on two incremental-game VODs judged by the maintainer. In
+  `review`: a background plan with progress (`/api/story/plan`,
+  `/status`), beats edited in a dialog with its own player and kept,
+  rendered by `POST /api/story`; manual step RV26.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1428,7 +1431,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      - 9l-2. ~~The core (`core/story.py`), a `StoryWriter` and its Ollama
        adapter, the client's context size and its check on tokens read.~~
        (done; the committed code gives round 3's beats in 56 s)
-     - 9l-3. The page, server and render, with a manual step.
+     - 9l-3. ~~The page, server and render, with a manual step.~~ (done;
+       a background plan with progress, the beat editor with its own
+       player, kept edits, render and the Summary entry; RV26)
      - 9l-4. Queue and `posted` for the summary.
 
 Later, not scheduled:

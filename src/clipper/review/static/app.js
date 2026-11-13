@@ -46,6 +46,8 @@ let isVertical = true;
 let previewLayout = null;
 // The folder's combined clip, if made (ADR 0032).
 let folderCombined = null;
+// The folder's story as the page loaded it (ADR 0033); story.js keeps it.
+let folderStoryAtLoad = null;
 // Names this video in frame URLs, so the browser's cache of frames never
 // mixes VODs (every run is served from the same address).
 let framesKey = "";
@@ -1602,6 +1604,7 @@ async function load() {
   isVertical = Boolean(data.vertical);
   previewLayout = data.layout;
   folderCombined = data.combined || null;
+  folderStoryAtLoad = data.story || null;
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {
     if (data[name]) {
