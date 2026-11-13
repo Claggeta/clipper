@@ -5,7 +5,13 @@ from pathlib import Path
 from clipper.adapters.media._process import format_failure, run_tool
 from clipper.core.cuts import check_cuts
 from clipper.domain.errors import ClipRenderError
-from clipper.domain.models import ClipCandidate, CropPath, RenderedClip
+from clipper.domain.models import (
+    ClipCandidate,
+    CropPath,
+    HandCropPlan,
+    RenderedClip,
+    Zoom,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +69,67 @@ def _still_crop(crop: CropPath) -> str:
     return f"crop={crop.width}:{crop.height}:{left}:0,scale=1080:1920,setsar=1"
 
 
+# ADR 0025, hand crop amendment: the fit style's hand-placed window moves
+# by `sendcmd` from its own file, as the face crop does.
+_HAND_NAME = "hand.cmd"
+# A smooth zoom eases in and out over this long, or half a short zoom.
+ZOOM_EASE_SECONDS = 0.3
+
+
+def _zoom_weight(zoom: Zoom) -> str:
+    """0 outside the zoom, 1 inside it; eased at its ends when smooth."""
+    a, b = _seconds(zoom.start_seconds), _seconds(zoom.end_seconds)
+    inside = f"between(t,{a},{b})"
+    if not zoom.smooth:
+        return inside
+    ease = _seconds(min(ZOOM_EASE_SECONDS, (zoom.end_seconds - zoom.start_seconds) / 2))
+    return f"{inside}*clip(min((t-{a})/{ease},({b}-t)/{ease}),0,1)"
+
+
+def _zoom_filter(zooms: tuple[Zoom, ...]) -> str:
+    """ADR 0016, zoom amendment. The 9:16 frame scaled up per frame by the
+    zoom in force and cropped back to 1080x1920 around its centre. The
+    crop's offsets are worked out from `t`, not `iw`, which `crop` reads
+    once (checked on ffmpeg 9.0.2); zooms do not overlap, so the sums hold
+    one term at a time."""
+    weights = [_zoom_weight(zoom) for zoom in zooms]
+    scale = "1+" + "+".join(
+        f"{z.scale - 1:.3f}*{w}" for z, w in zip(zooms, weights, strict=True)
+    )
+    x = "+".join(
+        f"{1080 * (z.scale - 1) * z.x:.1f}*{w}"
+        for z, w in zip(zooms, weights, strict=True)
+    )
+    y = "+".join(
+        f"{1920 * (z.scale - 1) * z.y:.1f}*{w}"
+        for z, w in zip(zooms, weights, strict=True)
+    )
+    return (
+        f"scale=w='trunc(1080*({scale})/2)*2':h='trunc(1920*({scale})/2)*2':eval=frame,"
+        f"crop=1080:1920:'floor({x})':'floor({y})',setsar=1"
+    )
+
+
+def _hand_filter(hand: HandCropPlan) -> str:
+    """ADR 0025, hand crop amendment. The fit frame, and the hand-placed
+    window shown over it in its stretches."""
+    left = hand.path.points[0][1]
+    shown = "+".join(f"between(t,{_seconds(a)},{_seconds(b)})" for a, b in hand.ranges)
+    return (
+        f"split[zbase][zhand];[zbase]{_VERTICAL_FILTER}[zfit];"
+        f"[zhand]sendcmd=f={_HAND_NAME},crop@hand={hand.path.width}:"
+        f"{hand.path.height}:{left}:0,scale=1080:1920,setsar=1[zcrop];"
+        f"[zfit][zcrop]overlay=enable='{shown}',setsar=1"
+    )
+
+
+def _hand_commands(hand: HandCropPlan) -> str:
+    """One `sendcmd` line per window: from its start, its left edge."""
+    return "".join(
+        f"{_seconds(t)} crop@hand x {left};\n" for t, left in hand.path.points
+    )
+
+
 def _cut_filters(
     candidate: ClipCandidate, cuts: tuple[tuple[float, float], ...]
 ) -> tuple[str, str]:
@@ -106,6 +173,8 @@ class FfmpegClipRenderer:
         vertical: bool = False,
         crop: CropPath | None = None,
         cuts: tuple[tuple[float, float], ...] = (),
+        zooms: tuple[Zoom, ...] = (),
+        hand: HandCropPlan | None = None,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -115,6 +184,8 @@ class FfmpegClipRenderer:
             )
 
         check_cuts(cuts, candidate.start_seconds, candidate.end_seconds)
+        if (zooms or hand is not None) and not (vertical or crop is not None):
+            raise ClipRenderError("Zooms and hand crops need the vertical frame")
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         # Drop the cuts first, so the frame, crop moves and captions all run
@@ -131,8 +202,14 @@ class FfmpegClipRenderer:
         if crop is not None:
             filters.append(_face_filter(crop))
             files[_CROP_NAME] = _crop_commands(crop).encode("utf-8")
+        elif hand is not None:
+            filters.append(_hand_filter(hand))
+            files[_HAND_NAME] = _hand_commands(hand).encode("utf-8")
         elif vertical:
             filters.append(_VERTICAL_FILTER)
+        # Zooms after the frame, before captions, so text never zooms.
+        if zooms:
+            filters.append(_zoom_filter(zooms))
         if captions:
             filters.append(_SUBTITLES_FILTER)
             files[_CAPTIONS_NAME] = captions.encode("utf-8")

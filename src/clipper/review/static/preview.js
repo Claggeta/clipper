@@ -4,7 +4,7 @@
 // width over a blurred copy) or face (the crop a re-render would use);
 // with the word captions and on-screen texts drawn at their burn-in
 // sizes. Close, not exact: Save's re-render is the result. Loaded after
-// app.js, keys.js, precision.js and captions.js.
+// app.js, keys.js, precision.js, captions.js and frame.js.
 "use strict";
 
 const previewCanvas = document.getElementById("preview-canvas");
@@ -212,6 +212,21 @@ function drawFace(context, width, height, seconds) {
   );
 }
 
+// The full-height 9:16 window of a hand crop, in the player's pixels
+// (ADR 0025, hand crop amendment; core/framing.py's hand_left).
+function handWindow(hand) {
+  const sourceWidth = player.videoWidth;
+  const sourceHeight = player.videoHeight;
+  const window = Math.floor(Math.min(Math.round((sourceHeight * 9) / 16), sourceWidth) / 2) * 2;
+  const left = clamp(Math.round(hand.x * sourceWidth - window / 2), 0, sourceWidth - window);
+  return { left, window, sourceWidth, sourceHeight };
+}
+
+function drawHand(context, width, height, hand) {
+  const { left, window, sourceHeight } = handWindow(hand);
+  context.drawImage(player, left, 0, window, sourceHeight, 0, 0, width, height);
+}
+
 // Lines of words no wider than `maxWidth` at the context's font.
 function wrapWords(context, words, maxWidth) {
   const lines = [];
@@ -379,11 +394,24 @@ function drawPreview() {
   context.fillRect(0, 0, width, height);
   const seconds = player.currentTime;
   if (player.videoWidth) {
-    if (crop && isVertical) {
+    // A zoom scales the frame around its centre, as the renderer does:
+    // scaled by Z, then cropped at (Z - 1) times its centre (ADR 0016).
+    const zoomed = isVertical ? activeZoom(seconds) : null;
+    if (zoomed) {
+      const z = 1 + (zoomed.zoom.scale - 1) * zoomed.weight;
+      const left = width * (zoomed.zoom.scale - 1) * zoomed.zoom.x * zoomed.weight;
+      const top = height * (zoomed.zoom.scale - 1) * zoomed.zoom.y * zoomed.weight;
+      context.setTransform(ratio * z, 0, 0, ratio * z, -ratio * left, -ratio * top);
+    }
+    const hand = isVertical ? activeHand(seconds) : null;
+    if (hand) {
+      drawHand(context, width, height, hand);
+    } else if (crop && isVertical) {
       drawFace(context, width, height, seconds);
     } else {
       drawFit(context, width, height);
     }
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
   }
   if (burnsCaptions) {
     drawCaptions(context, width, height, seconds);
@@ -442,16 +470,40 @@ previewCanvas.addEventListener("pointerdown", (event) => {
     .find((b) => px >= b.left && px <= b.left + b.width && py >= b.top && py <= b.top + b.height);
   const item = hit ? textsOf(current)[hit.index] : null;
   const offset = hit ? [px - (hit.left + hit.width / 2), py - (hit.top + hit.height / 2)] : null;
+  // Off a text, a drag pans the zoom in force, else the hand crop's window
+  // (ADR 0016 and 0025 amendments): the picture follows the pointer.
+  const zoomed = item || !isVertical ? null : activeZoom(player.currentTime);
+  const hand = item || zoomed || !isVertical ? null : activeHand(player.currentTime);
+  const start = zoomed
+    ? [zoomed.zoom.x, zoomed.zoom.y]
+    : hand
+      ? [hand.x, 0]
+      : null;
   let dragging = false;
   previewCanvas.setPointerCapture(event.pointerId);
   const onMove = (moveEvent) => {
-    if (!item) {
+    if (!item && !start) {
       return;
     }
     if (!dragging && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < TEXT_DRAG_PX) {
       return;
     }
     dragging = true;
+    const dx = moveEvent.clientX - event.clientX;
+    const dy = moveEvent.clientY - event.clientY;
+    if (zoomed) {
+      const spare = zoomed.zoom.scale - 1;
+      zoomed.zoom.x = clamp(start[0] - dx / (box.width * spare), 0, 1);
+      zoomed.zoom.y = clamp(start[1] - dy / (box.height * spare), 0, 1);
+      frameChanged();
+      return;
+    }
+    if (hand) {
+      const { window, sourceWidth } = handWindow(hand);
+      hand.x = clamp(start[0] - (dx * window) / (box.width * sourceWidth), 0, 1);
+      frameChanged();
+      return;
+    }
     let x = (moveEvent.clientX - box.left - offset[0]) / box.width;
     const y = (moveEvent.clientY - box.top - offset[1]) / box.height;
     if (Math.abs(x - 0.5) < TEXT_SNAP) {
@@ -465,8 +517,10 @@ previewCanvas.addEventListener("pointerdown", (event) => {
     previewCanvas.removeEventListener("pointermove", onMove);
     previewCanvas.removeEventListener("pointerup", onUp);
     previewCanvas.removeEventListener("pointercancel", onUp);
-    if (dragging) {
+    if (dragging && item) {
       drawTexts(current);
+    } else if (dragging) {
+      drawFrameEditor(current);
     } else {
       togglePreviewPlay();
     }

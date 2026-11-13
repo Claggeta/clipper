@@ -201,8 +201,10 @@ function drawMarks() {
   drawCuts();
   drawCutIn();
   drawTimes();
-  // The caption words follow the span and its cuts (ADR 0017).
+  // The caption words follow the span and its cuts (ADR 0017); the zoom
+  // and hand crop bars follow the view.
   scheduleEditor();
+  drawFrameLane();
 }
 
 function drawTimes() {
@@ -641,6 +643,7 @@ function drawUnsaved() {
     !sameCuts(activeCuts(), savedCuts(current)) ||
     !sameTexts(sentTexts(current), savedTexts(current)) ||
     !sameCaptionEdits(sentCaptionEdits(current), savedCaptionEdits(current)) ||
+    !sameFrame(current) ||
     titleBox.value.trim() !== saved.title ||
     noteBox.value.trim() !== saved.note;
   document.getElementById("unsaved").hidden = !changed;
@@ -843,6 +846,7 @@ function select(clip, button) {
   drawDraftTexts();
   drawThumb(clip);
   resetCaptionEditor(clip);
+  resetFrameEditor(clip);
   player.currentTime = span.start;
   fit();
 }
@@ -1025,6 +1029,7 @@ document.getElementById("reset").addEventListener("click", () => {
   drawTexts(current);
   drawDraftTexts();
   resetCaptionEditor(current, true);
+  resetFrameEditor(current, true);
   notice("");
   fit();
 });
@@ -1168,7 +1173,8 @@ function rendersOnSave(clip) {
     !sameTime(span.end, clip.end) ||
     !sameCuts(activeCuts(), clip.cuts || []) ||
     !sameTexts(sentTexts(clip), clip.texts || []) ||
-    (burnsCaptions && !sameCaptionEdits(sentCaptionEdits(clip), clip.caption_edits || null))
+    (burnsCaptions && !sameCaptionEdits(sentCaptionEdits(clip), clip.caption_edits || null)) ||
+    !sameFrame(clip)
   );
 }
 
@@ -1205,6 +1211,7 @@ function judged(clip, reply) {
   marks.delete(clip.key);
   textEdits.delete(clip.key);
   captionEdits.delete(clip.key);
+  frameEdits.delete(clip.key);
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
@@ -1216,6 +1223,7 @@ function judged(clip, reply) {
     drawDraftTexts();
     drawThumb(clip);
     resetCaptionEditor(clip);
+    resetFrameEditor(clip);
     drawUnsaved();
   }
 }
@@ -1241,6 +1249,8 @@ saveButton.addEventListener("click", async () => {
       cuts: activeCuts(),
       texts: sentTexts(clip),
       caption_edits: sentCaptionEdits(clip),
+      zooms: sentZooms(clip),
+      hand_crops: sentHands(clip),
     });
     clip.isNew = false;
     judged(clip, reply);

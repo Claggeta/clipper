@@ -224,6 +224,24 @@ Picking happens in the review page (0024, style switch amendment): Save
 keeps one style, deletes the other and records `style` on the judged
 label, so the picks over time show which style wins on which videos.
 
+## Amended by hand crops (V7 item 9h, ADR 0031)
+
+- A clip may carry hand crops, made in the review page: a stretch in
+  source seconds and a centre `x` (a fraction of the source width) for a
+  full-height 9:16 window, where neither the fit nor the face track
+  frames it well. At most 10, in order and apart, inside the span;
+  `HandCrop` on the manifest clip and judged label.
+- Face style: `with_hand_crops` (`core/framing.py`) puts the windows into
+  the tracked crop path in their stretches and the tracked position back
+  after each; the renderer moves it with `sendcmd` as before.
+- Fit style: `hand_crop_plan` gives one window path moving at each
+  stretch's start; the renderer splits the source, makes the fit and the
+  window (`crop@hand` moved by `sendcmd` from `hand.cmd`), and lays the
+  window over the fit with `overlay=enable` in the stretches. That
+  doubles the scaling only, not the decoding.
+- Times move to the cut clip through the time map; the run needs the
+  frame size. Vertical folders only. Manual step RV23.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

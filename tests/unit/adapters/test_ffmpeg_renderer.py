@@ -3,10 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.rendering.ffmpeg import _VERTICAL_FILTER, FfmpegClipRenderer
+from clipper.core.framing import hand_crop_plan
 from clipper.core.interfaces import ClipRenderer
 from clipper.domain.errors import ClipRenderError
-from clipper.domain.models import ClipCandidate, CropPath
+from clipper.domain.models import ClipCandidate, CropPath, Zoom
 
 _CANDIDATE = ClipCandidate(
     start_seconds=32.5, end_seconds=73.25, score=0.5, reasons=("pace",)
@@ -486,3 +487,82 @@ def test_a_failed_still_raises_and_leaves_no_file(
     with pytest.raises(ClipRenderError, match="bad"):
         FfmpegClipRenderer().still(video, 5.0, out)
     assert not out.exists()
+
+
+# --- Zooms and hand crops (ADR 0016 and 0025 amendments) ---
+
+
+def test_a_zoom_scales_the_frame_by_time_and_crops_around_its_centre(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+    zoom = Zoom(start_seconds=1.0, end_seconds=3.0, scale=1.5, x=0.5, y=0.25)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", vertical=True, zooms=(zoom,)
+    )
+
+    command = captured[0]
+    w = "between(t,1.000,3.000)"
+    assert command[command.index("-vf") + 1] == (
+        _VERTICAL_FILTER + f",scale=w='trunc(1080*(1+0.500*{w})/2)*2':"
+        f"h='trunc(1920*(1+0.500*{w})/2)*2':eval=frame,"
+        f"crop=1080:1920:'floor(270.0*{w})':'floor(240.0*{w})',setsar=1"
+    )
+
+
+def test_a_smooth_zoom_eases_in_and_out(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+    # Shorter than two eases: half its length each way.
+    zoom = Zoom(start_seconds=2.0, end_seconds=2.4, smooth=True)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", vertical=True, zooms=(zoom,)
+    )
+
+    vf = captured[0][captured[0].index("-vf") + 1]
+    assert "between(t,2.000,2.400)*clip(min((t-2.000)/0.200,(2.400-t)/0.200),0,1)" in vf
+
+
+def test_without_zooms_or_hands_the_filter_is_unchanged(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", vertical=True)
+    assert captured[0][captured[0].index("-vf") + 1] == _VERTICAL_FILTER
+
+
+def test_hand_crops_lay_a_moving_window_over_the_fit_in_their_stretches(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _CropRun(monkeypatch)
+    hand = hand_crop_plan([(1.0, 2.0, 0.25), (4.0, 5.5, 0.75)], 1920, 1080)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", vertical=True, hand=hand
+    )
+
+    vf = run.commands[0][run.commands[0].index("-vf") + 1]
+    assert vf == (
+        f"split[zbase][zhand];[zbase]{_VERTICAL_FILTER}[zfit];"
+        "[zhand]sendcmd=f=hand.cmd,crop@hand=608:1080:176:0,scale=1080:1920,"
+        "setsar=1[zcrop];[zfit][zcrop]overlay=enable="
+        "'between(t,1.000,2.000)+between(t,4.000,5.500)',setsar=1"
+    )
+    # 0.25 of 1920 is 480, less half the 608 window: 176; 0.75: 1136.
+    assert run.files[0]["hand.cmd"] == (
+        b"0.000 crop@hand x 176;\n4.000 crop@hand x 1136;\n"
+    )
+
+
+def test_zooms_need_the_vertical_frame(video: Path, tmp_path: Path) -> None:
+    zoom = Zoom(start_seconds=1.0, end_seconds=2.0)
+    with pytest.raises(ClipRenderError, match="need the vertical frame"):
+        FfmpegClipRenderer().render(
+            video, _CANDIDATE, tmp_path / "c.mp4", zooms=(zoom,)
+        )

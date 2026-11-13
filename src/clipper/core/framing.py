@@ -1,6 +1,11 @@
 import statistics
+from collections.abc import Sequence
 
-from clipper.domain.models import CropPath, FaceTrack
+from clipper.domain.models import CropPath, FaceTrack, HandCropPlan
+
+# A hand crop in the cut clip's seconds: start, end, and its centre as a
+# fraction of the source width (ADR 0025, hand crop amendment).
+HandWindow = tuple[float, float, float]
 
 # The face style's window (ADR 0025, locked framing amendment). It holds one
 # position per shot and moves only as a cut: at a camera cut, where the
@@ -127,3 +132,68 @@ def _holds(shot: list[_Point], window: int) -> list[tuple[float, float | None]]:
             run_start = None
     centres = [p.centre for p in shot if p.centre is not None]
     return [(first, statistics.median(centres))]
+
+
+def hand_left(x: float, frame_width: int, window: int) -> int:
+    """The left edge of a window of width `window` centred at `x`, a
+    fraction of the frame's width, kept inside the frame."""
+    return min(max(round(x * frame_width - window / 2), 0), frame_width - window)
+
+
+def _left_at(points: Sequence[tuple[float, int]], seconds: float) -> int:
+    left = points[0][1]
+    for time, point_left in points:
+        if time <= seconds:
+            left = point_left
+    return left
+
+
+def with_hand_crops(
+    crop: CropPath, hands: Sequence[HandWindow], frame_width: int
+) -> CropPath:
+    """The face style's crop path with the hand-placed windows in their
+    stretches, and the tracked position back after each (ADR 0025, hand
+    crop amendment). Times are the cut clip's seconds; hands are in order
+    and apart."""
+    if not hands:
+        return crop
+    inside = [(a, b) for a, b, _ in hands]
+    points = [
+        (time, left)
+        for time, left in crop.points
+        if not any(a <= time < b for a, b in inside)
+    ]
+    for a, b, x in hands:
+        points.append((a, hand_left(x, frame_width, crop.width)))
+        if not any(c <= b < d for c, d in inside):
+            points.append((b, _left_at(crop.points, b)))
+    points.sort()
+    kept: list[tuple[float, int]] = []
+    for time, left in points:
+        if kept and kept[-1][0] == time:
+            kept[-1] = (time, left)
+        elif not kept or kept[-1][1] != left:
+            kept.append((time, left))
+    if kept[0][0] != 0:
+        kept.insert(0, (0.0, _left_at(crop.points, 0.0)))
+    return crop.model_copy(update={"points": tuple(kept)})
+
+
+def hand_crop_plan(
+    hands: Sequence[HandWindow], frame_width: int, frame_height: int
+) -> HandCropPlan | None:
+    """The fit style's hand crops for the renderer: one window path, moving
+    at each stretch's start, and the stretches it shows in (ADR 0025, hand
+    crop amendment). None without hands."""
+    if not hands:
+        return None
+    window = window_width(frame_width, frame_height)
+    lefts = [(a, hand_left(x, frame_width, window)) for a, _, x in hands]
+    points = [(0.0, lefts[0][1])]
+    for a, left in lefts:
+        if left != points[-1][1]:
+            points.append((a, left))
+    return HandCropPlan(
+        path=CropPath(width=window, height=frame_height // 2 * 2, points=tuple(points)),
+        ranges=tuple((a, b) for a, b, _ in hands),
+    )

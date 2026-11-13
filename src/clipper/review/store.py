@@ -17,7 +17,12 @@ from pydantic import ValidationError
 
 from clipper.core.captions import build_ass
 from clipper.core.cuts import Cut, TimeMap, check_cuts, cut_crop
-from clipper.core.framing import plan_face_crop
+from clipper.core.framing import (
+    HandWindow,
+    hand_crop_plan,
+    plan_face_crop,
+    with_hand_crops,
+)
 from clipper.core.interfaces import ClipRenderer, FaceTracker, ReviewFiles
 from clipper.core.judging import (
     drop_clip,
@@ -37,11 +42,13 @@ from clipper.domain.models import (
     ClipCandidate,
     ClipVariant,
     CropPath,
+    HandCrop,
     LabeledVideo,
     ManifestClip,
     OnScreenText,
     RenderManifest,
     Transcript,
+    Zoom,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +62,9 @@ RATINGS = ("good", "ok")
 ADDED_REASON = "added in review"
 # On-screen texts per clip (ADR 0030); a hook and a few lines.
 MAX_TEXTS = 5
+# Zooms and hand crops per clip (ADR 0016 and 0025 amendments).
+MAX_ZOOMS = 10
+MAX_HAND_CROPS = 10
 # A text's look, sent by the page when set (ADR 0030, styling amendment).
 _TEXT_LOOK = ("colour", "look", "size", "fade", "x", "y")
 # A thumbnail's text is shown from time 0 of its one frame; any length will do.
@@ -88,6 +98,9 @@ class SaveRequest:
     texts: tuple[OnScreenText, ...] = ()
     # Word fixes, key words and colour; None for the transcript's (ADR 0017).
     caption_edits: CaptionEdits | None = None
+    # Punch-ins and hand-placed windows, in source seconds (ADR 0016, 0025).
+    zooms: tuple[Zoom, ...] = ()
+    hand_crops: tuple[HandCrop, ...] = ()
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -119,7 +132,10 @@ def parse_save(
     apart and strictly inside the span (ADR 0029). Texts are objects of
     `text`, `start`, `end` (seconds of the finished clip) and `place`
     (ADR 0030). Caption edits are `fixes` of `start_seconds` and `text`,
-    `keys` and a `highlight` (ADR 0017); none at all is None.
+    `keys` and a `highlight` (ADR 0017); none at all is None. Zooms are
+    `start`, `end`, `scale`, `x`, `y`, `smooth`, and hand crops `start`,
+    `end`, `x`, in source seconds, each list in order, apart and inside the
+    span (ADR 0016 and 0025 amendments).
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -164,7 +180,49 @@ def parse_save(
         cuts,
         texts,
         parse_caption_edits(data.get("caption_edits")),
+        _ranged(data.get("zooms", []), Zoom, MAX_ZOOMS, "zoom", start, end),
+        _ranged(
+            data.get("hand_crops", []),
+            HandCrop,
+            MAX_HAND_CROPS,
+            "hand crop",
+            start,
+            end,
+        ),
     )
+
+
+def _ranged[T: (Zoom, HandCrop)](
+    value: object, model: type[T], limit: int, what: str, start: float, end: float
+) -> tuple[T, ...]:
+    """Zooms or hand crops from a request: `start` and `end` in source
+    seconds and the model's own fields, in order, apart and inside the span."""
+    if not isinstance(value, list) or len(value) > limit:
+        raise BadRequest(f"{what}s must be a list of at most {limit}")
+    items: list[T] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise BadRequest(f"each {what} must be an object")
+        fields = {k: v for k, v in item.items() if k not in ("start", "end")}
+        try:
+            items.append(
+                model.model_validate(
+                    {
+                        "start_seconds": _seconds(item, "start"),
+                        "end_seconds": _seconds(item, "end"),
+                        **fields,
+                    }
+                )
+            )
+        except ValidationError as exc:
+            message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+            raise BadRequest(f"{what}: {message}") from exc
+    previous = start
+    for each in items:
+        if each.start_seconds < previous or each.end_seconds > end:
+            raise BadRequest(f"{what}s must be in order, apart and inside the span")
+        previous = each.end_seconds
+    return tuple(items)
 
 
 def parse_caption_edits(value: object) -> CaptionEdits | None:
@@ -265,6 +323,23 @@ def parse_thumbnail(data: object, duration: float) -> ThumbnailRequest:
     return ThumbnailRequest(at, text, style)
 
 
+def zoom_payload(zoom: Zoom) -> dict[str, object]:
+    """A zoom as the page sends and shows it."""
+    return {
+        "start": zoom.start_seconds,
+        "end": zoom.end_seconds,
+        "scale": zoom.scale,
+        "x": zoom.x,
+        "y": zoom.y,
+        "smooth": zoom.smooth,
+    }
+
+
+def hand_payload(hand: HandCrop) -> dict[str, object]:
+    """A hand crop as the page sends and shows it."""
+    return {"start": hand.start_seconds, "end": hand.end_seconds, "x": hand.x}
+
+
 def edits_payload(edits: CaptionEdits | None) -> dict[str, object] | None:
     """Caption edits as the page sends and reads them, or None."""
     return None if edits is None else edits.model_dump()
@@ -357,6 +432,8 @@ class ReviewStore:
                     "cuts": [[c.start_seconds, c.end_seconds] for c in label.cuts],
                     "texts": [text_payload(t) for t in label.texts],
                     "caption_edits": edits_payload(label.caption_edits),
+                    "zooms": [zoom_payload(z) for z in label.zooms],
+                    "hand_crops": [hand_payload(h) for h in label.hand_crops],
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -408,7 +485,11 @@ class ReviewStore:
             or not _same_cuts(clip.cuts, request.cuts)
             or clip.texts != request.texts
             or (self.manifest.captions and clip.caption_edits != request.caption_edits)
+            or clip.zooms != request.zooms
+            or clip.hand_crops != request.hand_crops
         )
+        if (request.zooms or request.hand_crops) and not self.manifest.vertical:
+            raise JudgingError("Zooms and hand crops need a vertical drafts folder")
         candidate = ClipCandidate(
             start_seconds=request.start,
             end_seconds=request.end,
@@ -434,6 +515,8 @@ class ReviewStore:
             request.cuts,
             request.texts,
             request.caption_edits,
+            request.zooms,
+            request.hand_crops,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -455,6 +538,8 @@ class ReviewStore:
                     request.cuts,
                     request.texts,
                     request.caption_edits,
+                    request.zooms,
+                    request.hand_crops,
                 )
             except ClipperError as exc:
                 render_error = str(exc)
@@ -517,6 +602,8 @@ class ReviewStore:
         cuts: tuple[Cut, ...] = (),
         texts: tuple[OnScreenText, ...] = (),
         caption_edits: CaptionEdits | None = None,
+        zooms: tuple[Zoom, ...] = (),
+        hand_crops: tuple[HandCrop, ...] = (),
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
@@ -527,7 +614,29 @@ class ReviewStore:
         """
         manifest = self.manifest
         time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
+        # Zooms and hand crops move to the cut clip's times; one inside a
+        # cut is left out (ADR 0016 and 0025 amendments).
+        clip_zooms = tuple(
+            zoom.model_copy(update={"start_seconds": a, "end_seconds": b})
+            for zoom in zooms
+            if (b := time_map.clamped(zoom.end_seconds))
+            > (a := time_map.clamped(zoom.start_seconds))
+        )
+        hands: list[HandWindow] = [
+            (a, b, hand.x)
+            for hand in hand_crops
+            if (b := time_map.clamped(hand.end_seconds))
+            > (a := time_map.clamped(hand.start_seconds))
+        ]
+        size = self._render.frame_size
+        if hands and size is None:
+            raise ReviewError("Hand crops need the video's frame size")
         crop = cut_crop(self._crop(candidate), time_map) if style == "face" else None
+        hand = None
+        if crop is not None and size is not None:
+            crop = with_hand_crops(crop, hands, size[0])
+        elif size is not None:
+            hand = hand_crop_plan(hands, *size)
         ass = ""
         burned: str | None = None
         captioned = manifest.captions and self._render.transcript is not None
@@ -556,6 +665,8 @@ class ReviewStore:
                 vertical=manifest.vertical,
                 crop=crop,
                 cuts=cuts,
+                zooms=clip_zooms,
+                hand=hand,
             )
             try:
                 os.replace(temp, target)
@@ -574,6 +685,8 @@ class ReviewStore:
             "draft_end_seconds": draft_end,
             "cuts": cuts,
             "texts": texts,
+            "zooms": zooms,
+            "hand_crops": hand_crops,
         }
 
     def _delete_others(self, clip: ManifestClip, keep: str, done: str) -> str | None:

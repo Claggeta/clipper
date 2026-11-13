@@ -10,6 +10,7 @@ from clipper.domain.models import (
     ClipLink,
     ClipTitle,
     Evaluation,
+    HandCrop,
     Label,
     LabeledVideo,
     ManifestClip,
@@ -21,6 +22,7 @@ from clipper.domain.models import (
     VideoSource,
     Word,
     WordFix,
+    Zoom,
     format_timestamp,
 )
 
@@ -764,3 +766,46 @@ def test_a_bad_text_look_is_refused(look: dict[str, object], message: str) -> No
         OnScreenText.model_validate(
             {"text": "Hook", "start_seconds": 0, "end_seconds": 3, **look}
         )
+
+
+# --- Zooms and hand crops (ADR 0016 and 0025 amendments) ---
+
+
+def test_a_zoom_defaults_to_a_centred_punch_in() -> None:
+    zoom = Zoom(start_seconds=1, end_seconds=2)
+    assert (zoom.scale, zoom.x, zoom.y, zoom.smooth) == (1.3, 0.5, 0.5, False)
+    assert HandCrop(start_seconds=1, end_seconds=2).x == 0.5
+
+
+@pytest.mark.parametrize(
+    ("model", "data", "message"),
+    [
+        (Zoom, {"start_seconds": 2, "end_seconds": 1}, "end after it starts"),
+        (
+            Zoom,
+            {"start_seconds": 1, "end_seconds": 2, "scale": 2.5},
+            "less than or equal to 2",
+        ),
+        (
+            Zoom,
+            {"start_seconds": 1, "end_seconds": 2, "scale": 1.0},
+            "greater than or equal to 1.1",
+        ),
+        (
+            Zoom,
+            {"start_seconds": 1, "end_seconds": 2, "x": -0.1},
+            "greater than or equal to 0",
+        ),
+        (HandCrop, {"start_seconds": 1, "end_seconds": 1}, "end after it starts"),
+        (
+            HandCrop,
+            {"start_seconds": 1, "end_seconds": 2, "x": 1.5},
+            "less than or equal to 1",
+        ),
+    ],
+)
+def test_bad_zooms_and_hand_crops_are_refused(
+    model: type[Zoom] | type[HandCrop], data: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        model.model_validate(data)

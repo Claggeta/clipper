@@ -13,6 +13,7 @@ from clipper.core.evaluation import spans_hit
 from clipper.domain.errors import JudgingError, LabelsError
 from clipper.domain.models import (
     CaptionEdits,
+    HandCrop,
     Label,
     LabeledVideo,
     ManifestClip,
@@ -20,6 +21,7 @@ from clipper.domain.models import (
     RejectedSpan,
     RenderManifest,
     Span,
+    Zoom,
     format_timestamp,
 )
 
@@ -109,14 +111,17 @@ def save_judgment(
     cuts: tuple[tuple[float, float], ...] = (),
     texts: tuple[OnScreenText, ...] = (),
     caption_edits: CaptionEdits | None = None,
+    zooms: tuple[Zoom, ...] = (),
+    hand_crops: tuple[HandCrop, ...] = (),
 ) -> LabeledVideo:
     """The labels with `clip` saved as `post` (span unchanged) or `fix`, or
     as `added` for a clip added in the page, whatever its span. `style` is the
     vertical style kept, if the clip had styles (ADR 0025); `rating` and
     `people` are the page's rating and who is on screen (ADR 0024); `cuts`
     the ranges left out (ADR 0029), `texts` the lines burned over it (ADR
-    0030) and `caption_edits` its caption fixes (ADR 0017), none of which
-    changes the verdict.
+    0030), `caption_edits` its caption fixes (ADR 0017), and `zooms` and
+    `hand_crops` its punch-ins and hand windows (ADR 0016, 0025), none of
+    which changes the verdict.
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
     if the span overlaps another label by the hit rule (half the shorter
@@ -145,6 +150,10 @@ def save_judgment(
         fields["texts"] = texts
     if caption_edits is not None:
         fields["caption_edits"] = caption_edits
+    if zooms:
+        fields["zooms"] = zooms
+    if hand_crops:
+        fields["hand_crops"] = hand_crops
     if clip.added:
         fields["verdict"] = "added"
     elif same_span(clip.draft_span, (start, end)):

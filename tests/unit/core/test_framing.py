@@ -4,8 +4,11 @@ from clipper.core.framing import (
     MIN_MOVE,
     PAIR_FIT,
     PAIR_SIZE,
+    hand_crop_plan,
+    hand_left,
     plan_face_crop,
     window_width,
+    with_hand_crops,
 )
 from clipper.domain.models import CropPath, FaceBox, FaceSample, FaceTrack
 
@@ -123,3 +126,37 @@ def test_the_window_never_leaves_the_frame() -> None:
 def test_a_shot_whose_face_appears_late_locks_on_it() -> None:
     # No face in the first 2 s: the lock uses the faces that come later.
     assert _points(_track(*[None] * 12, *_at(1500, 3))) == [(0.0, 1196)]
+
+
+# --- Hand crops (ADR 0025, hand crop amendment) ---
+
+
+def test_hand_left_centres_the_window_and_keeps_it_in_the_frame() -> None:
+    assert hand_left(0.5, 1920, 608) == 656
+    assert hand_left(0.0, 1920, 608) == 0
+    assert hand_left(1.0, 1920, 608) == 1312
+
+
+def test_hand_crops_replace_the_track_and_hand_it_back() -> None:
+    tracked = CropPath(
+        width=608, height=1080, points=((0.0, 600), (3.0, 900), (8.0, 700))
+    )
+    merged = with_hand_crops(tracked, [(2.0, 5.0, 0.0)], 1920)
+    # The tracked move at 3 s falls inside the hand stretch and is dropped;
+    # at 5 s the track's position then (900) comes back.
+    assert merged.points == ((0.0, 600), (2.0, 0), (5.0, 900), (8.0, 700))
+    assert with_hand_crops(tracked, [], 1920) is tracked
+
+
+def test_a_hand_crop_from_the_start_replaces_the_first_point() -> None:
+    tracked = CropPath(width=608, height=1080, points=((0.0, 600),))
+    merged = with_hand_crops(tracked, [(0.0, 1.0, 1.0)], 1920)
+    assert merged.points == ((0.0, 1312), (1.0, 600))
+
+
+def test_hand_crop_plan_moves_one_window_at_each_stretch() -> None:
+    plan = hand_crop_plan([(1.0, 2.0, 0.25), (4.0, 5.0, 0.5)], 1920, 1080)
+    assert plan is not None
+    assert plan.path.points == ((0.0, 176), (4.0, 656))
+    assert plan.ranges == ((1.0, 2.0), (4.0, 5.0))
+    assert hand_crop_plan([], 1920, 1080) is None

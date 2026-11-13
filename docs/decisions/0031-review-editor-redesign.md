@@ -255,6 +255,20 @@ asked for a chat box that turns a described edit into the page's edits.
   the wider); 9e's preview filled the first line instead. Manual step
   RV22.
 
+## Amended by the zoom and reframing PR (V7 item 9h)
+
+- The Frame tab lists zooms (from, to in seconds into the span, scale,
+  smooth) and hand crops (from, to, centre), with "Add zoom at playhead"
+  (2 s) and "Crop by hand from here" (3 s); a new one may not overlap
+  another. `static/frame.js`.
+- Bars for them in a lane under the strip; a press on a bar goes to its
+  start, its ends drag (not past a neighbour or the span), and neither
+  seeks nor cuts.
+- The preview draws the zoom (scaled by Z and offset as the renderer
+  crops) and the hand window; off a text, a drag on the preview pans the
+  zoom's centre, else the hand window, the picture following the
+  pointer. Manual step RV23.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).
