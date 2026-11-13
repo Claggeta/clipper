@@ -1,4 +1,11 @@
-from clipper.core.captions import Captions, build_ass, clip_text
+from clipper.core.captions import (
+    Captions,
+    CaptionWord,
+    build_ass,
+    caption_chunks,
+    clip_text,
+    preview_layout,
+)
 from clipper.domain.models import (
     ClipCandidate,
     OnScreenText,
@@ -347,3 +354,49 @@ def test_texts_share_one_box_so_wrapped_lines_do_not_overlap() -> None:
 def test_without_texts_the_header_has_no_text_style() -> None:
     seg = _wseg((10.0, 10.4, "one."))
     assert "Style: Text" not in build_ass(_t(seg), _c(10.0, 20.0), vertical=True).text
+
+
+def test_caption_chunks_are_the_chunks_build_ass_shows_in_source_time() -> None:
+    seg = _wseg(
+        (9.0, 9.5, "early"),
+        (10.0, 10.4, "one"),
+        (10.5, 10.9, "two."),
+        (11.0, 11.3, "{three}"),
+        (11.4, 11.8, "four"),
+        (12.0, 12.3, "cut"),
+        (12.6, 12.9, "five"),
+        (13.0, 13.4, "six"),
+        (19.8, 20.6, "last"),
+    )
+    candidate = _c(10.0, 20.0)
+    cuts = ((11.95, 12.45),)
+    chunks = caption_chunks(_t(seg), candidate, cuts)
+    assert chunks == [
+        [CaptionWord(10.0, 10.4, "one"), CaptionWord(10.5, 10.9, "two.")],
+        [
+            CaptionWord(11.0, 11.3, "three"),
+            CaptionWord(11.4, 11.8, "four"),
+            CaptionWord(12.6, 12.9, "five"),
+        ],
+        [CaptionWord(13.0, 13.4, "six"), CaptionWord(19.8, 20.0, "last")],
+    ]
+    # Each chunk is one run of events in build_ass, in the same words.
+    events = _events(build_ass(_t(seg), candidate, vertical=True, cuts=cuts))
+    shown = [
+        e.split(",", 2)[2].replace("{\\c&H0000FFFF&}", "").replace("{\\r}", "")
+        for e in events
+    ]
+    assert shown == [" ".join(w.text for w in chunk) for chunk in chunks for _ in chunk]
+
+
+def test_caption_chunks_skip_segments_without_word_times() -> None:
+    plain = Segment(start_seconds=10.0, end_seconds=12.0, text="No word times.")
+    assert caption_chunks(_t(plain), _c(10.0, 20.0)) == []
+
+
+def test_preview_layout_names_the_burn_in_sizes() -> None:
+    vertical = preview_layout(True)
+    assert (vertical["width"], vertical["height"]) == (1080, 1920)
+    assert (vertical["caption_size"], vertical["caption_margin_v"]) == (80, 420)
+    assert (vertical["text_size"], vertical["text_top"]) == (84, [540, 300])
+    assert preview_layout(False)["height"] == 1080

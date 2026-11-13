@@ -196,6 +196,36 @@ asked for a chat box that turns a described edit into the page's edits.
 - The page code is in `static/precision.js`. Checked in headless Edge on
   v2924392099; manual step RV19.
 
+## Amended by the live preview PR (V7 item 9e)
+
+- The centre has three views, **Preview**, Source and Draft; Preview
+  shows once a clip is chosen (Source with none). D cycles them, skipping
+  Draft without a file; Preview span, the step buttons and Add clip go
+  from the draft back to the preview.
+- `static/preview.js` draws a canvas at the shown size each animation
+  frame from the source player, which plays out of sight behind it
+  (1 px, transparent, still decoding). Fit: the frame covering the canvas
+  drawn 24 times smaller and scaled up as the blurred fill, the picture
+  across the width over it (0016). Face: the crop from `GET /api/crop`,
+  the face tracker and `plan_face_crop` as a re-render uses them (0025),
+  "Tracking faces…" until it arrives and fit meanwhile; no face is a note
+  and fit. Landscape folders: the frame fitted, no fill.
+- Captions from `GET /api/captions?start=&end=&cuts=`: `caption_chunks`
+  in `core/captions.py`, pulled out of `build_ass` with no change in its
+  output (same words, same chunks, source seconds), fetched 300 ms after
+  the last span or cut edit. Each word shows until the next starts, the
+  active one yellow, at `preview_layout`'s sizes (sent with the clips),
+  with fonts scaled by 0.87: libass sizes by line height, about 1.15 em
+  in Arial. Checked against a rendered draft at the same moment: the
+  caption's size and place matched to a pixel or two.
+- On-screen texts at the finished clip's time (cuts taken out), on one
+  half-dark box each.
+- Space, K and a click on the canvas play the span through its cuts from
+  the playhead, or from the start handle when outside it; a label shows
+  the finished clip's time or "Outside the span".
+- Zooms join with 9h. Captions from segments without word times are not
+  previewed. Manual step RV20.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

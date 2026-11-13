@@ -222,6 +222,51 @@ button[aria-pressed="true"] {
   border-radius: 8px;
 }
 
+/* The live preview (ADR 0031): a canvas drawn from the source player,
+   which keeps playing out of sight behind it. */
+.screen { position: relative; }
+
+#player.behind {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preview-view {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  height: 100%;
+}
+
+.preview-canvas {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 6px;
+  background: #000;
+  cursor: pointer;
+}
+
+.preview-time,
+.preview-note {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.preview-time { bottom: 8px; }
+
+.preview-note { top: 8px; color: var(--accent); }
+
 .draft-view {
   display: flex;
   justify-content: center;

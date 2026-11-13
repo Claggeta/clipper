@@ -67,6 +67,14 @@ _HALF_BLACK = "&H80000000"
 _CLEAR = "&HFF000000"
 
 
+class CaptionWord(NamedTuple):
+    """One word of a caption chunk, in source seconds (ADR 0031)."""
+
+    start: float
+    end: float
+    text: str
+
+
 class Captions(NamedTuple):
     """ASS text for one clip, whether any cue lacked word times, and whether
     any speech is in it (beside on-screen texts)."""
@@ -199,6 +207,24 @@ class _Timed(NamedTuple):
     text: str
 
 
+def _kept_words(
+    words: tuple[Word, ...],
+    clip_start: int,
+    clip_end: int,
+    cuts: TimeMap | None = None,
+) -> Iterator[_Timed]:
+    """The words captions show, in source milliseconds: those that start
+    inside the clip and not inside a cut, their ends clamped to the clip."""
+    for word in words:
+        start = _to_ms(word.start_seconds)
+        text = _clean(word.text)
+        if not (clip_start <= start < clip_end) or not text:
+            continue
+        if cuts is not None and cuts.output(start) is None:
+            continue
+        yield _Timed(start, min(_to_ms(word.end_seconds), clip_end), text)
+
+
 def _words_in_clip(
     words: tuple[Word, ...],
     clip_start: int,
@@ -211,18 +237,15 @@ def _words_in_clip(
     and the rest move to their times in the cut clip (ADR 0029).
     """
     kept: list[_Timed] = []
-    for word in words:
-        start = _to_ms(word.start_seconds)
-        text = _clean(word.text)
-        if not (clip_start <= start < clip_end) or not text:
-            continue
-        end = min(_to_ms(word.end_seconds), clip_end)
+    for word in _kept_words(words, clip_start, clip_end, cuts):
         if cuts is None:
-            kept.append(_Timed(start - clip_start, end - clip_start, text))
+            kept.append(
+                _Timed(word.start - clip_start, word.end - clip_start, word.text)
+            )
             continue
-        moved = cuts.output(start)
-        if moved is not None:
-            kept.append(_Timed(round(moved), round(cuts.clamped(end)), text))
+        moved = cuts.output(word.start)
+        assert moved is not None  # _kept_words drops words inside a cut
+        kept.append(_Timed(round(moved), round(cuts.clamped(word.end)), word.text))
     return kept
 
 
@@ -267,6 +290,50 @@ def _segment_event(
     if cuts is None:
         return _event(start - clip_start, end - clip_start, text)
     return _event(round(cuts.clamped(start)), round(cuts.clamped(end)), text)
+
+
+def caption_chunks(
+    transcript: Transcript,
+    candidate: ClipCandidate,
+    cuts: tuple[Cut, ...] = (),
+) -> list[list[CaptionWord]]:
+    """The word chunks `build_ass` shows for the clip, in source seconds,
+    for the review page's live preview (ADR 0031). The same words and the
+    same chunks; segments without word times give none."""
+    clip_start = _to_ms(candidate.start_seconds)
+    clip_end = _to_ms(candidate.end_seconds)
+    time_map = (
+        TimeMap(clip_start, clip_end, [(_to_ms(a), _to_ms(b)) for a, b in cuts])
+        if cuts
+        else None
+    )
+    chunks: list[list[CaptionWord]] = []
+    for segment in transcript.segments:
+        words = list(_kept_words(segment.words, clip_start, clip_end, time_map))
+        for chunk in _chunks(words):
+            chunks.append(
+                [CaptionWord(w.start / 1000, w.end / 1000, w.text) for w in chunk]
+            )
+    return chunks
+
+
+def preview_layout(vertical: bool) -> dict[str, object]:
+    """The caption and on-screen text sizes and places on the canvas, for
+    the live preview to draw as the burn-in does (ADR 0031)."""
+    layout = _VERTICAL if vertical else _SOURCE
+    text = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
+    return {
+        "width": layout.width,
+        "height": layout.height,
+        "caption_size": layout.font_size,
+        "caption_outline": layout.outline,
+        "caption_margin_h": layout.margin_h,
+        "caption_margin_v": layout.margin_v,
+        "text_size": text.font_size,
+        "text_padding": text.padding,
+        "text_top": list(text.top),
+        "text_middle": list(text.middle),
+    }
 
 
 def build_ass(

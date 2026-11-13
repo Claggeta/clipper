@@ -40,6 +40,10 @@ const CONFIRM_MS = 3000;
 const RANGE_SECONDS = 120;
 
 let duration = 0;
+// The folder's flags and the burn-in's sizes, for the live preview.
+let burnsCaptions = false;
+let isVertical = true;
+let previewLayout = null;
 // Names this video in frame URLs, so the browser's cache of frames never
 // mixes VODs (every run is served from the same address).
 let framesKey = "";
@@ -1208,6 +1212,7 @@ function removeClip(clip) {
     preview = null;
     document.getElementById("details").hidden = true;
     document.getElementById("empty").hidden = false;
+    drawScreen();
   }
 }
 
@@ -1337,9 +1342,12 @@ window.addEventListener("resize", () => {
 // --- The layout (ADR 0031): the player shown, the tab, the clip list ---
 
 const editor = document.getElementById("editor");
+const previewView = document.getElementById("preview-view");
 const LAYOUT_KEY = "clipper-review-layout";
 const TABS = ["clip", "text", "frame"];
-let screen = "source"; // or "draft", when the clip has one
+// "preview" (the clip as it will look, ADR 0031 item 9e), "source" or
+// "draft"; with no clip chosen the source shows.
+let screen = "preview";
 let hasDraft = false;
 
 // The tab and whether the list is hidden, remembered in this browser only;
@@ -1367,17 +1375,36 @@ function keepLayout() {
   }
 }
 
-function drawScreen() {
-  const showDraft = screen === "draft" && hasDraft;
-  player.hidden = showDraft;
-  draftView.hidden = !showDraft;
-  const draftButton = document.getElementById("show-draft");
-  draftButton.disabled = !hasDraft;
-  draftButton.setAttribute("aria-pressed", String(showDraft));
-  document.getElementById("show-source").setAttribute("aria-pressed", String(!showDraft));
+// The view on screen: the draft or preview only when there is one.
+function shownScreen() {
+  if (screen === "draft" && hasDraft) {
+    return "draft";
+  }
+  return screen === "preview" && current ? "preview" : "source";
 }
 
-// Only the player shown plays.
+function drawScreen() {
+  const shown = shownScreen();
+  // The preview draws the source player, which plays behind it.
+  player.classList.toggle("behind", shown === "preview");
+  player.hidden = shown === "draft";
+  draftView.hidden = shown !== "draft";
+  previewView.hidden = shown !== "preview";
+  const draftButton = document.getElementById("show-draft");
+  draftButton.disabled = !hasDraft;
+  document.getElementById("show-preview").disabled = !current;
+  for (const name of ["preview", "source", "draft"]) {
+    document
+      .getElementById(`show-${name}`)
+      .setAttribute("aria-pressed", String(shown === name));
+  }
+  // preview.js loads after this file, which draws the screen once first.
+  if (typeof drawPreviewNow === "function") {
+    drawPreviewNow();
+  }
+}
+
+// Only the player shown plays: the draft, or the source behind the others.
 function showScreen(name) {
   screen = name;
   (name === "draft" ? player : draft).pause();
@@ -1387,18 +1414,24 @@ function showScreen(name) {
   }
 }
 
-document.getElementById("show-source").addEventListener("click", () => showScreen("source"));
-document.getElementById("show-draft").addEventListener("click", () => showScreen("draft"));
+for (const name of ["preview", "source", "draft"]) {
+  document.getElementById(`show-${name}`).addEventListener("click", () => showScreen(name));
+}
 
-// Preview span and the step buttons play or move the source, so show it.
+// Preview span and the step buttons play or move the source; from the
+// draft, show the clip's preview again.
 player.addEventListener("play", () => {
-  if (screen !== "source") {
-    showScreen("source");
+  if (screen === "draft") {
+    showScreen("preview");
   }
 });
 
 for (const button of document.querySelectorAll("[data-step], #add")) {
-  button.addEventListener("click", () => showScreen("source"));
+  button.addEventListener("click", () => {
+    if (screen === "draft") {
+      showScreen("preview");
+    }
+  });
 }
 
 function showTab(name) {
@@ -1440,6 +1473,9 @@ async function load() {
   framesKey = encodeURIComponent(data.frames_key);
   text("source", data.source);
   people = data.people || [];
+  burnsCaptions = Boolean(data.captions);
+  isVertical = Boolean(data.vertical);
+  previewLayout = data.layout;
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {
     if (data[name]) {

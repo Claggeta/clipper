@@ -16,9 +16,18 @@ from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.adapters.results.labels_json import load_labels
 from clipper.adapters.results.manifest_json import load_manifest
 from clipper.adapters.results.review_files import JsonReviewFiles
-from clipper.domain.errors import ClipperError, FrameError, PeaksError, ReviewError
+from clipper.domain.errors import (
+    ClipperError,
+    FaceError,
+    FrameError,
+    PeaksError,
+    ReviewError,
+)
 from clipper.domain.models import (
     ClipCandidate,
+    FaceBox,
+    FaceSample,
+    FaceTrack,
     ManifestClip,
     RenderManifest,
     Segment,
@@ -31,7 +40,9 @@ from clipper.review.server import (
     UnsatisfiableRange,
     cached_frame,
     cached_peaks,
+    captions_payload,
     clips_payload,
+    crop_payload,
     frames_folder,
     make_server,
     make_store,
@@ -231,6 +242,7 @@ def _get(
         ("/app.js", "text/javascript", b"/api/clips"),
         ("/keys.js", "text/javascript", b"keydown"),
         ("/precision.js", "text/javascript", b"/api/words"),
+        ("/preview.js", "text/javascript", b"/api/captions"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -838,7 +850,7 @@ def test_the_page_scripts_declare_each_function_once() -> None:
     static = files("clipper.review") / "static"
     script = "\n".join(
         (static / name).read_text("utf-8")
-        for name in ("app.js", "keys.js", "precision.js")
+        for name in ("app.js", "keys.js", "precision.js", "preview.js")
     )
     names = re.findall(r"^(?:async )?function (\w+)\(", script, re.MULTILINE)
     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
@@ -1034,3 +1046,120 @@ def test_a_bad_thumbnail_body_is_refused(base_url: str) -> None:
     status, reply = _post(base_url, "/api/clips/1/thumbnail", {"at": 9999.0})
     assert status == 400
     assert "inside the video" in reply["error"]
+
+
+# --- The live preview (ADR 0031) ---
+
+
+_WORDED = Transcript(
+    segments=(
+        Segment(
+            start_seconds=62.0,
+            end_seconds=64.0,
+            text="One two. Three",
+            words=(
+                Word(start_seconds=62.0, end_seconds=62.4, text=" One"),
+                Word(start_seconds=62.5, end_seconds=62.9, text=" two."),
+                Word(start_seconds=63.2, end_seconds=63.6, text=" Three"),
+            ),
+        ),
+    )
+)
+
+
+def test_captions_payload_gives_the_burn_in_chunks(tmp_path: Path) -> None:
+    session = dataclasses.replace(_session(tmp_path), transcript=_WORDED)
+    assert captions_payload(session, "start=60&end=90") == {
+        "chunks": [[[62.0, 62.4, "One"], [62.5, 62.9, "two."]], [[63.2, 63.6, "Three"]]]
+    }
+    # A word starting inside a cut is not shown, as in the burn-in.
+    assert captions_payload(session, "start=60&end=90&cuts=62.45:63.0") == {
+        "chunks": [[[62.0, 62.4, "One"], [63.2, 63.6, "Three"]]]
+    }
+    with pytest.raises(ReviewError, match="no captions"):
+        captions_payload(
+            dataclasses.replace(session, transcript=None), "start=60&end=90"
+        )
+
+
+@pytest.mark.parametrize(
+    "cuts",
+    ["x", "62:61", "59:61", "70:89,65:66", "62:63:64", "80:95"],
+)
+def test_bad_preview_cuts_are_refused(base_url: str, cuts: str) -> None:
+    status, _, _ = _get(base_url + f"/api/captions?start=60&end=90&cuts={cuts}")
+    assert status == 400
+
+
+def test_the_page_gets_the_preview_layout(base_url: str) -> None:
+    layout = json.loads(_get(base_url + "/api/clips")[2])["layout"]
+    assert (layout["width"], layout["caption_size"]) == (1080, 80)
+
+
+class FakeTracker:
+    """A face at the frame's centre, none, or a failure."""
+
+    def __init__(self, face: bool = True, fail: bool = False) -> None:
+        self.face = face
+        self.fail = fail
+        self.spans: list[tuple[float, float]] = []
+
+    def track(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FaceTrack:
+        self.spans.append((start_seconds, end_seconds))
+        if self.fail:
+            raise FaceError("ffmpeg failed (exit 1): [bad] frames")
+        box = FaceBox(x=0.45, y=0.2, w=0.1, h=0.3, score=0.9)
+        return FaceTrack(
+            source=video_path.name,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            samples_per_second=5.0,
+            samples=(
+                FaceSample(seconds=start_seconds, faces=(box,) if self.face else ()),
+            ),
+        )
+
+
+def _faced(tmp_path: Path, tracker: FakeTracker) -> ReviewSession:
+    return dataclasses.replace(
+        _session(tmp_path), face_tracker=tracker, frame_size=(1920, 1080)
+    )
+
+
+def test_crop_payload_frames_the_span_as_a_re_render_would(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    reply = crop_payload(_faced(tmp_path, tracker), "start=60&end=90")
+    assert reply == {
+        # A 9:16 window, even, centred on the face at 960: 960 - 608 / 2.
+        "crop": {"width": 608, "height": 1080, "points": [[0.0, 656]]},
+        "frame": [1920, 1080],
+    }
+    assert tracker.spans == [(60.0, 90.0)]
+
+
+def test_crop_payload_without_a_face_says_so(tmp_path: Path) -> None:
+    reply = crop_payload(_faced(tmp_path, FakeTracker(face=False)), "start=60&end=90")
+    assert reply["crop"] is None
+    assert "framed as fit" in str(reply["note"])
+    with pytest.raises(ReviewError, match="cannot find faces"):
+        crop_payload(_session(tmp_path), "start=60&end=90")
+
+
+def test_a_failed_face_track_is_a_server_error_with_its_message(
+    tmp_path: Path,
+) -> None:
+    server = make_server(_faced(tmp_path, FakeTracker(fail=True)), 0)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        status, _, body = _get(url + "/api/crop?start=60&end=90")
+        assert status == 500
+        assert "[bad] frames" in json.loads(body)["error"]
+    finally:
+        server.shutdown()
+        server.server_close()
