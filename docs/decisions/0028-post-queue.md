@@ -90,6 +90,17 @@ planned to match them by title, length and date.
   `<stem>/<file>`, so the queue and `posts.json` are unchanged. Manual
   step Q1.
 
+## Amended by summaries (V7 item 9k-2, ADR 0032)
+
+- A folder's summary rated `good` (or `ok` with `--include-ok`) and not
+  yet posted joins the queue after that folder's clips, in its turn. Its
+  people are everyone marked on its clips, in order, so its campaigns
+  follow theirs; with no hook its caption opens with its title, as for
+  any clip without one; its thumbnail is listed. It shows as `summary`
+  in place of a rank, in the table and the page.
+- `posted` accepts the summary's file (`<stem>/<stem>_summary.mp4`, or
+  its path), and a posted summary leaves the queue. Manual step Q3.
+
 ## Revisit when
 
 - Posting from the review page would save a step.

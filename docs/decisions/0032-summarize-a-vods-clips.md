@@ -69,6 +69,11 @@ captions, text, framing, zooms, audio) and re-renders it (0024, 0029,
 - Joining takes about a quarter of real time: 80 s of clips in 20.5 s
   on v2924392099.
 
+## Amended by the queue PR (V7 item 9k-2)
+
+- Decision 8's second PR: summaries in `queue` and `posted`, as the ADR
+  0028 amendment describes. Manual step Q3.
+
 ## Revisit when
 
 - The plain summary leaves gaps the maintainer wants filled.

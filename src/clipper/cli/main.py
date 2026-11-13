@@ -1336,13 +1336,13 @@ def queue_(
     if not scheduled:
         console.print("Nothing to post: no saved clip rated good is left.")
     else:
-        table = Table("#", "Day", "Video", "Rank", "Title", "Campaigns")
+        table = Table("#", "Day", "Video", "Clip", "Title", "Campaigns")
         for number, (day, item) in enumerate(scheduled, start=1):
             table.add_row(
                 str(number),
                 day.isoformat(),
                 escape(item.folder),
-                str(item.rank),
+                escape(item.place),
                 escape(item.title or ""),
                 escape(", ".join(c.name for c in item.eligible.campaigns)),
             )
@@ -1451,6 +1451,9 @@ def _clip_key(clips_dir: Path, clip: str) -> str:
         manifest = load_manifest(found)
     except ClipperError as exc:
         raise QueueError(f"{clip}: {exc}") from exc
-    if not any(c.file == file for c in manifest.clips):
+    summary = manifest.summary
+    if not any(c.file == file for c in manifest.clips) and not (
+        summary is not None and summary.file == file
+    ):
         raise QueueError(f"{folder}'s manifest lists no clip {file}")
     return clip_key(folder, file)
