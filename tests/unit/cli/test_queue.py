@@ -153,7 +153,8 @@ def test_posted_records_the_clip_and_it_leaves_the_queue(env: Env) -> None:
         (
             "v1_1.mp4",
             "https://youtu.be/abcDEF12345",
-            "Name the clip by its full path or as <folder>/<file>",
+            "Name the clip by its path (absolute, or from here or the clips dir) "
+            "or as <folder>/<file>",
         ),
         ("v1/v1_1.mp4", "https://www.twitch.tv/videos/123", "Not a YouTube link"),
         ("v1/v1_1.mp4", "https://example.com/x", "Not a"),
@@ -183,6 +184,41 @@ def test_folders_by_channel_and_day_are_queued_and_posted(env: Env) -> None:
         "v2/v2_1.mp4",
         "v2/v2_2.mp4",
     ]
+
+
+def test_posted_takes_paths_relative_to_here_or_the_clips_dir(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = env.folder("v2", ["good", "good"], under="Lacy/11-10-2026")
+    for name in ("v2_1.mp4", "v2_2.mp4"):
+        (folder / name).write_bytes(b"")
+    monkeypatch.chdir(tmp_path)
+    from_here = env.run(
+        "posted", "clips/Lacy/11-10-2026/v2/v2_1.mp4", "https://youtu.be/abcDEF12345"
+    )
+    assert from_here.exit_code == 0, from_here.output
+    from_clips = env.run(
+        "posted", "Lacy/11-10-2026/v2/v2_2.mp4", "https://youtu.be/xyzDEF12345"
+    )
+    assert from_clips.exit_code == 0, from_clips.output
+    assert [p.clip for p in load_posts(env.posts).posts] == [
+        "v2/v2_1.mp4",
+        "v2/v2_2.mp4",
+    ]
+
+
+def test_posted_refuses_a_relative_path_outside_the_clips_dir(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env.folder("v1", ["good"])
+    other = tmp_path / "other" / "deep" / "v1"
+    other.mkdir(parents=True)
+    (other / "v1_1.mp4").write_bytes(b"")
+    monkeypatch.chdir(tmp_path)
+    result = env.run("posted", "other/deep/v1/v1_1.mp4", "https://youtu.be/abcDEF12345")
+    assert result.exit_code == 1
+    assert "Name the clip by its path" in " ".join(result.output.split())
+    assert not env.posts.exists()
 
 
 def test_posted_names_a_missing_folder(env: Env) -> None:
