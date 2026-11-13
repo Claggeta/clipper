@@ -55,6 +55,8 @@ RATINGS = ("good", "ok")
 ADDED_REASON = "added in review"
 # On-screen texts per clip (ADR 0030); a hook and a few lines.
 MAX_TEXTS = 5
+# A text's look, sent by the page when set (ADR 0030, styling amendment).
+_TEXT_LOOK = ("colour", "look", "size", "fade", "x", "y")
 # A thumbnail's text is shown from time 0 of its one frame; any length will do.
 THUMBNAIL_TEXT_SECONDS = 10.0
 # No speech, for texts alone in a folder without captions.
@@ -197,6 +199,12 @@ def _texts(value: object) -> tuple[OnScreenText, ...]:
                         "start_seconds": _seconds(item, "start"),
                         "end_seconds": _seconds(item, "end"),
                         "place": item.get("place", "top"),
+                        # Its look; absent is the original (ADR 0030).
+                        **{
+                            name: item[name]
+                            for name in _TEXT_LOOK
+                            if item.get(name) is not None
+                        },
                     }
                 )
             )
@@ -736,6 +744,12 @@ def text_payload(text: OnScreenText) -> dict[str, object]:
         "start": text.start_seconds,
         "end": text.end_seconds,
         "place": text.place,
+        "colour": text.colour,
+        "look": text.look,
+        "size": text.size,
+        "fade": text.fade,
+        "x": text.x,
+        "y": text.y,
     }
 
 

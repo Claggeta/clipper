@@ -30,6 +30,13 @@ let cropFrame = null; // the source frame size the crop is in
 let cropKey = "";
 let cropPending = false;
 let previewFrame = 0; // the animation frame request, while the preview shows
+// Where each on-screen text was last drawn, in the canvas's CSS pixels,
+// for dragging: [{index, left, top, width, height}].
+let textBoxes = [];
+// A press on the canvas is a drag past this many pixels, else a click.
+const TEXT_DRAG_PX = 4;
+// A dragged text's centre snaps to the middle within this fraction.
+const TEXT_SNAP = 0.02;
 
 // --- What to draw: captions and crop for the current span ---
 
@@ -224,6 +231,26 @@ function wrapWords(context, words, maxWidth) {
   return lines;
 }
 
+// As libass's smart wrapping (WrapStyle 0): as few lines as greedy
+// wrapping needs, but as even as they can be, the top one the wider.
+function balancedWrap(context, words, maxWidth) {
+  const lines = wrapWords(context, words, maxWidth);
+  if (lines.length < 2) {
+    return lines;
+  }
+  let low = 0;
+  let high = maxWidth;
+  for (let step = 0; step < 16; step += 1) {
+    const middle = (low + high) / 2;
+    if (wrapWords(context, words, middle).length > lines.length) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return wrapWords(context, words, high);
+}
+
 // The chunk shown at `seconds` and its active word, as build_ass times
 // them: each word until the next starts, the last until it ends.
 function activeChunk(seconds) {
@@ -257,7 +284,7 @@ function drawCaptions(context, width, height, seconds) {
     text,
     lit: index === active || key,
   }));
-  const lines = wrapWords(context, words, width - previewLayout.caption_margin_h * 2 * scale);
+  const lines = balancedWrap(context, words, width - previewLayout.caption_margin_h * 2 * scale);
   const space = context.measureText(" ").width;
   let baseline = height - previewLayout.caption_margin_v * scale - (lines.length - 1) * size;
   for (const line of lines) {
@@ -273,36 +300,64 @@ function drawCaptions(context, width, height, seconds) {
   }
 }
 
-// On-screen texts (ADR 0030) at the finished clip's time, each on one
-// half-dark box behind all its lines (the one box amendment).
+// On-screen texts (ADR 0030) at the finished clip's time, in their look:
+// a colour, one half-dark box behind all lines or a black outline, a
+// size, a fade in, and their place or own position (styling amendment).
 function drawOnScreenTexts(context, width, height, seconds) {
   const at = clipSeconds(seconds);
   const scale = height / previewLayout.height;
-  const size = previewLayout.text_size * ASS_FONT_SCALE * scale;
   const padding = previewLayout.text_padding * scale;
-  context.font = `bold ${size}px Arial, sans-serif`;
   context.textBaseline = "middle";
-  for (const item of sentTexts(current)) {
-    if (!(at >= item.start && at < Math.min(item.end, clipLength()))) {
-      continue;
+  context.lineJoin = "round";
+  textBoxes = [];
+  textsOf(current).forEach((item, index) => {
+    const text = item.text.trim();
+    if (!text || !(at >= item.start && at < Math.min(item.end, clipLength()))) {
+      return;
     }
-    const words = item.text.split(/\s+/).filter(Boolean).map((text) => ({ text }));
-    const lines = wrapWords(context, words, width - previewLayout.caption_margin_h * 2 * scale)
+    const size =
+      previewLayout.text_size *
+      previewLayout.text_sizes[item.size || "large"] *
+      ASS_FONT_SCALE *
+      scale;
+    context.font = `bold ${size}px Arial, sans-serif`;
+    const words = text.split(/\s+/).map((word) => ({ text: word }));
+    const lines = balancedWrap(context, words, width - previewLayout.caption_margin_h * 2 * scale)
       .map((line) => line.map((w) => w.text).join(" "));
     const lineHeight = size * 1.15;
     const boxWidth = Math.max(...lines.map((line) => context.measureText(line).width)) + padding * 2;
     const boxHeight = lines.length * lineHeight + padding * 2;
-    const [x, y] = (item.place === "top" ? previewLayout.text_top : previewLayout.text_middle)
-      .map((value) => value * scale);
-    const top = item.place === "top" ? y : y - boxHeight / 2;
-    context.fillStyle = "rgb(0 0 0 / 0.5)";
-    context.fillRect(x - boxWidth / 2, top, boxWidth, boxHeight);
-    context.fillStyle = "#fff";
-    lines.forEach((line, index) => {
-      const lineWidth = context.measureText(line).width;
-      context.fillText(line, x - lineWidth / 2, top + padding + lineHeight * (index + 0.5));
+    let x;
+    let top;
+    if (item.x !== null && item.x !== undefined) {
+      x = item.x * width;
+      top = item.y * height - boxHeight / 2;
+    } else {
+      const point = item.place === "top" ? previewLayout.text_top : previewLayout.text_middle;
+      x = point[0] * scale;
+      top = item.place === "top" ? point[1] * scale : point[1] * scale - boxHeight / 2;
+    }
+    const fadeSeconds = previewLayout.text_fade_ms / 1000;
+    context.globalAlpha = item.fade ? Math.min((at - item.start) / fadeSeconds, 1) : 1;
+    const outline = item.look === "outline";
+    if (!outline) {
+      context.fillStyle = "rgb(0 0 0 / 0.5)";
+      context.fillRect(x - boxWidth / 2, top, boxWidth, boxHeight);
+    }
+    context.fillStyle = previewLayout.text_colours[item.colour || "white"];
+    context.strokeStyle = "#000";
+    context.lineWidth = previewLayout.text_outline * 2 * scale;
+    lines.forEach((line, lineIndex) => {
+      const left = x - context.measureText(line).width / 2;
+      const middle = top + padding + lineHeight * (lineIndex + 0.5);
+      if (outline) {
+        context.strokeText(line, left, middle);
+      }
+      context.fillText(line, left, middle);
     });
-  }
+    context.globalAlpha = 1;
+    textBoxes.push({ index, left: x - boxWidth / 2, top, width: boxWidth, height: boxHeight });
+  });
 }
 
 function drawPreview() {
@@ -372,5 +427,52 @@ function togglePreviewPlay() {
   requestAnimationFrame(watchPreview);
 }
 
-previewCanvas.addEventListener("click", togglePreviewPlay);
+// A press on a text drags it to a position of its own (ADR 0030, styling
+// amendment); a press anywhere else, or one that does not move, plays or
+// pauses.
+previewCanvas.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || !current) {
+    return;
+  }
+  const box = previewCanvas.getBoundingClientRect();
+  const px = event.clientX - box.left;
+  const py = event.clientY - box.top;
+  const hit = [...textBoxes]
+    .reverse()
+    .find((b) => px >= b.left && px <= b.left + b.width && py >= b.top && py <= b.top + b.height);
+  const item = hit ? textsOf(current)[hit.index] : null;
+  const offset = hit ? [px - (hit.left + hit.width / 2), py - (hit.top + hit.height / 2)] : null;
+  let dragging = false;
+  previewCanvas.setPointerCapture(event.pointerId);
+  const onMove = (moveEvent) => {
+    if (!item) {
+      return;
+    }
+    if (!dragging && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < TEXT_DRAG_PX) {
+      return;
+    }
+    dragging = true;
+    let x = (moveEvent.clientX - box.left - offset[0]) / box.width;
+    const y = (moveEvent.clientY - box.top - offset[1]) / box.height;
+    if (Math.abs(x - 0.5) < TEXT_SNAP) {
+      x = 0.5;
+    }
+    item.x = Math.round(clamp(x, 0, 1) * 1000) / 1000;
+    item.y = Math.round(clamp(y, 0, 1) * 1000) / 1000;
+    textsChanged();
+  };
+  const onUp = () => {
+    previewCanvas.removeEventListener("pointermove", onMove);
+    previewCanvas.removeEventListener("pointerup", onUp);
+    previewCanvas.removeEventListener("pointercancel", onUp);
+    if (dragging) {
+      drawTexts(current);
+    } else {
+      togglePreviewPlay();
+    }
+  };
+  previewCanvas.addEventListener("pointermove", onMove);
+  previewCanvas.addEventListener("pointerup", onUp);
+  previewCanvas.addEventListener("pointercancel", onUp);
+});
 drawPreviewNow();

@@ -316,6 +316,10 @@ VerticalStyleName = Literal["fit", "face"]
 # Where an on-screen text sits (ADR 0030): below the area YouTube's own
 # interface covers, or the middle. Never the bottom, the captions' place.
 TextPlace = Literal["top", "middle"]
+# An on-screen text's look (ADR 0030, styling amendment, V7 9g).
+TextColour = Literal["white", "yellow", "green", "cyan", "pink", "orange"]
+TextLook = Literal["box", "outline"]
+TextSize = Literal["small", "medium", "large"]
 TEXT_LIMIT = 120
 
 
@@ -323,7 +327,10 @@ class OnScreenText(BaseModel):
     """A line of text burned over the clip (ADR 0030).
 
     `start_seconds` and `end_seconds` are seconds of the finished clip,
-    after any cuts, not of the source video.
+    after any cuts, not of the source video. Its look (styling amendment):
+    a colour, a half-dark `box` or a black `outline`, a size, and a fade in;
+    `x` and `y`, fractions of the frame for the text's centre, place it
+    freely instead of at `place`. The defaults are the original look.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -332,6 +339,12 @@ class OnScreenText(BaseModel):
     start_seconds: float = Field(ge=0)
     end_seconds: float
     place: TextPlace = "top"
+    colour: TextColour = "white"
+    look: TextLook = "box"
+    size: TextSize = "large"
+    fade: bool = False
+    x: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    y: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
 
     @field_validator("text")
     @classmethod
@@ -349,6 +362,8 @@ class OnScreenText(BaseModel):
     def _ends_after_start(self) -> "OnScreenText":
         if self.end_seconds <= self.start_seconds:
             raise ValueError("a text must end after it starts")
+        if (self.x is None) != (self.y is None):
+            raise ValueError("a text's position needs both x and y")
         return self
 
 

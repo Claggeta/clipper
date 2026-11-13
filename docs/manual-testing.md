@@ -3046,6 +3046,30 @@ as RV12, on a folder with captions.
 
 Then delete the scratch folders.
 
+### RV22. Text styling
+
+Covers [ADR 0030](decisions/0030-on-screen-text-and-thumbnails.md)'s
+styling amendment (V7 item 9g). Same scratch copy and labels dir as RV12.
+
+1. Choose a clip, open `Text` and press `Add text` twice; type `NO WAY`
+   in the second. Pass: each row has six colour swatches, `Box`, `Large`
+   and `Fade in`; the preview shows the hook at the top and `NO WAY` in
+   the middle, both white on a box.
+2. On the second row pick pink, `Outline`, `Medium` and tick `Fade in`.
+   Pass: in the preview it turns pink, smaller, with a black edge and no
+   box, and fades in over its first third of a second when played.
+3. Pause where it shows and drag it in the preview. Pass: it follows the
+   pointer, settles on the centre line near the middle, playback does not
+   start, and its place menu says `Custom`. A plain click elsewhere still
+   plays and pauses.
+4. Save. Pass: "re-rendered"; in the draft the text has the same colour,
+   look, size, fade and place as the preview showed.
+5. Choose `Middle` in its place menu. Pass: it goes back to the middle;
+   Save again moves it in the draft.
+6. A long text that wraps: the preview's line breaks match the draft's.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

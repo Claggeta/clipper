@@ -297,11 +297,31 @@ function textsOf(clip) {
   return textEdits.get(clip.key);
 }
 
-// The texts Save sends: those with words.
+// A text's look when none is set: the original (ADR 0030, styling).
+const TEXT_LOOK = { colour: "white", look: "box", size: "large", fade: false, x: null, y: null };
+
+// The texts Save sends: those with words, with their look.
 function sentTexts(clip) {
   return textsOf(clip)
     .filter((t) => t.text.trim())
-    .map((t) => ({ text: t.text.trim(), start: t.start, end: t.end, place: t.place }));
+    .map((t) => ({
+      text: t.text.trim(),
+      start: t.start,
+      end: t.end,
+      place: t.place,
+      colour: t.colour || TEXT_LOOK.colour,
+      look: t.look || TEXT_LOOK.look,
+      size: t.size || TEXT_LOOK.size,
+      fade: Boolean(t.fade),
+      x: t.x ?? null,
+      y: t.y ?? null,
+    }));
+}
+
+function samePosition(a, b) {
+  return (a ?? null) === null || (b ?? null) === null
+    ? (a ?? null) === (b ?? null)
+    : Math.abs(a - b) < 0.001;
 }
 
 function sameTexts(a, b) {
@@ -312,9 +332,82 @@ function sameTexts(a, b) {
         t.text === b[i].text &&
         t.place === b[i].place &&
         sameTime(t.start, b[i].start) &&
-        sameTime(t.end, b[i].end),
+        sameTime(t.end, b[i].end) &&
+        (t.colour || "white") === (b[i].colour || "white") &&
+        (t.look || "box") === (b[i].look || "box") &&
+        (t.size || "large") === (b[i].size || "large") &&
+        Boolean(t.fade) === Boolean(b[i].fade) &&
+        samePosition(t.x, b[i].x) &&
+        samePosition(t.y, b[i].y),
     )
   );
+}
+
+function selectInput(options, value, onChange) {
+  const select = document.createElement("select");
+  for (const [optionValue, label] of options) {
+    const option = document.createElement("option");
+    option.value = optionValue;
+    option.textContent = label;
+    select.append(option);
+  }
+  select.value = value;
+  select.addEventListener("change", () => onChange(select.value));
+  return select;
+}
+
+// A text's look (ADR 0030, styling amendment): colour, box or outline,
+// size and fade in. Its position is set by dragging it on the preview.
+function textStyleRow(item) {
+  const row = document.createElement("div");
+  row.className = "text-style";
+  const swatches = document.createElement("div");
+  swatches.className = "toggle-row";
+  swatches.setAttribute("role", "group");
+  swatches.setAttribute("aria-label", "Text colour");
+  for (const [name, colour] of Object.entries(previewLayout.text_colours)) {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "swatch small";
+    swatch.style.background = colour;
+    swatch.title = name;
+    swatch.setAttribute("aria-label", name);
+    swatch.setAttribute("aria-pressed", String((item.colour || "white") === name));
+    swatch.addEventListener("click", () => {
+      item.colour = name;
+      for (const other of swatches.children) {
+        other.setAttribute("aria-pressed", String(other === swatch));
+      }
+      textsChanged();
+    });
+    swatches.append(swatch);
+  }
+  const look = selectInput([["box", "Box"], ["outline", "Outline"]], item.look || "box", (value) => {
+    item.look = value;
+    textsChanged();
+  });
+  look.title = "Look";
+  const size = selectInput(
+    [["large", "Large"], ["medium", "Medium"], ["small", "Small"]],
+    item.size || "large",
+    (value) => {
+      item.size = value;
+      textsChanged();
+    },
+  );
+  size.title = "Size";
+  const fade = document.createElement("label");
+  fade.className = "fade";
+  const fadeBox = document.createElement("input");
+  fadeBox.type = "checkbox";
+  fadeBox.checked = Boolean(item.fade);
+  fadeBox.addEventListener("change", () => {
+    item.fade = fadeBox.checked;
+    textsChanged();
+  });
+  fade.append(fadeBox, " Fade in");
+  row.append(swatches, look, size, fade);
+  return row;
 }
 
 function numberInput(value, onChange) {
@@ -357,16 +450,19 @@ function drawTexts(clip) {
       textsChanged();
     });
     end.title = "To (s)";
-    const place = document.createElement("select");
-    for (const [value, label] of [["top", "Top"], ["middle", "Middle"]]) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      place.append(option);
+    // Custom once dragged on the preview; Top or Middle puts it back.
+    const places = [["top", "Top"], ["middle", "Middle"]];
+    const custom = item.x !== null && item.x !== undefined;
+    if (custom) {
+      places.push(["custom", "Custom"]);
     }
-    place.value = item.place;
-    place.addEventListener("change", () => {
-      item.place = place.value;
+    const place = selectInput(places, custom ? "custom" : item.place, (value) => {
+      if (value !== "custom") {
+        item.place = value;
+        item.x = null;
+        item.y = null;
+        drawTexts(clip);
+      }
       textsChanged();
     });
     const remove = document.createElement("button");
@@ -377,7 +473,7 @@ function drawTexts(clip) {
       drawTexts(clip);
       textsChanged();
     });
-    row.append(words, start, end, place, remove);
+    row.append(words, start, end, place, remove, textStyleRow(item));
     textsBox.append(row);
   });
   document.getElementById("add-text").disabled = texts.length >= MAX_TEXTS;

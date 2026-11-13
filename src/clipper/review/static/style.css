@@ -466,13 +466,36 @@ button[aria-pressed="true"] {
 
 .text-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1.4fr auto;
   gap: 6px;
   align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
 
-/* The text box takes its own line in the narrow inspector. */
-.text-row > :first-child { grid-column: 1 / -1; }
+/* The text box and its look take their own lines in the narrow inspector. */
+.text-row > :first-child,
+.text-row > .text-style { grid-column: 1 / -1; }
+
+.text-style {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.text-style select { width: auto; }
+
+.judge .fade {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.judge .fade input { width: auto; margin: 0; }
+
+.swatch.small { width: 22px; height: 22px; }
 
 /* Caption words (ADR 0017, caption editing amendment): one group per
    chunk; fixed words underlined, hidden ones struck through, key words in

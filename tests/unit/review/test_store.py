@@ -702,7 +702,19 @@ def test_texts_re_render_and_are_recorded_on_manifest_and_label(
     [label] = load_labels(env.labels_path).labels
     assert label.texts == (_hook(),)
     assert env.store.judgment(clip)["texts"] == [  # type: ignore[index]
-        {"text": "Ron at the pump", "start": 0.0, "end": 3.0, "place": "top"}
+        {
+            "text": "Ron at the pump",
+            "start": 0.0,
+            "end": 3.0,
+            "place": "top",
+            # The original look (ADR 0030, styling amendment).
+            "colour": "white",
+            "look": "box",
+            "size": "large",
+            "fade": False,
+            "x": None,
+            "y": None,
+        }
     ]
     env.store.save(1, request)
     assert len(env.renderer.calls) == 1  # the same texts do not re-render
@@ -889,3 +901,65 @@ def test_parse_caption_edits_checks_and_drops_empty_ones() -> None:
         parse_caption_edits({"highlight": "purple"})
     with pytest.raises(BadRequest, match="caption_edits"):
         parse_caption_edits([1, 2])
+
+
+def test_a_styled_text_is_parsed_saved_and_burned(tmp_path: Path) -> None:
+    from clipper.review.store import parse_save
+
+    request = parse_save(
+        {
+            "start": 10.0,
+            "end": 40.0,
+            "texts": [
+                {
+                    "text": "Look",
+                    "start": 0,
+                    "end": 2,
+                    "place": "top",
+                    "colour": "cyan",
+                    "look": "outline",
+                    "size": "medium",
+                    "fade": True,
+                    "x": 0.5,
+                    "y": 0.4,
+                }
+            ],
+        },
+        600.0,
+    )
+    [text] = request.texts
+    assert (text.colour, text.look, text.size, text.fade, text.x, text.y) == (
+        "cyan",
+        "outline",
+        "medium",
+        True,
+        0.5,
+        0.4,
+    )
+    env = Env(tmp_path)
+    saved = env.store.save(1, request)
+    assert saved.clip.texts == request.texts
+    assert "TextOutline" in str(env.renderer.captions[-1])
+    [label] = load_labels(env.labels_path).labels
+    assert label.texts == request.texts
+    # The labels file keeps only a text's look that is not the default.
+    written = env.labels_path.read_text(encoding="utf-8")
+    assert '"colour": "cyan"' in written
+    with pytest.raises(BadRequest, match="text:"):
+        parse_save(
+            {
+                "start": 10,
+                "end": 40,
+                "texts": [{"text": "x", "start": 0, "end": 2, "x": 2}],
+            },
+            600.0,
+        )
+
+
+def test_an_unstyled_text_is_written_as_before(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    hook = OnScreenText(text="Hook", start_seconds=0, end_seconds=3)
+    env.store.save(1, SaveRequest(10.0, 40.0, None, None, texts=(hook,)))
+    written = env.labels_path.read_text(encoding="utf-8")
+    assert '"place": "top"' in written
+    assert "colour" not in written
