@@ -660,6 +660,9 @@ From the review editor questions on 2026-11-13:
 - A chat box in the page to describe edits and have them made, with the
   edits the page has. Free only: the local LLM, not Claude through a
   paid API.
+- A "Summarize" button that condenses a VOD's clips into one longer
+  Short, for episodes of iterative games that ramp from boring tasks to
+  huge goals; each clip can still be posted alone.
 
 ## Current state
 
@@ -1367,6 +1370,13 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      local LLM turning them into the page's edits), then an Assist tab
      if it is right often enough. ADR 0014 and 0031 amendments. May end
      in nothing.
+   - 9k. Summarize (added 2026-11-13, the maintainer's choice): a button in
+     `review` that joins a VOD's kept clips, as edited, in VOD order into
+     one longer Short (`<stem>_summary.mp4`), with optional label cards
+     between them, a length warning past the Shorts limit, and its own
+     manifest entry to title, rate and queue. After 9i, so it can carry
+     music. No new picking; suggested filler moments only if the plain
+     version shows gaps. Design stated first; an ADR.
 
 Later, not scheduled:
 
