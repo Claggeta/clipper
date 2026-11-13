@@ -4,7 +4,7 @@ import pytest
 
 from clipper.adapters.titles.ollama import SYSTEM_PROMPT, OllamaTitleWriter
 from clipper.core.interfaces import TitleWriter
-from clipper.domain.errors import ClipperError, DetectionError, TitleError
+from clipper.domain.errors import ClipperError, LlmError, TitleError
 from clipper.domain.models import ClipTitle, VideoInfo
 
 # All replies here are constructed, not produced by a real model.
@@ -67,7 +67,7 @@ def test_invalid_reply_raises_title_error(reply: str, detail: str) -> None:
 def test_client_errors_become_title_errors_with_the_same_message() -> None:
     class Failing:
         def generate(self, system: str, prompt: str, schema: dict[str, object]) -> str:
-            raise DetectionError("Cannot reach Ollama at [url]")
+            raise LlmError("Cannot reach Ollama at [url]")
 
     with pytest.raises(TitleError, match=r"^Cannot reach Ollama at \[url\]$"):
         OllamaTitleWriter(Failing()).write("text")

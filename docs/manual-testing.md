@@ -3239,12 +3239,12 @@ script that followed the steps, with the output pasted back.
 | Folder left in `%TEMP%` (C4) | `TemporaryDirectory` in `adapters/rendering/ffmpeg.py`; ADR 0010 |
 | Caption run fails on a path (C5) | Absolute paths and `cwd` in `adapters/rendering/ffmpeg.py`; `run_tool` in `adapters/media/_process.py`; ADR 0010 |
 | Markup, accents or backslashes mangled (C7) | `_MARKUP` in `core/captions.py`; ADR 0010 |
-| `Unexpected response` or `not a valid score` on every run (L1) | The payload in `adapters/detection/ollama.py`; `WindowScore` and `_SCHEMA` in `adapters/detection/llm.py`; ADR 0014 |
-| Error message wrong or a traceback (L2) | `generate` and `_http_failure` in `adapters/detection/ollama.py`; the `try` in `analyze` and `eval`; ADR 0013 |
+| `Unexpected response` or `not a valid score` on every run (L1) | The payload in `adapters/llm/ollama.py`; `WindowScore` and `_SCHEMA` in `adapters/detection/llm.py`; ADR 0014 |
+| Error message wrong or a traceback (L2) | `generate` and `_http_failure` in `adapters/llm/ollama.py`; the `try` in `analyze` and `eval`; ADR 0013 |
 | `Detector:` line or saved `detector` wrong (L1) | `_detector_label` in `cli/main.py`; ADR 0013 |
-| Timeout on the first window (L1) | `TIMEOUT_SECONDS` in `adapters/detection/ollama.py`; model load time |
+| Timeout on the first window (L1) | `TIMEOUT_SECONDS` in `adapters/llm/ollama.py`; model load time |
 | `HTTP 400 ... invalid model name` (L0 to L5) | A placeholder or typo in `$M1` to `$M3` or `CLIPPER_LLM_MODEL`; the L0 `ollama show` check |
-| Tens of seconds per window, or `not a valid score ... (got '')` (L1) | `think` in the payload in `adapters/detection/ollama.py`; ADR 0014, thinking amendment |
+| Tens of seconds per window, or `not a valid score ... (got '')` (L1) | `think` in the payload in `adapters/llm/ollama.py`; ADR 0014, thinking amendment |
 
 | Symptom | Look at |
 |---------|---------|

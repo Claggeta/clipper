@@ -1,7 +1,7 @@
 from pydantic import ValidationError
 
-from clipper.adapters.detection.llm import TextGenerator
-from clipper.domain.errors import DetectionError, TitleError
+from clipper.adapters.llm.ollama import TextGenerator
+from clipper.domain.errors import LlmError, TitleError
 from clipper.domain.models import ClipTitle, VideoInfo
 
 # Limits are in words: the model keeps to them, not to character counts (ADR
@@ -43,7 +43,7 @@ _SCHEMA = ClipTitle.model_json_schema()
 class OllamaTitleWriter:
     """Writes a title and hook per clip with a local LLM. See docs/decisions/0018.
 
-    One request per clip, through the detector's `OllamaClient` (temperature 0,
+    One request per clip, through the shared `OllamaClient` (temperature 0,
     seed 0, `think: false`). Any failure raises `TitleError`; there is no
     fallback text.
     """
@@ -58,9 +58,8 @@ class OllamaTitleWriter:
             reply = self._generator.generate(
                 SYSTEM_PROMPT, _prompt(text, video, about), _SCHEMA
             )
-        except DetectionError as exc:
-            # The client is shared with the detector; its messages name Ollama,
-            # not detection, so they are kept as they are.
+        except LlmError as exc:
+            # The client's messages name Ollama, so they are kept as they are.
             raise TitleError(str(exc)) from exc
         try:
             return ClipTitle.model_validate_json(reply)

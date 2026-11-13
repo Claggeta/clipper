@@ -114,6 +114,9 @@ and planned code:
   rejected excerpts from other videos in the system prompt; on four VODs
   at top 10, keepers 29 to 25 (27), rejects 11 to 12; the examples
   reshuffled the top 10 rather than sharpening it.
+  Shared client amendment (V7 4): `OllamaClient` and `TextGenerator` in
+  `adapters/llm/ollama.py`, raising `LlmError`, which the detector and
+  title writer turn into their own errors with the message kept.
   Drafts defaults amendment (V5 11): `drafts` uses the LLM and `--top N`
   (default 10, `CLIPPER_TOP_N` not used); `analyze` and `eval` keep the
   heuristic and top 5. Judged keepers at top 10 on three VODs: LLM 18,
@@ -1230,8 +1233,9 @@ in item 7 may land any time.
      keys `[`, `]`, Esc; Cut silence keeps manual cuts; manual step RV16)
    - 3b. ~~Drag a range on the film strip to cut it. Manual step.~~
      (done; over 4 px is a drag, a click still seeks; RV16 steps 9, 10)
-4. Move `OllamaClient` to a shared adapter module with its own error,
-   behaviour-neutral (Parked), before item 5 changes the prompt.
+4. ~~Move `OllamaClient` to a shared adapter module with its own error,
+   behaviour-neutral (Parked), before item 5 changes the prompt.~~ (done;
+   `adapters/llm/ollama.py`, `LlmError`; ADR 0014 amendment)
 5. A finer LLM score (Parked): a scoring rubric in the prompt, so scores
    stop clustering on round values; token probabilities only if Ollama
    returns them (unverified). Measured on the judged VODs at top 10
@@ -1364,11 +1368,6 @@ Later, not scheduled:
   An ADR 0016 amendment. Scheduled as V7 item 7c.
 - `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
   temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.
-- `OllamaClient` lives in `adapters/detection/` but titles use it too, so
-  `adapters/titles/` imports across adapters, and the client raises
-  `DetectionError`, which the title writer re-raises as `TitleError`. Fix:
-  move it to a shared adapter module with its own error, behaviour-neutral.
-  Scheduled as V7 item 4.
 - Title quality after the prompt fix (#114, `qwen3.5:9b`): lengths are
   within the limits on 35 clips, but one clip keeps "Ass" in its title under
   every prompt tried, and some hooks misstate the speaker or may add details

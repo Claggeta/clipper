@@ -1,5 +1,4 @@
 import logging
-from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -9,7 +8,8 @@ from clipper.adapters.detection.windows import (
     select_top,
     sliding_windows,
 )
-from clipper.domain.errors import DetectionError
+from clipper.adapters.llm.ollama import TextGenerator
+from clipper.domain.errors import DetectionError, LlmError
 from clipper.domain.models import ClipCandidate, Segment, Transcript
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,6 @@ SYSTEM_PROMPT = (
 _PROGRESS_EVERY = 50
 # Enough of a bad reply to see what went wrong.
 _REPLY_LIMIT = 200
-
-
-class TextGenerator(Protocol):
-    """Returns a model's raw reply to one prompt, constrained to a JSON schema."""
-
-    def generate(self, system: str, prompt: str, schema: dict[str, object]) -> str: ...
 
 
 class WindowScore(BaseModel):
@@ -81,7 +75,11 @@ class LlmClipDetector:
     def _score(self, window: tuple[Segment, ...]) -> ClipCandidate:
         start, end = window[0].start_seconds, window[-1].end_seconds
         text = " ".join(s.text.strip() for s in window)
-        reply = self._generator.generate(SYSTEM_PROMPT, text, _SCHEMA)
+        try:
+            reply = self._generator.generate(SYSTEM_PROMPT, text, _SCHEMA)
+        except LlmError as exc:
+            # The client's messages name Ollama, so they are kept as they are.
+            raise DetectionError(str(exc)) from exc
         try:
             verdict = WindowScore.model_validate_json(reply)
         except ValidationError as exc:

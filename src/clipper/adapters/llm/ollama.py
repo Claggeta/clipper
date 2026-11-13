@@ -1,8 +1,9 @@
 import json
 import urllib.error
 import urllib.request
+from typing import Protocol
 
-from clipper.domain.errors import DetectionError
+from clipper.domain.errors import LlmError
 
 # Per request. The first request also loads the model into memory.
 TIMEOUT_SECONDS = 120.0
@@ -12,10 +13,18 @@ SEED = 0
 _BODY_LIMIT = 300
 
 
+class TextGenerator(Protocol):
+    """Returns a model's raw reply to one prompt, constrained to a JSON schema."""
+
+    def generate(self, system: str, prompt: str, schema: dict[str, object]) -> str: ...
+
+
 class OllamaClient:
     """Sends one prompt at a time to a local Ollama server. See docs/decisions/0014.
 
-    Uses the standard library only, so no HTTP client dependency is added.
+    Shared by the LLM detector and the title writer, each of which turns
+    its `LlmError` into its own error with the message kept. Uses the
+    standard library only, so no HTTP client dependency is added.
     """
 
     def __init__(
@@ -48,19 +57,17 @@ class OllamaClient:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:
                 body: bytes = response.read()
         except urllib.error.HTTPError as exc:
-            raise DetectionError(self._http_failure(exc)) from exc
+            raise LlmError(self._http_failure(exc)) from exc
         except urllib.error.URLError as exc:
             if isinstance(exc.reason, TimeoutError):
-                raise DetectionError(self._timed_out()) from exc
-            raise DetectionError(
+                raise LlmError(self._timed_out()) from exc
+            raise LlmError(
                 f"Cannot reach Ollama at {self._url}: {exc.reason}. Is it running?"
             ) from exc
         except TimeoutError as exc:
-            raise DetectionError(self._timed_out()) from exc
+            raise LlmError(self._timed_out()) from exc
         except OSError as exc:
-            raise DetectionError(
-                f"Request to Ollama at {self._url} failed: {exc}"
-            ) from exc
+            raise LlmError(f"Request to Ollama at {self._url} failed: {exc}") from exc
         return self._reply(body)
 
     def _timed_out(self) -> str:
@@ -96,7 +103,7 @@ class OllamaClient:
             data = None
         reply = data.get("response") if isinstance(data, dict) else None
         if not isinstance(reply, str):
-            raise DetectionError(
+            raise LlmError(
                 f"Unexpected response from Ollama at {self._url}: "
                 f"{text.strip()[:_BODY_LIMIT]!r}"
             )

@@ -308,6 +308,23 @@ labels. Fixed examples do not help this model; examples chosen per window
 by similarity (ADR 0026 decision 5) are a separate idea, after item 5's
 embeddings.
 
+## Amended by the shared client move (V7 item 4)
+
+Behaviour-neutral. The title writer (0018) used the detector's client, so
+`adapters/titles/` imported from `adapters/detection/`, and the client
+raised `DetectionError`, which titles re-raised as `TitleError`.
+
+- `OllamaClient` and the `TextGenerator` Protocol moved to
+  `adapters/llm/ollama.py`; the "Two classes" decision above stands with
+  that path.
+- The client raises `LlmError` (`domain/errors.py`). `LlmClipDetector`
+  turns it into `DetectionError` and the title writer into `TitleError`,
+  each with the message unchanged, so every command prints what it did
+  before. Requests, timeouts and the payload are unchanged; no manual
+  step.
+- The Parked `done_reason` note (a reply cut off at the length limit
+  reads as `not a valid score ... (got '')`) is not part of this move.
+
 ## Related
 
 - 0012: evaluation
