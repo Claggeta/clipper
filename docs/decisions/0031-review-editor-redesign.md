@@ -142,6 +142,29 @@ asked for a chat box that turns a described edit into the page's edits.
   change. Checked in headless Edge at 1600x900 (no page scroll) and
   1000x800 (stacked); manual step RV17.
 
+## Amended by the keys PR (V7 item 9c)
+
+- `static/keys.js`, loaded after `app.js` and served from the fixed path
+  list, holds every key; the first split of the page script. The scripts
+  share one global scope, so a test checks that no function or top-level
+  `const`/`let` is declared twice across them.
+- Keys: Space or K play or pause the player shown; J and L 5 s (Shift
+  1 s); `,` and `.` one frame of 1/30 s (the page does not know the
+  frame rate); I and O set start and end; P Preview span; `[`, `]`, Esc
+  cuts (moved from `app.js`); 1 and 2 rate; S or Ctrl+S Save; Delete
+  Trash (twice); ↓ or N and ↑ or Shift+N move between clips; D switches
+  Source and Draft (only with a draft); A Add clip; T Add text; `?` the
+  list. Keys press the page's own buttons, so disabled buttons stay
+  disabled. Backspace is not Trash, so a stray key cannot arm it.
+- Nothing happens while typing in a box; Esc leaves it. A handled key's
+  default is prevented, so Space does not also press a focused button.
+- Move on: after a Save that wrote its label and render, or a Trash, the
+  page selects the next clip without a verdict after it (wrapping), and
+  says so; "Move on after Save/Trash" turns it off, kept in local
+  storage. `app.js` announces a `judged` event; `keys.js` acts on it only
+  if that clip is still shown.
+- Checked in headless Edge with real key presses; manual step RV18.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

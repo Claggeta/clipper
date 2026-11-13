@@ -413,7 +413,9 @@ and planned code:
   Layout amendment (9b): a CSS grid, `Source`/`Draft` switch until 9e,
   `Clip`, `Text` and `Frame` tabs, trim and cut buttons in the timeline
   bar, tab and hidden list in local storage, stacked below 1200 px;
-  manual step RV17.
+  manual step RV17. Keys amendment (9c): `static/keys.js`, keys press
+  the page's buttons, nothing while typing, move on to the next clip
+  without a verdict after Save or Trash (a box turns it off); RV18.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1311,8 +1313,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9b. ~~Layout: clip list, preview, inspector tabs and timeline on one
      screen; no behaviour change.~~ (done; `Source`/`Draft` switch until
      9e, three tabs, manual step RV17)
-   - 9c. Keys: play, J/K/L, frame step, start and end, cuts, rating,
-     Save, Trash, next and previous, auto-advance, a `?` list.
+   - 9c. ~~Keys: play, J/K/L, frame step, start and end, cuts, rating,
+     Save, Trash, next and previous, auto-advance, a `?` list.~~ (done;
+     `static/keys.js`, manual step RV18)
    - 9d. Precision: a waveform from cached ffmpeg peaks, frame stepping,
      snapping to word edges, timeline zoom below a second.
    - 9e. Live preview: the span through its cuts, framed as the style,

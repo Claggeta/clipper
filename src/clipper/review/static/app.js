@@ -44,6 +44,7 @@ let current = null;
 // Keyed by `clip.key`: the rank, or `new-<n>` for a clip added in the page,
 // which keeps its key once Save gives it a rank.
 const buttons = new Map(); // key -> the clip's button in the list
+const clipsByKey = new Map(); // key -> the clip, for moving between clips
 const edits = new Map(); // key -> {start, end}, kept while the page is open
 const chosen = new Map(); // key -> the style picked and not yet saved
 const versions = new Map(); // key -> bumped after a Save, so the draft reloads
@@ -1024,24 +1025,6 @@ function dropCutIn() {
 document.getElementById("cut-in-button").addEventListener("click", markCutIn);
 document.getElementById("cut-out-button").addEventListener("click", markCutOut);
 
-// `[` and `]` for Cut in and out, Esc to drop a Cut in; not while typing.
-document.addEventListener("keydown", (event) => {
-  const target = event.target;
-  const typing =
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable);
-  if (typing || event.ctrlKey || event.metaKey || event.altKey || !current) {
-    return;
-  }
-  const action = { "[": markCutIn, "]": markCutOut, Escape: dropCutIn }[event.key];
-  if (action) {
-    event.preventDefault();
-    action();
-  }
-});
-
 // --- Save and Trash ---
 
 function judgeNotice(message, failed = false) {
@@ -1139,8 +1122,12 @@ saveButton.addEventListener("click", async () => {
     });
     clip.isNew = false;
     judged(clip, reply);
+    const [message, failed] = savedMessage(reply, rendered);
     if (clip === current) {
-      judgeNotice(...savedMessage(reply, rendered));
+      judgeNotice(message, failed);
+    }
+    if (!failed) {
+      announceJudged(clip, message);
     }
   } catch (error) {
     if (clip === current) {
@@ -1152,6 +1139,11 @@ saveButton.addEventListener("click", async () => {
     drawJudged(current);
   }
 });
+
+// A Save or Trash went through; keys.js may move on to the next clip.
+function announceJudged(clip, message) {
+  document.dispatchEvent(new CustomEvent("judged", { detail: { clip, message } }));
+}
 
 function disarmTrash() {
   clearTimeout(trashArmed);
@@ -1179,10 +1171,12 @@ trashButton.addEventListener("click", async () => {
     });
     if (reply.removed !== undefined) {
       removeClip(clip);
+      announceJudged(clip, "Removed the added clip.");
       return;
     }
     judged(clip, reply);
     judgeNotice("Trashed; the clip's files are deleted.");
+    announceJudged(clip, "Trashed; the clip's files are deleted.");
   } catch (error) {
     judgeNotice(error.message, true);
   }
@@ -1193,6 +1187,7 @@ trashButton.addEventListener("click", async () => {
 function removeClip(clip) {
   buttons.get(clip.key).closest("li").remove();
   buttons.delete(clip.key);
+  clipsByKey.delete(clip.key);
   edits.delete(clip.key);
   if (clip === current) {
     current = null;
@@ -1226,6 +1221,7 @@ function addListItem(clip) {
   item.append(button);
   list.append(item);
   buttons.set(clip.key, button);
+  clipsByKey.set(clip.key, clip);
   drawBadge(clip);
   return button;
 }

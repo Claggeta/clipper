@@ -63,6 +63,7 @@ _CHUNK = 1024 * 1024
 _STATIC = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 # A film strip frame, at a whole second: /frames/<video key>/<second>.jpg.

@@ -2922,6 +2922,43 @@ browser window at 1600x900 or larger, then again narrower than 1200 px.
 
 Then delete the scratch folders.
 
+### RV18. Keys
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s keys
+amendment (V7 item 9c). Same scratch copy and labels dir as RV12, with at
+least two clips not yet judged.
+
+1. Press `?`. Pass: the keys list; `Esc` closes it. The `?` button in
+   the bar opens it too.
+2. With no clip chosen, press `↓`. Pass: the first clip is chosen. `N`
+   and `↓` go down the list, `Shift+N` and `↑` go up, and the list
+   scrolls to keep the clip in view.
+3. Press `Space`, then `K`. Pass: the source plays, then pauses. `L` and
+   `J` move 5 s on and back, `Shift+L` and `Shift+J` 1 s; `.` and `,`
+   move one frame and pause.
+4. Press `I`, play on a few seconds, press `O`. Pass: the handles move to
+   those times and `Unsaved` shows. `P` plays the span. `[`, `]` and `Esc`
+   cut as in RV16.
+5. Press `1`. Pass: `Good` is pressed; `1` again clears it; `2` presses
+   `OK`.
+6. Press `D` on a clip with a draft. Pass: the draft shows, and `Space`
+   plays it. `D` again shows the source. On a trashed clip `D` does
+   nothing.
+7. Click in the title box and type `sd1`. Pass: the letters are typed and
+   nothing else happens. Press `Esc`, then `T`. Pass: the box is left, and
+   a text row is added on the `Text` tab.
+8. Press `Delete`. Pass: `Confirm trash`; it goes back to `Trash` after
+   3 s. Press `Delete` twice on a clip you can lose. Pass: it is trashed,
+   and the page moves to the next clip without a verdict, saying "On to
+   <name>".
+9. Rate a clip and press `S` (or `Ctrl+S`; the browser's save dialog
+   must not open). Pass: it saves, then moves on as in step 8. Untick
+   `Move on after Save/Trash`, reload, and save another. Pass: the box is
+   still unticked and the page stays on that clip.
+10. Press `A`. Pass: a new clip at the playhead, as `Add clip here`.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

@@ -12,6 +12,7 @@
     <h1>Clipper Review</h1>
     <span id="source" class="muted"></span>
     <span id="flags" class="flags"></span>
+    <button type="button" id="keys-open" class="icon" title="Keys ( ? )">?</button>
   </header>
   <!-- One screen (ADR 0031): the clip list, the player, the inspector and
        the timeline. Below about 1200 px wide they stack. -->
@@ -106,6 +107,7 @@
             <button type="button" id="save" class="primary">Save</button>
             <button type="button" id="trash" class="danger">Trash</button>
           </div>
+          <label class="move-on"><input type="checkbox" id="move-on" checked> Move on after Save/Trash</label>
           <p id="judge-notice" class="judge-notice" role="status"></p>
         </div>
       </form>
@@ -144,6 +146,31 @@
       </section>
     </div>
   </div>
+  <div id="keys-help" class="keys-help" role="dialog" aria-label="Keys" hidden>
+    <div class="keys-card">
+      <h2>Keys</h2>
+      <dl>
+        <dt><kbd>Space</kbd> <kbd>K</kbd></dt><dd>Play or pause</dd>
+        <dt><kbd>J</kbd> <kbd>L</kbd></dt><dd>Back or on 5 s (with <kbd>Shift</kbd>, 1 s)</dd>
+        <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>Back or on one frame</dd>
+        <dt><kbd>I</kbd> <kbd>O</kbd></dt><dd>Set start or end at the playhead</dd>
+        <dt><kbd>P</kbd></dt><dd>Preview span</dd>
+        <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Cut in, cut out (<kbd>Esc</kbd> drops a cut in)</dd>
+        <dt><kbd>1</kbd> <kbd>2</kbd></dt><dd>Rate Good or OK (again to clear)</dd>
+        <dt><kbd>S</kbd> <kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save</dd>
+        <dt><kbd>Delete</kbd></dt><dd>Trash (twice to confirm)</dd>
+        <dt><kbd>↓</kbd> <kbd>N</kbd></dt><dd>Next clip</dd>
+        <dt><kbd>↑</kbd> <kbd>Shift</kbd>+<kbd>N</kbd></dt><dd>Previous clip</dd>
+        <dt><kbd>D</kbd></dt><dd>Source or draft</dd>
+        <dt><kbd>A</kbd></dt><dd>Add clip here</dd>
+        <dt><kbd>T</kbd></dt><dd>Add text</dd>
+        <dt><kbd>?</kbd></dt><dd>This list (<kbd>Esc</kbd> closes it)</dd>
+      </dl>
+      <p class="muted">Keys do nothing while typing in a box; <kbd>Esc</kbd> leaves the box.</p>
+      <button type="button" id="keys-close">Close</button>
+    </div>
+  </div>
   <script src="/app.js"></script>
+  <script src="/keys.js"></script>
 </body>
 </html>
