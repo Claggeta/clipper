@@ -460,6 +460,11 @@ sizes as `layout`. Manual step RV20.
 highlight colour) and stores them on the judged label and manifest clip;
 `/api/captions` takes `&edits=` as JSON. Manual step RV21.
 
+## Amended by text styling (ADR 0030 and 0031, V7 item 9g)
+
+Save's texts may carry `colour`, `look`, `size`, `fade`, `x` and `y`;
+the page's texts and `/api/clips` carry them back. Manual step RV22.
+
 ## Related
 
 - 0011: render's failure policy

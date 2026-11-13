@@ -10,6 +10,7 @@ from clipper.domain.models import (
     AnalysisResult,
     ClipLink,
     LabeledVideo,
+    OnScreenText,
     Span,
     format_timestamp,
 )
@@ -39,6 +40,15 @@ def load_labels(path: Path) -> LabeledVideo:
         ) from exc
 
 
+# Always written for a text; its look only when not the default (ADR 0030).
+_TEXT_FIELDS = ("text", "start_seconds", "end_seconds", "place")
+
+
+def _text(text: OnScreenText) -> dict[str, object]:
+    entry: dict[str, object] = {name: getattr(text, name) for name in _TEXT_FIELDS}
+    return entry | text.model_dump(exclude_defaults=True)
+
+
 def save_labels(labeled: LabeledVideo, path: Path) -> None:
     """Write a labels file in the hand-written format, times as "H:MM:SS".
 
@@ -62,7 +72,7 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
         if label.cuts:
             entry["cuts"] = [_span(cut) for cut in label.cuts]
         if label.texts:
-            entry["texts"] = [text.model_dump() for text in label.texts]
+            entry["texts"] = [_text(text) for text in label.texts]
         if label.caption_edits is not None:
             entry["caption_edits"] = label.caption_edits.model_dump()
         if label.note is not None:

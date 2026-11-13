@@ -41,10 +41,24 @@ HIGHLIGHTS = {
 }
 
 
+# On-screen text colours (ADR 0030, styling amendment): white, then the
+# highlights.
+TEXT_COLOURS = {"white": "#FFFFFF", **HIGHLIGHTS}
+# A text's size against the large one, the original (ADR 0030).
+TEXT_SIZES = {"large": 1.0, "medium": 0.8, "small": 0.65}
+# A text's fade in, in milliseconds.
+TEXT_FADE_MS = 300
+
+
+def _bgr(rgb: str) -> str:
+    """ASS's `&H00BBGGRR` for `#RRGGBB`."""
+    hex_ = rgb.removeprefix("#")
+    return f"&H00{hex_[4:6]}{hex_[2:4]}{hex_[0:2]}"
+
+
 def _colour_tag(name: str) -> str:
     """`{\\c&HBBGGRR&}`, ASS's colour override, for a highlight name."""
-    rgb = HIGHLIGHTS[name].removeprefix("#")
-    return f"{{\\c&H00{rgb[4:6]}{rgb[2:4]}{rgb[0:2]}&}}"
+    return f"{{\\c{_bgr(HIGHLIGHTS[name])}&}}"
 
 
 _HIGHLIGHT = _colour_tag("yellow")
@@ -125,7 +139,7 @@ def _clean(text: str) -> str:
     return " ".join(text.translate(_MARKUP).split())
 
 
-def _text_style(layout: _Layout, text: _TextLayout) -> str:
+def _text_style(layout: _Layout, text: _TextLayout, outline: bool = False) -> str:
     """The on-screen text's style: bold white on one half-dark box.
 
     BorderStyle 3 draws a box per line, padded by the outline, so wrapped
@@ -136,12 +150,13 @@ def _text_style(layout: _Layout, text: _TextLayout) -> str:
     return ",".join(
         str(v)
         for v in (
-            "Text",
+            "TextOutline" if outline else "Text",
             _FONT,
             text.font_size,
             _WHITE,
             _WHITE,
-            _CLEAR,  # no outline round the letters
+            # The outline look's black edge, or none round the box's letters.
+            _BLACK if outline else _CLEAR,
             _HALF_BLACK,  # the box
             -1,  # bold
             0,
@@ -151,8 +166,8 @@ def _text_style(layout: _Layout, text: _TextLayout) -> str:
             100,
             0,
             0,
-            4,  # one box per event
-            text.padding,
+            1 if outline else 4,  # an outline, or one box per event
+            layout.outline if outline else text.padding,
             0,
             8,  # top centre; each event sets its own point
             layout.margin_h,
@@ -163,7 +178,9 @@ def _text_style(layout: _Layout, text: _TextLayout) -> str:
     )
 
 
-def _header(layout: _Layout, text: _TextLayout | None = None) -> str:
+def _header(
+    layout: _Layout, text: _TextLayout | None = None, outline: bool = False
+) -> str:
     style = ",".join(
         str(v)
         for v in (
@@ -207,6 +224,7 @@ def _header(layout: _Layout, text: _TextLayout | None = None) -> str:
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: {style}\n"
         + (f"Style: {_text_style(layout, text)}\n" if text else "")
+        + (f"Style: {_text_style(layout, text, True)}\n" if text and outline else "")
         + "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
@@ -371,6 +389,10 @@ def preview_layout(vertical: bool) -> dict[str, object]:
         "text_top": list(text.top),
         "text_middle": list(text.middle),
         "highlights": HIGHLIGHTS,
+        "text_colours": TEXT_COLOURS,
+        "text_sizes": TEXT_SIZES,
+        "text_outline": layout.outline,
+        "text_fade_ms": TEXT_FADE_MS,
     }
 
 
@@ -431,28 +453,48 @@ def build_ass(
             events.extend(_word_events(chunk, highlight))
     speech = bool(events)
     text_layout = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
+    layout = _VERTICAL if vertical else _SOURCE
     length = round(time_map.duration) if time_map else clip_end - clip_start
-    shown = [e for t in texts if (e := _text_event(t, text_layout, length))]
-    events.extend(shown)
+    pairs = [
+        (t, e) for t in texts if (e := _text_event(t, text_layout, layout, length))
+    ]
+    events.extend(event for _, event in pairs)
     if not events:
         return Captions("", from_segments=False)
-    layout = _VERTICAL if vertical else _SOURCE
-    header = _header(layout, text_layout if shown else None)
+    outlined = any(t.look == "outline" for t, _ in pairs)
+    header = _header(layout, text_layout if pairs else None, outlined)
     return Captions(header + "".join(events), from_segments, speech)
 
 
-def _text_event(text: OnScreenText, layout: _TextLayout, length: int) -> str | None:
+def _text_event(
+    text: OnScreenText, layout: _TextLayout, canvas: _Layout, length: int
+) -> str | None:
     """One on-screen text as a Dialogue line on the layer above captions,
-    pinned to its place so libass does not move it out of another's way."""
+    pinned to its place (or its own `x`, `y`, centred there) so libass does
+    not move it out of another's way. Its colour, size and fade are
+    override tags, and the outline look its own style; the default look
+    adds no tags (ADR 0030, styling amendment)."""
     start = _to_ms(text.start_seconds)
     end = min(_to_ms(text.end_seconds), length)
     words = _clean(text.text)
     if start >= length or not words or _centis(end) <= _centis(start):
         return None
-    align, (x, y) = (8, layout.top) if text.place == "top" else (5, layout.middle)
+    if text.x is not None and text.y is not None:
+        align = 5
+        x, y = round(text.x * canvas.width), round(text.y * canvas.height)
+    else:
+        align, (x, y) = (8, layout.top) if text.place == "top" else (5, layout.middle)
+    tags = f"\\an{align}\\pos({x},{y})"
+    if text.colour != "white":
+        tags += f"\\c{_bgr(TEXT_COLOURS[text.colour])}&"
+    if text.size != "large":
+        tags += f"\\fs{round(layout.font_size * TEXT_SIZES[text.size])}"
+    if text.fade:
+        tags += f"\\fad({TEXT_FADE_MS},0)"
+    style = "TextOutline" if text.look == "outline" else "Text"
     return (
-        f"Dialogue: 1,{_timestamp(start)},{_timestamp(end)},Text,,0,0,0,,"
-        f"{{\\an{align}\\pos({x},{y})}}{words}\n"
+        f"Dialogue: 1,{_timestamp(start)},{_timestamp(end)},{style},,0,0,0,,"
+        f"{{{tags}}}{words}\n"
     )
 
 

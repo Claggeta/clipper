@@ -130,6 +130,30 @@ cuts since 0029.
   recorded here rather than checked at startup. Manual steps RV13 step 7
   and RV14 step 6.
 
+## Amended by text styling (V7 item 9g, ADR 0031)
+
+- Each text may have a colour (white, yellow, green, cyan, pink,
+  orange), a look (`box`, the half-dark box, or `outline`, a black edge
+  and no box), a size (`large`, the original, `medium` 0.8, `small`
+  0.65), a 0.3 s fade in, and a position of its own: `x` and `y`,
+  fractions of the frame for its centre, set by dragging it on the
+  review page's live preview. This reverses decision 1's two places
+  only and the "free placement" alternative, at the maintainer's ask;
+  `place` stays for texts not dragged.
+- `OnScreenText` gains `colour`, `look`, `size`, `fade`, `x`, `y`, all
+  defaulting to the original look; the labels file writes them only when
+  not the default, so older labels and unstyled texts are written as
+  before. The default look adds no override tags, so its burn-in is
+  unchanged.
+- In the ASS: `\\an5\\pos` at the fraction of the canvas for a dragged
+  text, `\\c`, `\\fs` and `\\fad(300,0)` per event, and a second
+  `TextOutline` style (BorderStyle 1, black edge, the captions' outline
+  width), added only when a text uses it, since libass cannot switch box
+  and outline per event.
+- Thumbnails keep their text and place only. Checked on v2924392099: a
+  pink, outlined, medium, faded, dragged text burned where the preview
+  showed it. Manual step RV22.
+
 ## Revisit when
 
 - The ffmpeg build changes to one with an older libass (RV13 step 7).

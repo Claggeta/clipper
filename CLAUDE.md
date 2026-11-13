@@ -397,6 +397,9 @@ and planned code:
   draft, manual step RV13. Thumbnails amendment: `ClipRenderer.still`,
   `POST /api/clips/<rank>/thumbnail` in the style shown (fit when no face),
   `ManifestClip.thumbnail`, deleted by Trash, listed by the queue; RV14.
+  Styling amendment (V7 9g): per text a colour of six, `box` or
+  `outline` (a `TextOutline` style), large, medium or small, a 0.3 s fade
+  and a free `x`/`y` dragged on the preview; defaults burn as before.
   One box amendment (V7 7e): `BorderStyle 4`, one box behind a wrapped
   text (per-line boxes overlapped darker), outline colour clear; needs
   libass 0.17 or newer.
@@ -433,6 +436,9 @@ and planned code:
   Caption editing amendment (9f): a Captions tab of word chips by chunk,
   fixes, hidden words, key words and a highlight colour (`CaptionEdits`,
   ADR 0017 amendment), previewed and burned; `static/captions.js`; RV21.
+  Text styling amendment (9g): colour, box or outline, size, fade and a
+  dragged position per text (ADR 0030 amendment); preview lines balanced
+  as libass wraps them; RV22.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1342,8 +1348,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9f. ~~Caption editing: fix a word's text (time kept), key words and a
      highlight colour. ADR 0017 amendment.~~ (done; hidden words too;
      manual step RV21)
-   - 9g. Text styling: colour, box or outline, size, fade-in, free
-     position by dragging. ADR 0030 amendment.
+   - 9g. ~~Text styling: colour, box or outline, size, fade-in, free
+     position by dragging. ADR 0030 amendment.~~ (done; manual step
+     RV22)
    - 9h. Zoom and reframing: punch-ins over a range, a crop set by hand.
      ADR 0016 and 0025 amendments.
    - 9i. Audio: clip volume, a music bed lowered under speech, sound

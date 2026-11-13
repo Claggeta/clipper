@@ -464,3 +464,57 @@ def test_fixes_that_match_no_word_change_nothing() -> None:
 def test_the_preview_layout_lists_the_highlight_colours() -> None:
     assert preview_layout(True)["highlights"] == HIGHLIGHTS
     assert HIGHLIGHTS["yellow"] == "#FFFF00"
+
+
+# --- Text styling (ADR 0030, styling amendment) ---
+
+
+def _styled(**look: object) -> OnScreenText:
+    return OnScreenText.model_validate(
+        {"text": "Hook", "start_seconds": 0.0, "end_seconds": 3.0, **look}
+    )
+
+
+def _text_lines(captions: Captions) -> list[str]:
+    return [line for line in captions.text.splitlines() if ",Text" in line]
+
+
+def test_the_default_look_adds_no_tags_and_no_outline_style() -> None:
+    captions = build_ass(
+        Transcript(segments=()), _c(10.0, 20.0), vertical=True, texts=(_styled(),)
+    )
+    assert _text_lines(captions) == [
+        "Dialogue: 1,0:00:00.00,0:00:03.00,Text,,0,0,0,,{\\an8\\pos(540,300)}Hook"
+    ]
+    assert "TextOutline" not in captions.text
+
+
+def test_a_styled_text_has_its_colour_size_fade_and_position() -> None:
+    text = _styled(colour="pink", size="small", fade=True, x=0.25, y=0.75)
+    [line] = _text_lines(
+        build_ass(Transcript(segments=()), _c(10.0, 20.0), vertical=True, texts=(text,))
+    )
+    # Centred on a quarter of 1080 across and three quarters of 1920 down;
+    # pink #FF4FD8 as BGR; 84 * 0.65 = 55; a 300 ms fade in.
+    assert line.endswith(
+        ",Text,,0,0,0,,{\\an5\\pos(270,1440)\\c&H00D84FFF&\\fs55\\fad(300,0)}Hook"
+    )
+
+
+def test_an_outlined_text_uses_its_own_style() -> None:
+    captions = build_ass(
+        Transcript(segments=()),
+        _c(10.0, 20.0),
+        vertical=False,
+        texts=(_styled(look="outline", place="middle"),),
+    )
+    styles = [
+        line for line in captions.text.splitlines() if line.startswith("Style: Text")
+    ]
+    # The box style and the outline one: black edge, BorderStyle 1, the
+    # captions' outline width.
+    assert len(styles) == 2
+    fields = styles[1].removeprefix("Style: ").split(",")
+    assert fields[0] == "TextOutline"
+    assert (fields[5], fields[15], fields[16]) == ("&H00000000", "1", "5")
+    assert _text_lines(captions)[0].split(",")[3] == "TextOutline"

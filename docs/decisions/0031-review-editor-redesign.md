@@ -242,6 +242,19 @@ asked for a chat box that turns a described edit into the page's edits.
   `captionsChanged` clash stopped `preview.js` loading in testing).
   Manual step RV21.
 
+## Amended by the text styling PR (V7 item 9g)
+
+- Each text row in the Text tab has colour swatches, Box or Outline,
+  Large, Medium or Small, and Fade in; its place menu gains Custom once
+  the text is dragged, and Top or Middle puts it back.
+- The preview draws the look and records where each text is; a press on
+  a text and a drag of over 4 px moves it (its centre snaps to the middle
+  within 2% of the width), any other press plays or pauses.
+- Wrapped captions and texts in the preview now balance their lines as
+  libass's smart wrapping does (as few as greedy wrapping, the top line
+  the wider); 9e's preview filled the first line instead. Manual step
+  RV22.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

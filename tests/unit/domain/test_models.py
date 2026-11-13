@@ -14,6 +14,7 @@ from clipper.domain.models import (
     LabeledVideo,
     ManifestClip,
     MediaInfo,
+    OnScreenText,
     RenderedClip,
     Segment,
     Transcript,
@@ -731,3 +732,35 @@ def test_caption_edits_tidy_fixes_and_say_when_they_change_nothing() -> None:
 def test_bad_caption_edits_are_refused(data: dict[str, object], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         CaptionEdits.model_validate(data)
+
+
+# --- Text styling (ADR 0030, styling amendment) ---
+
+
+def test_a_text_defaults_to_the_original_look() -> None:
+    text = OnScreenText(text="Hook", start_seconds=0, end_seconds=3)
+    assert (text.colour, text.look, text.size, text.fade, text.x, text.y) == (
+        "white",
+        "box",
+        "large",
+        False,
+        None,
+        None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("look", "message"),
+    [
+        ({"x": 0.5}, "both x and y"),
+        ({"x": 1.2, "y": 0.5}, "less than or equal to 1"),
+        ({"colour": "purple"}, "Input should be"),
+        ({"size": "huge"}, "Input should be"),
+        ({"look": "shadow"}, "Input should be"),
+    ],
+)
+def test_a_bad_text_look_is_refused(look: dict[str, object], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        OnScreenText.model_validate(
+            {"text": "Hook", "start_seconds": 0, "end_seconds": 3, **look}
+        )
