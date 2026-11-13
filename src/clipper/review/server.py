@@ -111,6 +111,8 @@ _ACTION_PATH = re.compile(r"/api/clips/(\d{1,4})/(save|trash|thumbnail)")
 _THUMB_PATH = re.compile(r"/thumbs/([^/\\]+\.jpg)")
 _ADD_PATH = "/api/clips/add"
 _MAX_BODY = 64 * 1024
+# A refused body is read and dropped up to this size before the reply.
+_MAX_DRAIN = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -611,11 +613,23 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             except ValueError as exc:
                 raise BadRequest("a Content-Length is needed") from exc
             if not 0 <= length <= _MAX_BODY:
+                self._drain(length)
                 raise BadRequest(f"the body must be at most {_MAX_BODY} bytes")
             try:
                 return json.loads(self.rfile.read(length))
             except (ValueError, UnicodeDecodeError) as exc:
                 raise BadRequest("the body is not valid JSON") from exc
+
+        def _drain(self, length: int) -> None:
+            """Read and drop up to `_MAX_DRAIN` bytes of a body refused for its
+            size, so the client is not cut off mid-send: on Windows that
+            aborts its connection before it reads the 400."""
+            remaining = min(max(length, 0), _MAX_DRAIN)
+            while remaining > 0:
+                chunk = self.rfile.read(min(_CHUNK, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
 
         def _send_json(self, status: HTTPStatus, data: object) -> None:
             body = json.dumps(data).encode("utf-8")
