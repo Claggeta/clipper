@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from clipper.adapters.detection.ollama import SEED, TIMEOUT_SECONDS, OllamaClient
-from clipper.domain.errors import DetectionError
+from clipper.adapters.llm.ollama import SEED, TIMEOUT_SECONDS, OllamaClient
+from clipper.domain.errors import LlmError
 
 # All server responses here are constructed, not captured from a real Ollama
 # server. docs/manual-testing.md checks the real ones.
@@ -83,7 +83,7 @@ def test_trailing_slash_in_url_is_ignored(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_unreachable_server(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch(monkeypatch, urllib.error.URLError(ConnectionRefusedError("refused")))
-    with pytest.raises(DetectionError) as info:
+    with pytest.raises(LlmError) as info:
         _generate()
     assert str(info.value) == f"Cannot reach Ollama at {URL}: refused. Is it running?"
 
@@ -93,7 +93,7 @@ def test_unreachable_server(monkeypatch: pytest.MonkeyPatch) -> None:
 )
 def test_timeout(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
     _patch(monkeypatch, error)
-    with pytest.raises(DetectionError) as info:
+    with pytest.raises(LlmError) as info:
         _generate()
     assert str(info.value) == (
         f"Ollama at {URL} did not answer within 120 s (model 'some-model:tag')"
@@ -102,7 +102,7 @@ def test_timeout(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
 
 def test_other_os_error(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch(monkeypatch, ConnectionResetError("reset"))
-    with pytest.raises(DetectionError, match="Request to Ollama at .* failed: reset"):
+    with pytest.raises(LlmError, match="Request to Ollama at .* failed: reset"):
         _generate()
 
 
@@ -110,7 +110,7 @@ def test_404_passes_on_the_server_error_and_suggests_a_pull(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch(monkeypatch, _http_error(404, b'{"error": "no such model"}'))
-    with pytest.raises(DetectionError) as info:
+    with pytest.raises(LlmError) as info:
         _generate()
     assert str(info.value) == (
         f"Ollama at {URL} returned HTTP 404 for model 'some-model:tag': "
@@ -122,7 +122,7 @@ def test_other_http_error_with_a_non_json_body(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch(monkeypatch, _http_error(500, b"  boom  "))
-    with pytest.raises(DetectionError) as info:
+    with pytest.raises(LlmError) as info:
         _generate()
     assert str(info.value) == (
         f"Ollama at {URL} returned HTTP 500 for model 'some-model:tag': boom"
@@ -133,7 +133,7 @@ def test_http_error_with_an_empty_body_uses_the_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch(monkeypatch, _http_error(500, b""))
-    with pytest.raises(DetectionError, match="HTTP 500 .*: reason$"):
+    with pytest.raises(LlmError, match="HTTP 500 .*: reason$"):
         _generate()
 
 
@@ -142,6 +142,6 @@ def test_http_error_with_an_empty_body_uses_the_reason(
 )
 def test_unexpected_response_body(monkeypatch: pytest.MonkeyPatch, body: bytes) -> None:
     _patch(monkeypatch, body)
-    with pytest.raises(DetectionError) as info:
+    with pytest.raises(LlmError) as info:
         _generate()
     assert str(info.value).startswith(f"Unexpected response from Ollama at {URL}: ")

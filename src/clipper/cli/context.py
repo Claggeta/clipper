@@ -4,12 +4,12 @@ from enum import StrEnum
 
 from clipper.adapters.detection.heuristic import HeuristicClipDetector
 from clipper.adapters.detection.llm import LlmClipDetector
-from clipper.adapters.detection.ollama import OllamaClient
 from clipper.adapters.download.ytdlp import (
     YtDlpClipLookup,
     YtDlpDownloader,
     YtDlpVideoInfoLookup,
 )
+from clipper.adapters.llm.ollama import OllamaClient
 from clipper.adapters.media.faces import (
     TRACKER_NAME,
     CachingFaceTracker,

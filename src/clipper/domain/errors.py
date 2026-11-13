@@ -50,6 +50,10 @@ class DetectionError(ClipperError):
     """Raised when a detector cannot score a transcript."""
 
 
+class LlmError(ClipperError):
+    """Raised when a request to a local LLM fails."""
+
+
 class TitleError(ClipperError):
     """Raised when a title and hook cannot be written for a clip."""
 

@@ -6,7 +6,7 @@ import pytest
 from clipper.adapters.detection.llm import SYSTEM_PROMPT, LlmClipDetector, WindowScore
 from clipper.adapters.detection.windows import sliding_windows
 from clipper.core.interfaces import ClipDetector
-from clipper.domain.errors import DetectionError
+from clipper.domain.errors import DetectionError, LlmError
 from clipper.domain.models import Segment, Transcript
 
 # All replies here are constructed, not produced by a real model.
@@ -111,12 +111,12 @@ def test_invalid_reply_raises_and_names_the_window(reply: str, detail: str) -> N
     assert repr(reply[:200]) in message
 
 
-def test_generator_error_propagates() -> None:
+def test_client_errors_become_detection_errors_with_the_same_message() -> None:
     class Failing:
         def generate(self, system: str, prompt: str, schema: dict[str, object]) -> str:
-            raise DetectionError("Cannot reach Ollama")
+            raise LlmError("Cannot reach Ollama at [url]")
 
-    with pytest.raises(DetectionError, match="Cannot reach Ollama"):
+    with pytest.raises(DetectionError, match=r"^Cannot reach Ollama at \[url\]$"):
         LlmClipDetector(Failing()).detect(_transcript())
 
 
