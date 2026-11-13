@@ -145,3 +145,51 @@ def test_unexpected_response_body(monkeypatch: pytest.MonkeyPatch, body: bytes) 
     with pytest.raises(LlmError) as info:
         _generate()
     assert str(info.value).startswith(f"Unexpected response from Ollama at {URL}: ")
+
+
+# --- A context size for long prompts (ADR 0033) ---
+
+
+def _long(prompt: str = "words", num_ctx: int = 1000) -> str:
+    return OllamaClient(URL, "m").generate("sys", prompt, SCHEMA, num_ctx)
+
+
+def test_a_context_size_is_sent_as_num_ctx(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _patch(
+        monkeypatch, json.dumps({"response": "{}", "prompt_eval_count": 40}).encode()
+    )
+    assert _long() == "{}"
+    [(request, _)] = seen
+    assert json.loads(request.data)["options"] == {
+        "temperature": 0,
+        "seed": SEED,
+        "num_ctx": 1000,
+    }
+
+
+def test_a_prompt_too_long_for_its_context_is_refused_before_sending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen = _patch(monkeypatch, json.dumps({"response": "{}"}).encode())
+    with pytest.raises(LlmError, match="too long for a 1000-token context"):
+        _long("x" * 2800)
+    assert seen == []
+
+
+def test_a_reply_whose_prompt_filled_the_context_is_an_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(
+        monkeypatch, json.dumps({"response": "{}", "prompt_eval_count": 990}).encode()
+    )
+    with pytest.raises(LlmError, match="read 990 prompt tokens, filling its 1000"):
+        _long()
+
+
+def test_without_a_context_size_the_tokens_read_are_not_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(
+        monkeypatch, json.dumps({"response": "{}", "prompt_eval_count": 4096}).encode()
+    )
+    assert _generate() == "{}"

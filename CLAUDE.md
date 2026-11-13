@@ -1425,8 +1425,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
        context dropped the start of the 5,370-token story prompt, so the
        beats request uses `num_ctx` 16384; the maintainer: "Those sound
        good to me")
-     - 9l-2. The core (`core/story.py`), a `StoryWriter` and its Ollama
-       adapter, the client's context size and its check on tokens read.
+     - 9l-2. ~~The core (`core/story.py`), a `StoryWriter` and its Ollama
+       adapter, the client's context size and its check on tokens read.~~
+       (done; the committed code gives round 3's beats in 56 s)
      - 9l-3. The page, server and render, with a manual step.
      - 9l-4. Queue and `posted` for the summary.
 

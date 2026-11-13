@@ -727,6 +727,62 @@ class Combined(BaseModel):
     thumbnail: str | None = None
 
 
+# A VOD's story (ADR 0033): what a part of the stream is to the story.
+NoteKind = Literal[
+    "start", "goal", "progress", "milestone", "setback", "ending", "other"
+]
+
+
+class StoryNote(BaseModel):
+    """The model's note on one chunk of a VOD's transcript (ADR 0033): what
+    happens, its kind, how much it matters (0 to 1), and the time and text
+    of the line that best shows it, as the model gave them."""
+
+    model_config = ConfigDict(frozen=True)
+
+    summary: str
+    kind: NoteKind
+    importance: float = Field(ge=0, le=1)
+    key_time: str
+    key_line: str
+
+
+class BeatChoice(BaseModel):
+    """One beat the model picked from the notes: the part's number, a card
+    for the screen, and why (ADR 0033)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    part: int = Field(ge=1)
+    card: str
+    why: str = ""
+
+
+class StoryBeat(BaseModel):
+    """One beat of a summary: a span of the source with its card (ADR 0033)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    end_seconds: float = Field(allow_inf_nan=False)
+    card: str = ""
+    why: str = ""
+
+    @field_validator("card")
+    @classmethod
+    def _one_short_line(cls, value: str) -> str:
+        card = " ".join(value.split())
+        if len(card) > CARD_LIMIT:
+            raise ValueError(f"a card must be at most {CARD_LIMIT} characters")
+        return card
+
+    @model_validator(mode="after")
+    def _ends_after_start(self) -> "StoryBeat":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("a beat must end after it starts")
+        return self
+
+
 class RenderManifest(BaseModel):
     """What one `render` run wrote to a video's folder. See docs/decisions/0019.
 

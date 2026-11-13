@@ -58,6 +58,10 @@ class LlmError(ClipperError):
     """Raised when a request to a local LLM fails."""
 
 
+class StoryError(ClipperError):
+    """Raised when a VOD's story cannot be planned (ADR 0033)."""
+
+
 class TitleError(ClipperError):
     """Raised when a title and hook cannot be written for a clip."""
 
