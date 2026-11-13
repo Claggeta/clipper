@@ -10,6 +10,7 @@ from clipper.domain.models import (
     ClipInfo,
     ClipLink,
     ClipTitle,
+    CombinedPart,
     Evaluation,
     HandCrop,
     Label,
@@ -19,9 +20,9 @@ from clipper.domain.models import (
     MusicBed,
     OnScreenText,
     RenderedClip,
+    RenderManifest,
     Segment,
     SoundEffect,
-    SummaryPart,
     Transcript,
     VideoSource,
     Word,
@@ -845,12 +846,32 @@ def test_bad_clip_audio_is_refused(data: dict[str, object], message: str) -> Non
         ClipAudio.model_validate(data)
 
 
-# --- Summaries (ADR 0032) ---
+# --- Combined clips (ADR 0032) ---
 
 
-def test_a_summary_part_keeps_a_short_one_line_card() -> None:
-    assert SummaryPart(rank=2, label="  Hour 3 ").label == "Hour 3"
+def test_a_combined_part_keeps_a_short_one_line_card() -> None:
+    assert CombinedPart(rank=2, label="  Hour 3 ").label == "Hour 3"
     with pytest.raises(ValidationError, match="at most 60"):
-        SummaryPart(rank=2, label="x" * 61)
+        CombinedPart(rank=2, label="x" * 61)
     with pytest.raises(ValidationError, match="one line"):
-        SummaryPart(rank=2, label="a\nb")
+        CombinedPart(rank=2, label="a\nb")
+
+
+def test_a_manifest_written_before_the_rename_loads_its_combined_clip() -> None:
+    data: dict[str, object] = {
+        "source": "v.mp4",
+        "analysis": "a.json",
+        "detector": None,
+        "vertical": True,
+        "captions": True,
+        "titles": True,
+        "clips": [],
+        "summary": {
+            "file": "v_summary.mp4",
+            "parts": [{"rank": 1}],
+            "duration_seconds": 40,
+        },
+    }
+    manifest = RenderManifest.model_validate(data)
+    assert manifest.combined is not None and manifest.combined.file == "v_summary.mp4"
+    assert '"combined"' in manifest.model_dump_json()

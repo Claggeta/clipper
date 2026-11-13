@@ -247,7 +247,7 @@ def _get(
         ("/captions.js", "text/javascript", b"caption_edits"),
         ("/frame.js", "text/javascript", b"hand_crops"),
         ("/audio.js", "text/javascript", b"/api/audio"),
-        ("/summary.js", "text/javascript", b"/api/summary"),
+        ("/combine.js", "text/javascript", b"/api/combined"),
         ("/style.css", "text/css", b"--bg"),
     ],
 )
@@ -870,7 +870,7 @@ def test_the_page_scripts_declare_each_function_once() -> None:
             "captions.js",
             "frame.js",
             "audio.js",
-            "summary.js",
+            "combine.js",
             "preview.js",
         )
     )
@@ -1248,37 +1248,37 @@ def test_without_audio_folders_nothing_is_listed(base_url: str) -> None:
     assert json.loads(_get(base_url + "/api/audio")[2]) == {"music": [], "sfx": []}
 
 
-# --- Summaries (ADR 0032) ---
+# --- Combined clips (ADR 0032) ---
 
 
-def test_a_summary_is_made_listed_served_and_trashed(base_url: str) -> None:
+def test_a_combined_is_made_listed_served_and_trashed(base_url: str) -> None:
     status, reply = _post(
-        base_url, "/api/summary", {"parts": [{"rank": 1, "label": "Hour 1"}]}
+        base_url, "/api/combined", {"parts": [{"rank": 1, "label": "Hour 1"}]}
     )
     assert status == 200, reply
     assert (reply["file"], reply["parts"]) == (
-        "talk_summary.mp4",
+        "talk_combined.mp4",
         [{"rank": 1, "label": "Hour 1"}],
     )
     clips = json.loads(_get(base_url + "/api/clips")[2])
-    assert clips["summary"]["file"] == "talk_summary.mp4"
-    assert _get(base_url + "/clips/talk_summary.mp4")[0] == 200
+    assert clips["combined"]["file"] == "talk_combined.mp4"
+    assert _get(base_url + "/clips/talk_combined.mp4")[0] == 200
     status, saved = _post(
-        base_url, "/api/summary/save", {"title": "All of it", "rating": "good"}
+        base_url, "/api/combined/save", {"title": "All of it", "rating": "good"}
     )
     assert (status, saved["title"], saved["rating"]) == (200, "All of it", "good")
-    status, reply = _post(base_url, "/api/summary/trash", {})
+    status, reply = _post(base_url, "/api/combined/trash", {})
     assert (status, reply) == (200, {"removed": True})
-    assert _get(base_url + "/clips/talk_summary.mp4")[0] == 404
+    assert _get(base_url + "/clips/talk_combined.mp4")[0] == 404
 
 
-def test_summary_writes_are_checked(base_url: str) -> None:
-    assert _post(base_url, "/api/summary/save", {"title": "x"})[0] == 409
-    assert _post(base_url, "/api/summary", {"parts": [{"rank": 99}]})[0] == 404
-    assert _post(base_url, "/api/summary", {"parts": "x"})[0] == 400
+def test_combined_writes_are_checked(base_url: str) -> None:
+    assert _post(base_url, "/api/combined/save", {"title": "x"})[0] == 409
+    assert _post(base_url, "/api/combined", {"parts": [{"rank": 99}]})[0] == 404
+    assert _post(base_url, "/api/combined", {"parts": "x"})[0] == 400
     status, _ = _post(
         base_url,
-        "/api/summary",
+        "/api/combined",
         {"parts": [{"rank": 1}]},
         headers={"Origin": "https://evil"},
     )

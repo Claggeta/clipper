@@ -153,7 +153,7 @@ def _mix_graph(
     """ADR 0007, audio amendment. The clip's own sound (cut, then at its
     gain), the music looped from input 1 at its level and faded out at the
     end, ducked under the clip's sound, and each sound effect delayed to
-    its moment, mixed without normalising, as long as the clip. A summary's
+    its moment, mixed without normalising, as long as the clip. A combined clip's
     voice is its joined clips' sound, and its music the input after them
     (ADR 0032)."""
     cut = cut_filter + "," if cut_filter else ""

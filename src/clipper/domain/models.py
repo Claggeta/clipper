@@ -4,7 +4,14 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 _TIMESTAMP = re.compile(r"(?:([0-9]+):)?([0-9]+):([0-9]{2}(?:\.[0-9]+)?)")
 _TIMESTAMP_HINT = 'must be a "M:SS" or "H:MM:SS" string, e.g. "0:50" or "1:02:03"'
@@ -677,14 +684,14 @@ class ManifestClip(BaseModel):
         return self.draft_start_seconds, self.draft_end_seconds
 
 
-# A summary of a VOD's clips (ADR 0032, V7 9k): YouTube Shorts run up to
+# A VOD's clips combined (ADR 0032, V7 9k): YouTube Shorts run up to
 # about this long, so past it the page warns; a label card is one line.
-SUMMARY_LIMIT_SECONDS = 180.0
-SUMMARY_LABEL_LIMIT = 60
+SHORTS_LIMIT_SECONDS = 180.0
+CARD_LIMIT = 60
 
 
-class SummaryPart(BaseModel):
-    """One clip in a summary, by rank, with an optional label card shown
+class CombinedPart(BaseModel):
+    """One clip in a combined clip, by rank, with an optional label card shown
     at its start ("Hour 3")."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -698,14 +705,12 @@ class SummaryPart(BaseModel):
         label = value.strip()
         if "\n" in label or "\r" in label:
             raise ValueError("a label card must be one line")
-        if len(label) > SUMMARY_LABEL_LIMIT:
-            raise ValueError(
-                f"a label card must be at most {SUMMARY_LABEL_LIMIT} characters"
-            )
+        if len(label) > CARD_LIMIT:
+            raise ValueError(f"a label card must be at most {CARD_LIMIT} characters")
         return label
 
 
-class Summary(BaseModel):
+class Combined(BaseModel):
     """A VOD's kept clips joined into one longer Short (ADR 0032): its file
     in the drafts folder, the clips in VOD order with their cards, the
     music under it, its length, and the title, rating and thumbnail set in
@@ -714,7 +719,7 @@ class Summary(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     file: str
-    parts: tuple[SummaryPart, ...] = Field(min_length=1)
+    parts: tuple[CombinedPart, ...] = Field(min_length=1)
     music: MusicBed | None = None
     duration_seconds: float = Field(gt=0)
     title: str | None = None
@@ -728,7 +733,7 @@ class RenderManifest(BaseModel):
     `vertical`, `captions` and `titles` are the flags the run was given.
     `analysis` is the result JSON path as given on the command line.
     `styles` are the vertical styles rendered, in order (ADR 0025); empty for
-    a landscape run or an older manifest. `summary` is the clips joined in
+    a landscape run or an older manifest. `combined` is the clips joined in
     the review page, if made (ADR 0032).
     """
 
@@ -742,7 +747,10 @@ class RenderManifest(BaseModel):
     titles: bool
     clips: tuple[ManifestClip, ...]
     styles: tuple[VerticalStyleName, ...] = ()
-    summary: Summary | None = None
+    # Written as "summary" before the feature was renamed (ADR 0032).
+    combined: Combined | None = Field(
+        default=None, validation_alias=AliasChoices("combined", "summary")
+    )
 
 
 def _parse_timestamp(value: object) -> float:

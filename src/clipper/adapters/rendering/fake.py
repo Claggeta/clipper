@@ -80,7 +80,7 @@ class FakeClipRenderer:
         if self.fail_joins:
             raise ClipRenderError(f"Fake join failed for {output_path.name}")
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_bytes(b"fake summary")
+        output_path.write_bytes(b"fake combined")
         return output_path
 
     def still(
