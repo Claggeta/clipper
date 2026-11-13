@@ -327,6 +327,23 @@ def test_texts_are_clamped_to_the_cut_clip_and_late_ones_dropped() -> None:
     assert _events(captions) == ["0:00:04.00,0:00:06.00,{\\an8\\pos(540,300)}long"]
 
 
+def test_texts_share_one_box_so_wrapped_lines_do_not_overlap() -> None:
+    captions = build_ass(
+        Transcript(segments=()),
+        _c(10.0, 20.0),
+        vertical=True,
+        texts=(_text("Hook", 0.0, 3.0),),
+    )
+    style = next(
+        line for line in captions.text.splitlines() if line.startswith("Style: Text,")
+    )
+    fields = style.removeprefix("Style: ").split(",")
+    # Outline colour clear, back colour the half-dark box, BorderStyle 4
+    # (one box per event), the outline as its padding.
+    assert fields[5:7] == ["&HFF000000", "&H80000000"]
+    assert fields[15:17] == ["4", "18"]
+
+
 def test_without_texts_the_header_has_no_text_style() -> None:
     seg = _wseg((10.0, 10.4, "one."))
     assert "Style: Text" not in build_ass(_t(seg), _c(10.0, 20.0), vertical=True).text

@@ -2780,6 +2780,11 @@ uv run clipper review "$env:TEMP\rv12\<id>"
    Remove the middle one and Save: the new draft has only the hook.
 6. Stop the server. The clip's label in
    `$env:TEMP\rv12-labels\picks\<id>.json` has `"texts"` with the hook.
+7. Start the server again, add a text long enough to wrap onto two or
+   three lines (`Ron cannot believe what Jason just said about the
+   boxing match`) and Save. Pass: the lines sit on one even half-dark
+   box, with no darker band where they meet and no dark edge round the
+   letters (ADR 0030, one box amendment).
 
 Then `Remove-Item Env:CLIPPER_LABELS_DIR` and delete the scratch folders.
 
@@ -2809,6 +2814,9 @@ Remove-Item Env:CLIPPER_LABELS_DIR   # after stopping the server
 5. With the server stopped, run
    `$env:CLIPPER_CLIPS_DIR = "$env:TEMP\rv12"; uv run clipper queue --include-ok --out "$env:TEMP\rv14-queue.md"; Remove-Item Env:CLIPPER_CLIPS_DIR`.
    Pass: that clip, if rated, lists `- Thumbnail:` with the image's path.
+6. Start the server again and make a thumbnail with text that wraps
+   (`Jason has no idea what is coming next`). Pass: one even half-dark
+   box behind all its lines, no darker band between them.
 
 Then delete the scratch folders.
 

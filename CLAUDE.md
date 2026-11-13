@@ -388,6 +388,9 @@ and planned code:
   draft, manual step RV13. Thumbnails amendment: `ClipRenderer.still`,
   `POST /api/clips/<rank>/thumbnail` in the style shown (fit when no face),
   `ManifestClip.thumbnail`, deleted by Trash, listed by the queue; RV14.
+  One box amendment (V7 7e): `BorderStyle 4`, one box behind a wrapped
+  text (per-line boxes overlapped darker), outline colour clear; needs
+  libass 0.17 or newer.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1252,6 +1255,11 @@ in item 7 may land any time.
    - 7d. Docs and housekeeping: `docs/architecture.md` drift and code
      fences, mojibake in `docs/roadmap.md` and `docs/architecture.md`,
      duplicate `.gitignore` entries, the D9 and D10 pipe.
+   - 7e. ~~On-screen text that wraps (added 2026-11-13, found by the
+     maintainer): one box behind all lines, not a box per line that
+     overlaps its neighbour. ADR 0030 amendment, manual steps.~~ (done;
+     `BorderStyle 4`, needs libass 0.17 or newer; RV13 step 7, RV14
+     step 6)
 8. Release notes and tag `v0.7.0`.
 
 Later, not scheduled:

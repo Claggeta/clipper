@@ -59,11 +59,12 @@ class _TextLayout(NamedTuple):
 
 
 # Checked by eye on a rendered frame: below the area Shorts' own buttons
-# and title cover at the top, and the frame's centre. The box is the ASS
-# opaque box, half transparent.
+# and title cover at the top, and the frame's centre. The box is libass's
+# one box per event, half transparent (ADR 0030, one box amendment).
 _VERTICAL_TEXT = _TextLayout(84, 18, top=(540, 300), middle=(540, 960))
 _SOURCE_TEXT = _TextLayout(64, 14, top=(960, 80), middle=(960, 540))
 _HALF_BLACK = "&H80000000"
+_CLEAR = "&HFF000000"
 
 
 class Captions(NamedTuple):
@@ -97,7 +98,13 @@ def _clean(text: str) -> str:
 
 
 def _text_style(layout: _Layout, text: _TextLayout) -> str:
-    """The on-screen text's style: bold white on a half-dark opaque box."""
+    """The on-screen text's style: bold white on one half-dark box.
+
+    BorderStyle 3 draws a box per line, padded by the outline, so wrapped
+    lines' boxes overlapped and printed darker. BorderStyle 4 (libass
+    0.17 or newer) draws one box behind the whole event in the back
+    colour, still padded by the outline, whose own colour is clear.
+    """
     return ",".join(
         str(v)
         for v in (
@@ -106,8 +113,8 @@ def _text_style(layout: _Layout, text: _TextLayout) -> str:
             text.font_size,
             _WHITE,
             _WHITE,
-            _HALF_BLACK,  # the box, with BorderStyle 3
-            _HALF_BLACK,
+            _CLEAR,  # no outline round the letters
+            _HALF_BLACK,  # the box
             -1,  # bold
             0,
             0,
@@ -116,7 +123,7 @@ def _text_style(layout: _Layout, text: _TextLayout) -> str:
             100,
             0,
             0,
-            3,  # an opaque box
+            4,  # one box per event
             text.padding,
             0,
             8,  # top centre; each event sets its own point

@@ -111,8 +111,28 @@ cuts since 0029.
 - The queue page lists each clip's thumbnail path (0028). Manual step
   RV14.
 
+## Amended by the one box fix (V7 item 7e)
+
+- The maintainer found that a text wrapping onto a second line showed a
+  darker band between the lines, on clips and thumbnails. The cause:
+  ASS `BorderStyle 3` draws a box per line, padded on every side by the
+  outline (18 px vertical, 14 px source), and lines sit one text height
+  apart, so neighbouring boxes overlapped and the half-transparent
+  overlap printed darker.
+- The `Text` style now uses `BorderStyle 4`, libass's one box behind the
+  whole event, in the back colour (`&H80000000`) and padded by the
+  outline as before, with the outline colour clear (`&HFF000000`) so the
+  letters get no dark edge. Checked on ffmpeg 9.0.2 (gyan build): a
+  wrapped text shows one even box, and a single line looks as before.
+  Word captions keep their outlined style.
+- `BorderStyle 4` needs libass 0.17 or newer; an older one would draw
+  the text with no box. Nothing else renders these clips, so this is
+  recorded here rather than checked at startup. Manual steps RV13 step 7
+  and RV14 step 6.
+
 ## Revisit when
 
+- The ffmpeg build changes to one with an older libass (RV13 step 7).
 - The maintainer wants other looks (colours, outlined text, all caps) or
   more places.
 - The performance report shows hooks or thumbnails do or do not help.
