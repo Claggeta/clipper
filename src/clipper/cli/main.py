@@ -1256,6 +1256,7 @@ def review(
             peaks_path=peaks_file(settings.cache_dir, video),
             music_dir=settings.music_dir,
             sfx_dir=settings.sfx_dir,
+            title_writer=_summary_title_writer(build, settings),
         )
         build.serve(
             session,
@@ -1404,6 +1405,15 @@ def posted(
         f"{action} {escape(key)}: {source.video_id} on {day.isoformat()}",
         soft_wrap=True,
     )
+
+
+def _summary_title_writer(build: AppContext, settings: Settings) -> TitleWriter | None:
+    """The title writer for a summary's suggested title, or None when no
+    model is set; the page then says it cannot suggest (ADR 0032)."""
+    try:
+        return build.title_writer(settings)
+    except TitleError:
+        return None
 
 
 def _clip_key(clips_dir: Path, clip: str) -> str:

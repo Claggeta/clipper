@@ -232,7 +232,8 @@ drawn) beside the source and draft players, an inspector with Clip, Captions (fi
 Frame tabs,
 and the film strip across the bottom. Most actions have a key (`?` lists
 them), and after Save or Trash the page moves on to the next clip without a
-verdict. A waveform and the words sit under the film strip, and handles and
+verdict. `Summarize` joins the saved clips into one longer Short with
+optional "Hour N" cards and music. A waveform and the words sit under the film strip, and handles and
 cuts snap to word edges (the first waveform of a long VOD takes a couple of
 minutes). Ctrl+C stops the server. See
 [ADR 0024](docs/decisions/0024-review-drafts-in-a-local-browser-page.md),

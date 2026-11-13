@@ -452,6 +452,13 @@ and planned code:
   Audio amendment (9i): an Audio tab of clip volume, music and sound
   effects from `data/music/` and `data/sfx/`, previewed through the
   browser's audio engine (ADR 0007 amendment); `static/audio.js`; RV24.
+- `0032` — Summarize: a VOD's saved clips joined in VOD order into
+  `<stem>_summary.mp4` by `ClipRenderer.join` (`concat`, label cards as
+  on-screen texts, music as a clip's), one more encode; its own
+  `RenderManifest.summary` (parts, music, length, title, rating,
+  thumbnail), no judged label; a dialog in `review` to make, title
+  (Suggest from the local model), rate, thumbnail and trash it; past
+  180 s a warning. Queue and `posted` in a second PR. Manual step RV25.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1381,9 +1388,10 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      `review` that joins a VOD's kept clips, as edited, in VOD order into
      one longer Short (`<stem>_summary.mp4`), with optional label cards
      between them, a length warning past the Shorts limit, and its own
-     manifest entry to title, rate and queue. After 9i, so it can carry
-     music. No new picking; suggested filler moments only if the plain
-     version shows gaps. Design stated first; an ADR.
+     manifest entry to title, rate and queue. ADR 0032, in two PRs:
+     - 9k-1. ~~The summary: dialog, join, manifest entry, title, rating,
+       thumbnail, trash.~~ (done; manual step RV25)
+     - 9k-2. Queue and `posted` for the summary (ADR 0028 amendment).
 
 Later, not scheduled:
 

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -131,6 +132,20 @@ class ClipRenderer(Protocol):
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
     ) -> RenderedClip: ...
+
+    def join(
+        self,
+        clips: Sequence[Path],
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        audio: AudioMix | None = None,
+        length: float = 0.0,
+    ) -> Path:
+        """Rendered clips joined end to end into `output_path`, with ASS
+        `captions` timed on the joined clip and an audio mix as long as
+        `length` (ADR 0032)."""
+        ...
 
     def still(
         self,

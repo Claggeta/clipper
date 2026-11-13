@@ -21,6 +21,7 @@ from clipper.domain.models import (
     RenderedClip,
     Segment,
     SoundEffect,
+    SummaryPart,
     Transcript,
     VideoSource,
     Word,
@@ -842,3 +843,14 @@ def test_clip_audio_defaults_and_empty() -> None:
 def test_bad_clip_audio_is_refused(data: dict[str, object], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         ClipAudio.model_validate(data)
+
+
+# --- Summaries (ADR 0032) ---
+
+
+def test_a_summary_part_keeps_a_short_one_line_card() -> None:
+    assert SummaryPart(rank=2, label="  Hour 3 ").label == "Hour 3"
+    with pytest.raises(ValidationError, match="at most 60"):
+        SummaryPart(rank=2, label="x" * 61)
+    with pytest.raises(ValidationError, match="one line"):
+        SummaryPart(rank=2, label="a\nb")

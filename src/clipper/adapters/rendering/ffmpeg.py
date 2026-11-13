@@ -1,5 +1,6 @@
 import logging
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 
 from clipper.adapters.media._process import format_failure, run_tool
@@ -142,22 +143,29 @@ DUCK_RELEASE_MS = 400
 MUSIC_FADE_SECONDS = 1.0
 
 
-def _mix_graph(audio: AudioMix, length: float, cut_filter: str | None) -> str:
+def _mix_graph(
+    audio: AudioMix,
+    length: float,
+    cut_filter: str | None,
+    voice_input: str = "[0:a:0]",
+    music_input: int = 1,
+) -> str:
     """ADR 0007, audio amendment. The clip's own sound (cut, then at its
     gain), the music looped from input 1 at its level and faded out at the
     end, ducked under the clip's sound, and each sound effect delayed to
-    its moment, mixed without normalising, as long as the clip."""
-    voice = (
-        f"[0:a:0]{cut_filter + ',' if cut_filter else ''}volume={audio.gain_db:.1f}dB"
-    )
+    its moment, mixed without normalising, as long as the clip. A summary's
+    voice is its joined clips' sound, and its music the input after them
+    (ADR 0032)."""
+    cut = cut_filter + "," if cut_filter else ""
+    voice = f"{voice_input}{cut}volume={audio.gain_db:.1f}dB"
     parts: list[str] = []
     mixed: list[str] = ["[voice]"]
-    first_effect = 1
+    first_effect = music_input
     if audio.music is not None:
         parts.append(voice + (",asplit=2[voice][key]" if audio.duck else "[voice]"))
         fade = _seconds(max(length - MUSIC_FADE_SECONDS, 0.0))
         bed = (
-            f"[1:a]volume={audio.music_level_db:.1f}dB,"
+            f"[{music_input}:a]volume={audio.music_level_db:.1f}dB,"
             f"afade=t=out:st={fade}:d={MUSIC_FADE_SECONDS:.1f}"
         )
         if audio.duck:
@@ -170,7 +178,7 @@ def _mix_graph(audio: AudioMix, length: float, cut_filter: str | None) -> str:
         else:
             parts.append(bed + "[music]")
         mixed.append("[music]")
-        first_effect = 2
+        first_effect = music_input + 1
     else:
         parts.append(voice + "[voice]")
     for n, effect in enumerate(audio.effects):
@@ -378,6 +386,84 @@ class FfmpegClipRenderer:
                 cwd=Path(folder),
             )
         if result.returncode != 0 or not output_path.is_file():
+            output_path.unlink(missing_ok=True)
+            raise ClipRenderError(format_failure(self._executable, result))
+        return output_path
+
+    def join(
+        self,
+        clips: Sequence[Path],
+        output_path: Path,
+        captions: str | None = None,
+        *,
+        audio: AudioMix | None = None,
+        length: float = 0.0,
+    ) -> Path:
+        """ADR 0032. Rendered clips joined end to end in one more encode,
+        with label cards (`captions`, timed on the joined clip) and a music
+        bed of `length` seconds; the clips must share a frame size."""
+        missing = [path for path in clips if not path.is_file()]
+        if missing:
+            raise ClipRenderError(f"Input file not found: {missing[0]}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        count = len(clips)
+        graph = [f"[{i}:v:0]setsar=1[v{i}]" for i in range(count)]
+        graph.append(
+            "".join(f"[v{i}][{i}:a:0]" for i in range(count))
+            + f"concat=n={count}:v=1:a=1[vj][aj]"
+        )
+        graph.append(f"[vj]{_SUBTITLES_FILTER if captions else 'null'}[vout]")
+        if audio is not None and audio != AudioMix():
+            graph.append(_mix_graph(audio, length, None, "[aj]", count))
+        else:
+            graph.append("[aj]anull[aout]")
+        inputs: list[str] = []
+        for path in clips:
+            inputs += ["-i", str(path.resolve())]
+        if audio is not None and audio.music is not None:
+            inputs += ["-stream_loop", "-1", "-i", str(audio.music.resolve())]
+        with tempfile.TemporaryDirectory(
+            prefix="clipper-join-", ignore_cleanup_errors=True
+        ) as folder:
+            if captions:
+                (Path(folder) / _CAPTIONS_NAME).write_bytes(captions.encode("utf-8"))
+            args = [
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-y",
+                *inputs,
+                "-filter_complex",
+                ";".join(graph),
+                "-map",
+                "[vout]",
+                "-map",
+                "[aout]",
+                "-c:v",
+                "libx264",
+                "-preset",
+                _PRESET,
+                "-crf",
+                _CRF,
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                _AUDIO_BITRATE,
+                "-movflags",
+                "+faststart",
+                str(output_path.resolve()),
+            ]
+            result = run_tool(
+                self._executable,
+                args,
+                error_type=ClipRenderError,
+                log=logger,
+                cwd=Path(folder),
+            )
+        if result.returncode != 0:
             output_path.unlink(missing_ok=True)
             raise ClipRenderError(format_failure(self._executable, result))
         return output_path

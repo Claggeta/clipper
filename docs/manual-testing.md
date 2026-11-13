@@ -3126,6 +3126,33 @@ music file you may post in `data\music\` and a short sound effect in
 
 Then delete the scratch folders.
 
+### RV25. Summarize
+
+Covers [ADR 0032](decisions/0032-summarize-a-vods-clips.md) (V7 item 9k).
+Same scratch copy and labels dir as RV12, with at least two saved clips.
+
+1. Press `Summarize`. Pass: a dialog listing the saved and untrashed
+   clips in VOD order, saved ones ticked, each with its length; the
+   total at the bottom. A clip with unsaved edits says so.
+2. Press `Hour N cards`. Pass: each card says the clip's hour in the VOD.
+   Untick clips until the total passes 3 minutes and back. Pass: the
+   total turns the warning colour past 3:00.
+3. Pick a music file and press `Make summary`. Pass: "Rendering …";
+   then the result with the summary playing: the clips in order, each
+   card for its first 2.5 s, captions and edits as in the drafts, music
+   under it dipping under speech. A `Summary` entry appears above the
+   clip list.
+4. Type a title (or press `Suggest` with Ollama running) and press
+   `Good`. Pass: the entry shows the title and rating.
+5. Pause on a frame and `Make thumbnail` with text. Pass: the image shows
+   under the row; `<stem>_summary.thumb.jpg` is in the folder.
+6. Press `Remake`, change the clips and make it again. Pass: the title
+   and rating stay, the thumbnail is gone.
+7. Reload. Pass: the entry is still there and opens the result. Press
+   `Trash summary` twice. Pass: the entry and the files are gone.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

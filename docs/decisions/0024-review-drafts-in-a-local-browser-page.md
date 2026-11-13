@@ -479,6 +479,14 @@ effect folders) and `/music/<name>` and `/sfx/<name>` (listed names
 only). Save takes `audio` (`gain_db`, `music`, `effects`) and refuses a
 file not in its folder (409). Manual step RV24.
 
+## Amended by Summarize (ADR 0032, V7 item 9k)
+
+`/summary.js`; `POST /api/summary` (`parts` of `rank` and `label`, an
+optional `music`) joins the clips into `<stem>_summary.mp4`, and
+`/api/summary/save`, `/trash`, `/thumbnail` and `/suggest` handle it;
+`/api/clips` carries `summary`, and the summary file and thumbnail are
+served as listed names. Manual step RV25.
+
 ## Related
 
 - 0011: render's failure policy

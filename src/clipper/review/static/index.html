@@ -18,6 +18,12 @@
        the timeline. Below about 1200 px wide they stack. -->
   <div id="editor" class="editor">
     <nav class="sidebar" aria-label="Clips">
+      <div class="sidebar-head">
+        <button type="button" id="summarize" title="Join the kept clips into one longer Short">Summarize</button>
+      </div>
+      <button type="button" id="summary-entry" class="summary-entry" hidden>
+        <span class="rank">Σ</span><span class="name">Summary</span><span class="badge" data-state="summary">Summary</span><span class="span"></span>
+      </button>
       <ol id="clips" class="clips"></ol>
     </nav>
     <main class="stage">
@@ -181,6 +187,56 @@
     </div>
   </div>
   <audio id="music-player" loop preload="auto" hidden></audio>
+  <div id="summary-dialog" class="keys-help" role="dialog" aria-label="Summary" hidden>
+    <div class="keys-card summary-card judge">
+      <div id="summary-pick">
+        <h2>Summarize this VOD</h2>
+        <p class="muted">The ticked clips, as last saved, in VOD order, as one Short. A card shows for 2.5 s at a clip's start.</p>
+        <div id="summary-rows" class="summary-rows"></div>
+        <div class="summary-bar">
+          <button type="button" id="summary-hours" title="Label each clip by its hour in the VOD">Hour N cards</button>
+          <span id="summary-total" class="muted"></span>
+        </div>
+        <div class="summary-bar">
+          <select id="summary-music" aria-label="Music"></select>
+          <select id="summary-level" aria-label="Music level">
+            <option value="-24">-24 dB</option><option value="-21">-21 dB</option><option value="-18" selected>-18 dB</option><option value="-15">-15 dB</option><option value="-12">-12 dB</option>
+          </select>
+          <label class="fade"><input type="checkbox" id="summary-duck" checked> Lower under speech</label>
+        </div>
+        <div class="summary-bar">
+          <button type="button" id="summary-make" class="primary">Make summary</button>
+          <button type="button" id="summary-close">Close</button>
+        </div>
+        <p id="summary-notice" class="judge-notice" role="status"></p>
+      </div>
+      <div id="summary-result" hidden>
+        <h2>Summary <span id="summary-length" class="muted"></span></h2>
+        <video id="summary-video" class="summary-video" controls preload="metadata" playsinline></video>
+        <label for="summary-title">Title</label>
+        <div class="summary-bar">
+          <input id="summary-title" type="text" maxlength="200" autocomplete="off">
+          <button type="button" id="summary-suggest" title="Ask the local model, from the clips' words">Suggest</button>
+        </div>
+        <div id="summary-rating" class="toggle-row" role="group" aria-label="Rating">
+          <button type="button" data-value="good">Good</button>
+          <button type="button" data-value="ok">OK</button>
+        </div>
+        <div class="summary-bar">
+          <input id="summary-thumb-text" type="text" maxlength="120" autocomplete="off" placeholder="Thumbnail text (optional)">
+          <button type="button" id="summary-thumb-make" title="The frame shown in the player">Make thumbnail</button>
+        </div>
+        <img id="summary-thumb" class="thumb" alt="The summary's thumbnail" hidden>
+        <div class="summary-bar">
+          <button type="button" id="summary-save" class="primary">Save title</button>
+          <button type="button" id="summary-remake">Remake</button>
+          <button type="button" id="summary-trash" class="danger">Trash summary</button>
+          <button type="button" id="summary-close-2" onclick="document.getElementById('summary-close').click()">Close</button>
+        </div>
+        <p id="summary-result-notice" class="judge-notice" role="status"></p>
+      </div>
+    </div>
+  </div>
   <div id="keys-help" class="keys-help" role="dialog" aria-label="Keys" hidden>
     <div class="keys-card">
       <h2>Keys</h2>
@@ -211,6 +267,7 @@
   <script src="/captions.js"></script>
   <script src="/frame.js"></script>
   <script src="/audio.js"></script>
+  <script src="/summary.js"></script>
   <script src="/preview.js"></script>
 </body>
 </html>

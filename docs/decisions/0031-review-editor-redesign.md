@@ -283,6 +283,13 @@ asked for a chat box that turns a described edit into the page's edits.
   burn-in ducks on the real sound), and each effect as the playhead
   passes it. Manual step RV24.
 
+## Amended by the Summarize PR (V7 item 9k, ADR 0032)
+
+- A Summarize button and a Summary entry above the clip list open a
+  dialog (`static/summary.js`) to pick the clips, cards and music and to
+  play, title, rate, thumbnail or trash the result; the page's keys wait
+  while it is open, and Esc closes it. Manual step RV25.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).
