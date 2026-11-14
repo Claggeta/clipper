@@ -1350,10 +1350,12 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      checked against boxes marked by hand. Ends in an ADR 0025 amendment
      or in nothing.
    - 6b. If 6a says so: a `facecam` style in `render` and `drafts`, the
-     box stacked above the gameplay; a clip with no box is a note and
-     renders in `fit`. Manual step.
-   - 6c. The `facecam` style in the review page's style switch (ADR 0024
-     amendment). Manual step.
+     box stacked above or below the gameplay (a choice, added 2026-11-14
+     at the maintainer's ask; the default decided in the item); a clip
+     with no box is a note and renders in `fit`. Manual step.
+   - 6c. The `facecam` style in the review page's style switch, with the
+     cam's position, top or bottom, per clip (ADR 0024 amendment).
+     Manual step.
 7. Small fixes from "Parked", each its own PR:
    - 7a. ffmpeg exit codes: signed `AVERROR` values, with short names for
      invalid data, no stream and permission denied.
@@ -1460,8 +1462,8 @@ Later, not scheduled:
   second did not tell them apart. Needs an audio-visual model; after
   13e's picks show how often `face` loses to `fit` for it.
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
-  first, and stack it above the gameplay. After V5 item 13e's picks show
-  how often facecam clips are posted. Scheduled as V7 item 6.
+  first, and stack it above or below the gameplay. After V5 item 13e's
+  picks show how often facecam clips are posted. Scheduled as V7 item 6.
 - Audio and video-frame embeddings as ranker inputs (ADR 0026), for the
   visual moments a transcript cannot see. After V6 item 5 shows the
   transcript-only ranker works; a frame encoder likely brings PyTorch with
