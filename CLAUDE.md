@@ -1330,6 +1330,12 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    `eval` still counts them apart, and refuses above that (409, as now).
    ADR 0024 amendment, unit tests, manual step.~~ (done; ADR 0024 and
    0012 amendments, `spans_hit`, manual step RV15)
+2a. A reason on Trash (added 2026-11-14, the maintainer's choice): one of
+   a fixed set (first guess: nothing happening, needs context, seen not
+   said, bad cut, other), picked by a key, optional, saved on the
+   rejected span (ADR 0012 and 0024 amendments). For learning: bad cuts
+   are noisy negatives for a ranker, and the counts say which lever
+   (text score, frames) fits the bad picks. Manual step.
 3. Manual cuts (ADR 0029 "later"), in PRs:
    - 3a. ~~Cut in and out at the playhead, by buttons and keys, added to the
      cut list beside the pause cuts, toggled, previewed and saved in
