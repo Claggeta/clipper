@@ -1446,6 +1446,13 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
        player, kept edits, render and the Summary entry; RV26)
      - 9l-4. ~~Queue and `posted` for the summary.~~ (done; the people
        of the clips its beats overlap; Q3 extended)
+   - 9m. B-roll (added 2026-11-14, the maintainer's choice): video clips
+     and images from a local `data/broll/` folder (the maintainer's own
+     files, as with music, ADR 0007), placed over a range of the clip on
+     a B-roll track, as a full-frame cutaway or a picture-in-picture box
+     placed by dragging on the preview; the clip's audio continues;
+     drawn in the live preview and burned in the one encode. ADR 0031
+     and 0007 amendments, design stated first, manual step. After item 5.
 
 Later, not scheduled:
 
