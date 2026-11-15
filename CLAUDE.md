@@ -500,6 +500,9 @@ and planned code:
   `BlockMap` in `core/sequence.py`; a block's own zooms or hand crops
   replace the clip's there; clips without a sequence keep the cuts and
   `select` path unchanged; framing after the join; manual step R21.
+  Lane amendment (9n-3): keys `B` split, `Shift+D` duplicate,
+  `Backspace` remove, `Alt+←/→` move; cuts off while a clip has its own
+  sequence; other lanes stay in source time; manual step RV27.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1495,10 +1498,13 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
        on manifest clip and label, `RenderManifest.pad`.~~ (done; an
        input per block and `concat`; sound effects in source seconds,
        blocks may have their own; manual step R21)
-     - 9n-3. The Sequence lane in clip time (reorder, trim, delete,
-       duplicate) and the preview through blocks.
-     - 9n-4. The pad: a marked range sent with `P`, named, dragged onto
-       the sequence.
+     - 9n-3. ~~The Sequence lane in clip time (reorder, trim, delete,
+       duplicate) and the preview through blocks.~~ (done; split too,
+       cuts off while a clip has its own sequence; manual step RV27)
+     - 9n-4. The pad: a marked range sent to it (key decided in the
+       item, `P` is Preview span), named, dragged onto the sequence.
+     - 9n-5. "This block only" zooms, hand crops and sound effects in
+       the Frame and Audio tabs (the core takes them since 9n-2).
 
 Later, not scheduled:
 

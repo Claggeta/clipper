@@ -246,6 +246,7 @@ def _get(
         ("/app.js", "text/javascript", b"/api/clips"),
         ("/keys.js", "text/javascript", b"keydown"),
         ("/precision.js", "text/javascript", b"/api/words"),
+        ("/sequence.js", "text/javascript", b"sequence-lane"),
         ("/preview.js", "text/javascript", b"/api/captions"),
         ("/captions.js", "text/javascript", b"caption_edits"),
         ("/frame.js", "text/javascript", b"hand_crops"),
@@ -873,6 +874,7 @@ def test_the_page_scripts_declare_each_function_once() -> None:
             "app.js",
             "keys.js",
             "precision.js",
+            "sequence.js",
             "captions.js",
             "frame.js",
             "audio.js",
@@ -1368,3 +1370,26 @@ def test_summarizing_needs_a_model(base_url: str) -> None:
     assert "CLIPPER_LLM_MODEL" in reply["error"]
     assert _post(base_url, "/api/story/beats", {"beats": "x"})[0] == 400
     assert _post(base_url, "/api/story/save", {"title": "x"})[0] == 409
+
+
+def test_save_with_a_sequence_records_it_on_the_clip_and_label(
+    base_url: str, tmp_path: Path
+) -> None:
+    blocks = [{"start": 80.0, "end": 85.0}, {"start": 60.0, "end": 70.0}]
+    status, clip = _post(
+        base_url,
+        "/api/clips/1/save",
+        {"start": 60.0, "end": 105.0, "sequence": blocks},
+    )
+
+    assert status == 200
+    shown = [{"start": b["start"], "end": b["end"]} for b in clip["sequence"]]
+    assert shown == blocks
+    assert clip["judgment"]["sequence"] == clip["sequence"]
+    listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
+    assert listed[0]["sequence"] == clip["sequence"]
+    [label] = load_labels(_labels_path(tmp_path)).labels
+    assert [(b.start_seconds, b.end_seconds) for b in label.sequence] == [
+        (80.0, 85.0),
+        (60.0, 70.0),
+    ]

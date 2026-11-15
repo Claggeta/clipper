@@ -3282,6 +3282,41 @@ folder of a long stream, ideally an incremental game, with captions.
 
 Then delete the scratch folders.
 
+### RV27. The Sequence lane
+
+Covers the Sequence lane ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+V7 item 9n-3). Use a scratch copy of a vertical drafts folder with
+captions and a scratch `CLIPPER_LABELS_DIR`, as in RV7.
+
+1. Choose a clip. Pass: under the strip, the Sequence lane shows one
+   faint block (or one per kept part if the clip has cuts), "the span
+   less its cuts" and the length; `Back to span` is greyed out.
+2. Put the playhead 3 s into the span and press `B`, then again at 10 s.
+   Pass: three blocks, no longer faint, "its own sequence"; Length reads
+   `sequence ... s`; still not Unsaved, as the blocks are the span.
+3. Click the first block, press `Shift+D`, then `Alt+→` three times.
+   Pass: four blocks, the copy last and purple (a repeat); Unsaved.
+4. Press `[`. Pass: nothing is cut; the notice says to split and remove
+   blocks instead. Cut silence and a drag on the strip say the same.
+5. Drag the last block onto the first. Pass: it moves to the front.
+   Drag a block's right edge with the mouse. Pass: it grows, the length
+   follows, and its end snaps to a word edge (Alt frees it).
+6. Press `Preview span` on the Preview view. Pass: the blocks play in
+   order, jumping at each join (a brief hitch is expected); the time
+   under the preview counts on across joins; captions and texts follow;
+   it stops after the last block.
+7. Save. Pass: "re-rendered"; the Draft view plays the blocks in order
+   with a repeat; the label in `picks/<stem>.json` has `sequence` and
+   no `cuts`. Reload the page. Pass: the lane shows the saved blocks.
+8. `Back to span`, then `Reset`. Pass: one faint block again; any cuts
+   the clip had before the sequence come back with Back to span, and
+   Reset clears them.
+
+Run 2026-11-15 in headless Edge over CDP on a scratch copy of
+3Sbj_BZORr4's judging folder: steps 1 to 6 and 8 as above, with a cut
+clip for 8; step 7 re-rendered the 4-block clip and the manifest held
+the sequence. The draft was not watched.
+
 ## Record your run
 
 | Field | Value |

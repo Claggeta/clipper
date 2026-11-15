@@ -151,7 +151,9 @@ const CLIP_KEYS = {
   2: () => rate("ok"),
   s: () => press("save"),
   delete: () => press("trash"),
-  d: toggleScreen,
+  d: (shift) => (shift ? press("seq-duplicate") : toggleScreen()),
+  b: () => press("seq-split"),
+  backspace: () => press("seq-remove"),
   t: () => press("add-text"),
 };
 
@@ -184,6 +186,12 @@ document.addEventListener("keydown", (event) => {
     if (current) {
       press("save");
     }
+    return;
+  }
+  // Alt+arrows move the selected block on the Sequence lane (ADR 0034).
+  if (event.altKey && !event.ctrlKey && current && (key === "arrowleft" || key === "arrowright")) {
+    event.preventDefault();
+    moveBlock(key === "arrowleft" ? -1 : 1);
     return;
   }
   if (event.ctrlKey || event.metaKey || event.altKey) {

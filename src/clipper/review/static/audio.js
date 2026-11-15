@@ -277,7 +277,8 @@ function syncPreviewAudio() {
     if (musicPlayer.getAttribute("src") !== src) {
       musicPlayer.setAttribute("src", src);
     }
-    const at = clipSeconds(seconds);
+    // Outside every block of a sequence, the music holds (ADR 0034).
+    const at = clipSeconds(seconds) || 0;
     const length = musicPlayer.duration || 0;
     const target = length ? at % length : at;
     if (Math.abs(musicPlayer.currentTime - target) > 0.3) {
