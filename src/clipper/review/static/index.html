@@ -212,12 +212,19 @@
           <div id="sequence-lane" class="sequence-lane">
             <div id="seq-playhead" class="seq-playhead" hidden></div>
           </div>
+          <div class="sequence-bar overlay-head">
+            <span class="sequence-name">B-roll over</span>
+            <span id="broll-note" class="muted">Drop a B-roll file here, or press Overlay on it in the pad.</span>
+          </div>
+          <div id="broll-lane" class="broll-lane empty"></div>
+          <div id="broll-row" class="sequence-bar broll-row" hidden></div>
         </div>
       </section>
     </div>
   </div>
   <audio id="music-player" loop preload="auto" hidden></audio>
   <video id="broll-player" preload="auto" playsinline hidden></video>
+  <video id="overlay-player" preload="auto" playsinline muted hidden></video>
   <div id="story-dialog" class="keys-help" role="dialog" aria-label="Summary" hidden>
     <div class="keys-card combine-card judge">
       <div id="story-plan">
@@ -357,6 +364,7 @@
   <script src="/captions.js"></script>
   <script src="/frame.js"></script>
   <script src="/audio.js"></script>
+  <script src="/overlays.js"></script>
   <script src="/combine.js"></script>
   <script src="/story.js"></script>
   <script src="/preview.js"></script>

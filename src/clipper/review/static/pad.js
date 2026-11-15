@@ -214,7 +214,8 @@ sequenceLane.addEventListener("drop", (event) => {
 document.getElementById("to-pad").addEventListener("click", () => toPad());
 
 // B-roll files (ADR 0034, B-roll amendment): listed under the pieces,
-// inserted after the selected block or dropped onto the Sequence lane.
+// inserted after the selected block or dropped onto the Sequence lane, or
+// laid over the clip (overlays.js).
 const BROLL_TYPE = "application/x-clipper-broll";
 const brollList = document.getElementById("broll-list");
 
@@ -252,7 +253,12 @@ function drawBrollFiles() {
     add.textContent = "Insert";
     add.title = "Put it in the clip's sequence after the selected block";
     add.addEventListener("click", () => insertBroll(file, selectedBlock + 1));
-    actions.append(add);
+    const over = document.createElement("button");
+    over.type = "button";
+    over.textContent = "Overlay";
+    over.title = "Lay it over the clip at the playhead, its sound off";
+    over.addEventListener("click", () => addOverlay(file));
+    actions.append(add, over);
     item.append(thumb, name, meta, actions);
     item.addEventListener("dragstart", (event) => {
       event.dataTransfer.setData(BROLL_TYPE, file.name);

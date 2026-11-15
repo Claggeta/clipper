@@ -653,6 +653,7 @@ function drawUnsaved() {
     !sameTime(span.end, saved.end) ||
     !sameCuts(sentShape(current).cuts, savedCuts(current)) ||
     !sameSequence(sentShape(current).sequence, savedSequence(current)) ||
+    !sameOverlays(sentOverlays(current), savedOverlays(current)) ||
     !sameTexts(sentTexts(current), savedTexts(current)) ||
     !sameCaptionEdits(sentCaptionEdits(current), savedCaptionEdits(current)) ||
     !sameFrame(current) ||
@@ -863,6 +864,8 @@ function select(clip, button) {
   resetCaptionEditor(clip);
   resetFrameEditor(clip);
   resetAudioEditor(clip);
+  selectedOverlay = -1;
+  overlayPlayer.pause();
   player.currentTime = span.start;
   fit();
 }
@@ -1047,6 +1050,7 @@ document.getElementById("reset").addEventListener("click", () => {
   cutEdits.set(current.key, []);
   cutIn = null;
   resetSequence(current, true);
+  resetOverlays(current, true);
   textEdits.set(current.key, []);
   drawTexts(current);
   drawDraftTexts();
@@ -1211,6 +1215,7 @@ function rendersOnSave(clip) {
     !sameTime(span.end, clip.end) ||
     !sameCuts(sentShape(clip).cuts, clip.cuts || []) ||
     !sameSequence(sentShape(clip).sequence, clip.sequence || []) ||
+    !sameOverlays(sentOverlays(clip), clip.broll || []) ||
     !sameTexts(sentTexts(clip), clip.texts || []) ||
     (burnsCaptions && !sameCaptionEdits(sentCaptionEdits(clip), clip.caption_edits || null)) ||
     !sameFrame(clip) ||
@@ -1254,6 +1259,7 @@ function judged(clip, reply) {
   frameEdits.delete(clip.key);
   audioEdits.delete(clip.key);
   resetSequence(clip);
+  resetOverlays(clip);
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
@@ -1290,6 +1296,7 @@ saveButton.addEventListener("click", async () => {
       rating: marksOf(clip).rating,
       people: chosenPeople(clip),
       ...sentShape(clip),
+      broll: sentOverlays(clip),
       texts: sentTexts(clip),
       caption_edits: sentCaptionEdits(clip),
       zooms: sentZooms(clip),

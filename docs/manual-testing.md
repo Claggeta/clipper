@@ -3515,6 +3515,45 @@ the start (setting the same time still fires `seeking`, which ended the
 preview, in Preview span too); fixed before the PR. The draft was not
 watched.
 
+### RV29b. B-roll overlays in the page
+
+Covers B-roll overlays in `review` ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+B-roll amendment, V7 item 9m-2b). Set up as RV29a: a scratch copy of a
+drafts folder with captions, a scratch `CLIPPER_LABELS_DIR`, and
+`CLIPPER_BROLL_DIR` with R22's test files.
+
+1. Choose a clip and put the playhead 2 s in. Press `Overlay` on the
+   video with sound in the pad. Pass: a green bar on the "B-roll over"
+   lane under the Sequence lane, 2 s from the playhead, selected; a row
+   below it reads the file name, `Cutaway`, a greyed Size slider and
+   `Remove`.
+2. Drag the still from the pad onto the lane about halfway along. Pass:
+   a second bar there. In its row choose `Picture-in-picture` and set
+   Size to 30%. Pass: the bar's border turns dashed; the slider works.
+3. Drag the first bar's left edge right. Pass: it gets shorter from the
+   start, and its tooltip's "s into the file" grows by as much. Drag the
+   bar itself. Pass: it moves, the same length. Drag its right edge far
+   right. Pass: it stops where the file ends (6 s of footage).
+4. Click a bar. Pass: it is selected and the playhead goes to that
+   point of the clip. On the Preview view, inside the cutaway: the
+   B-roll fills the frame on a blurred copy of itself; inside the
+   picture-in-picture: a box of 30% of the width over the clip, under
+   the captions. Drag the box on the preview. Pass: it follows the
+   pointer and does not start playing.
+5. Press `Preview span` over the cutaway. Pass: the B-roll plays in step
+   with the clip, silent, the clip's sound going on; pausing pauses both.
+6. Edit the sequence so the clip is shorter than an overlay's end.
+   Pass: that bar's border turns red, and Save says the overlay ends past
+   the clip. Move it back inside and Save. Pass: re-rendered; the Draft
+   view matches the preview; label and manifest list `broll`. `Reset`
+   clears the overlays (unsaved).
+
+Run 2026-11-15 in headless Edge over CDP, R22's test files: steps 1 to
+6 as above (drops and drags scripted). The overlay player stayed within
+0.05 s of the clip's time while playing; frames of the re-rendered file
+at 5.5 and 26 s matched the preview, the box where it was dragged. The
+draft was not watched.
+
 ## Record your run
 
 | Field | Value |

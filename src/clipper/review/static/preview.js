@@ -4,7 +4,8 @@
 // width over a blurred copy) or face (the crop a re-render would use);
 // with the word captions and on-screen texts drawn at their burn-in
 // sizes. Close, not exact: Save's re-render is the result. Loaded after
-// app.js, keys.js, precision.js, captions.js, frame.js and audio.js.
+// app.js, keys.js, precision.js, captions.js, frame.js, audio.js and
+// overlays.js.
 "use strict";
 
 const previewCanvas = document.getElementById("preview-canvas");
@@ -445,6 +446,8 @@ function drawPreview() {
     }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
   }
+  // B-roll overlays in clip time, over inserts too (ADR 0034).
+  drawOverlays(context, width, height, clipSeconds(seconds), !player.paused || insertPlaying());
   if (burnsCaptions && !insert) {
     drawCaptions(context, width, height, seconds);
   }
@@ -511,9 +514,20 @@ previewCanvas.addEventListener("pointerdown", (event) => {
   const hit = [...textBoxes]
     .reverse()
     .find((b) => px >= b.left && px <= b.left + b.width && py >= b.top && py <= b.top + b.height);
-  const item = hit ? textsOf(current)[hit.index] : null;
-  const offset = hit ? [px - (hit.left + hit.width / 2), py - (hit.top + hit.height / 2)] : null;
-  // Off a text, a drag pans the zoom in force, else the hand crop's window
+  // Off a text, a picture-in-picture box moves (ADR 0034, B-roll amendment).
+  const boxHit = hit
+    ? null
+    : [...overlayBoxes]
+        .reverse()
+        .find((b) => px >= b.left && px <= b.left + b.width && py >= b.top && py <= b.top + b.height);
+  const placed = boxHit || hit;
+  const item = hit ? textsOf(current)[hit.index] : boxHit ? overlaysOf(current)[boxHit.index] : null;
+  const offset = placed ? [px - (placed.left + placed.width / 2), py - (placed.top + placed.height / 2)] : null;
+  if (boxHit) {
+    selectedOverlay = boxHit.index;
+    drawOverlayLane();
+  }
+  // Off both, a drag pans the zoom in force, else the hand crop's window
   // (ADR 0016 and 0025 amendments): the picture follows the pointer.
   const zoomed = item || !isVertical ? null : activeZoom(player.currentTime);
   const hand = item || zoomed || !isVertical ? null : activeHand(player.currentTime);
@@ -554,13 +568,19 @@ previewCanvas.addEventListener("pointerdown", (event) => {
     }
     item.x = Math.round(clamp(x, 0, 1) * 1000) / 1000;
     item.y = Math.round(clamp(y, 0, 1) * 1000) / 1000;
-    textsChanged();
+    if (boxHit) {
+      drawUnsaved();
+    } else {
+      textsChanged();
+    }
   };
   const onUp = () => {
     previewCanvas.removeEventListener("pointermove", onMove);
     previewCanvas.removeEventListener("pointerup", onUp);
     previewCanvas.removeEventListener("pointercancel", onUp);
-    if (dragging && item) {
+    if (dragging && boxHit) {
+      overlaysChanged();
+    } else if (dragging && item) {
       drawTexts(current);
     } else if (dragging) {
       drawFrameEditor(current);
