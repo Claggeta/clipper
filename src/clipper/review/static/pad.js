@@ -181,7 +181,8 @@ function insertPiece(piece, index) {
 }
 
 sequenceLane.addEventListener("dragover", (event) => {
-  if (event.dataTransfer.types.includes(PIECE_TYPE)) {
+  const types = event.dataTransfer.types;
+  if (types.includes(PIECE_TYPE) || types.includes(BROLL_TYPE)) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
     sequenceLane.classList.add("dropping");
@@ -194,6 +195,13 @@ sequenceLane.addEventListener("dragleave", () => {
 
 sequenceLane.addEventListener("drop", (event) => {
   sequenceLane.classList.remove("dropping");
+  const name = event.dataTransfer.getData(BROLL_TYPE);
+  const file = name ? brollFiles.find((f) => f.name === name) : null;
+  if (file) {
+    event.preventDefault();
+    insertBroll(file, dropIndex(event.clientX));
+    return;
+  }
   const id = event.dataTransfer.getData(PIECE_TYPE);
   const piece = pad.find((p) => p.id === id);
   if (!piece) {
@@ -204,6 +212,55 @@ sequenceLane.addEventListener("drop", (event) => {
 });
 
 document.getElementById("to-pad").addEventListener("click", () => toPad());
+
+// B-roll files (ADR 0034, B-roll amendment): listed under the pieces,
+// inserted after the selected block or dropped onto the Sequence lane.
+const BROLL_TYPE = "application/x-clipper-broll";
+const brollList = document.getElementById("broll-list");
+
+function drawBrollFiles() {
+  brollList.replaceChildren();
+  document.getElementById("broll-empty").hidden = brollFiles.length > 0;
+  for (const file of brollFiles) {
+    const item = document.createElement("li");
+    item.className = "piece broll-file";
+    item.draggable = true;
+    const src = `/broll/${encodeURIComponent(file.name)}`;
+    let thumb;
+    if (file.still) {
+      thumb = document.createElement("img");
+      thumb.src = src;
+      thumb.alt = "";
+    } else {
+      thumb = document.createElement("video");
+      thumb.src = `${src}#t=0.1`;
+      thumb.muted = true;
+      thumb.preload = "metadata";
+    }
+    thumb.className = "piece-thumb";
+    const name = document.createElement("span");
+    name.className = "piece-title";
+    name.textContent = file.name;
+    const meta = document.createElement("span");
+    meta.className = "piece-meta";
+    const length = file.still ? "still" : file.duration ? `${file.duration.toFixed(1)} s` : "length unknown";
+    meta.textContent = `${length}${file.sound ? " · 🔊" : ""}`;
+    const actions = document.createElement("span");
+    actions.className = "piece-actions";
+    const add = document.createElement("button");
+    add.type = "button";
+    add.textContent = "Insert";
+    add.title = "Put it in the clip's sequence after the selected block";
+    add.addEventListener("click", () => insertBroll(file, selectedBlock + 1));
+    actions.append(add);
+    item.append(thumb, name, meta, actions);
+    item.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData(BROLL_TYPE, file.name);
+      event.dataTransfer.effectAllowed = "copy";
+    });
+    brollList.append(item);
+  }
+}
 
 loaded.then(() => {
   pad = padAtLoad || [];

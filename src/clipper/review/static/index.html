@@ -34,6 +34,9 @@
         <p id="pad-empty" class="muted pad-empty">Mark a range with Cut in, then Shift+P (or To pad); or Shift-drag on the strip. Drag a piece onto the Sequence lane.</p>
         <ol id="pad-list" class="pad-list"></ol>
         <p id="pad-notice" class="error pad-notice" role="status"></p>
+        <h2>B-roll <span class="muted">data/broll</span></h2>
+        <p id="broll-empty" class="muted pad-empty">Put your own videos and stills in data/broll, then reload.</p>
+        <ol id="broll-list" class="pad-list"></ol>
       </section>
     </nav>
     <main class="stage">
@@ -202,6 +205,7 @@
             <button type="button" id="seq-remove" title="Remove the selected block (Backspace)">Remove</button>
             <button type="button" id="seq-left" title="Move the selected block earlier (Alt+Left)">‹ Move</button>
             <button type="button" id="seq-right" title="Move the selected block later (Alt+Right)">Move ›</button>
+            <button type="button" id="seq-sound" aria-pressed="false" title="The selected B-roll insert's own sound, or silence" disabled>Sound off</button>
             <button type="button" id="seq-back" title="Drop the clip's own sequence: the span less its cuts">Back to span</button>
             <span id="sequence-state" class="muted"></span>
           </div>
@@ -213,6 +217,7 @@
     </div>
   </div>
   <audio id="music-player" loop preload="auto" hidden></audio>
+  <video id="broll-player" preload="auto" playsinline hidden></video>
   <div id="story-dialog" class="keys-help" role="dialog" aria-label="Summary" hidden>
     <div class="keys-card combine-card judge">
       <div id="story-plan">

@@ -3,8 +3,10 @@
 // and cuts make, drawn faint; the first edit on the lane makes the
 // sequence the clip's own: split, duplicate, remove, move and trim, a
 // block may repeat. While a clip has its own sequence, cuts are off and
-// the handles set only the span the label keeps. Loaded after app.js and
-// precision.js, before preview.js.
+// the handles set only the span the label keeps. A block may be a B-roll
+// insert (B-roll amendment, V7 item 9m-2a), played in a second player
+// while the source player waits. Loaded after app.js and precision.js,
+// before preview.js.
 "use strict";
 
 const sequenceBox = document.getElementById("sequence");
@@ -19,6 +21,16 @@ let selectedBlock = 0;
 let playingBlock = 0;
 // A press on a block is a drag past this many pixels, else a click.
 const BLOCK_DRAG_PX = 4;
+// B-roll inserts (ADR 0034, B-roll amendment): a hidden player for video,
+// an image for a still, and the insert shown, playing or cued.
+const brollPlayer = document.getElementById("broll-player");
+const brollStill = new Image();
+const STILL_SUFFIXES = [".png", ".jpg", ".jpeg"];
+const MAX_STILL = 30;
+let brollFiles = []; // [{name, still, duration, sound}] from /api/broll
+// {index, still, from, playing, startedAt, timer}: the insert on show.
+let insert = null;
+let lastWatch = 0; // when the frame loop last stepped the blocks
 // While an edge is dragged, the lane is not rebuilt under the pointer.
 let laneDragging = false;
 
@@ -29,7 +41,27 @@ function copyBlock(block) {
     zooms: (block.zooms || []).map((zoom) => ({ ...zoom })),
     hand_crops: (block.hand_crops || []).map((hand) => ({ ...hand })),
     effects: (block.effects || []).map((effect) => ({ ...effect })),
+    broll: block.broll || null,
+    sound: block.sound !== false,
   };
+}
+
+function isStill(name) {
+  return STILL_SUFFIXES.some((suffix) => name.toLowerCase().endsWith(suffix));
+}
+
+function brollFile(name) {
+  return brollFiles.find((file) => file.name === name) || null;
+}
+
+// How far into its file a B-roll block may run: the video's length, or
+// MAX_STILL for a still (unknown length: no limit here; Save checks it).
+function brollLimit(name) {
+  if (isStill(name)) {
+    return MAX_STILL;
+  }
+  const file = brollFile(name);
+  return file && file.duration ? file.duration : Infinity;
 }
 
 // The sequence on disk: the label's, else the one the file was rendered with.
@@ -101,7 +133,12 @@ function blockStarts(blocks) {
 function sequenceClipTime(seconds) {
   const blocks = blocksOf(current);
   const starts = blockStarts(blocks);
-  const inside = (i) => seconds >= blocks[i].start - 0.02 && seconds <= blocks[i].end + 0.02;
+  if (insert && blocks[insert.index] && blocks[insert.index].broll) {
+    const block = blocks[insert.index];
+    return starts[insert.index] + clamp(insertTime() - block.start, 0, blockLength(block));
+  }
+  const inside = (i) =>
+    !blocks[i].broll && seconds >= blocks[i].start - 0.02 && seconds <= blocks[i].end + 0.02;
   if (!(playingBlock < blocks.length && inside(playingBlock))) {
     const found = blocks.findIndex((_, i) => inside(i));
     if (found < 0) {
@@ -139,10 +176,11 @@ function drawSequence() {
       "repeat",
       blocks.some((other, i) => i < index && other.start < block.end && block.start < other.end),
     );
+    element.classList.toggle("broll", Boolean(block.broll));
     element.style.flexGrow = String(blockLength(block));
-    element.title = `${fmtTenths(block.start)} - ${fmtTenths(block.end)} (${blockLength(block).toFixed(1)} s)`;
+    element.title = blockTitle(block);
     const label = document.createElement("span");
-    label.textContent = `${index + 1} · ${fmt(block.start)}`;
+    label.textContent = blockLabel(block, index);
     const startGrip = document.createElement("div");
     startGrip.className = "grip start";
     const endGrip = document.createElement("div");
@@ -151,9 +189,31 @@ function drawSequence() {
     dragBlock(element, index);
     trimBlock(startGrip, index, "start");
     trimBlock(endGrip, index, "end");
+    if (block.broll && isStill(block.broll)) {
+      startGrip.hidden = true;
+    }
     sequenceLane.append(element);
   });
+  const chosen = blocks[selectedBlock];
+  const file = chosen && chosen.broll ? brollFile(chosen.broll) : null;
+  const sound = document.getElementById("seq-sound");
+  sound.disabled = !file || file.still || !file.sound;
+  sound.setAttribute("aria-pressed", String(Boolean(chosen && chosen.broll && chosen.sound && file && file.sound)));
+  sound.textContent = chosen && chosen.broll && chosen.sound && file && file.sound ? "Sound on" : "Sound off";
   drawSequencePlayhead();
+}
+
+function blockTitle(block) {
+  const length = `${blockLength(block).toFixed(1)} s`;
+  if (block.broll) {
+    const sound = block.sound ? "" : ", silent";
+    return `${block.broll}: ${fmtTenths(block.start)} - ${fmtTenths(block.end)} (${length}${sound})`;
+  }
+  return `${fmtTenths(block.start)} - ${fmtTenths(block.end)} (${length})`;
+}
+
+function blockLabel(block, index) {
+  return block.broll ? `${index + 1} · ▣ ${block.broll}` : `${index + 1} · ${fmt(block.start)}`;
 }
 
 function drawSequencePlayhead() {
@@ -188,7 +248,13 @@ function sequenceChanged() {
 function selectBlock(index, seconds) {
   selectedBlock = index;
   playingBlock = index;
-  player.currentTime = seconds;
+  if (blocksOf(current)[index].broll) {
+    player.pause();
+    startInsert(index, seconds, false);
+  } else {
+    stopInsert();
+    player.currentTime = seconds;
+  }
   drawSequence();
 }
 
@@ -285,24 +351,28 @@ function trimBlock(grip, index, edge) {
     const onMove = (moveEvent) => {
       // The first move makes the sequence the clip's own; a click does not.
       const block = makeOwn(current)[index];
-      const seconds = snap(
-        from + (moveEvent.clientX - fromX) * perPixel,
-        edge,
-        moveEvent.altKey,
-      );
-      if (edge === "start") {
-        block.start = round(clamp(seconds, 0, block.end - MIN_SPAN));
+      const moved = from + (moveEvent.clientX - fromX) * perPixel;
+      if (block.broll) {
+        // In the B-roll's own file: from 0 to its length, unsnapped.
+        if (edge === "start") {
+          block.start = round(clamp(moved, 0, block.end - MIN_SPAN));
+        } else {
+          block.end = round(clamp(moved, block.start + MIN_SPAN, brollLimit(block.broll)));
+        }
+        startInsert(index, block[edge], false);
+      } else if (edge === "start") {
+        block.start = round(clamp(snap(moved, edge, moveEvent.altKey), 0, block.end - MIN_SPAN));
         player.currentTime = block.start;
       } else {
-        block.end = round(clamp(seconds, block.start + MIN_SPAN, duration));
+        block.end = round(clamp(snap(moved, edge, moveEvent.altKey), block.start + MIN_SPAN, duration));
         player.currentTime = block.end;
       }
       playingBlock = index;
       laneDragging = true;
       const element = grip.parentElement;
       element.style.flexGrow = String(blockLength(block));
-      element.title = `${fmtTenths(block.start)} - ${fmtTenths(block.end)} (${blockLength(block).toFixed(1)} s)`;
-      element.querySelector("span").textContent = `${index + 1} · ${fmt(block.start)}`;
+      element.title = blockTitle(block);
+      element.querySelector("span").textContent = blockLabel(block, index);
       drawMarks();
     };
     const onUp = () => {
@@ -327,10 +397,15 @@ function splitBlock() {
   if (!current) {
     return;
   }
-  const seconds = round(player.currentTime);
   const blocks = blocksOf(current);
+  if (insert && blocks[insert.index] && blocks[insert.index].broll) {
+    splitAt(insert.index, round(insertTime()));
+    return;
+  }
+  const seconds = round(player.currentTime);
   // The block playing if the playhead is in it, else the first that shows it.
-  const inside = (block) => block && seconds > block.start && seconds < block.end;
+  const inside = (block) =>
+    block && !block.broll && seconds > block.start && seconds < block.end;
   const found = inside(blocks[playingBlock])
     ? playingBlock
     : blocks.findIndex(inside);
@@ -338,7 +413,17 @@ function splitBlock() {
     sequenceNotice("Put the playhead inside a block to split it.");
     return;
   }
-  const block = blocks[found];
+  splitAt(found, seconds);
+}
+
+// Split block `found` at `seconds`, in its own time (the source's, or a
+// B-roll file's).
+function splitAt(found, seconds) {
+  const block = blocksOf(current)[found];
+  if (block.broll && isStill(block.broll)) {
+    sequenceNotice("A still is not split; trim its end instead.");
+    return;
+  }
   if (seconds - block.start < MIN_SPAN || block.end - seconds < MIN_SPAN) {
     sequenceNotice(`Each half must be at least ${MIN_SPAN} s.`);
     return;
@@ -400,6 +485,7 @@ function backToSpan() {
   if (!current) {
     return;
   }
+  stopInsert();
   sequenceEdits.set(current.key, { own: false, blocks: [] });
   selectedBlock = 0;
   sequenceNotice("");
@@ -412,6 +498,126 @@ document.getElementById("seq-remove").addEventListener("click", removeBlock);
 document.getElementById("seq-left").addEventListener("click", () => moveBlock(-1));
 document.getElementById("seq-right").addEventListener("click", () => moveBlock(1));
 document.getElementById("seq-back").addEventListener("click", backToSpan);
+
+// Sound on or off for the selected insert, when its file has any.
+document.getElementById("seq-sound").addEventListener("click", () => {
+  const blocks = makeOwn(current);
+  const block = blocks[selectedBlock];
+  if (!block || !block.broll) {
+    return;
+  }
+  block.sound = !block.sound;
+  if (insert && insert.index === selectedBlock) {
+    brollPlayer.muted = !block.sound;
+  }
+  sequenceChanged();
+});
+
+// Put a B-roll file in the clip's sequence at `index`: the first 3 s of a
+// video (all of it if shorter), or 2 s of a still.
+function insertBroll(file, index) {
+  if (!current) {
+    return;
+  }
+  const length = file.still ? 2 : Math.min(3, file.duration || 3);
+  const blocks = makeOwn(current);
+  const at = clamp(index, 0, blocks.length);
+  blocks.splice(at, 0, copyBlock({ start: 0, end: length, broll: file.name, sound: file.sound }));
+  selectedBlock = at;
+  playingBlock = at;
+  sequenceChanged();
+}
+
+// --- The insert on show: a B-roll block played or cued ---
+
+// Seconds into the insert's own file.
+function insertTime() {
+  if (!insert) {
+    return 0;
+  }
+  if (insert.still) {
+    return insert.playing ? insert.from + (performance.now() - insert.startedAt) / 1000 : insert.from;
+  }
+  return brollPlayer.currentTime;
+}
+
+function insertPlaying() {
+  return Boolean(insert && insert.playing);
+}
+
+// Show block `index`, a B-roll insert, from `from` seconds into its file,
+// playing or cued; the source player waits.
+function startInsert(index, from, playing) {
+  const block = blocksOf(current)[index];
+  const src = `/broll/${encodeURIComponent(block.broll)}`;
+  const still = isStill(block.broll);
+  clearTimeout(insert && insert.timer);
+  insert = { index, still, from, playing, startedAt: performance.now(), timer: 0 };
+  if (still) {
+    if (brollStill.getAttribute("src") !== src) {
+      brollStill.src = src;
+    }
+    brollPlayer.pause();
+    if (playing) {
+      // A still has no player to keep frames coming, so its end is also
+      // timed, in case the page draws no frames meanwhile.
+      const left = (block.end - from) * 1000 + 30;
+      insert.timer = setTimeout(stillEnded, left);
+    }
+    return;
+  }
+  if (brollPlayer.getAttribute("src") !== src) {
+    brollPlayer.src = src;
+  }
+  brollPlayer.muted = !block.sound;
+  brollPlayer.currentTime = from;
+  if (playing) {
+    brollPlayer.play().catch(() => {
+      if (insert) {
+        insert.playing = false;
+      }
+    });
+  } else {
+    brollPlayer.pause();
+  }
+}
+
+function stopInsert() {
+  if (insert) {
+    clearTimeout(insert.timer);
+    brollPlayer.pause();
+    insert = null;
+  }
+}
+
+// What the preview draws during an insert: the video or the still, once
+// it has a frame; null otherwise.
+function insertFrame() {
+  if (!insert) {
+    return null;
+  }
+  if (insert.still) {
+    return brollStill.complete && brollStill.naturalWidth
+      ? { media: brollStill, width: brollStill.naturalWidth, height: brollStill.naturalHeight }
+      : null;
+  }
+  return brollPlayer.videoWidth
+    ? { media: brollPlayer, width: brollPlayer.videoWidth, height: brollPlayer.videoHeight }
+    : null;
+}
+
+async function loadBroll() {
+  try {
+    const response = await fetch("/api/broll");
+    const data = await response.json();
+    brollFiles = data.broll || [];
+  } catch {
+    brollFiles = [];
+  }
+  if (typeof drawBrollFiles === "function") {
+    drawBrollFiles();
+  }
+}
 
 // --- Playing through the blocks ---
 
@@ -431,36 +637,94 @@ function playSequence(index = null) {
     }
   }
   playingBlock = from;
+  if (blocks[from].broll) {
+    preview = { end: Infinity, settling: false, sequence: true };
+    startInsert(from, blocks[from].start, true);
+    requestAnimationFrame(watchPreview);
+    return;
+  }
+  stopInsert();
   const start = at === null ? blocks[from].start : at;
+  // Setting the time it already has still fires `seeking`, which would end
+  // the preview, so the time is set only when it changes.
   const seeks = Math.abs(player.currentTime - start) > 0.01;
   preview = { end: Infinity, settling: seeks, sequence: true };
-  player.currentTime = start;
+  if (seeks) {
+    player.currentTime = start;
+  }
   player.play().catch(() => {
     preview = null;
   });
   requestAnimationFrame(watchPreview);
 }
 
+// Pause the blocks while an insert plays.
+function pauseInsert() {
+  if (insert) {
+    insert.from = insertTime();
+    insert.playing = false;
+    clearTimeout(insert.timer);
+    brollPlayer.pause();
+  }
+  preview = null;
+}
+
 // Called by watchPreview each frame while the blocks play: on to the next
 // block at a block's end, a seek of our own; paused after the last.
 function watchSequence() {
+  lastWatch = performance.now();
+  if (stepSequence()) {
+    requestAnimationFrame(watchPreview);
+  }
+}
+
+// When the still's timer fires: step, and start the frame loop again if
+// it stalled while nothing played.
+function stillEnded() {
+  if (stepSequence() && performance.now() - lastWatch > 200) {
+    requestAnimationFrame(watchPreview);
+  }
+}
+
+// One step of playing the blocks: on to the next block when this one has
+// ended. False once the blocks are done or stopped.
+function stepSequence() {
+  if (!preview || !preview.sequence) {
+    return false;
+  }
   const blocks = blocksOf(current);
   const block = blocks[playingBlock];
   if (!block) {
+    stopInsert();
     player.pause();
-    return;
+    return false;
   }
-  if (!preview.settling && player.currentTime >= block.end) {
+  const ended = block.broll
+    ? insertPlaying() && insertTime() >= block.end - 0.02
+    : !preview.settling && player.currentTime >= block.end;
+  if (ended) {
     const next = playingBlock + 1;
     if (next >= blocks.length) {
+      stopInsert();
+      preview = null;
       player.pause();
-      return;
+      return false;
     }
     playingBlock = next;
-    preview.settling = true;
-    player.currentTime = blocks[next].start;
+    const after = blocks[next];
+    if (after.broll) {
+      // The source waits; its pause is ours, not the user's.
+      preview.handoff = !player.paused;
+      player.pause();
+      startInsert(next, after.start, true);
+    } else {
+      stopInsert();
+      preview.settling = true;
+      player.currentTime = after.start;
+      player.play().catch(() => {});
+    }
   }
-  requestAnimationFrame(watchPreview);
+  return true;
 }
 
 // --- What Save sends ---
@@ -475,7 +739,7 @@ function sequenceAsCuts(blocks) {
   const cuts = [];
   for (let i = 0; i < blocks.length; i += 1) {
     const block = blocks[i];
-    if (block.zooms.length || block.hand_crops.length || block.effects.length) {
+    if (block.broll || block.zooms.length || block.hand_crops.length || block.effects.length) {
       return null;
     }
     if (i > 0) {
@@ -513,6 +777,8 @@ function sameSequence(a, b) {
       (block, i) =>
         sameTime(block.start, b[i].start) &&
         sameTime(block.end, b[i].end) &&
+        (block.broll || null) === (b[i].broll || null) &&
+        (block.sound !== false) === (b[i].sound !== false) &&
         JSON.stringify([block.zooms || [], block.hand_crops || [], block.effects || []]) ===
           JSON.stringify([b[i].zooms || [], b[i].hand_crops || [], b[i].effects || []]),
     )
@@ -521,6 +787,9 @@ function sameSequence(a, b) {
 
 // A Save went through, or the clip was reset: back to what is on disk.
 function resetSequence(clip, toSpan = false) {
+  if (clip === current) {
+    stopInsert();
+  }
   if (toSpan) {
     sequenceEdits.set(clip.key, { own: false, blocks: [] });
   } else {
@@ -534,3 +803,5 @@ function resetSequence(clip, toSpan = false) {
 }
 
 player.addEventListener("timeupdate", drawSequencePlayhead);
+brollPlayer.addEventListener("timeupdate", drawSequencePlayhead);
+loaded.then(loadBroll);

@@ -3476,6 +3476,45 @@ Run 2026-11-15 in headless Edge over CDP on a scratch copy of
 as a scripted drop; Play first ran past the piece's end, fixed before
 the PR. The draft was not watched.
 
+### RV29a. B-roll inserts in the page
+
+Covers B-roll inserts in `review` ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+B-roll amendment, V7 item 9m-2a). Use a scratch copy of a drafts folder
+with captions, a scratch `CLIPPER_LABELS_DIR`, and `CLIPPER_BROLL_DIR`
+set to a folder with a video that has sound, one without, and a still
+(R22's test files will do).
+
+1. Choose a clip. Pass: under the pad, "B-roll" lists the files with a
+   first frame, the length (or "still") and 🔊 for a file with sound.
+   With no folder, the hint says to put files in `data/broll`.
+2. `Insert` on the video with sound. Pass: a green block after the
+   selected one, its first 3 s; `Sound on` is lit. Drag a still onto
+   the end of the Sequence lane. Pass: a 2 s green block there; with it
+   selected, the Sound button is greyed out.
+3. Click the video insert part way along. Pass: the preview shows that
+   frame of the B-roll, fitted on a blurred copy. Press `Sound on`.
+   Pass: it reads `Sound off`. Press `B`. Pass: the insert splits at
+   that point; a still is not split (a notice says so).
+4. Drag an insert's right edge. Pass: it grows, but no further than the
+   file's end (a still: 30 s); a still has no left edge to drag.
+5. On the Preview view, press `Preview span`. Pass: the source plays,
+   then the insert, with its sound if on and no captions, then the
+   still, silent, then the next block; the time under the preview
+   counts on across every join; texts and music carry on; it stops after
+   the last block. Space pauses and resumes inside an insert.
+6. Save. Pass: re-rendered; the Draft view matches the preview; the
+   label and manifest list the inserts with `broll` and `sound`.
+
+Run 2026-11-15 in headless Edge over CDP, test B-roll from R22: steps 1
+to 4 and 6 as above (the drop scripted); step 5 played source, insert,
+still and source in turn with the time counting on, and paused and
+resumed in an insert. Headless Edge sometimes stops drawing frames once
+no video plays, so the stop after the last block was checked by calling
+its step directly. Playing first failed when the playhead was already at
+the start (setting the same time still fires `seeking`, which ended the
+preview, in Preview span too); fixed before the PR. The draft was not
+watched.
+
 ## Record your run
 
 | Field | Value |

@@ -510,6 +510,9 @@ and planned code:
   and stills, `/api/broll`; `SequenceBlock.broll` inserts with `sound`;
   `BrollOverlay` cutaway or picture-in-picture in clip seconds; blocks
   framed one by one before the join; manual step R22.
+  Inserts amendment (9m-2a): B-roll in the pad, inserts on the lane with
+  a sound toggle, played in a second player; a seek to the same time no
+  longer ends a preview; manual step RV29a.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1500,10 +1503,12 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      - 9m-1. ~~The core: files and `/api/broll`, inserts and overlays
        on manifest and label, blocks framed one by one before the join,
        Save's checks.~~ (done; manual step R22)
-     - 9m-2. The page: B-roll in the pad panel, inserts on the
-       Sequence lane with a sound toggle, a B-roll lane of overlays,
-       picture-in-picture dragged on the preview, the preview playing
-       inserts in a second player. Manual step RV29.
+     - 9m-2a. ~~The page's inserts: B-roll in the pad panel, inserts
+       on the Sequence lane with a sound toggle, the preview playing
+       them in a second player.~~ (done; manual step RV29a)
+     - 9m-2b. The page's overlays: a B-roll lane of cutaways and
+       picture-in-picture boxes, mode and size, the box dragged on the
+       preview, overlays drawn in the preview. Manual step RV29b.
    - 9n. Sequence track and pad (added 2026-11-14, the maintainer's
      choice; ADR 0034), next, in PRs, each with a manual step:
      - 9n-1. ~~ADR 0034 and the mock (docs).~~ (done)
