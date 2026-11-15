@@ -187,6 +187,21 @@
           <div id="handle-start" class="handle" title="Start"></div>
           <div id="handle-end" class="handle" title="End"></div>
         </div>
+        <div id="sequence" class="sequence">
+          <div class="sequence-bar">
+            <span class="sequence-name">Sequence</span>
+            <button type="button" id="seq-split" title="Split the block at the playhead (B)">Split</button>
+            <button type="button" id="seq-duplicate" title="Duplicate the selected block after it (Shift+D)">Duplicate</button>
+            <button type="button" id="seq-remove" title="Remove the selected block (Backspace)">Remove</button>
+            <button type="button" id="seq-left" title="Move the selected block earlier (Alt+Left)">‹ Move</button>
+            <button type="button" id="seq-right" title="Move the selected block later (Alt+Right)">Move ›</button>
+            <button type="button" id="seq-back" title="Drop the clip's own sequence: the span less its cuts">Back to span</button>
+            <span id="sequence-state" class="muted"></span>
+          </div>
+          <div id="sequence-lane" class="sequence-lane">
+            <div id="seq-playhead" class="seq-playhead" hidden></div>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -309,6 +324,10 @@
         <dt><kbd>↓</kbd> <kbd>N</kbd></dt><dd>Next clip</dd>
         <dt><kbd>↑</kbd> <kbd>Shift</kbd>+<kbd>N</kbd></dt><dd>Previous clip</dd>
         <dt><kbd>D</kbd></dt><dd>Preview, source or draft</dd>
+        <dt><kbd>B</kbd></dt><dd>Split the block at the playhead</dd>
+        <dt><kbd>Shift</kbd>+<kbd>D</kbd></dt><dd>Duplicate the selected block</dd>
+        <dt><kbd>Backspace</kbd></dt><dd>Remove the selected block</dd>
+        <dt><kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd></dt><dd>Move the selected block</dd>
         <dt><kbd>A</kbd></dt><dd>Add clip here</dd>
         <dt><kbd>T</kbd></dt><dd>Add text</dd>
         <dt><kbd>?</kbd></dt><dd>This list (<kbd>Esc</kbd> closes it)</dd>
@@ -320,6 +339,7 @@
   <script src="/app.js"></script>
   <script src="/keys.js"></script>
   <script src="/precision.js"></script>
+  <script src="/sequence.js"></script>
   <script src="/captions.js"></script>
   <script src="/frame.js"></script>
   <script src="/audio.js"></script>

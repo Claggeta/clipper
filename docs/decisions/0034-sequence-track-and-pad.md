@@ -163,6 +163,31 @@ goes next, then 9m on top of it.
   repeat with its own 2.0x zoom), face style, captions, music and two
   effects; 14.03 s, 6.9 s to render, frames as expected.
 
+## Amended by the Sequence lane (V7 item 9n-3)
+
+- **The lane** is under the strip, in clip time, with its own playhead.
+  A clip shows the blocks its span and cuts make, faint; the first edit
+  makes the sequence its own, and `Back to span` drops it.
+- **Keys** differ from decision 8, whose `D` and `P` were taken (`D`
+  switches the view, `P` is Preview span): `B` splits at the playhead,
+  `Shift+D` duplicates the selected block, `Backspace` removes it
+  (`Delete` is Trash), `Alt+←`/`Alt+→` move it; blocks are also
+  dragged, and their edges dragged to trim (snapped to words).
+- **Cuts are off** while a clip has its own sequence: Cut in and out,
+  Cut silence and a drag on the strip say to split and remove blocks
+  instead, and no cuts are sent. The handles still set the span.
+- **The other lanes stay in source time** for now, not clip time as
+  decision 8 said: captions, zooms, hand crops and the face crop look
+  themselves up by source time, which a repeat shares, so the preview
+  needed no change for them. Texts, music and the time readout use the
+  block playing.
+- **Save** sends the span and cuts when the blocks are in source order,
+  apart and run from the start handle to the end handle with no edits of
+  their own (decision 1); otherwise `sequence` and no cuts.
+- "This block only" zooms, hand crops and effects in the Frame and Audio
+  tabs are left to a later item (9n-5); the core already takes them.
+- Manual step RV27.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.

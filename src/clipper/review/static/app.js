@@ -210,18 +210,22 @@ function drawMarks() {
   scheduleEditor();
   drawFrameLane();
   drawAudioLane();
+  drawSequenceSoft();
 }
 
 function drawTimes() {
   const length = span.end - span.start;
   const removed = activeCuts().reduce((sum, [start, end]) => sum + end - start, 0);
-  const final = length - removed;
+  const own = ownSequence(current);
+  const final = own ? sequenceLength() : length - removed;
   text("edit-start", fmtTenths(span.start));
   text("edit-end", fmtTenths(span.end));
   const lengthCell = document.getElementById("edit-length");
-  lengthCell.textContent = removed
-    ? `${length.toFixed(1)} s → ${final.toFixed(1)} s`
-    : `${length.toFixed(1)} s`;
+  lengthCell.textContent = own
+    ? `sequence ${final.toFixed(1)} s`
+    : removed
+      ? `${length.toFixed(1)} s → ${final.toFixed(1)} s`
+      : `${length.toFixed(1)} s`;
   lengthCell.classList.toggle("warn", final < MIN_LENGTH || final > MAX_LENGTH);
   drawUnsaved();
 }
@@ -270,7 +274,7 @@ function withCut(cuts, cut) {
 
 // The cuts Save sends: those still cut and inside the span, as pairs.
 function activeCuts() {
-  if (!current || !span) {
+  if (!current || !span || ownSequence(current)) {
     return [];
   }
   return cutsOf(current)
@@ -577,7 +581,7 @@ document.getElementById("add-text").addEventListener("click", () => {
 function drawCuts() {
   const box = document.getElementById("cuts");
   box.replaceChildren();
-  if (!current) {
+  if (!current || ownSequence(current)) {
     return;
   }
   for (const cut of cutsOf(current)) {
@@ -645,7 +649,8 @@ function drawUnsaved() {
     chosenStyle(current) !== (current.style || null) ||
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
-    !sameCuts(activeCuts(), savedCuts(current)) ||
+    !sameCuts(sentShape(current).cuts, savedCuts(current)) ||
+    !sameSequence(sentShape(current).sequence, savedSequence(current)) ||
     !sameTexts(sentTexts(current), savedTexts(current)) ||
     !sameCaptionEdits(sentCaptionEdits(current), savedCaptionEdits(current)) ||
     !sameFrame(current) ||
@@ -835,6 +840,8 @@ function select(clip, button) {
   span = edits.get(clip.key);
   preview = null;
   cutIn = null;
+  selectedBlock = 0;
+  playingBlock = 0;
   disarmTrash();
   notice("");
   judgeNotice(
@@ -1032,6 +1039,7 @@ document.getElementById("reset").addEventListener("click", () => {
   titleBox.value = current.model_title || "";
   cutEdits.set(current.key, []);
   cutIn = null;
+  resetSequence(current, true);
   textEdits.set(current.key, []);
   drawTexts(current);
   drawDraftTexts();
@@ -1048,6 +1056,9 @@ document.getElementById("reset").addEventListener("click", () => {
 // left out (V7 item 3a). Nothing is written until Save.
 document.getElementById("cut-silence").addEventListener("click", async () => {
   const clip = current;
+  if (cutsOff()) {
+    return;
+  }
   const query = `start=${span.start}&end=${span.end}`;
   try {
     const response = await fetch(`/api/pauses?${query}`);
@@ -1084,7 +1095,7 @@ document.getElementById("clear-cuts").addEventListener("click", () => {
 // Cuts marked by hand (ADR 0029, V7 item 3a): Cut in at the playhead, then
 // Cut out at a later time adds the range between them as a cut.
 function markCutIn() {
-  if (!current) {
+  if (!current || cutsOff()) {
     return;
   }
   const seconds = round(snap(player.currentTime, "end"));
@@ -1121,6 +1132,9 @@ function markCutOut() {
 // strip (V7 items 3a and 3b). False, with a notice, if it is too short or
 // would not lie inside the span.
 function addManualCut(start, end) {
+  if (cutsOff()) {
+    return false;
+  }
   if (end < start + MIN_CUT) {
     notice(`A cut must be at least ${MIN_CUT} s long.`);
     return false;
@@ -1142,6 +1156,16 @@ function addManualCut(start, end) {
   cutEdits.set(current.key, cuts);
   notice("");
   drawMarks();
+  return true;
+}
+
+// While a clip has its own sequence, cuts are made by splitting blocks
+// (ADR 0034); true, with a notice, then.
+function cutsOff() {
+  if (!ownSequence(current)) {
+    return false;
+  }
+  notice("This clip has its own sequence: split and remove blocks on the Sequence lane instead.");
   return true;
 }
 
@@ -1179,7 +1203,8 @@ function rendersOnSave(clip) {
     !clip.file ||
     !sameTime(span.start, clip.start) ||
     !sameTime(span.end, clip.end) ||
-    !sameCuts(activeCuts(), clip.cuts || []) ||
+    !sameCuts(sentShape(clip).cuts, clip.cuts || []) ||
+    !sameSequence(sentShape(clip).sequence, clip.sequence || []) ||
     !sameTexts(sentTexts(clip), clip.texts || []) ||
     (burnsCaptions && !sameCaptionEdits(sentCaptionEdits(clip), clip.caption_edits || null)) ||
     !sameFrame(clip) ||
@@ -1222,6 +1247,7 @@ function judged(clip, reply) {
   captionEdits.delete(clip.key);
   frameEdits.delete(clip.key);
   audioEdits.delete(clip.key);
+  resetSequence(clip);
   versions.set(clip.key, (versions.get(clip.key) || 0) + 1);
   drawBadge(clip);
   if (clip === current) {
@@ -1257,7 +1283,7 @@ saveButton.addEventListener("click", async () => {
       style: chosenStyle(clip),
       rating: marksOf(clip).rating,
       people: chosenPeople(clip),
-      cuts: activeCuts(),
+      ...sentShape(clip),
       texts: sentTexts(clip),
       caption_edits: sentCaptionEdits(clip),
       zooms: sentZooms(clip),
@@ -1404,6 +1430,11 @@ noteBox.addEventListener("input", drawUnsaved);
 // --- Preview span: play from the start handle, pause at the end handle ---
 
 document.getElementById("preview").addEventListener("click", () => {
+  // A clip with its own sequence plays its blocks in turn (ADR 0034).
+  if (ownSequence(current)) {
+    playSequence(0);
+    return;
+  }
   // A seek fires one `seeking` event of its own; any later one is the
   // user's and cancels the preview.
   const seeks = Math.abs(player.currentTime - span.start) > 0.01;
@@ -1419,6 +1450,10 @@ document.getElementById("preview").addEventListener("click", () => {
 // times a second and would play past the end handle.
 function watchPreview() {
   if (!preview) {
+    return;
+  }
+  if (preview.sequence) {
+    watchSequence();
     return;
   }
   if (!preview.settling && player.currentTime >= preview.end) {

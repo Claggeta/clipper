@@ -62,6 +62,7 @@ from clipper.review.store import (
     ReviewStore,
     UnknownClip,
     audio_payload,
+    block_payload,
     combined_payload,
     edits_payload,
     hand_payload,
@@ -93,6 +94,7 @@ _STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
     "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
+    "/sequence.js": ("sequence.js", "text/javascript; charset=utf-8"),
     "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
     "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
     "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
@@ -303,8 +305,9 @@ def clip_payload(
     are the detector's span, the same until a re-render. `model_title` is
     the model's title, kept once the page has written the clip. `variants`
     are the rendered styles and `style` the clip's own, its first (ADR 0025).
-    `cuts` are the ranges left out of the file (ADR 0029), and `texts`
-    the lines burned over it (ADR 0030).
+    `cuts` are the ranges left out of the file (ADR 0029), `texts`
+    the lines burned over it (ADR 0030), and `sequence` its blocks (ADR
+    0034).
     """
     draft_start, draft_end = clip.draft_span
     return {
@@ -331,6 +334,7 @@ def clip_payload(
         "zooms": [zoom_payload(zoom) for zoom in clip.zooms],
         "hand_crops": [hand_payload(hand) for hand in clip.hand_crops],
         "audio": audio_payload(clip.audio),
+        "sequence": [block_payload(block) for block in clip.sequence],
         "judgment": store.judgment(clip),
     }
 

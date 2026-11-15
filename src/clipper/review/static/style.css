@@ -397,7 +397,9 @@ button[aria-pressed="true"] {
   font: inherit;
 }
 
-.judge textarea { resize: vertical; }
+/* At least a few lines, so a short window scrolls the inspector rather
+   than squashing the box. */
+.judge textarea { resize: vertical; min-height: 72px; flex-shrink: 0; }
 
 .judge input:focus,
 .judge textarea:focus,
@@ -1048,4 +1050,81 @@ kbd {
   .draft-frame { height: 480px; }
   .inspector { border-left: 0; }
   .empty { border-left: 0; }
+}
+
+/* The Sequence lane (ADR 0034): the finished clip as blocks of the
+   source, in clip time, under the strip. */
+.sequence { margin-top: 8px; }
+
+.sequence-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sequence-name { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+.sequence-bar .muted { font-size: 12px; }
+
+.sequence-lane {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 34px;
+  margin-top: 6px;
+  padding: 3px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0b0d11;
+  user-select: none;
+  touch-action: none;
+}
+
+.sequence-lane .block {
+  position: relative;
+  flex-basis: 0;
+  min-width: 18px;
+  overflow: hidden;
+  padding: 0 8px;
+  border: 1px solid #5d7fb0;
+  border-radius: 5px;
+  background: #2b3b55;
+  font-size: 11px;
+  line-height: 26px;
+  white-space: nowrap;
+  cursor: grab;
+}
+
+.sequence:not(.own) .block { opacity: 0.55; }
+
+.sequence-lane .block.repeat { border-color: #b59cff; background: #3b2f5c; }
+
+.sequence-lane .block.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.sequence-lane .block.dragging { opacity: 0.6; cursor: grabbing; }
+
+.sequence-lane .grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: rgb(255 255 255 / 0.3);
+  cursor: ew-resize;
+}
+
+.sequence-lane .grip.start { left: 0; }
+
+.sequence-lane .grip.end { right: 0; }
+
+.seq-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 3px #000;
+  pointer-events: none;
 }

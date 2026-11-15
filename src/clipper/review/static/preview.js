@@ -46,15 +46,27 @@ function cutsQuery() {
     .join(",");
 }
 
+// The source range the captions are wanted for: the span, or every
+// block of a clip's own sequence (ADR 0034); chunks are in source seconds.
+function captionRange() {
+  if (!ownSequence(current)) {
+    return [span.start, span.end];
+  }
+  const blocks = blocksOf(current);
+  return [Math.min(...blocks.map((b) => b.start)), Math.max(...blocks.map((b) => b.end))];
+}
+
 function spanKey() {
-  return `${current.key}|${span.start}|${span.end}|${cutsQuery()}|${captionEditsQuery(current)}`;
+  const [start, end] = captionRange();
+  return `${current.key}|${start}|${end}|${cutsQuery()}|${captionEditsQuery(current)}`;
 }
 
 async function fetchCaptions(key) {
   captionsPending = true;
   const cuts = cutsQuery();
+  const [start, end] = captionRange();
   const query =
-    `start=${span.start}&end=${span.end}${cuts ? `&cuts=${cuts}` : ""}` +
+    `start=${start}&end=${end}${cuts ? `&cuts=${cuts}` : ""}` +
     captionEditsQuery(current);
   try {
     const response = await fetch(`/api/captions?${query}`);
@@ -123,8 +135,12 @@ function refreshData() {
 // --- Time in the finished clip ---
 
 // Seconds into the finished clip at source time `seconds`: from the span's
-// start, less the cuts before it (ADR 0029).
+// start, less the cuts before it (ADR 0029); in a clip with its own
+// sequence, in the block playing (ADR 0034), NaN outside every block.
 function clipSeconds(seconds) {
+  if (ownSequence(current)) {
+    return sequenceClipTime(seconds);
+  }
   let removed = 0;
   for (const [start, end] of activeCuts()) {
     if (seconds >= end) {
@@ -137,7 +153,7 @@ function clipSeconds(seconds) {
 }
 
 function clipLength() {
-  return clipSeconds(span.end);
+  return ownSequence(current) ? sequenceLength() : clipSeconds(span.end);
 }
 
 // --- Drawing ---
@@ -417,10 +433,12 @@ function drawPreview() {
     drawCaptions(context, width, height, seconds);
   }
   drawOnScreenTexts(context, width, height, seconds);
-  const inside = seconds >= span.start && seconds <= span.end;
+  const inside = ownSequence(current)
+    ? Number.isFinite(clipSeconds(seconds))
+    : seconds >= span.start && seconds <= span.end;
   previewTime.textContent = inside
     ? `${clipSeconds(seconds).toFixed(1)} / ${clipLength().toFixed(1)} s`
-    : `Outside the span (${fmtTenths(seconds)})`;
+    : `Outside the ${ownSequence(current) ? "sequence" : "span"} (${fmtTenths(seconds)})`;
 }
 
 // Draws every frame while the preview shows; cheap at the shown size.
@@ -442,6 +460,10 @@ function drawPreviewNow() {
 function togglePreviewPlay() {
   if (!player.paused) {
     player.pause();
+    return;
+  }
+  if (ownSequence(current)) {
+    playSequence();
     return;
   }
   const at = player.currentTime;
