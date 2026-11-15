@@ -1216,3 +1216,61 @@ kbd {
 .broll-file .piece-thumb { object-fit: cover; }
 
 #seq-sound[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+/* B-roll overlays (ADR 0034, B-roll amendment): bars in clip time under
+   the Sequence lane. */
+.overlay-head { margin-top: 6px; }
+
+.broll-lane {
+  position: relative;
+  height: 24px;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0b0d11;
+  user-select: none;
+  touch-action: none;
+}
+
+.broll-lane.empty { height: 16px; }
+
+.broll-lane.dropping { outline: 2px dashed var(--accent); }
+
+.overlay-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  min-width: 8px;
+  overflow: hidden;
+  padding: 0 8px;
+  border: 1px solid #5ad18a;
+  border-radius: 4px;
+  background: #23432f;
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: grab;
+}
+
+.overlay-bar.pip { border-style: dashed; }
+
+.overlay-bar.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.overlay-bar.past { border-color: #e06c75; }
+
+.overlay-bar .grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: rgb(255 255 255 / 0.3);
+  cursor: ew-resize;
+}
+
+.overlay-bar .grip.start { left: 0; }
+
+.overlay-bar .grip.end { right: 0; }
+
+.broll-row { margin-top: 6px; }
+
+.broll-row input[type="range"] { width: 110px; vertical-align: middle; }

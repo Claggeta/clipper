@@ -269,6 +269,32 @@ goes next, then 9m on top of it.
   and playing the blocks now set the time only when it changes.
 - Manual step RV29a.
 
+## Amended by B-roll overlays in the page (V7 item 9m-2b)
+
+- **The lane**: "B-roll over", under the Sequence lane, in the finished
+  clip's seconds over its whole length (the span less its cuts, or the
+  blocks). `Overlay` on a pad file, or a drop on the lane, adds a 2 s
+  cutaway at the playhead or the drop (shorter if the clip or file ends
+  first), at most 10. A bar drags to move, its edges to trim, at least
+  0.5 s; trimming the start moves `offset` with it, never below 0, and
+  the end stops at the clip's end and the video's. A click selects it
+  and shows the clip there. A bar past the clip's end, after a sequence
+  edit, is outlined red; Save's check refuses it as before.
+- **The row** for the selected overlay: `Cutaway` or
+  `Picture-in-picture`, a size of 15 to 100% (picture-in-picture only)
+  and `Remove`.
+- **Preview**: overlays are drawn at clip time after the framing and
+  zooms and under the captions and texts, over inserts too, as the
+  renderer lays them; a cutaway fitted on its blurred copy, a box of
+  `size` of the width centred at `x`, `y`. A third hidden player, muted,
+  plays the first video overlay shown, put back in step past 0.25 s of
+  drift; a second overlapping video overlay is not previewed (the render
+  shows both). A box dragged on the preview moves the overlay, after
+  texts and before zooms and hand crops.
+- **Save** sends `broll`; the unsaved mark, the re-render check and
+  Reset include it.
+- Manual step RV29b.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.

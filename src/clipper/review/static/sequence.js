@@ -201,6 +201,10 @@ function drawSequence() {
   sound.setAttribute("aria-pressed", String(Boolean(chosen && chosen.broll && chosen.sound && file && file.sound)));
   sound.textContent = chosen && chosen.broll && chosen.sound && file && file.sound ? "Sound on" : "Sound off";
   drawSequencePlayhead();
+  // The overlays are in clip time, so they follow the blocks' length.
+  if (typeof drawOverlayLane === "function") {
+    drawOverlayLane();
+  }
 }
 
 function blockTitle(block) {

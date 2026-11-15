@@ -108,6 +108,7 @@ _STATIC = {
     "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
     "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
     "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
+    "/overlays.js": ("overlays.js", "text/javascript; charset=utf-8"),
     "/combine.js": ("combine.js", "text/javascript; charset=utf-8"),
     "/story.js": ("story.js", "text/javascript; charset=utf-8"),
     "/preview.js": ("preview.js", "text/javascript; charset=utf-8"),
