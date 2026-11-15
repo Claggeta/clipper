@@ -1,0 +1,211 @@
+// The pad (ADR 0034, V7 item 9n-4): ranges of the source kept for later,
+// one list per drafts folder, saved in its manifest. A range goes to the
+// pad from the Cut in mark to the playhead (or the span) with Shift+P or
+// "To pad", or by a Shift-drag on the strip; a piece goes into the clip's
+// sequence by a drag onto the Sequence lane or by Add, as a copy of its
+// range. Loaded after app.js and sequence.js.
+"use strict";
+
+const padList = document.getElementById("pad-list");
+const padNotice = document.getElementById("pad-notice");
+let pad = []; // [{id, name, start, end}], as the server keeps it
+let padArmed = null; // {id, timer} while × waits for its second click
+let padPlaying = null; // the piece playing, until its end
+// The MIME type a dragged piece carries, so the lane knows it.
+const PIECE_TYPE = "application/x-clipper-piece";
+
+function padSay(message) {
+  padNotice.textContent = message;
+}
+
+async function padPost(path, body) {
+  try {
+    const reply = await post(path, body);
+    pad = reply.pad;
+    padSay("");
+    drawPad();
+    return true;
+  } catch (error) {
+    padSay(error.message);
+    return false;
+  }
+}
+
+// Send a range to the pad: Cut in mark to the playhead, else the span.
+async function toPad(start = null, end = null) {
+  if (!current) {
+    return;
+  }
+  let from = start;
+  let to = end;
+  if (from === null) {
+    if (cutIn && cutIn.key === current.key) {
+      [from, to] = [cutIn.seconds, player.currentTime].sort((a, b) => a - b);
+      cutIn = null;
+      drawMarks();
+    } else {
+      [from, to] = [span.start, span.end];
+    }
+  }
+  if (await padPost("/api/pad", { start: round(from), end: round(to) })) {
+    notice("");
+  }
+}
+
+function drawPad() {
+  padList.replaceChildren();
+  document.getElementById("pad-empty").hidden = pad.length > 0;
+  for (const piece of pad) {
+    const item = document.createElement("li");
+    item.className = "piece";
+    item.draggable = true;
+    item.dataset.id = piece.id;
+    const thumb = document.createElement("img");
+    thumb.className = "piece-thumb";
+    thumb.alt = "";
+    thumb.src = `/frames/${framesKey}/${Math.floor(piece.start)}.jpg`;
+    thumb.addEventListener("error", () => thumb.remove());
+    const name = document.createElement("input");
+    name.className = "piece-name";
+    name.value = piece.name;
+    name.maxLength = 60;
+    name.title = "Click to rename; Enter keeps it";
+    const rename = () => {
+      const value = name.value.trim();
+      if (value && value !== piece.name) {
+        padPost(`/api/pad/${piece.id}`, { name: value });
+      } else {
+        name.value = piece.name;
+      }
+    };
+    name.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        name.blur();
+      }
+    });
+    name.addEventListener("change", rename);
+    const meta = document.createElement("span");
+    meta.className = "piece-meta";
+    meta.textContent = `${fmtTenths(piece.start)} - ${fmtTenths(piece.end)} · ${(piece.end - piece.start).toFixed(1)} s`;
+    const actions = document.createElement("span");
+    actions.className = "piece-actions";
+    const play = document.createElement("button");
+    play.type = "button";
+    play.textContent = "Play";
+    play.addEventListener("click", () => playPiece(piece));
+    const add = document.createElement("button");
+    add.type = "button";
+    add.textContent = "Add";
+    add.title = "Put it in the clip's sequence after the selected block";
+    add.addEventListener("click", () => insertPiece(piece, selectedBlock + 1));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "danger";
+    remove.textContent = "×";
+    remove.title = "Take it off the pad (twice to confirm); clips that use it keep it";
+    remove.addEventListener("click", () => removePiece(piece, remove));
+    actions.append(play, add, remove);
+    item.append(thumb, name, meta, actions);
+    item.addEventListener("dragstart", (event) => {
+      if (event.target === name) {
+        event.preventDefault();
+        return;
+      }
+      event.dataTransfer.setData(PIECE_TYPE, piece.id);
+      event.dataTransfer.effectAllowed = "copy";
+    });
+    padList.append(item);
+  }
+}
+
+function removePiece(piece, button) {
+  if (!padArmed || padArmed.id !== piece.id) {
+    if (padArmed) {
+      clearTimeout(padArmed.timer);
+    }
+    button.textContent = "Sure?";
+    padArmed = {
+      id: piece.id,
+      timer: setTimeout(() => {
+        padArmed = null;
+        drawPad();
+      }, CONFIRM_MS),
+    };
+    return;
+  }
+  clearTimeout(padArmed.timer);
+  padArmed = null;
+  padPost(`/api/pad/${piece.id}/delete`, {});
+}
+
+// Play just the piece in the source player, from its start to its end.
+function playPiece(piece) {
+  preview = null;
+  padPlaying = piece;
+  player.currentTime = piece.start;
+  // Watched once it plays: until then the player still reads as paused.
+  player
+    .play()
+    .then(() => requestAnimationFrame(watchPiece))
+    .catch(() => {
+      padPlaying = null;
+    });
+}
+
+function watchPiece() {
+  if (!padPlaying || player.paused) {
+    padPlaying = null;
+    return;
+  }
+  if (player.currentTime >= padPlaying.end) {
+    player.pause();
+    padPlaying = null;
+    return;
+  }
+  requestAnimationFrame(watchPiece);
+}
+
+// A piece into the clip's sequence at `index`, as a block of its own.
+function insertPiece(piece, index) {
+  if (!current) {
+    padSay("Choose a clip first.");
+    return;
+  }
+  const blocks = makeOwn(current);
+  const at = clamp(index, 0, blocks.length);
+  blocks.splice(at, 0, copyBlock({ start: piece.start, end: piece.end }));
+  selectedBlock = at;
+  playingBlock = at;
+  padSay("");
+  sequenceChanged();
+}
+
+sequenceLane.addEventListener("dragover", (event) => {
+  if (event.dataTransfer.types.includes(PIECE_TYPE)) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    sequenceLane.classList.add("dropping");
+  }
+});
+
+sequenceLane.addEventListener("dragleave", () => {
+  sequenceLane.classList.remove("dropping");
+});
+
+sequenceLane.addEventListener("drop", (event) => {
+  sequenceLane.classList.remove("dropping");
+  const id = event.dataTransfer.getData(PIECE_TYPE);
+  const piece = pad.find((p) => p.id === id);
+  if (!piece) {
+    return;
+  }
+  event.preventDefault();
+  insertPiece(piece, dropIndex(event.clientX));
+});
+
+document.getElementById("to-pad").addEventListener("click", () => toPad());
+
+loaded.then(() => {
+  pad = padAtLoad || [];
+  drawPad();
+});

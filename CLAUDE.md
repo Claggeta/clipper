@@ -503,6 +503,9 @@ and planned code:
   Lane amendment (9n-3): keys `B` split, `Shift+D` duplicate,
   `Backspace` remove, `Alt+←/→` move; cuts off while a clip has its own
   sequence; other lanes stay in source time; manual step RV27.
+  Pad amendment (9n-4): `Shift+P` or To pad (Cut in mark to playhead,
+  else the span), `Shift`-drag on the strip; `/api/pad`; named by the
+  first words; a panel below the clip list; manual step RV28.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1501,8 +1504,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      - 9n-3. ~~The Sequence lane in clip time (reorder, trim, delete,
        duplicate) and the preview through blocks.~~ (done; split too,
        cuts off while a clip has its own sequence; manual step RV27)
-     - 9n-4. The pad: a marked range sent to it (key decided in the
-       item, `P` is Preview span), named, dragged onto the sequence.
+     - 9n-4. ~~The pad: a marked range sent to it (key decided in the
+       item, `P` is Preview span), named, dragged onto the sequence.~~
+       (done; `Shift+P`, `Shift`-drag, Add; manual step RV28)
      - 9n-5. "This block only" zooms, hand crops and sound effects in
        the Frame and Audio tabs (the core takes them since 9n-2).
 

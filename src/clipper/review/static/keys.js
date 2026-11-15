@@ -144,7 +144,7 @@ const CLIP_KEYS = {
   ".": () => stepFrame(1),
   i: () => press("set-start"),
   o: () => press("set-end"),
-  p: () => press("preview"),
+  p: (shift) => (shift ? toPad() : press("preview")),
   "[": markCutIn,
   "]": markCutOut,
   1: () => rate("good"),

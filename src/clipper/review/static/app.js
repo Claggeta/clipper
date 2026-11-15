@@ -48,6 +48,8 @@ let previewLayout = null;
 let folderCombined = null;
 // The folder's story as the page loaded it (ADR 0033); story.js keeps it.
 let folderStoryAtLoad = null;
+// The folder's pad as loaded, for pad.js (ADR 0034).
+let padAtLoad = null;
 // Names this video in frame URLs, so the browser's cache of frames never
 // mixes VODs (every run is served from the same address).
 let framesKey = "";
@@ -944,7 +946,12 @@ track.addEventListener("pointerdown", (event) => {
       dragged = true;
       if (upEvent.type === "pointerup") {
         const [start, end] = range(upEvent);
-        addManualCut(round(start), round(end));
+        // With Shift, the range goes to the pad instead (ADR 0034).
+        if (event.shiftKey || upEvent.shiftKey) {
+          toPad(start, end);
+        } else {
+          addManualCut(round(start), round(end));
+        }
       }
     }
   };
@@ -1094,16 +1101,15 @@ document.getElementById("clear-cuts").addEventListener("click", () => {
 
 // Cuts marked by hand (ADR 0029, V7 item 3a): Cut in at the playhead, then
 // Cut out at a later time adds the range between them as a cut.
+// The mark is also where Shift+P's range to the pad starts (ADR 0034), so
+// it may be set outside the span, or in a clip with its own sequence.
 function markCutIn() {
-  if (!current || cutsOff()) {
+  if (!current) {
     return;
   }
   const seconds = round(snap(player.currentTime, "end"));
-  if (seconds <= span.start || seconds >= span.end) {
-    notice("A cut must start inside the span; move the start instead.");
-    return;
-  }
-  notice("");
+  const forPad = ownSequence(current) || seconds <= span.start || seconds >= span.end;
+  notice(forPad ? "Mark set: Shift+P sends from here to the playhead to the pad." : "");
   cutIn = { key: current.key, seconds };
   drawMarks();
 }
@@ -1640,6 +1646,7 @@ async function load() {
   previewLayout = data.layout;
   folderCombined = data.combined || null;
   folderStoryAtLoad = data.story || null;
+  padAtLoad = data.pad || [];
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {
     if (data[name]) {

@@ -29,6 +29,12 @@
         <span class="rank">+</span><span class="name">Combined clip</span><span class="badge" data-state="combined">Combined</span><span class="span"></span>
       </button>
       <ol id="clips" class="clips"></ol>
+      <section class="pad" aria-label="Pad">
+        <h2>Pad <span class="muted">this video</span></h2>
+        <p id="pad-empty" class="muted pad-empty">Mark a range with Cut in, then Shift+P (or To pad); or Shift-drag on the strip. Drag a piece onto the Sequence lane.</p>
+        <ol id="pad-list" class="pad-list"></ol>
+        <p id="pad-notice" class="error pad-notice" role="status"></p>
+      </section>
     </nav>
     <main class="stage">
       <div class="screen-switch" role="group" aria-label="Show">
@@ -164,6 +170,7 @@
           <button type="button" id="cut-in-button" title="Start a cut at the playhead ( [ )">Cut in</button>
           <button type="button" id="cut-out-button" title="End the cut at the playhead ( ] ); Esc drops it">Cut out</button>
           <button type="button" id="clear-cuts">Clear cuts</button>
+          <button type="button" id="to-pad" title="Keep the range from Cut in to the playhead, or the span, on the pad (Shift+P)">To pad</button>
           <span class="sep" aria-hidden="true"></span>
           <button type="button" id="snap" aria-pressed="true" title="Handles and cuts move to the nearest word edge within 0.3 s; hold Alt while dragging to place them freely">Snap to words</button>
           <span id="trim-notice" class="error"></span>
@@ -317,6 +324,7 @@
         <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>Back or on one frame</dd>
         <dt><kbd>I</kbd> <kbd>O</kbd></dt><dd>Set start or end at the playhead</dd>
         <dt><kbd>P</kbd></dt><dd>Preview span</dd>
+        <dt><kbd>Shift</kbd>+<kbd>P</kbd></dt><dd>Cut in mark to the playhead (or the span) to the pad</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Cut in, cut out (<kbd>Esc</kbd> drops a cut in)</dd>
         <dt><kbd>1</kbd> <kbd>2</kbd></dt><dd>Rate Good or OK (again to clear)</dd>
         <dt><kbd>S</kbd> <kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save</dd>
@@ -340,6 +348,7 @@
   <script src="/keys.js"></script>
   <script src="/precision.js"></script>
   <script src="/sequence.js"></script>
+  <script src="/pad.js"></script>
   <script src="/captions.js"></script>
   <script src="/frame.js"></script>
   <script src="/audio.js"></script>

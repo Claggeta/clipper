@@ -1497,3 +1497,91 @@ def test_a_face_sequence_tracks_each_block_and_joins_the_crops(tmp_path: Path) -
     [crop] = env.renderer.crops
     assert crop is not None and crop.width == 608
     assert [t for t, _ in crop.points] == [0.0]
+
+
+# --- The pad (ADR 0034) ---
+
+
+def test_pieces_are_added_named_renamed_and_deleted_in_the_manifest(
+    tmp_path: Path,
+) -> None:
+    from clipper.adapters.results.manifest_json import load_manifest
+
+    env = Env(tmp_path)
+
+    spoken = env.store.add_piece(11.5, 14.0, None)
+    silent = env.store.add_piece(30.0, 33.0, None)
+    named = env.store.add_piece(50.0, 52.0, "the crash")
+
+    assert [(p.id, p.name) for p in env.store.manifest.pad] == [
+        ("p1", "Hello there."),
+        ("p2", "piece at 0:00:30"),
+        ("p3", "the crash"),
+    ]
+    assert (spoken.start_seconds, silent.end_seconds, named.id) == (11.5, 33.0, "p3")
+    env.store.rename_piece("p2", "quiet bit")
+    env.store.delete_piece("p1")
+    assert [(p.id, p.name) for p in env.store.manifest.pad] == [
+        ("p2", "quiet bit"),
+        ("p3", "the crash"),
+    ]
+    # A new piece takes the next number, never a deleted one's.
+    assert env.store.add_piece(1.0, 2.0, "x").id == "p4"
+    on_disk = load_manifest(env.folder)
+    assert [p.id for p in on_disk.pad] == ["p2", "p3", "p4"]
+
+
+def test_an_unknown_piece_and_a_full_pad_are_refused(tmp_path: Path) -> None:
+    from clipper.review.store import UnknownPiece
+
+    env = Env(tmp_path)
+    with pytest.raises(UnknownPiece):
+        env.store.rename_piece("p9", "x")
+    with pytest.raises(UnknownPiece):
+        env.store.delete_piece("p9")
+    for n in range(50):
+        env.store.add_piece(n, n + 1.0, f"piece {n}")
+    with pytest.raises(BadRequest, match="at most 50"):
+        env.store.add_piece(100.0, 101.0, None)
+
+
+def test_a_long_first_line_is_cut_at_a_word_for_the_name(tmp_path: Path) -> None:
+    words = tuple(
+        Word(start_seconds=20.0 + i, end_seconds=20.5 + i, text=f"word{i:02d}")
+        for i in range(20)
+    )
+    env = Env(tmp_path)
+    env.store._render = RenderInputs(  # noqa: SLF001
+        tmp_path / "talk.mp4",
+        env.renderer,
+        Transcript(
+            segments=(
+                Segment(
+                    start_seconds=20.0, end_seconds=40.0, text="words", words=words
+                ),
+            )
+        ),
+    )
+    piece = env.store.add_piece(20.0, 40.0, None)
+    assert len(piece.name) <= 60 and piece.name.endswith("…")
+    assert piece.name.startswith("word00 word01")
+
+
+def test_pad_bodies_are_checked() -> None:
+    from clipper.review.store import parse_pad_name, parse_pad_piece
+
+    assert parse_pad_piece({"start": 1.0, "end": 2.0}, 100.0) == (1.0, 2.0, None)
+    assert parse_pad_piece({"start": 1, "end": 2, "name": " a "}, 100.0)[2] == "a"
+    for body, message in [
+        ({"start": 1.0, "end": 1.2}, "at least 0.5 s"),
+        ({"start": -1.0, "end": 2.0}, "inside the video"),
+        ({"start": 1.0, "end": 200.0}, "inside the video"),
+        ({"start": 1.0, "end": 2.0, "name": "a\nb"}, "one line"),
+        ({"start": 1.0, "end": 2.0, "name": "x" * 61}, "at most 60"),
+        ([], "JSON object"),
+    ]:
+        with pytest.raises(BadRequest, match=message):
+            parse_pad_piece(body, 100.0)
+    assert parse_pad_name({"name": " crash "}) == "crash"
+    with pytest.raises(BadRequest, match="needs a name"):
+        parse_pad_name({"name": "  "})

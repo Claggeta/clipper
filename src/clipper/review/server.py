@@ -61,13 +61,17 @@ from clipper.review.store import (
     RenderInputs,
     ReviewStore,
     UnknownClip,
+    UnknownPiece,
     audio_payload,
     block_payload,
     combined_payload,
     edits_payload,
     hand_payload,
+    pad_payload,
     parse_caption_edits,
     parse_combine,
+    parse_pad_name,
+    parse_pad_piece,
     parse_save,
     parse_story_beats,
     parse_thumbnail,
@@ -95,6 +99,7 @@ _STATIC = {
     "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
     "/precision.js": ("precision.js", "text/javascript; charset=utf-8"),
     "/sequence.js": ("sequence.js", "text/javascript; charset=utf-8"),
+    "/pad.js": ("pad.js", "text/javascript; charset=utf-8"),
     "/captions.js": ("captions.js", "text/javascript; charset=utf-8"),
     "/frame.js": ("frame.js", "text/javascript; charset=utf-8"),
     "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
@@ -130,6 +135,8 @@ _STORY_PATH = re.compile(r"/api/story(?:/(plan|beats|save|trash|thumbnail|sugges
 # The folder's combined clip (ADR 0032): make it, or save, trash, thumbnail or
 # title it.
 _COMBINED_PATH = re.compile(r"/api/combined(?:/(save|trash|thumbnail|suggest))?")
+# The folder's pad (ADR 0034): add a piece, or rename or delete one.
+_PAD_PATH = re.compile(r"/api/pad(?:/(p\d{1,4})(?:/(delete))?)?")
 _MAX_BODY = 64 * 1024
 # A refused body is read and dropped up to this size before the reply.
 _MAX_DRAIN = 1024 * 1024
@@ -354,6 +361,7 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "clips": [clip_payload(session, store, clip) for clip in manifest.clips],
         "combined": combined_payload(manifest.combined),
         "story": story_payload(manifest.story),
+        "pad": pad_payload(manifest.pad),
     }
 
 
@@ -621,6 +629,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             if (combined := _COMBINED_PATH.fullmatch(path)) is not None:
                 self._post_combined(combined.group(1) or "make")
                 return
+            if (pad := _PAD_PATH.fullmatch(path)) is not None:
+                self._post_pad(pad.group(1), pad.group(2))
+                return
             action = _ACTION_PATH.fullmatch(path)
             if path == _ADD_PATH:
                 rank, verb = 0, "add"
@@ -666,6 +677,31 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
             else:
                 self._send_json(HTTPStatus.OK, reply)
+
+        def _post_pad(self, piece_id: str | None, verb: str | None) -> None:
+            """Add a piece to the pad, or rename or delete one; the reply is
+            the whole pad (ADR 0034)."""
+            if not self._trusted():
+                self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
+                return
+            try:
+                data = self._read_json()
+                if piece_id is None:
+                    store.add_piece(*parse_pad_piece(data, session.duration_seconds))
+                elif verb == "delete":
+                    store.delete_piece(piece_id)
+                else:
+                    store.rename_piece(piece_id, parse_pad_name(data))
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except UnknownPiece:
+                self._send_error(
+                    HTTPStatus.NOT_FOUND, f"No piece {piece_id} on the pad"
+                )
+            except (ClipperError, OSError) as exc:
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, {"pad": pad_payload(store.manifest.pad)})
 
         def _post_combined(self, verb: str) -> None:
             if not self._trusted():

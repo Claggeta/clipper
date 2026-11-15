@@ -247,6 +247,7 @@ def _get(
         ("/keys.js", "text/javascript", b"keydown"),
         ("/precision.js", "text/javascript", b"/api/words"),
         ("/sequence.js", "text/javascript", b"sequence-lane"),
+        ("/pad.js", "text/javascript", b"/api/pad"),
         ("/preview.js", "text/javascript", b"/api/captions"),
         ("/captions.js", "text/javascript", b"caption_edits"),
         ("/frame.js", "text/javascript", b"hand_crops"),
@@ -875,6 +876,7 @@ def test_the_page_scripts_declare_each_function_once() -> None:
             "keys.js",
             "precision.js",
             "sequence.js",
+            "pad.js",
             "captions.js",
             "frame.js",
             "audio.js",
@@ -1393,3 +1395,26 @@ def test_save_with_a_sequence_records_it_on_the_clip_and_label(
         (80.0, 85.0),
         (60.0, 70.0),
     ]
+
+
+def test_the_pad_is_listed_added_to_renamed_and_deleted(base_url: str) -> None:
+    assert json.loads(_get(base_url + "/api/clips")[2])["pad"] == []
+
+    status, reply = _post(
+        base_url, "/api/pad", {"start": 62.0, "end": 66.0, "name": "crash"}
+    )
+    assert status == 200
+    assert reply["pad"] == [{"id": "p1", "name": "crash", "start": 62.0, "end": 66.0}]
+    status, reply = _post(base_url, "/api/pad/p1", {"name": "the crash"})
+    assert (status, reply["pad"][0]["name"]) == (200, "the crash")
+    assert json.loads(_get(base_url + "/api/clips")[2])["pad"][0]["name"] == "the crash"
+    status, reply = _post(base_url, "/api/pad/p1/delete", {})
+    assert (status, reply["pad"]) == (200, [])
+    status, reply = _post(base_url, "/api/pad/p1/delete", {})
+    assert (status, reply["error"]) == (404, "No piece p1 on the pad")
+    status, reply = _post(base_url, "/api/pad", {"start": 62.0, "end": 62.1})
+    assert status == 400
+    status, _ = _post(
+        base_url, "/api/pad", {"start": 1, "end": 5}, {"Origin": "http://evil"}
+    )
+    assert status == 403

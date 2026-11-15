@@ -188,6 +188,27 @@ goes next, then 9m on top of it.
   tabs are left to a later item (9n-5); the core already takes them.
 - Manual step RV27.
 
+## Amended by the pad (V7 item 9n-4)
+
+- **To the pad**: `Shift+P` or `To pad` sends the range from the Cut in
+  mark to the playhead, or the span when no mark is set; a `Shift`-drag
+  on the strip sends the dragged range (a plain drag still cuts). `[`
+  now sets its mark anywhere, outside the span or in a clip with its own
+  sequence, for the pad; `]` still needs a cut inside the span.
+- **Server**: the clip list returns `pad`; `POST /api/pad` adds a piece
+  (`start`, `end`, optional `name`), `/api/pad/<id>` renames it,
+  `/api/pad/<id>/delete` deletes it, each with Save's checks and
+  replying with the whole pad. Ids are `p<n>`, one past the highest.
+  At least 0.5 s, at most 50 pieces, names one line of 60 characters.
+- **Default name**: the words spoken in the range, cut at a word to 60
+  characters, or `piece at H:MM:SS` when nothing is said or the folder
+  has no captions.
+- **The panel** is below the clip list, the clips scrolling above it:
+  each piece's first frame, name (renamed in place), times, `Play`,
+  `Add` (after the selected block) and `×` (twice). A piece is dragged
+  onto the Sequence lane as a copy of its range.
+- Manual step RV28.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.

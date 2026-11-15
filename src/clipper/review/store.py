@@ -57,6 +57,7 @@ from clipper.domain.models import (
     MixEffect,
     MusicBed,
     OnScreenText,
+    PadPiece,
     RenderManifest,
     SequenceBlock,
     SoundEffect,
@@ -64,6 +65,7 @@ from clipper.domain.models import (
     StoryBeat,
     Transcript,
     Zoom,
+    format_timestamp,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,8 +82,9 @@ MAX_TEXTS = 5
 # Zooms and hand crops per clip (ADR 0016 and 0025 amendments).
 MAX_ZOOMS = 10
 MAX_HAND_CROPS = 10
-# Blocks in a clip's sequence (ADR 0034).
+# Blocks in a clip's sequence, and pieces on a folder's pad (ADR 0034).
 MAX_BLOCKS = 30
+MAX_PAD_PIECES = 50
 # A text's look, sent by the page when set (ADR 0030, styling amendment).
 _TEXT_LOOK = ("colour", "look", "size", "fade", "x", "y")
 # A combined clip's label card shows this long at its clip's start (ADR 0032).
@@ -98,6 +101,10 @@ class BadRequest(Exception):
 
 class UnknownClip(Exception):
     """No clip in the manifest has that rank (HTTP 404)."""
+
+
+class UnknownPiece(Exception):
+    """No piece on the pad has that id (HTTP 404)."""
 
 
 @dataclass(frozen=True)
@@ -557,6 +564,52 @@ def thumbnail_name(clip_file: str) -> str:
     """`<clip stem>.thumb.jpg`, the same for each style of a clip."""
     stem = Path(clip_file).stem.removesuffix(".face")
     return f"{stem}.thumb.jpg"
+
+
+# A pad piece is at least this long, and its name at most this many
+# characters (ADR 0034, pad amendment).
+MIN_PIECE_SECONDS = 0.5
+PIECE_NAME = 60
+
+
+def parse_pad_piece(data: object, duration: float) -> tuple[float, float, str | None]:
+    """Check an Add to pad body: `start` and `end` inside the video, at least
+    MIN_PIECE_SECONDS apart, and an optional one-line `name`."""
+    if not isinstance(data, dict):
+        raise BadRequest("the body must be a JSON object")
+    start, end = _seconds(data, "start"), _seconds(data, "end")
+    if start < 0 or end > duration:
+        raise BadRequest("the piece must be inside the video")
+    if end - start < MIN_PIECE_SECONDS:
+        raise BadRequest(f"a piece must be at least {MIN_PIECE_SECONDS} s long")
+    name = _text(data, "name")
+    return start, end, None if name is None else _piece_name(name)
+
+
+def parse_pad_name(data: object) -> str:
+    """Check a rename body: a one-line `name`."""
+    if not isinstance(data, dict):
+        raise BadRequest("the body must be a JSON object")
+    name = _text(data, "name")
+    if name is None:
+        raise BadRequest("a piece needs a name")
+    return _piece_name(name)
+
+
+def _piece_name(name: str) -> str:
+    if "\n" in name or "\r" in name:
+        raise BadRequest("a piece's name must be one line")
+    if len(name) > PIECE_NAME:
+        raise BadRequest(f"a piece's name must be at most {PIECE_NAME} characters")
+    return name
+
+
+def pad_payload(pad: tuple[PadPiece, ...]) -> list[dict[str, object]]:
+    """The pad as the page shows it, in the order the pieces were added."""
+    return [
+        {"id": p.id, "name": p.name, "start": p.start_seconds, "end": p.end_seconds}
+        for p in pad
+    ]
 
 
 def parse_trash(data: object) -> str | None:
@@ -1267,6 +1320,72 @@ class ReviewStore:
             for start, end in spans
         ]
         return " ".join(w for w in words if w)
+
+    # --- The pad (ADR 0034) ---
+
+    def add_piece(self, start: float, end: float, name: str | None) -> PadPiece:
+        """Keep a range of the source on the folder's pad, named by hand or
+        by its first words, or its time when nothing is said in it."""
+        with self._lock:
+            pad = self.manifest.pad
+            if len(pad) >= MAX_PAD_PIECES:
+                raise BadRequest(f"the pad holds at most {MAX_PAD_PIECES} pieces")
+            numbers = [
+                int(p.id[1:]) for p in pad if p.id[:1] == "p" and p.id[1:].isdigit()
+            ]
+            piece = PadPiece(
+                id=f"p{max(numbers, default=0) + 1}",
+                name=name or self._piece_name(start, end),
+                start_seconds=start,
+                end_seconds=end,
+            )
+            self._set_pad((*pad, piece))
+            return piece
+
+    def rename_piece(self, piece_id: str, name: str) -> PadPiece:
+        """Give a pad piece a new name; the clips that use it keep theirs."""
+        with self._lock:
+            piece = self._piece(piece_id).model_copy(update={"name": name})
+            self._set_pad(
+                tuple(piece if p.id == piece_id else p for p in self.manifest.pad)
+            )
+            return piece
+
+    def delete_piece(self, piece_id: str) -> None:
+        """Take a piece off the pad. Blocks copied from it stay (ADR 0034)."""
+        with self._lock:
+            self._piece(piece_id)
+            self._set_pad(tuple(p for p in self.manifest.pad if p.id != piece_id))
+
+    def _piece(self, piece_id: str) -> PadPiece:
+        for piece in self.manifest.pad:
+            if piece.id == piece_id:
+                return piece
+        raise UnknownPiece(piece_id)
+
+    def _piece_name(self, start: float, end: float) -> str:
+        transcript = self._render.transcript
+        words = (
+            clip_text(
+                transcript,
+                ClipCandidate(
+                    start_seconds=start, end_seconds=end, score=0.0, reasons=("pad",)
+                ),
+            )
+            if transcript is not None
+            else ""
+        )
+        if not words:
+            return f"piece at {format_timestamp(start)}"
+        if len(words) <= PIECE_NAME:
+            return words
+        cut = words[: PIECE_NAME - 1].rsplit(" ", 1)[0]
+        return f"{cut}…"
+
+    def _set_pad(self, pad: tuple[PadPiece, ...]) -> None:
+        manifest = self.manifest.model_copy(update={"pad": pad})
+        self._files.save_manifest(manifest, self._folder)
+        self.manifest = manifest
 
     # --- The story (ADR 0033) ---
 
