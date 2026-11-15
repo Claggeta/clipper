@@ -483,6 +483,19 @@ and planned code:
   `review`: a background plan with progress (`/api/story/plan`,
   `/status`), beats edited in a dialog with its own player and kept,
   rendered by `POST /api/story`; manual step RV26.
+- `0034` — a sequence track and a pad in `review`: a clip is blocks in
+  play order (`sequence` on manifest clip and label), VOD ranges or
+  B-roll files; a clip in VOD order with nothing inserted is still saved
+  as span and `cuts`. The label's span stays the moment, so `eval` is
+  unchanged. A VOD range may repeat; VOD-time edits apply to every
+  occurrence, zooms and hand crops may be "this block only". A pad per
+  drafts folder (`RenderManifest.pad`) of VOD ranges sent from a marked
+  range; B-roll from `data/broll/` (`CLIPPER_BROLL_DIR`) as an overlay
+  (cutaway or picture-in-picture, clip sound continues) or an inserted
+  block (fitted, own sound or silence, no captions). One encode:
+  `trim`/`atrim` per block and `concat`, replacing `select`. Mock
+  `docs/mockups/review-sequence.html`. Amends 0007, 0017, 0019, 0024,
+  0025, 0029, 0031.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1465,11 +1478,21 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
        of the clips its beats overlap; Q3 extended)
    - 9m. B-roll (added 2026-11-14, the maintainer's choice): video clips
      and images from a local `data/broll/` folder (the maintainer's own
-     files, as with music, ADR 0007), placed over a range of the clip on
-     a B-roll track, as a full-frame cutaway or a picture-in-picture box
-     placed by dragging on the preview; the clip's audio continues;
-     drawn in the live preview and burned in the one encode. ADR 0031
-     and 0007 amendments, design stated first, manual step. After item 5.
+     files, as with music, ADR 0007), in 9n's pad, as an overlay (a
+     full-frame cutaway or a picture-in-picture box placed by dragging
+     on the preview; the clip's audio continues) or an inserted block
+     with its own sound or silence (ADR 0034); drawn in the live preview
+     and burned in the one encode. Manual step. After 9n.
+   - 9n. Sequence track and pad (added 2026-11-14, the maintainer's
+     choice; ADR 0034), next, in PRs, each with a manual step:
+     - 9n-1. ~~ADR 0034 and the mock (docs).~~ (done)
+     - 9n-2. The core: blocks, the time map with repeats, block-only
+       zooms and crops, the renderer's `trim`/`concat` join, `sequence`
+       on manifest clip and label, `RenderManifest.pad`.
+     - 9n-3. The Sequence lane in clip time (reorder, trim, delete,
+       duplicate) and the preview through blocks.
+     - 9n-4. The pad: a marked range sent with `P`, named, dragged onto
+       the sequence.
 
 Later, not scheduled:
 
