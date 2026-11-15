@@ -7,7 +7,9 @@ from clipper.domain.models import (
     ClipCandidate,
     CropPath,
     HandCropPlan,
+    RenderBlock,
     RenderedClip,
+    RenderOverlay,
     Zoom,
 )
 
@@ -19,7 +21,7 @@ class FakeClipRenderer:
     each call in `captions`, its `vertical` flag in `vertical`, its crop
     path in `crops`, its cuts in `cuts`, its zooms in `zooms`, its hand
     crops in `hands`, its audio mix in `audio` and its sequence in
-    `sequences`. Candidates
+    `sequences`, and its B-roll overlays in `overlays`. Candidates
     in `fail_on` raise ClipRenderError and write nothing.
     """
 
@@ -33,7 +35,8 @@ class FakeClipRenderer:
         self.zooms: list[tuple[Zoom, ...]] = []
         self.hands: list[HandCropPlan | None] = []
         self.audio: list[AudioMix | None] = []
-        self.sequences: list[tuple[tuple[float, float], ...]] = []
+        self.sequences: list[tuple[RenderBlock, ...]] = []
+        self.overlays: list[tuple[RenderOverlay, ...]] = []
         self.stills: list[tuple[float, Path, str | None, bool, CropPath | None]] = []
         self.fail_stills = False
         self.joins: list[
@@ -54,11 +57,14 @@ class FakeClipRenderer:
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
-        sequence: tuple[tuple[float, float], ...] = (),
+        sequence: tuple[RenderBlock, ...] = (),
+        overlays: tuple[RenderOverlay, ...] = (),
+        frame: tuple[int, int] | None = None,
     ) -> RenderedClip:
         self.calls.append((video_path, candidate, output_path))
         self.audio.append(audio)
         self.sequences.append(sequence)
+        self.overlays.append(overlays)
         self.zooms.append(zooms)
         self.hands.append(hand)
         self.cuts.append(cuts)

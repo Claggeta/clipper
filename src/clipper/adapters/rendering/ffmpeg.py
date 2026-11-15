@@ -11,7 +11,9 @@ from clipper.domain.models import (
     ClipCandidate,
     CropPath,
     HandCropPlan,
+    RenderBlock,
     RenderedClip,
+    RenderOverlay,
     Zoom,
 )
 
@@ -31,19 +33,28 @@ _AUDIO_BITRATE = "128k"
 _CAPTIONS_NAME = "clip.ass"
 _SUBTITLES_FILTER = f"subtitles={_CAPTIONS_NAME}:charenc=UTF-8"
 
+
 # ADR 0016. The whole frame, fitted inside 1080x1920 at even sizes, centred on
 # a blurred copy of itself scaled to fill the frame. The blur runs at quarter
 # size (270x480) and is scaled back up, which is far cheaper than blurring at
 # full size. Blur strength is a first guess, checked by eye only. setsar=1
 # stops players stretching the result.
-_VERTICAL_FILTER = (
-    "split[bg][fg];"
-    "[bg]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,"
-    "boxblur=10:2,scale=1080:1920[blurred];"
-    "[fg]scale=1080:1920:force_original_aspect_ratio=decrease:"
-    "force_divisible_by=2[fitted];"
-    "[blurred][fitted]overlay=(W-w)/2:(H-h)/2,setsar=1"
-)
+def _fit_filter(tag: str = "", width: int = 1080, height: int = 1920) -> str:
+    """The picture fitted inside `width` x `height` on a blurred copy of
+    itself; `tag` keeps its labels apart from another copy's in one graph
+    (ADR 0034, B-roll amendment)."""
+    small_w, small_h = width // 4, height // 4
+    return (
+        f"split[bg{tag}][fg{tag}];"
+        f"[bg{tag}]scale={small_w}:{small_h}:force_original_aspect_ratio=increase,"
+        f"crop={small_w}:{small_h},boxblur=10:2,scale={width}:{height}[blurred{tag}];"
+        f"[fg{tag}]scale={width}:{height}:force_original_aspect_ratio=decrease:"
+        f"force_divisible_by=2[fitted{tag}];"
+        f"[blurred{tag}][fitted{tag}]overlay=(W-w)/2:(H-h)/2,setsar=1"
+    )
+
+
+_VERTICAL_FILTER = _fit_filter()
 
 # ADR 0025. The face style's moving crop: `sendcmd` reads the window's left
 # edge over time from a bare filename in ffmpeg's working directory, as the
@@ -52,17 +63,19 @@ _VERTICAL_FILTER = (
 _CROP_NAME = "crop.cmd"
 
 
-def _face_filter(crop: CropPath) -> str:
+def _face_filter(crop: CropPath, tag: str = "") -> str:
     left = crop.points[0][1]
     return (
-        f"sendcmd=f={_CROP_NAME},crop@face={crop.width}:{crop.height}:{left}:0,"
+        f"sendcmd=f=crop{tag}.cmd,crop@face{tag}={crop.width}:{crop.height}:{left}:0,"
         "scale=1080:1920,setsar=1"
     )
 
 
-def _crop_commands(crop: CropPath) -> str:
+def _crop_commands(crop: CropPath, tag: str = "") -> str:
     """One `sendcmd` line per point: from that time, the crop's left edge."""
-    return "".join(f"{_seconds(t)} crop@face x {left};\n" for t, left in crop.points)
+    return "".join(
+        f"{_seconds(t)} crop@face{tag} x {left};\n" for t, left in crop.points
+    )
 
 
 def _still_crop(crop: CropPath) -> str:
@@ -112,23 +125,23 @@ def _zoom_filter(zooms: tuple[Zoom, ...]) -> str:
     )
 
 
-def _hand_filter(hand: HandCropPlan) -> str:
+def _hand_filter(hand: HandCropPlan, tag: str = "") -> str:
     """ADR 0025, hand crop amendment. The fit frame, and the hand-placed
     window shown over it in its stretches."""
     left = hand.path.points[0][1]
     shown = "+".join(f"between(t,{_seconds(a)},{_seconds(b)})" for a, b in hand.ranges)
     return (
-        f"split[zbase][zhand];[zbase]{_VERTICAL_FILTER}[zfit];"
-        f"[zhand]sendcmd=f={_HAND_NAME},crop@hand={hand.path.width}:"
-        f"{hand.path.height}:{left}:0,scale=1080:1920,setsar=1[zcrop];"
-        f"[zfit][zcrop]overlay=enable='{shown}',setsar=1"
+        f"split[zbase{tag}][zhand{tag}];[zbase{tag}]{_fit_filter(tag)}[zfit{tag}];"
+        f"[zhand{tag}]sendcmd=f=hand{tag}.cmd,crop@hand{tag}={hand.path.width}:"
+        f"{hand.path.height}:{left}:0,scale=1080:1920,setsar=1[zcrop{tag}];"
+        f"[zfit{tag}][zcrop{tag}]overlay=enable='{shown}',setsar=1"
     )
 
 
-def _hand_commands(hand: HandCropPlan) -> str:
+def _hand_commands(hand: HandCropPlan, tag: str = "") -> str:
     """One `sendcmd` line per window: from its start, its left edge."""
     return "".join(
-        f"{_seconds(t)} crop@hand x {left};\n" for t, left in hand.path.points
+        f"{_seconds(t)} crop@hand{tag} x {left};\n" for t, left in hand.path.points
     )
 
 
@@ -230,18 +243,35 @@ def _cut_filters(
     )
 
 
-def _check_sequence(
-    sequence: tuple[tuple[float, float], ...], cuts: tuple[tuple[float, float], ...]
-) -> None:
-    """ADR 0034. Raise `ClipRenderError` unless each block has a length from
-    0 on, and there are no cuts beside them."""
-    if sequence and cuts:
-        raise ClipRenderError("A clip with a sequence has no cuts")
-    for a, b in sequence:
-        if not 0 <= a < b:
+# A still B-roll image is read at this frame rate (ADR 0034).
+_STILL_FPS = "30"
+
+
+def _check_blocks(blocks: tuple[RenderBlock, ...]) -> None:
+    """ADR 0034. Raise `ClipRenderError` unless each block has a length."""
+    for block in blocks:
+        if not 0 <= block.start_seconds < block.end_seconds:
             raise ClipRenderError(
-                f"Block {a:.3f}-{b:.3f}s must start at 0 or later, with a length"
+                f"Block {block.start_seconds:.3f}-{block.end_seconds:.3f}s must start "
+                "at 0 or later, with a length"
             )
+
+
+def _input(path: Path, start: float, length: float, still: bool) -> list[str]:
+    """One input: a still looped for `length`, or `length` of a video from
+    `start`, seeking fast."""
+    if still:
+        return [
+            "-loop",
+            "1",
+            "-framerate",
+            _STILL_FPS,
+            "-t",
+            _seconds(length),
+            "-i",
+            str(path),
+        ]
+    return ["-ss", _seconds(start), "-t", _seconds(length), "-i", str(path)]
 
 
 def _seconds(value: float) -> str:
@@ -268,7 +298,9 @@ class FfmpegClipRenderer:
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
-        sequence: tuple[tuple[float, float], ...] = (),
+        sequence: tuple[RenderBlock, ...] = (),
+        overlays: tuple[RenderOverlay, ...] = (),
+        frame: tuple[int, int] | None = None,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -278,7 +310,26 @@ class FfmpegClipRenderer:
             )
 
         check_cuts(cuts, candidate.start_seconds, candidate.end_seconds)
-        _check_sequence(sequence, cuts)
+        if sequence:
+            if cuts or crop is not None or hand is not None:
+                raise ClipRenderError(
+                    "A clip with a sequence has no cuts, and its blocks carry "
+                    "their own crops"
+                )
+            return self._render_blocks(
+                video_path,
+                candidate,
+                output_path,
+                captions,
+                vertical=vertical,
+                zooms=zooms,
+                audio=audio,
+                blocks=sequence,
+                overlays=overlays,
+                frame=frame,
+            )
+        if overlays:
+            raise ClipRenderError("B-roll overlays need the clip as a sequence")
         if (zooms or hand is not None) and not (vertical or crop is not None):
             raise ClipRenderError("Zooms and hand crops need the vertical frame")
 
@@ -314,29 +365,12 @@ class FfmpegClipRenderer:
         mix = None
         extra: list[str] = []
         if audio is not None and audio != AudioMix():
-            if sequence:
-                # The blocks' joined sound is the voice; the music and
-                # effects are the inputs after the blocks (ADR 0034).
-                length = sum(b - a for a, b in sequence)
-                mix = _mix_graph(audio, length, None, "[ac]", len(sequence))
-            else:
-                length = candidate.duration_seconds - sum(b - a for a, b in cuts)
-                mix = _mix_graph(audio, length, audio_filter)
+            length = candidate.duration_seconds - sum(b - a for a, b in cuts)
+            mix = _mix_graph(audio, length, audio_filter)
             extra = _mix_inputs(audio)
             audio_filter = None
 
         def run(video: Path, output: Path, cwd: Path | None = None) -> None:
-            if sequence:
-                self._join_blocks(
-                    video,
-                    sequence,
-                    output,
-                    cwd=cwd,
-                    video_filter=video_filter,
-                    mix=mix,
-                    extra_inputs=extra,
-                )
-                return
             self._cut(
                 video,
                 candidate,
@@ -496,33 +530,105 @@ class FfmpegClipRenderer:
             raise ClipRenderError(format_failure(self._executable, result))
         return output_path
 
-    def _join_blocks(
+    def _render_blocks(
         self,
         video_path: Path,
-        sequence: tuple[tuple[float, float], ...],
+        candidate: ClipCandidate,
         output_path: Path,
+        captions: str | None,
         *,
-        cwd: Path | None = None,
-        video_filter: str | None = None,
-        mix: str | None = None,
-        extra_inputs: list[str] | None = None,
-    ) -> None:
-        """ADR 0034. Each block is its own input, seeking fast to its start
-        and limited to its length, and the blocks are joined by `concat`;
-        the frame, captions and audio mix then run on the joined clip, in
-        one encode. `concat` needs every block's sound, so the source's
-        first audio stream is required."""
+        vertical: bool,
+        zooms: tuple[Zoom, ...],
+        audio: AudioMix | None,
+        blocks: tuple[RenderBlock, ...],
+        overlays: tuple[RenderOverlay, ...],
+        frame: tuple[int, int] | None,
+    ) -> RenderedClip:
+        """ADR 0034, B-roll amendment. Each block is an input of its own and
+        framed on its own: a source block as fit, its face crop or its hand
+        windows, a B-roll block fitted on a blurred fill, with silence where
+        it has no sound. The blocks are joined by `concat`; then the zooms,
+        the overlays and the captions run on the joined clip, all in one
+        encode. A source block needs the source's audio stream."""
+        _check_blocks(blocks)
+        if zooms and not vertical:
+            raise ClipRenderError("Zooms and hand crops need the vertical frame")
+        width, height = (1080, 1920) if vertical else (frame or (0, 0))
+        if (
+            not vertical
+            and width == 0
+            and (overlays or any(b.path is not None for b in blocks))
+        ):
+            raise ClipRenderError("B-roll in a landscape clip needs the frame size")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         inputs: list[str] = []
+        graph: list[str] = []
+        files: dict[str, bytes] = {}
         joined = ""
-        for n, (a, b) in enumerate(sequence):
-            inputs += ["-ss", _seconds(a), "-t", _seconds(b - a), "-i", str(video_path)]
-            joined += f"[{n}:v:0][{n}:a:0]"
-        graph = [
-            f"{joined}concat=n={len(sequence)}:v=1:a=1[vc][ac]",
-            f"[vc]{video_filter or 'null'}[vout]",
-        ]
-        if mix:
-            graph.append(mix)
+        for n, block in enumerate(blocks):
+            length = block.duration_seconds
+            if block.path is None:
+                inputs += _input(video_path, block.start_seconds, length, False)
+            else:
+                inputs += _input(
+                    block.path.resolve(), block.start_seconds, length, block.still
+                )
+            framed = self._frame(block, n, vertical, width, height, files)
+            graph.append(f"[{n}:v:0]{framed}[v{n}]")
+            if block.path is None or (block.sound and not block.still):
+                graph.append(f"[{n}:a:0]anull[a{n}]")
+            else:
+                graph.append(
+                    "anullsrc=channel_layout=stereo:sample_rate=48000,"
+                    f"atrim=duration={_seconds(length)}[a{n}]"
+                )
+            joined += f"[v{n}][a{n}]"
+        graph.append(f"{joined}concat=n={len(blocks)}:v=1:a=1[vc][ac]")
+        current = "vc"
+        if zooms:
+            graph.append(f"[vc]{_zoom_filter(zooms)}[vz]")
+            current = "vz"
+        for k, overlay in enumerate(overlays):
+            m = len(blocks) + k
+            length = overlay.end_seconds - overlay.start_seconds
+            inputs += _input(
+                overlay.path.resolve(), overlay.offset_seconds, length, overlay.still
+            )
+            shift = f"setpts=PTS-STARTPTS+{_seconds(overlay.start_seconds)}/TB"
+            if overlay.mode == "cutaway":
+                look = _fit_filter(f"o{k}", width, height)
+                place = "0:0"
+            else:
+                box = max(round(overlay.size * width / 2) * 2, 2)
+                look = f"scale={box}:-2,setsar=1"
+                place = (
+                    f"x='{overlay.x * width:.0f}-w/2':y='{overlay.y * height:.0f}-h/2'"
+                )
+            graph.append(f"[{m}:v:0]{shift},{look}[o{k}]")
+            shown = (
+                f"between(t,{_seconds(overlay.start_seconds)},"
+                f"{_seconds(overlay.end_seconds)})"
+            )
+            graph.append(
+                f"[{current}][o{k}]overlay={place}:enable='{shown}':eof_action=pass[ov{k}]"
+            )
+            current = f"ov{k}"
+        if captions:
+            graph.append(f"[{current}]{_SUBTITLES_FILTER}[vout]")
+            files[_CAPTIONS_NAME] = captions.encode("utf-8")
+        else:
+            graph.append(f"[{current}]null[vout]")
+        audio_map = "[ac]"
+        extra: list[str] = []
+        if audio is not None and audio != AudioMix():
+            # The blocks' joined sound is the voice; the music and effects
+            # are the inputs after the blocks and overlays (ADR 0034).
+            length = sum(block.duration_seconds for block in blocks)
+            graph.append(
+                _mix_graph(audio, length, None, "[ac]", len(blocks) + len(overlays))
+            )
+            extra = _mix_inputs(audio)
+            audio_map = "[aout]"
         args = [
             "-hide_banner",
             "-loglevel",
@@ -530,13 +636,13 @@ class FfmpegClipRenderer:
             "-nostdin",
             "-y",
             *inputs,
-            *(extra_inputs or []),
+            *extra,
             "-filter_complex",
             ";".join(graph),
             "-map",
             "[vout]",
             "-map",
-            "[aout]" if mix else "[ac]",
+            audio_map,
             "-c:v",
             "libx264",
             "-preset",
@@ -551,8 +657,54 @@ class FfmpegClipRenderer:
             _AUDIO_BITRATE,
             "-movflags",
             "+faststart",
-            str(output_path),
         ]
+        if not files:
+            self._run_blocks([*args, str(output_path)], output_path)
+        else:
+            with tempfile.TemporaryDirectory(
+                prefix="clipper-render-", ignore_cleanup_errors=True
+            ) as folder:
+                for name, data in files.items():
+                    (Path(folder) / name).write_bytes(data)
+                # ffmpeg runs in `folder`, so every path is absolute.
+                resolved = [
+                    str(video_path.resolve()) if a == str(video_path) else a
+                    for a in args
+                ]
+                self._run_blocks(
+                    [*resolved, str(output_path.resolve())],
+                    output_path,
+                    Path(folder),
+                )
+        return RenderedClip(candidate=candidate, path=output_path)
+
+    @staticmethod
+    def _frame(
+        block: RenderBlock,
+        n: int,
+        vertical: bool,
+        width: int,
+        height: int,
+        files: dict[str, bytes],
+    ) -> str:
+        """One block's own framing, its labels and command files tagged
+        with its number so the blocks' copies do not meet in one graph."""
+        tag = f"b{n}"
+        if block.path is not None:
+            return f"{_fit_filter(tag, width, height)},format=yuv420p"
+        if block.crop is not None:
+            files[f"crop{tag}.cmd"] = _crop_commands(block.crop, tag).encode("utf-8")
+            return f"{_face_filter(block.crop, tag)},format=yuv420p"
+        if block.hand is not None:
+            files[f"hand{tag}.cmd"] = _hand_commands(block.hand, tag).encode("utf-8")
+            return f"{_hand_filter(block.hand, tag)},format=yuv420p"
+        if vertical:
+            return f"{_fit_filter(tag)},format=yuv420p"
+        return "setsar=1,format=yuv420p"
+
+    def _run_blocks(
+        self, args: list[str], output_path: Path, cwd: Path | None = None
+    ) -> None:
         result = run_tool(
             self._executable, args, error_type=ClipRenderError, log=logger, cwd=cwd
         )

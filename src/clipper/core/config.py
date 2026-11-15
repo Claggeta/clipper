@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # is downloaded (ADR 0007, audio amendment).
     music_dir: Path = Path("data/music")
     sfx_dir: Path = Path("data/sfx")
+    # B-roll video and still files, the maintainer's own (ADR 0034).
+    broll_dir: Path = Path("data/broll")
     # The post queue's campaigns and posts record (ADR 0028).
     campaigns_file: Path = Path("data/campaigns.txt")
     posts_file: Path = Path("data/posts.json")

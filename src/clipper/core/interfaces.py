@@ -13,8 +13,10 @@ from clipper.domain.models import (
     HandCropPlan,
     LabeledVideo,
     MediaInfo,
+    RenderBlock,
     RenderedClip,
     RenderManifest,
+    RenderOverlay,
     StoryNote,
     Transcript,
     VideoInfo,
@@ -132,10 +134,14 @@ class ClipRenderer(Protocol):
     vertical frame. `audio` is the clip's volume, music and sound effects,
     effect times in the cut clip's seconds (ADR 0007, audio amendment).
 
-    `sequence` is source ranges played in turn, in place of the candidate's
-    span and cuts (ADR 0034): a range may repeat or come from outside the
-    span. Captions, crop, zoom, hand and effect times are then the joined
-    clip's. It needs the source's audio stream.
+    `sequence` is blocks played in turn, in place of the candidate's span
+    and cuts (ADR 0034): source ranges, which may repeat or come from
+    outside the span, or B-roll files. Each block is framed on its own (its
+    face crop or hand windows, or fit), so `crop` and `hand` are not given;
+    captions, zoom and effect times are the joined clip's. `overlays` are
+    B-roll over stretches of the joined clip, and `frame` the source's
+    width and height, for B-roll in a landscape clip. A source block needs
+    the source's audio stream.
     """
 
     def render(
@@ -151,7 +157,9 @@ class ClipRenderer(Protocol):
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
-        sequence: tuple[tuple[float, float], ...] = (),
+        sequence: tuple[RenderBlock, ...] = (),
+        overlays: tuple[RenderOverlay, ...] = (),
+        frame: tuple[int, int] | None = None,
     ) -> RenderedClip: ...
 
     def join(

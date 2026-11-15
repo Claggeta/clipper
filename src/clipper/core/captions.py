@@ -404,7 +404,7 @@ def build_ass(
     cuts: tuple[Cut, ...] = (),
     texts: tuple[OnScreenText, ...] = (),
     edits: CaptionEdits | None = None,
-    sequence: tuple[Cut, ...] = (),
+    sequence: tuple[Cut | float, ...] = (),
 ) -> Captions:
     """Build styled ASS captions for the part of `transcript` inside the clip.
 
@@ -433,7 +433,9 @@ def build_ass(
     `sequence` is the clip's blocks as source ranges in play order (ADR
     0034), in place of the span and cuts: each block is captioned as a clip
     of its own and moved to its place, so a chunk never spans a join, and
-    a repeated range is captioned, with its edits, each time it plays.
+    a repeated range is captioned, with its edits, each time it plays. A
+    bare number is a block of that many seconds with no speech, a B-roll
+    insert (B-roll amendment).
 
     The text is "" when no event remains. The caller decides what that means.
     """
@@ -494,7 +496,7 @@ def _clip_events(
 
 def _sequence_events(
     transcript: Transcript,
-    sequence: tuple[Cut, ...],
+    sequence: tuple[Cut | float, ...],
     edits: CaptionEdits | None,
     highlight: str,
 ) -> tuple[list[str], bool, int]:
@@ -502,7 +504,11 @@ def _sequence_events(
     events: list[str] = []
     from_segments = False
     at = 0
-    for start, end in sequence:
+    for block in sequence:
+        if not isinstance(block, tuple):
+            at += _to_ms(block)
+            continue
+        start, end = block
         clip_start, clip_end = _to_ms(start), _to_ms(end)
         for segment in transcript.segments:
             if not segment.words:

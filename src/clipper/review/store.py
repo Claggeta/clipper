@@ -26,7 +26,13 @@ from clipper.core.framing import (
     window_width,
     with_hand_crops,
 )
-from clipper.core.interfaces import ClipRenderer, FaceTracker, ReviewFiles, TitleWriter
+from clipper.core.interfaces import (
+    ClipRenderer,
+    FaceTracker,
+    MediaProbe,
+    ReviewFiles,
+    TitleWriter,
+)
 from clipper.core.judging import (
     drop_clip,
     is_own_label,
@@ -43,6 +49,7 @@ from clipper.core.sequence import BlockMap
 from clipper.domain.errors import ClipperError, JudgingError, ReviewError
 from clipper.domain.models import (
     AudioMix,
+    BrollOverlay,
     CaptionEdits,
     ClipAudio,
     ClipCandidate,
@@ -52,13 +59,17 @@ from clipper.domain.models import (
     CombinedPart,
     CropPath,
     HandCrop,
+    HandCropPlan,
     LabeledVideo,
     ManifestClip,
+    MediaInfo,
     MixEffect,
     MusicBed,
     OnScreenText,
     PadPiece,
+    RenderBlock,
     RenderManifest,
+    RenderOverlay,
     SequenceBlock,
     SoundEffect,
     Story,
@@ -66,6 +77,7 @@ from clipper.domain.models import (
     Transcript,
     Zoom,
     format_timestamp,
+    is_still,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,9 +94,11 @@ MAX_TEXTS = 5
 # Zooms and hand crops per clip (ADR 0016 and 0025 amendments).
 MAX_ZOOMS = 10
 MAX_HAND_CROPS = 10
-# Blocks in a clip's sequence, and pieces on a folder's pad (ADR 0034).
+# Blocks in a clip's sequence, pieces on a folder's pad, and B-roll
+# overlays per clip (ADR 0034).
 MAX_BLOCKS = 30
 MAX_PAD_PIECES = 50
+MAX_OVERLAYS = 10
 # A text's look, sent by the page when set (ADR 0030, styling amendment).
 _TEXT_LOOK = ("colour", "look", "size", "fade", "x", "y")
 # A combined clip's label card shows this long at its clip's start (ADR 0032).
@@ -131,6 +145,8 @@ class SaveRequest:
     audio: ClipAudio | None = None
     # Blocks played in turn, in place of the span less its cuts (ADR 0034).
     sequence: tuple[SequenceBlock, ...] = ()
+    # B-roll over stretches of the finished clip (ADR 0034).
+    broll: tuple[BrollOverlay, ...] = ()
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -173,7 +189,10 @@ def parse_save(
     its own `zooms`, `hand_crops` (as above, in seconds from the block's
     start) and `effects` (as above); with one there are no cuts, and the
     clip's zooms, hand crops and effects may lie anywhere its span or
-    blocks cover (ADR 0034).
+    blocks cover (ADR 0034). A block with `broll` names a B-roll file, its
+    `start` and `end` times in the file, and `sound`. `broll` is overlays
+    of `file`, `start`, `end` (the finished clip's seconds), `offset`,
+    `mode`, `x`, `y` and `size`.
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -211,8 +230,9 @@ def parse_save(
     if sequence and cuts:
         raise BadRequest("a clip with a sequence has no cuts")
     # Source-time edits may lie anywhere the clip shows (ADR 0034).
-    low = min([start, *(block.start_seconds for block in sequence)])
-    high = max([end, *(block.end_seconds for block in sequence)])
+    shown = [block for block in sequence if block.broll is None]
+    low = min([start, *(block.start_seconds for block in shown)])
+    high = max([end, *(block.end_seconds for block in shown)])
     return SaveRequest(
         start,
         end,
@@ -235,7 +255,36 @@ def parse_save(
         ),
         parse_audio(data.get("audio"), low, high),
         sequence,
+        _overlays(data.get("broll", [])),
     )
+
+
+def _overlays(value: object) -> tuple[BrollOverlay, ...]:
+    """B-roll overlays from a request (ADR 0034, B-roll amendment)."""
+    if not isinstance(value, list) or len(value) > MAX_OVERLAYS:
+        raise BadRequest(f"broll must be a list of at most {MAX_OVERLAYS} overlays")
+    overlays: list[BrollOverlay] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise BadRequest("each B-roll overlay must be an object")
+        fields = {k: v for k, v in item.items() if k not in ("start", "end", "offset")}
+        try:
+            overlays.append(
+                BrollOverlay.model_validate(
+                    {
+                        "start_seconds": _seconds(item, "start"),
+                        "end_seconds": _seconds(item, "end"),
+                        "offset_seconds": _seconds(item, "offset")
+                        if "offset" in item
+                        else 0.0,
+                        **fields,
+                    }
+                )
+            )
+        except ValidationError as exc:
+            message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+            raise BadRequest(f"B-roll overlay: {message}") from exc
+    return tuple(overlays)
 
 
 def _sequence(value: object, duration: float) -> tuple[SequenceBlock, ...]:
@@ -248,7 +297,13 @@ def _sequence(value: object, duration: float) -> tuple[SequenceBlock, ...]:
         if not isinstance(item, dict):
             raise BadRequest("each block must be an object")
         start, end = _seconds(item, "start"), _seconds(item, "end")
-        if start < 0 or end > duration or end <= start:
+        broll = item.get("broll")
+        if broll is not None and not isinstance(broll, str):
+            raise BadRequest("a block's broll must be a file name")
+        # A B-roll block's times are in its file (ADR 0034, B-roll amendment).
+        if broll is None and (start < 0 or end > duration):
+            raise BadRequest("each block must be inside the video, with a length")
+        if end <= start:
             raise BadRequest("each block must be inside the video, with a length")
         length = end - start
         effects = item.get("effects", [])
@@ -271,6 +326,8 @@ def _sequence(value: object, duration: float) -> tuple[SequenceBlock, ...]:
                         length,
                     ),
                     effects=tuple(SoundEffect.model_validate(e) for e in effects),
+                    broll=broll,
+                    sound=item.get("sound", True) is not False,
                 )
             )
         except ValidationError as exc:
@@ -653,6 +710,10 @@ class RenderInputs:
     sfx_dir: Path | None = None
     # Suggests a combined clip's title; None without a model (ADR 0032).
     title_writer: TitleWriter | None = None
+    # The maintainer's B-roll files, and a probe for their length and sound
+    # (ADR 0034, B-roll amendment).
+    broll_dir: Path | None = None
+    probe: MediaProbe | None = None
 
 
 class ReviewStore:
@@ -674,6 +735,7 @@ class ReviewStore:
         self._lock = threading.Lock()
         self.manifest = manifest
         self.labels = labels
+        self._broll_infos: dict[Path, MediaInfo] = {}
 
     def _clip(self, rank: int) -> ManifestClip:
         for clip in self.manifest.clips:
@@ -702,6 +764,7 @@ class ReviewStore:
                     "hand_crops": [hand_payload(h) for h in label.hand_crops],
                     "audio": audio_payload(label.audio),
                     "sequence": [block_payload(b) for b in label.sequence],
+                    "broll": [overlay_payload(o) for o in label.broll],
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -757,11 +820,18 @@ class ReviewStore:
             or clip.hand_crops != request.hand_crops
             or clip.audio != request.audio
             or clip.sequence != request.sequence
+            or clip.broll != request.broll
         )
         self._check_audio(request.audio)
         for block in request.sequence:
             for effect in block.effects:
                 self._audio_path(self._render.sfx_dir, effect.file, "sound effect")
+        length = (
+            sum(block.duration_seconds for block in request.sequence)
+            if request.sequence
+            else TimeMap(request.start, request.end, request.cuts).duration
+        )
+        self._check_broll(request.sequence, request.broll, length)
         block_edits = any(b.zooms or b.hand_crops for b in request.sequence)
         if (
             request.zooms or request.hand_crops or block_edits
@@ -796,6 +866,7 @@ class ReviewStore:
             request.hand_crops,
             request.audio,
             request.sequence,
+            request.broll,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -821,6 +892,7 @@ class ReviewStore:
                     request.hand_crops,
                     request.audio,
                     request.sequence,
+                    request.broll,
                 )
             except ClipperError as exc:
                 render_error = str(exc)
@@ -946,24 +1018,31 @@ class ReviewStore:
         hand_crops: tuple[HandCrop, ...] = (),
         audio: ClipAudio | None = None,
         sequence: tuple[SequenceBlock, ...] = (),
+        broll: tuple[BrollOverlay, ...] = (),
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
         Returns the manifest changes. A failure leaves no temporary file and
         any old file untouched. With cuts, the face crop and captions follow
         the cut clip's times (ADR 0029). Texts are burned with the captions,
-        or alone in a folder without them (ADR 0030). With a sequence, its
-        blocks play in turn and every source-time edit is placed at each
-        block it falls in (ADR 0034).
+        or alone in a folder without them (ADR 0030). With a sequence, or
+        B-roll overlays, the clip renders as blocks, each framed on its own,
+        and every source-time edit is placed at each block it falls in (ADR
+        0034); a clip with overlays and no sequence is its span less its
+        cuts as blocks.
         """
         manifest = self.manifest
-        blocks = BlockMap(sequence) if sequence else None
         time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
-        clip_zooms: tuple[Zoom, ...]
-        hands: list[HandWindow]
+        blocks: BlockMap | None = None
+        if sequence or broll:
+            blocks = BlockMap(sequence or _span_blocks(candidate, cuts))
+        size = self._render.frame_size
+        crop: CropPath | None = None
+        hand: HandCropPlan | None = None
+        render_blocks: tuple[RenderBlock, ...] = ()
         if blocks is not None:
             clip_zooms = blocks.zooms(zooms)
-            hands = blocks.hands(hand_crops)
+            render_blocks = self._render_blocks(blocks, style, hand_crops)
         else:
             # Zooms and hand crops move to the cut clip's times; one inside a
             # cut is left out (ADR 0016 and 0025 amendments).
@@ -973,27 +1052,20 @@ class ReviewStore:
                 if (b := time_map.clamped(zoom.end_seconds))
                 > (a := time_map.clamped(zoom.start_seconds))
             )
-            hands = [
+            hands: list[HandWindow] = [
                 (a, b, hand.x)
                 for hand in hand_crops
                 if (b := time_map.clamped(hand.end_seconds))
                 > (a := time_map.clamped(hand.start_seconds))
             ]
-        size = self._render.frame_size
-        if hands and size is None:
-            raise ReviewError("Hand crops need the video's frame size")
-        crop = None
-        if style == "face":
-            crop = (
-                self._block_crop(blocks)
-                if blocks is not None
-                else cut_crop(self._crop(candidate), time_map)
-            )
-        hand = None
-        if crop is not None and size is not None:
-            crop = with_hand_crops(crop, hands, size[0])
-        elif size is not None:
-            hand = hand_crop_plan(hands, *size)
+            if hands and size is None:
+                raise ReviewError("Hand crops need the video's frame size")
+            if style == "face":
+                crop = cut_crop(self._crop(candidate), time_map)
+            if crop is not None and size is not None:
+                crop = with_hand_crops(crop, hands, size[0])
+            elif size is not None:
+                hand = hand_crop_plan(hands, *size)
         ass = ""
         burned: str | None = None
         captioned = manifest.captions and self._render.transcript is not None
@@ -1004,10 +1076,10 @@ class ReviewStore:
                 else _SILENT,
                 candidate,
                 vertical=manifest.vertical,
-                cuts=cuts,
+                cuts=() if blocks is not None else cuts,
                 texts=texts,
                 edits=caption_edits,
-                sequence=blocks.ranges if blocks is not None else (),
+                sequence=blocks.captioned if blocks is not None else (),
             )
             ass = built.text
             if built.speech:
@@ -1022,11 +1094,13 @@ class ReviewStore:
                 captions=ass or None,
                 vertical=manifest.vertical,
                 crop=crop,
-                cuts=cuts,
+                cuts=() if blocks is not None else cuts,
                 zooms=clip_zooms,
                 hand=hand,
                 audio=self._mix(audio, time_map, blocks),
-                sequence=blocks.ranges if blocks is not None else (),
+                sequence=render_blocks,
+                overlays=tuple(self._overlay(o) for o in broll),
+                frame=size,
             )
             try:
                 os.replace(temp, target)
@@ -1049,21 +1123,139 @@ class ReviewStore:
             "hand_crops": hand_crops,
             "audio": audio,
             "sequence": sequence,
+            "broll": broll,
         }
 
-    def _block_crop(self, blocks: BlockMap) -> CropPath:
-        """The face style's crop for a sequence: each block tracked and
-        framed on its own, joined at the blocks' places; a block with no
-        face holds the window in the middle (ADR 0034)."""
-        tracker, size = self._render.face_tracker, self._render.frame_size
-        if tracker is None or size is None:
-            raise ReviewError("A face re-render needs the face tracker and frame size")
-        crops = [
-            plan_face_crop(tracker.track(self._render.video, a, b), *size)
-            for a, b in blocks.ranges
+    def _render_blocks(
+        self, blocks: BlockMap, style: str | None, hand_crops: tuple[HandCrop, ...]
+    ) -> tuple[RenderBlock, ...]:
+        """Each block as the renderer frames it on its own (ADR 0034): a
+        source block with its face crop (tracked over its range, held in
+        the middle where it has no face) or its hand windows, a B-roll
+        block as its file, with sound only if the file has any."""
+        size = self._render.frame_size
+        hands = blocks.block_hands(hand_crops)
+        if any(hands) and size is None:
+            raise ReviewError("Hand crops need the video's frame size")
+        crops: list[CropPath | None] = [None] * len(blocks.placed)
+        if style == "face":
+            tracker = self._render.face_tracker
+            if tracker is None or size is None:
+                raise ReviewError(
+                    "A face re-render needs the face tracker and frame size"
+                )
+            crops = [
+                None
+                if block.broll is not None
+                else plan_face_crop(
+                    tracker.track(
+                        self._render.video, block.start_seconds, block.end_seconds
+                    ),
+                    *size,
+                )
+                for block, _ in blocks.placed
+            ]
+            blocks.check_faces(crops)
+        made: list[RenderBlock] = []
+        for (block, _), crop, windows in zip(blocks.placed, crops, hands, strict=True):
+            if block.broll is not None:
+                path = self._broll_path(block.broll)
+                made.append(
+                    RenderBlock(
+                        start_seconds=block.start_seconds,
+                        end_seconds=block.end_seconds,
+                        path=path,
+                        still=is_still(block.broll),
+                        # A still has no sound; a video only if its file does.
+                        sound=block.sound
+                        and not is_still(block.broll)
+                        and self._broll_has_sound(path),
+                    )
+                )
+                continue
+            hand = None
+            if style == "face" and size is not None:
+                if crop is None:
+                    window = window_width(*size)
+                    crop = CropPath(
+                        width=window,
+                        height=size[1] // 2 * 2,
+                        points=((0.0, (size[0] - window) // 2),),
+                    )
+                crop = with_hand_crops(crop, windows, size[0])
+            elif size is not None:
+                hand = hand_crop_plan(windows, *size)
+            made.append(
+                RenderBlock(
+                    start_seconds=block.start_seconds,
+                    end_seconds=block.end_seconds,
+                    crop=crop,
+                    hand=hand,
+                )
+            )
+        return tuple(made)
+
+    def _broll_path(self, name: str) -> Path:
+        folder = self._render.broll_dir
+        path = (folder or Path()) / name
+        if folder is None or not path.is_file():
+            raise JudgingError(f"No B-roll file {name} in {folder}")
+        return path
+
+    def _broll_info(self, path: Path) -> MediaInfo | None:
+        """A B-roll file's length and streams, probed once; None without a
+        probe."""
+        probe = self._render.probe
+        if probe is None:
+            return None
+        if path not in self._broll_infos:
+            self._broll_infos[path] = probe.probe(path)
+        return self._broll_infos[path]
+
+    def _broll_has_sound(self, path: Path) -> bool:
+        info = self._broll_info(path)
+        return info is not None and info.has_audio
+
+    def _check_broll(
+        self,
+        sequence: tuple[SequenceBlock, ...],
+        broll: tuple[BrollOverlay, ...],
+        length: float,
+    ) -> None:
+        """Refuse a Save whose B-roll is missing, runs past the end of its
+        file, or whose overlays run past the clip's end, before anything is
+        written (ADR 0034, B-roll amendment)."""
+        uses = [(b.broll, b.end_seconds) for b in sequence if b.broll is not None]
+        uses += [
+            (o.file, o.offset_seconds + o.end_seconds - o.start_seconds) for o in broll
         ]
-        window = window_width(*size)
-        return blocks.join_crops(crops, (size[0] - window) // 2)
+        for name, reach in uses:
+            path = self._broll_path(name)
+            info = None if is_still(name) else self._broll_info(path)
+            if info is not None and reach > info.duration_seconds + 0.05:
+                raise JudgingError(
+                    f"B-roll {name} is {info.duration_seconds:.1f} s long; "
+                    f"this needs {reach:.1f} s of it"
+                )
+        for overlay in broll:
+            if overlay.end_seconds > length + 0.05:
+                raise JudgingError(
+                    f"A B-roll overlay ends at {overlay.end_seconds:.1f} s, past the "
+                    f"clip's {length:.1f} s"
+                )
+
+    def _overlay(self, overlay: BrollOverlay) -> RenderOverlay:
+        return RenderOverlay(
+            path=self._broll_path(overlay.file),
+            still=is_still(overlay.file),
+            start_seconds=overlay.start_seconds,
+            end_seconds=overlay.end_seconds,
+            offset_seconds=overlay.offset_seconds,
+            mode=overlay.mode,
+            x=overlay.x,
+            y=overlay.y,
+            size=overlay.size,
+        )
 
     def _delete_others(self, clip: ManifestClip, keep: str, done: str) -> str | None:
         """Delete the clip's files other than `keep`: its previous file and its
@@ -1665,7 +1857,35 @@ def block_payload(block: SequenceBlock) -> dict[str, object]:
         "zooms": [zoom_payload(z) for z in block.zooms],
         "hand_crops": [hand_payload(h) for h in block.hand_crops],
         "effects": [e.model_dump() for e in block.effects],
+        "broll": block.broll,
+        "sound": block.sound,
     }
+
+
+def overlay_payload(overlay: BrollOverlay) -> dict[str, object]:
+    """A B-roll overlay as the page sends and shows it (ADR 0034)."""
+    return {
+        "file": overlay.file,
+        "start": overlay.start_seconds,
+        "end": overlay.end_seconds,
+        "offset": overlay.offset_seconds,
+        "mode": overlay.mode,
+        "x": overlay.x,
+        "y": overlay.y,
+        "size": overlay.size,
+    }
+
+
+def _span_blocks(
+    candidate: ClipCandidate, cuts: tuple[Cut, ...]
+) -> tuple[SequenceBlock, ...]:
+    """The span less its cuts as blocks in order, for a clip with B-roll
+    overlays and no sequence of its own (ADR 0034)."""
+    start = candidate.start_seconds
+    return tuple(
+        SequenceBlock(start_seconds=start + a, end_seconds=start + b)
+        for a, b in TimeMap(start, candidate.end_seconds, cuts).kept()
+    )
 
 
 def _same_cuts(a: tuple[Cut, ...], b: tuple[Cut, ...]) -> bool:

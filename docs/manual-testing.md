@@ -1273,6 +1273,136 @@ None`, 1080x1920 with audio, 14.03 s, 6.9 s to render; frames at 1.8 s
 (1.4x), 6.5 and 9.5 s (block 2, no zoom) and 12.5 s (2.0x) as expected,
 captions in each block. Audio not listened to.
 
+### R22. B-roll: inserts and overlays in one encode
+
+Covers B-roll in the renderer ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+B-roll amendment, V7 item 9m-1). The page has no B-roll yet (9m-2), and
+the tests fake ffmpeg, so this drives a Save from Python, as R21 does,
+with test B-roll made by ffmpeg in a scratch folder: a test pattern with
+a 660 Hz tone, a silent portrait clip and a square still. Use R21's
+video, or change the times.
+
+```powershell
+$Vod = "3Sbj_BZORr4"; $B = "$S\r22\broll"
+New-Item -ItemType Directory -Force $B | Out-Null
+ffmpeg -v error -y -f lavfi -i "testsrc2=size=1280x720:rate=30:duration=6" -f lavfi -i "sine=frequency=660:duration=6" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$B\pattern.mp4"
+ffmpeg -v error -y -f lavfi -i "smptebars=size=720x1280:rate=30:duration=4" -c:v libx264 -pix_fmt yuv420p "$B\phone.mp4"
+ffmpeg -v error -y -f lavfi -i "color=c=orange:size=800x800,drawbox=x=200:y=200:w=400:h=400:color=navy:t=fill" -frames:v 1 "$B\badge.png"
+$Driver = @"
+import sys
+import time
+from pathlib import Path
+
+from clipper.adapters.media.faces import CachingFaceTracker, OpenCvFaceTracker
+from clipper.adapters.media.ffprobe import FfprobeMediaProbe
+from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.results.analysis_json import load_analysis_result
+from clipper.adapters.results.review_files import JsonReviewFiles
+from clipper.domain.models import (
+    BrollOverlay,
+    ClipVariant,
+    ManifestClip,
+    RenderManifest,
+    SequenceBlock,
+    Zoom,
+)
+from clipper.review.store import RenderInputs, ReviewStore, SaveRequest
+
+vod, out, broll, style = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4]
+folder = out / "clips" / vod
+folder.mkdir(parents=True, exist_ok=True)
+for name in ("a.mp4", "a.face.mp4"):
+    (folder / name).write_bytes(b"placeholder")
+clip = ManifestClip(
+    rank=1,
+    start_seconds=2522.0,
+    end_seconds=2559.0,
+    score=0.5,
+    reasons=("r22",),
+    file="a.mp4",
+    variants=(
+        ClipVariant(style="fit", file="a.mp4"),
+        ClipVariant(style="face", file="a.face.mp4"),
+    ),
+)
+manifest = RenderManifest(
+    source=f"{vod}.mp4",
+    analysis="r22",
+    detector=None,
+    vertical=True,
+    captions=True,
+    titles=False,
+    clips=(clip,),
+    styles=("fit", "face"),
+)
+store = ReviewStore(
+    folder,
+    manifest,
+    None,
+    out / "labels" / f"{vod}.json",
+    JsonReviewFiles(),
+    RenderInputs(
+        Path(f"data/videos/{vod}.mp4"),
+        FfmpegClipRenderer(),
+        load_analysis_result(Path(f"data/output/{vod}.json")).transcript,
+        CachingFaceTracker(OpenCvFaceTracker(), out / "faces", "yunet"),
+        (1920, 1080),
+        broll_dir=broll,
+        probe=FfprobeMediaProbe(),
+    ),
+)
+# 0-5 s source, 5-8 s pattern.mp4 with its tone, 8-10 s badge.png still,
+# 10-14 s source; a phone.mp4 cutaway at 11-12.5 s and a badge box at 1-3 s.
+sequence = (
+    SequenceBlock(start_seconds=2530.0, end_seconds=2535.0),
+    SequenceBlock(start_seconds=1.0, end_seconds=4.0, broll="pattern.mp4"),
+    SequenceBlock(start_seconds=0.0, end_seconds=2.0, broll="badge.png"),
+    SequenceBlock(start_seconds=2522.0, end_seconds=2526.0),
+)
+overlays = (
+    BrollOverlay(file="badge.png", start_seconds=1.0, end_seconds=3.0, mode="pip", x=0.75, y=0.2, size=0.3),
+    BrollOverlay(file="phone.mp4", start_seconds=11.0, end_seconds=12.5, offset_seconds=1.0),
+)
+began = time.perf_counter()
+result = store.save(
+    1,
+    SaveRequest(
+        2522.0,
+        2559.0,
+        None,
+        None,
+        style,
+        zooms=(Zoom(start_seconds=2531.0, end_seconds=2533.0, scale=1.4),),
+        sequence=sequence,
+        broll=overlays,
+    ),
+)
+print("render_error:", result.render_error)
+print("file:", result.clip.file, f"{time.perf_counter() - began:.1f} s")
+"@
+foreach ($Style in "face", "fit") {
+  Remove-Item -Recurse -Force "$S\r22\$Style" -ErrorAction SilentlyContinue
+  $Driver | uv run python - $Vod "$S\r22\$Style" $B $Style
+  $Clip = Get-ChildItem "$S\r22\$Style\clips\$Vod" -Filter "$Vod*.mp4"
+  ffprobe -v error -show_entries format=duration:stream=codec_type,width,height -of csv=p=0 $Clip.FullName
+}
+```
+
+Pass, for each style: `render_error: None`; a 1080x1920 file with audio,
+about 14.0 s long (blocks of 5, 3, 2 and 4 s). Watch it: the source with
+a 1.4x punch-in at 1 to 3 s and the orange badge as a box at the top
+right; at 5 s the test pattern fitted on a blurred copy of itself, with
+its tone and no captions; at 8 s the badge still, silent; at 10 s the
+source again, and at 11 to 12.5 s the colour bars over the whole frame,
+the speech going on and the captions on top. In the face style the
+source blocks follow the face; in fit they are the whole frame on a
+blurred fill.
+
+Run 2026-11-15 on 3Sbj_BZORr4 (ffmpeg 9.0.2): both styles 14.02 s with
+audio, 4.5 s (face) and 3.0 s (fit) to render; frames at 1.8, 3.5, 6.5,
+9.0, 11.7 and 13.0 s as above; mean volume -12.5 dB over speech, -24.1 dB
+in the pattern insert, -91.0 dB during the still.
+
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),

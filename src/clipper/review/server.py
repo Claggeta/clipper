@@ -34,6 +34,7 @@ from clipper.core.interfaces import (
     ClipRenderer,
     FaceTracker,
     FrameExtractor,
+    MediaProbe,
     PeaksExtractor,
     ReviewFiles,
     StoryWriter,
@@ -49,12 +50,15 @@ from clipper.domain.errors import (
 )
 from clipper.domain.models import (
     AUDIO_SUFFIXES,
+    BROLL_IMAGE_SUFFIXES,
+    BROLL_VIDEO_SUFFIXES,
     ClipCandidate,
     LabeledVideo,
     ManifestClip,
     MusicBed,
     RenderManifest,
     Transcript,
+    is_still,
 )
 from clipper.review.store import (
     BadRequest,
@@ -67,6 +71,7 @@ from clipper.review.store import (
     combined_payload,
     edits_payload,
     hand_payload,
+    overlay_payload,
     pad_payload,
     parse_caption_edits,
     parse_combine,
@@ -117,6 +122,9 @@ _FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7}(?:\.25|\.5|\.75)?)\.jpg")
 # The maintainer's audio files, for the page to play: /music/<name> and
 # /sfx/<name>, listed names only (ADR 0007, audio amendment).
 _AUDIO_PATH = re.compile(r"/(music|sfx)/([^/\\]+)")
+# The maintainer's B-roll, for the page to show: /broll/<name>, listed
+# names only (ADR 0034, B-roll amendment).
+_BROLL_PATH = re.compile(r"/broll/([^/\\]+)")
 # The video's audio levels for the waveform: /peaks/<video key>.bin.
 _PEAKS_PATH = re.compile(r"/peaks/([^/]+)\.bin")
 # A rendered draft listed in the manifest: /clips/<file name> (ADR 0025).
@@ -154,7 +162,9 @@ class ReviewSession:
     `people` are the names the page offers to mark as on screen (ADR 0024,
     rating amendment). `peaks` writes the waveform's levels to `peaks_path`
     once, on the first request (ADR 0031); without it there is none.
-    `music_dir` and `sfx_dir` hold the maintainer's audio files (ADR 0007).
+    `music_dir` and `sfx_dir` hold the maintainer's audio files (ADR 0007),
+    and `broll_dir` their B-roll, whose length and sound `probe` reads
+    (ADR 0034, B-roll amendment).
     """
 
     folder: Path
@@ -175,6 +185,8 @@ class ReviewSession:
     peaks_path: Path | None = None
     music_dir: Path | None = None
     sfx_dir: Path | None = None
+    broll_dir: Path | None = None
+    probe: MediaProbe | None = None
     title_writer: TitleWriter | None = None
     story_writer: StoryWriter | None = None
 
@@ -299,6 +311,8 @@ def make_store(session: ReviewSession) -> ReviewStore:
             session.music_dir,
             session.sfx_dir,
             session.title_writer,
+            broll_dir=session.broll_dir,
+            probe=session.probe,
         ),
     )
 
@@ -342,6 +356,7 @@ def clip_payload(
         "hand_crops": [hand_payload(hand) for hand in clip.hand_crops],
         "audio": audio_payload(clip.audio),
         "sequence": [block_payload(block) for block in clip.sequence],
+        "broll": [overlay_payload(overlay) for overlay in clip.broll],
         "judgment": store.judgment(clip),
     }
 
@@ -486,6 +501,47 @@ def audio_files(folder: Path | None) -> list[str]:
     )
 
 
+def broll_files(folder: Path | None) -> list[str]:
+    """The B-roll files in a folder, by name, which are all the page may
+    pick or fetch (ADR 0034, B-roll amendment)."""
+    if folder is None or not folder.is_dir():
+        return []
+    suffixes = BROLL_VIDEO_SUFFIXES + BROLL_IMAGE_SUFFIXES
+    return sorted(
+        path.name
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in suffixes
+    )
+
+
+def broll_payload(session: ReviewSession, known: dict[str, object]) -> list[object]:
+    """Each B-roll file with its kind, and for a video its length and
+    whether it has sound, probed once per run and kept in `known`; a file
+    the probe cannot read is listed with no length."""
+    listed: list[object] = []
+    for name in broll_files(session.broll_dir):
+        if name not in known:
+            entry: dict[str, object] = {
+                "name": name,
+                "still": is_still(name),
+                "duration": None,
+                "sound": False,
+            }
+            if not is_still(name) and session.probe and session.broll_dir:
+                try:
+                    info = session.probe.probe(session.broll_dir / name)
+                except ClipperError:
+                    pass
+                else:
+                    entry |= {
+                        "duration": info.duration_seconds,
+                        "sound": info.has_audio,
+                    }
+            known[name] = entry
+        listed.append(known[name])
+    return listed
+
+
 def _listed_thumbnails(store: ReviewStore) -> set[str]:
     """The thumbnails the manifest lists, which are all the page may fetch."""
     names = {c.thumbnail for c in store.manifest.clips if c.thumbnail is not None}
@@ -561,6 +617,8 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
     video_type = mimetypes.guess_type(session.video.name)[0] or "video/mp4"
     store = make_store(session)
     job = StoryJob()
+    # Each B-roll file's kind, length and sound, probed once (ADR 0034).
+    broll_known: dict[str, object] = {}
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -591,6 +649,14 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     )
                 elif (sound := _AUDIO_PATH.fullmatch(path)) and self._send_audio(
                     sound.group(1), sound.group(2)
+                ):
+                    pass
+                elif path == "/api/broll":
+                    self._send_json(
+                        HTTPStatus.OK, {"broll": broll_payload(session, broll_known)}
+                    )
+                elif (shot := _BROLL_PATH.fullmatch(path)) and self._send_broll(
+                    shot.group(1)
                 ):
                     pass
                 elif path == "/api/captions":
@@ -896,6 +962,15 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             """Send a listed music or sound effect file; False if not listed."""
             folder = session.music_dir if kind == "music" else session.sfx_dir
             if folder is None or name not in audio_files(folder):
+                return False
+            content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+            self._send_file(folder / name, content_type)
+            return True
+
+        def _send_broll(self, name: str) -> bool:
+            """Send a listed B-roll file; False if not listed."""
+            folder = session.broll_dir
+            if folder is None or name not in broll_files(folder):
                 return False
             content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
             self._send_file(folder / name, content_type)

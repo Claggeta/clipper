@@ -407,6 +407,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "hand_crops": [],
         "audio": None,
         "sequence": [],
+        "broll": [],
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -586,6 +587,7 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "hand_crops": [],
         "audio": None,
         "sequence": [],
+        "broll": [],
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]
@@ -1418,3 +1420,56 @@ def test_the_pad_is_listed_added_to_renamed_and_deleted(base_url: str) -> None:
         base_url, "/api/pad", {"start": 1, "end": 5}, {"Origin": "http://evil"}
     )
     assert status == 403
+
+
+def test_broll_files_are_listed_with_lengths_and_only_listed_ones_served(
+    tmp_path: Path,
+) -> None:
+    from clipper.domain.errors import MediaProbeError
+    from clipper.domain.models import MediaInfo
+
+    class Probe:
+        calls = 0
+
+        def probe(self, media_path: Path) -> MediaInfo:
+            Probe.calls += 1
+            if media_path.name == "broken.mp4":
+                raise MediaProbeError("unreadable")
+            return MediaInfo(duration_seconds=8.0, has_video=True, has_audio=True)
+
+    broll = tmp_path / "broll"
+    broll.mkdir()
+    for name, data in [
+        ("drift.mp4", b"mp4 bytes"),
+        ("skull.png", b"png bytes"),
+        ("broken.mp4", b"x"),
+        ("notes.txt", b"no"),
+    ]:
+        (broll / name).write_bytes(data)
+    session = dataclasses.replace(_session(tmp_path), broll_dir=broll, probe=Probe())
+    server = make_server(session, 0)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        listed = json.loads(_get(url + "/api/broll")[2])["broll"]
+        assert listed == [
+            {"name": "broken.mp4", "still": False, "duration": None, "sound": False},
+            {"name": "drift.mp4", "still": False, "duration": 8.0, "sound": True},
+            {"name": "skull.png", "still": True, "duration": None, "sound": False},
+        ]
+        _get(url + "/api/broll")
+        assert Probe.calls == 2
+        status, headers, body = _get(url + "/broll/drift.mp4")
+        assert (status, body, headers["Content-Type"]) == (
+            200,
+            b"mp4 bytes",
+            "video/mp4",
+        )
+        assert _get(url + "/broll/notes.txt")[0] == 404
+        assert _get(url + "/broll/..%2Fbroll%2Fdrift.mp4")[0] == 404
+    finally:
+        server.shutdown()
+        server.server_close()

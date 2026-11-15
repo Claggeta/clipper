@@ -82,7 +82,15 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
         if label.audio is not None:
             entry["audio"] = label.audio.model_dump()
         if label.sequence:
-            entry["sequence"] = [block.model_dump() for block in label.sequence]
+            # A source block's B-roll fields are left out (ADR 0034).
+            entry["sequence"] = [
+                block.model_dump(exclude={"broll", "sound"})
+                if block.broll is None
+                else block.model_dump()
+                for block in label.sequence
+            ]
+        if label.broll:
+            entry["broll"] = [overlay.model_dump() for overlay in label.broll]
         if label.note is not None:
             entry["note"] = label.note
         labels.append(entry)

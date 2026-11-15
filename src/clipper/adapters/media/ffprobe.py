@@ -70,6 +70,10 @@ class FfprobeMediaProbe:
                 has_video=video is not None,
                 width=width,
                 height=height,
+                has_audio=any(
+                    isinstance(s, dict) and s.get("codec_type") == "audio"
+                    for s in streams
+                ),
             )
         except (TypeError, ValueError, ValidationError) as exc:
             raise MediaProbeError(
