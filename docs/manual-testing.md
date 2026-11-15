@@ -3317,6 +3317,35 @@ Run 2026-11-15 in headless Edge over CDP on a scratch copy of
 clip for 8; step 7 re-rendered the 4-block clip and the manifest held
 the sequence. The draft was not watched.
 
+### RV28. The pad
+
+Covers the pad ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+V7 item 9n-4). Use a scratch copy of a drafts folder with captions and a
+scratch `CLIPPER_LABELS_DIR`, as in RV7.
+
+1. Choose a clip. Pass: below the clip list, "Pad" with a hint and no
+   pieces.
+2. Move the playhead outside the span, press `[`, move on 4 s and press
+   `Shift+P`. Pass: the notice says the mark is for the pad; a piece
+   appears, named by its first words, with its first frame, times and
+   length. `Shift+P` with no mark adds the span. A `Shift`-drag on the
+   strip adds the dragged range; a plain drag still cuts.
+3. Click a piece's name, type a new one, press Enter. Reload. Pass: the
+   pad keeps its pieces and the new name.
+4. `Play` on a piece. Pass: it plays from its start and stops at its end.
+5. `Add` on a piece, then drag another onto the front of the Sequence
+   lane. Pass: each becomes a block where it was put; the sequence is
+   the clip's own; the lane outlines while a piece is dragged over it.
+6. `×` on a piece, then again within 3 s. Pass: "Sure?", then it is
+   gone; the blocks made from it stay.
+7. Save. Pass: re-rendered; the Draft view plays the pad pieces in
+   their places; the manifest has the pad and the clip's sequence.
+
+Run 2026-11-15 in headless Edge over CDP on a scratch copy of
+3Sbj_BZORr4's judging folder: steps 1 to 7 as above, the drag in step 5
+as a scripted drop; Play first ran past the piece's end, fixed before
+the PR. The draft was not watched.
+
 ## Record your run
 
 | Field | Value |

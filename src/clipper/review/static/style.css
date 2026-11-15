@@ -107,10 +107,15 @@ button[aria-pressed="true"] {
 
 .sidebar {
   grid-area: list;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-right: 1px solid var(--line);
   background: var(--panel);
 }
+
+/* The clips scroll; the pad keeps its place below them (ADR 0034). */
+.sidebar .clips { flex: 1 1 auto; min-height: 80px; overflow-y: auto; }
 
 .clips { list-style: none; margin: 0; padding: 8px; }
 
@@ -1128,3 +1133,70 @@ kbd {
   box-shadow: 0 0 3px #000;
   pointer-events: none;
 }
+
+/* The pad (ADR 0034): ranges kept for later, under the clip list. */
+.pad {
+  flex: 0 1 auto;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.pad h2 {
+  margin: 0 4px 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pad h2 .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+.pad-empty { margin: 0 4px; font-size: 12px; }
+
+.pad-notice { margin: 4px; font-size: 12px; }
+
+.pad-list { list-style: none; margin: 0; padding: 0; }
+
+.piece {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 2px 8px;
+  margin-bottom: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  cursor: grab;
+}
+
+.piece-thumb {
+  grid-row: span 3;
+  width: 48px;
+  height: 27px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #000;
+}
+
+.piece-name {
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.piece-name:hover, .piece-name:focus { border-color: var(--line); background: var(--bg); }
+
+.piece-meta { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.piece-actions { display: flex; gap: 4px; }
+
+.piece-actions button { padding: 2px 8px; font-size: 12px; }
+
+.sequence-lane.dropping { outline: 2px dashed var(--accent); }
