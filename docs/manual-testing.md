@@ -1201,6 +1201,78 @@ cropped frame. The third run is faster, its faces read from the cache. The
 fourth exits 1 with `Error: --style face needs --vertical`. Record the
 times and anything framed badly.
 
+### R21. A sequence: blocks reordered and repeated, in one encode
+
+Covers the sequence core ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+V7 item 9n-2). The page has no sequence lane until 9n-3, and the tests
+fake ffmpeg and the face tracker, so this drives a Save in the review
+store from Python with the real renderer and tracker, on a scratch
+folder. It needs a video with a face, its analysis JSON with word
+times, and two files in `data\sfx` (one stands in for the music).
+
+```powershell
+$Vod = "3Sbj_BZORr4"; $Out = "$S\r21"
+Remove-Item -Recurse -Force $Out -ErrorAction SilentlyContinue
+@"
+import sys, time
+from pathlib import Path
+from clipper.adapters.media.faces import CachingFaceTracker, OpenCvFaceTracker
+from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
+from clipper.adapters.results.analysis_json import load_analysis_result
+from clipper.adapters.results.review_files import JsonReviewFiles
+from clipper.domain.models import (ClipAudio, ClipVariant, ManifestClip,
+    RenderManifest, SequenceBlock, SoundEffect, Zoom)
+from clipper.review.store import RenderInputs, ReviewStore, SaveRequest
+vod, out = sys.argv[1], Path(sys.argv[2])
+folder = out / "clips" / vod
+folder.mkdir(parents=True)
+for name in ("a.mp4", "a.face.mp4"):
+    (folder / name).write_bytes(b"placeholder")
+clip = ManifestClip(rank=1, start_seconds=2522.0, end_seconds=2559.0, score=0.5,
+    reasons=("r21",), file="a.mp4", variants=(ClipVariant(style="fit", file="a.mp4"),
+    ClipVariant(style="face", file="a.face.mp4")))
+manifest = RenderManifest(source=f"{vod}.mp4", analysis="r21", detector=None,
+    vertical=True, captions=True, titles=False, clips=(clip,), styles=("fit", "face"))
+store = ReviewStore(folder, manifest, None, out / "labels" / f"{vod}.json",
+    JsonReviewFiles(), RenderInputs(Path(f"data/videos/{vod}.mp4"),
+    FfmpegClipRenderer(), load_analysis_result(Path(f"data/output/{vod}.json")).transcript,
+    CachingFaceTracker(OpenCvFaceTracker(), out / "faces", "yunet"), (1920, 1080),
+    music_dir=Path("data/sfx"), sfx_dir=Path("data/sfx")))
+sequence = (SequenceBlock(start_seconds=2530.0, end_seconds=2536.0),
+    SequenceBlock(start_seconds=2522.0, end_seconds=2527.0),
+    SequenceBlock(start_seconds=2530.0, end_seconds=2533.0,
+        zooms=(Zoom(start_seconds=0.5, end_seconds=2.5, scale=2.0),),
+        effects=(SoundEffect(file="pop.wav", at_seconds=0.2),)))
+audio = ClipAudio.model_validate({"music": {"file": "riser.wav", "level_db": -18},
+    "effects": [{"file": "impact.wav", "at_seconds": 2531.0}]})
+began = time.perf_counter()
+result = store.save(1, SaveRequest(2522.0, 2559.0, None, None, "face",
+    zooms=(Zoom(start_seconds=2531.0, end_seconds=2532.5, scale=1.4),),
+    audio=audio, sequence=sequence))
+print("render_error:", result.render_error)
+print("file:", result.clip.file, f"{time.perf_counter() - began:.1f} s")
+"@ | uv run python - $Vod $Out
+$Clip = Get-ChildItem "$Out\clips\$Vod" -Filter "$Vod*.face.mp4"
+ffprobe -v error -show_entries format=duration:stream=codec_type,width,height -of csv=p=0 $Clip.FullName
+Get-Content "$Out\labels\$Vod.json"
+```
+
+Change the times and file names for another video. Pass: `render_error:
+None`; a 1080x1920 file with audio, about 14.0 s long (blocks of 6, 5 and
+3 s); the label has verdict `post` and the three blocks under `sequence`.
+Watch it: the moment at 0:42:10 plays first, then 0:42:02 to 0:42:07, then
+0:42:10 again; a 1.4x punch-in at 1.0 to 2.5 s in the first block only,
+since the replay has its own 2.0x zoom at 11.5 to 13.5 s; captions follow
+each block and never run across a join; the face window jumps at each
+join; the impact sounds at 1 s and 12 s, the pop at 11.2 s, and the music
+runs under it all and fades out at the end. Record the time and anything
+wrong.
+
+Run 2026-11-15 on 3Sbj_BZORr4 (Windows 11, ffmpeg 9.0.2): `render_error:
+None`, 1080x1920 with audio, 14.03 s, 6.9 s to render; frames at 1.8 s
+(1.4x), 6.5 and 9.5 s (block 2, no zoom) and 12.5 s (2.0x) as expected,
+captions in each block. Audio not listened to.
+
 ## Captions
 
 Covers `clipper render --captions` ([ADR 0010](decisions/0010-burn-in-captions-from-segment-text.md),

@@ -23,6 +23,7 @@ from clipper.core.framing import (
     HandWindow,
     hand_crop_plan,
     plan_face_crop,
+    window_width,
     with_hand_crops,
 )
 from clipper.core.interfaces import ClipRenderer, FaceTracker, ReviewFiles, TitleWriter
@@ -38,6 +39,7 @@ from clipper.core.judging import (
     trash_judgment,
 )
 from clipper.core.naming import clip_file_name, variant_file_name
+from clipper.core.sequence import BlockMap
 from clipper.domain.errors import ClipperError, JudgingError, ReviewError
 from clipper.domain.models import (
     AudioMix,
@@ -56,6 +58,8 @@ from clipper.domain.models import (
     MusicBed,
     OnScreenText,
     RenderManifest,
+    SequenceBlock,
+    SoundEffect,
     Story,
     StoryBeat,
     Transcript,
@@ -76,6 +80,8 @@ MAX_TEXTS = 5
 # Zooms and hand crops per clip (ADR 0016 and 0025 amendments).
 MAX_ZOOMS = 10
 MAX_HAND_CROPS = 10
+# Blocks in a clip's sequence (ADR 0034).
+MAX_BLOCKS = 30
 # A text's look, sent by the page when set (ADR 0030, styling amendment).
 _TEXT_LOOK = ("colour", "look", "size", "fade", "x", "y")
 # A combined clip's label card shows this long at its clip's start (ADR 0032).
@@ -116,6 +122,8 @@ class SaveRequest:
     hand_crops: tuple[HandCrop, ...] = ()
     # Volume, music and sound effects; None when as cut (ADR 0007).
     audio: ClipAudio | None = None
+    # Blocks played in turn, in place of the span less its cuts (ADR 0034).
+    sequence: tuple[SequenceBlock, ...] = ()
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -153,6 +161,12 @@ def parse_save(
     span (ADR 0016 and 0025 amendments). Audio is `gain_db`, `music`
     (`file`, `level_db`, `duck`) and `effects` (`file`, `at_seconds` inside
     the span, `level_db`) (ADR 0007, audio amendment).
+
+    A sequence is blocks of `start` and `end` inside the video, each with
+    its own `zooms`, `hand_crops` (as above, in seconds from the block's
+    start) and `effects` (as above); with one there are no cuts, and the
+    clip's zooms, hand crops and effects may lie anywhere its span or
+    blocks cover (ADR 0034).
     """
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
@@ -186,6 +200,12 @@ def parse_save(
     except ClipperError as exc:
         raise BadRequest(str(exc)) from exc
     texts = _texts(data.get("texts", []))
+    sequence = _sequence(data.get("sequence", []), duration)
+    if sequence and cuts:
+        raise BadRequest("a clip with a sequence has no cuts")
+    # Source-time edits may lie anywhere the clip shows (ADR 0034).
+    low = min([start, *(block.start_seconds for block in sequence)])
+    high = max([end, *(block.end_seconds for block in sequence)])
     return SaveRequest(
         start,
         end,
@@ -197,17 +217,59 @@ def parse_save(
         cuts,
         texts,
         parse_caption_edits(data.get("caption_edits")),
-        _ranged(data.get("zooms", []), Zoom, MAX_ZOOMS, "zoom", start, end),
+        _ranged(data.get("zooms", []), Zoom, MAX_ZOOMS, "zoom", low, high),
         _ranged(
             data.get("hand_crops", []),
             HandCrop,
             MAX_HAND_CROPS,
             "hand crop",
-            start,
-            end,
+            low,
+            high,
         ),
-        parse_audio(data.get("audio"), start, end),
+        parse_audio(data.get("audio"), low, high),
+        sequence,
     )
+
+
+def _sequence(value: object, duration: float) -> tuple[SequenceBlock, ...]:
+    """A clip's blocks from a request (ADR 0034), each inside the video,
+    with its own zooms, hand crops and effects in seconds from its start."""
+    if not isinstance(value, list) or len(value) > MAX_BLOCKS:
+        raise BadRequest(f"sequence must be a list of at most {MAX_BLOCKS} blocks")
+    blocks: list[SequenceBlock] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise BadRequest("each block must be an object")
+        start, end = _seconds(item, "start"), _seconds(item, "end")
+        if start < 0 or end > duration or end <= start:
+            raise BadRequest("each block must be inside the video, with a length")
+        length = end - start
+        effects = item.get("effects", [])
+        if not isinstance(effects, list):
+            raise BadRequest("a block's effects must be a list")
+        try:
+            blocks.append(
+                SequenceBlock(
+                    start_seconds=start,
+                    end_seconds=end,
+                    zooms=_ranged(
+                        item.get("zooms", []), Zoom, MAX_ZOOMS, "zoom", 0, length
+                    ),
+                    hand_crops=_ranged(
+                        item.get("hand_crops", []),
+                        HandCrop,
+                        MAX_HAND_CROPS,
+                        "hand crop",
+                        0,
+                        length,
+                    ),
+                    effects=tuple(SoundEffect.model_validate(e) for e in effects),
+                )
+            )
+        except ValidationError as exc:
+            message = exc.errors()[0]["msg"].removeprefix("Value error, ")
+            raise BadRequest(f"block: {message}") from exc
+    return tuple(blocks)
 
 
 def parse_audio(value: object, start: float, end: float) -> ClipAudio | None:
@@ -586,6 +648,7 @@ class ReviewStore:
                     "zooms": [zoom_payload(z) for z in label.zooms],
                     "hand_crops": [hand_payload(h) for h in label.hand_crops],
                     "audio": audio_payload(label.audio),
+                    "sequence": [block_payload(b) for b in label.sequence],
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
@@ -640,9 +703,16 @@ class ReviewStore:
             or clip.zooms != request.zooms
             or clip.hand_crops != request.hand_crops
             or clip.audio != request.audio
+            or clip.sequence != request.sequence
         )
         self._check_audio(request.audio)
-        if (request.zooms or request.hand_crops) and not self.manifest.vertical:
+        for block in request.sequence:
+            for effect in block.effects:
+                self._audio_path(self._render.sfx_dir, effect.file, "sound effect")
+        block_edits = any(b.zooms or b.hand_crops for b in request.sequence)
+        if (
+            request.zooms or request.hand_crops or block_edits
+        ) and not self.manifest.vertical:
             raise JudgingError("Zooms and hand crops need a vertical drafts folder")
         candidate = ClipCandidate(
             start_seconds=request.start,
@@ -672,6 +742,7 @@ class ReviewStore:
             request.zooms,
             request.hand_crops,
             request.audio,
+            request.sequence,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -696,6 +767,7 @@ class ReviewStore:
                     request.zooms,
                     request.hand_crops,
                     request.audio,
+                    request.sequence,
                 )
             except ClipperError as exc:
                 render_error = str(exc)
@@ -734,11 +806,26 @@ class ReviewStore:
         for effect in audio.effects:
             self._audio_path(self._render.sfx_dir, effect.file, "sound effect")
 
-    def _mix(self, audio: ClipAudio | None, time_map: TimeMap) -> AudioMix | None:
+    def _mix(
+        self, audio: ClipAudio | None, time_map: TimeMap, blocks: BlockMap | None = None
+    ) -> AudioMix | None:
         """The renderer's mix: files resolved, effects at their times in the
-        cut clip; one inside a cut is left out."""
-        if audio is None:
+        cut clip; one inside a cut is left out. With a sequence, an effect
+        plays at each block that shows its moment, and each block's own
+        effects play in it (ADR 0034)."""
+        placed: list[tuple[SoundEffect, float]]
+        if blocks is not None:
+            placed = blocks.effects(audio.effects if audio else ())
+            if audio is None and not placed:
+                return None
+        elif audio is None:
             return None
+        else:
+            placed = [
+                (effect, at)
+                for effect in audio.effects
+                if (at := time_map.output(effect.at_seconds)) is not None
+            ]
         effects = tuple(
             MixEffect(
                 path=self._audio_path(
@@ -747,9 +834,10 @@ class ReviewStore:
                 at_seconds=at,
                 level_db=effect.level_db,
             )
-            for effect in audio.effects
-            if (at := time_map.output(effect.at_seconds)) is not None
+            for effect, at in placed
         )
+        if audio is None:
+            return AudioMix(effects=effects)
         music = audio.music
         return AudioMix(
             gain_db=audio.gain_db,
@@ -804,34 +892,50 @@ class ReviewStore:
         zooms: tuple[Zoom, ...] = (),
         hand_crops: tuple[HandCrop, ...] = (),
         audio: ClipAudio | None = None,
+        sequence: tuple[SequenceBlock, ...] = (),
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
         Returns the manifest changes. A failure leaves no temporary file and
         any old file untouched. With cuts, the face crop and captions follow
         the cut clip's times (ADR 0029). Texts are burned with the captions,
-        or alone in a folder without them (ADR 0030).
+        or alone in a folder without them (ADR 0030). With a sequence, its
+        blocks play in turn and every source-time edit is placed at each
+        block it falls in (ADR 0034).
         """
         manifest = self.manifest
+        blocks = BlockMap(sequence) if sequence else None
         time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
-        # Zooms and hand crops move to the cut clip's times; one inside a
-        # cut is left out (ADR 0016 and 0025 amendments).
-        clip_zooms = tuple(
-            zoom.model_copy(update={"start_seconds": a, "end_seconds": b})
-            for zoom in zooms
-            if (b := time_map.clamped(zoom.end_seconds))
-            > (a := time_map.clamped(zoom.start_seconds))
-        )
-        hands: list[HandWindow] = [
-            (a, b, hand.x)
-            for hand in hand_crops
-            if (b := time_map.clamped(hand.end_seconds))
-            > (a := time_map.clamped(hand.start_seconds))
-        ]
+        clip_zooms: tuple[Zoom, ...]
+        hands: list[HandWindow]
+        if blocks is not None:
+            clip_zooms = blocks.zooms(zooms)
+            hands = blocks.hands(hand_crops)
+        else:
+            # Zooms and hand crops move to the cut clip's times; one inside a
+            # cut is left out (ADR 0016 and 0025 amendments).
+            clip_zooms = tuple(
+                zoom.model_copy(update={"start_seconds": a, "end_seconds": b})
+                for zoom in zooms
+                if (b := time_map.clamped(zoom.end_seconds))
+                > (a := time_map.clamped(zoom.start_seconds))
+            )
+            hands = [
+                (a, b, hand.x)
+                for hand in hand_crops
+                if (b := time_map.clamped(hand.end_seconds))
+                > (a := time_map.clamped(hand.start_seconds))
+            ]
         size = self._render.frame_size
         if hands and size is None:
             raise ReviewError("Hand crops need the video's frame size")
-        crop = cut_crop(self._crop(candidate), time_map) if style == "face" else None
+        crop = None
+        if style == "face":
+            crop = (
+                self._block_crop(blocks)
+                if blocks is not None
+                else cut_crop(self._crop(candidate), time_map)
+            )
         hand = None
         if crop is not None and size is not None:
             crop = with_hand_crops(crop, hands, size[0])
@@ -850,6 +954,7 @@ class ReviewStore:
                 cuts=cuts,
                 texts=texts,
                 edits=caption_edits,
+                sequence=blocks.ranges if blocks is not None else (),
             )
             ass = built.text
             if built.speech:
@@ -867,7 +972,8 @@ class ReviewStore:
                 cuts=cuts,
                 zooms=clip_zooms,
                 hand=hand,
-                audio=self._mix(audio, time_map),
+                audio=self._mix(audio, time_map, blocks),
+                sequence=blocks.ranges if blocks is not None else (),
             )
             try:
                 os.replace(temp, target)
@@ -889,7 +995,22 @@ class ReviewStore:
             "zooms": zooms,
             "hand_crops": hand_crops,
             "audio": audio,
+            "sequence": sequence,
         }
+
+    def _block_crop(self, blocks: BlockMap) -> CropPath:
+        """The face style's crop for a sequence: each block tracked and
+        framed on its own, joined at the blocks' places; a block with no
+        face holds the window in the middle (ADR 0034)."""
+        tracker, size = self._render.face_tracker, self._render.frame_size
+        if tracker is None or size is None:
+            raise ReviewError("A face re-render needs the face tracker and frame size")
+        crops = [
+            plan_face_crop(tracker.track(self._render.video, a, b), *size)
+            for a, b in blocks.ranges
+        ]
+        window = window_width(*size)
+        return blocks.join_crops(crops, (size[0] - window) // 2)
 
     def _delete_others(self, clip: ManifestClip, keep: str, done: str) -> str | None:
         """Delete the clip's files other than `keep`: its previous file and its
@@ -1414,6 +1535,17 @@ def text_payload(text: OnScreenText) -> dict[str, object]:
         "fade": text.fade,
         "x": text.x,
         "y": text.y,
+    }
+
+
+def block_payload(block: SequenceBlock) -> dict[str, object]:
+    """A sequence block as the page sends and shows it (ADR 0034)."""
+    return {
+        "start": block.start_seconds,
+        "end": block.end_seconds,
+        "zooms": [zoom_payload(z) for z in block.zooms],
+        "hand_crops": [hand_payload(h) for h in block.hand_crops],
+        "effects": [e.model_dump() for e in block.effects],
     }
 
 

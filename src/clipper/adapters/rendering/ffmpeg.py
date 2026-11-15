@@ -230,6 +230,20 @@ def _cut_filters(
     )
 
 
+def _check_sequence(
+    sequence: tuple[tuple[float, float], ...], cuts: tuple[tuple[float, float], ...]
+) -> None:
+    """ADR 0034. Raise `ClipRenderError` unless each block has a length from
+    0 on, and there are no cuts beside them."""
+    if sequence and cuts:
+        raise ClipRenderError("A clip with a sequence has no cuts")
+    for a, b in sequence:
+        if not 0 <= a < b:
+            raise ClipRenderError(
+                f"Block {a:.3f}-{b:.3f}s must start at 0 or later, with a length"
+            )
+
+
 def _seconds(value: float) -> str:
     """Fixed-point milliseconds, never scientific notation."""
     return f"{value:.3f}"
@@ -254,6 +268,7 @@ class FfmpegClipRenderer:
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
+        sequence: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
@@ -263,6 +278,7 @@ class FfmpegClipRenderer:
             )
 
         check_cuts(cuts, candidate.start_seconds, candidate.end_seconds)
+        _check_sequence(sequence, cuts)
         if (zooms or hand is not None) and not (vertical or crop is not None):
             raise ClipRenderError("Zooms and hand crops need the vertical frame")
 
@@ -298,21 +314,43 @@ class FfmpegClipRenderer:
         mix = None
         extra: list[str] = []
         if audio is not None and audio != AudioMix():
-            length = candidate.duration_seconds - sum(b - a for a, b in cuts)
-            mix = _mix_graph(audio, length, audio_filter)
+            if sequence:
+                # The blocks' joined sound is the voice; the music and
+                # effects are the inputs after the blocks (ADR 0034).
+                length = sum(b - a for a, b in sequence)
+                mix = _mix_graph(audio, length, None, "[ac]", len(sequence))
+            else:
+                length = candidate.duration_seconds - sum(b - a for a, b in cuts)
+                mix = _mix_graph(audio, length, audio_filter)
             extra = _mix_inputs(audio)
             audio_filter = None
-        if not files:
+
+        def run(video: Path, output: Path, cwd: Path | None = None) -> None:
+            if sequence:
+                self._join_blocks(
+                    video,
+                    sequence,
+                    output,
+                    cwd=cwd,
+                    video_filter=video_filter,
+                    mix=mix,
+                    extra_inputs=extra,
+                )
+                return
             self._cut(
-                video_path,
+                video,
                 candidate,
-                output_path,
+                output,
+                cwd=cwd,
                 video_filter=video_filter,
                 audio_filter=audio_filter,
                 cut=bool(cuts),
                 mix=mix,
                 extra_inputs=extra,
             )
+
+        if not files:
+            run(video_path, output_path)
         else:
             with tempfile.TemporaryDirectory(
                 prefix="clipper-render-", ignore_cleanup_errors=True
@@ -321,17 +359,7 @@ class FfmpegClipRenderer:
                     (Path(folder) / name).write_bytes(data)
                 # ffmpeg runs in `folder`, so the other paths must not depend on
                 # the caller's working directory.
-                self._cut(
-                    video_path.resolve(),
-                    candidate,
-                    output_path.resolve(),
-                    cwd=Path(folder),
-                    video_filter=video_filter,
-                    audio_filter=audio_filter,
-                    cut=bool(cuts),
-                    mix=mix,
-                    extra_inputs=extra,
-                )
+                run(video_path.resolve(), output_path.resolve(), Path(folder))
         return RenderedClip(candidate=candidate, path=output_path)
 
     def still(
@@ -467,6 +495,73 @@ class FfmpegClipRenderer:
             output_path.unlink(missing_ok=True)
             raise ClipRenderError(format_failure(self._executable, result))
         return output_path
+
+    def _join_blocks(
+        self,
+        video_path: Path,
+        sequence: tuple[tuple[float, float], ...],
+        output_path: Path,
+        *,
+        cwd: Path | None = None,
+        video_filter: str | None = None,
+        mix: str | None = None,
+        extra_inputs: list[str] | None = None,
+    ) -> None:
+        """ADR 0034. Each block is its own input, seeking fast to its start
+        and limited to its length, and the blocks are joined by `concat`;
+        the frame, captions and audio mix then run on the joined clip, in
+        one encode. `concat` needs every block's sound, so the source's
+        first audio stream is required."""
+        inputs: list[str] = []
+        joined = ""
+        for n, (a, b) in enumerate(sequence):
+            inputs += ["-ss", _seconds(a), "-t", _seconds(b - a), "-i", str(video_path)]
+            joined += f"[{n}:v:0][{n}:a:0]"
+        graph = [
+            f"{joined}concat=n={len(sequence)}:v=1:a=1[vc][ac]",
+            f"[vc]{video_filter or 'null'}[vout]",
+        ]
+        if mix:
+            graph.append(mix)
+        args = [
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            *inputs,
+            *(extra_inputs or []),
+            "-filter_complex",
+            ";".join(graph),
+            "-map",
+            "[vout]",
+            "-map",
+            "[aout]" if mix else "[ac]",
+            "-c:v",
+            "libx264",
+            "-preset",
+            _PRESET,
+            "-crf",
+            _CRF,
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            _AUDIO_BITRATE,
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+        result = run_tool(
+            self._executable, args, error_type=ClipRenderError, log=logger, cwd=cwd
+        )
+        if result.returncode != 0:
+            try:
+                output_path.unlink(missing_ok=True)
+            except OSError:
+                logger.info("Could not remove partial output %s", output_path)
+            raise ClipRenderError(format_failure(self._executable, result))
 
     def _cut(
         self,

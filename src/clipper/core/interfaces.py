@@ -131,6 +131,11 @@ class ClipRenderer(Protocol):
     hand-placed windows (ADR 0025, hand crop amendment). Both need the
     vertical frame. `audio` is the clip's volume, music and sound effects,
     effect times in the cut clip's seconds (ADR 0007, audio amendment).
+
+    `sequence` is source ranges played in turn, in place of the candidate's
+    span and cuts (ADR 0034): a range may repeat or come from outside the
+    span. Captions, crop, zoom, hand and effect times are then the joined
+    clip's. It needs the source's audio stream.
     """
 
     def render(
@@ -146,6 +151,7 @@ class ClipRenderer(Protocol):
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
+        sequence: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip: ...
 
     def join(

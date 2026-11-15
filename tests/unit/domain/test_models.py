@@ -875,3 +875,56 @@ def test_a_manifest_written_before_the_rename_loads_its_combined_clip() -> None:
     manifest = RenderManifest.model_validate(data)
     assert manifest.combined is not None and manifest.combined.file == "v_summary.mp4"
     assert '"combined"' in manifest.model_dump_json()
+
+
+def test_a_sequence_block_needs_a_length_and_its_own_edits_inside_it() -> None:
+    from clipper.domain.models import SequenceBlock
+
+    with pytest.raises(ValidationError, match="end after it starts"):
+        SequenceBlock(start_seconds=5.0, end_seconds=5.0)
+    with pytest.raises(ValidationError, match="zooms must be in order"):
+        SequenceBlock.model_validate(
+            {
+                "start_seconds": 5.0,
+                "end_seconds": 7.0,
+                "zooms": [{"start_seconds": 1.0, "end_seconds": 3.0}],
+            }
+        )
+    with pytest.raises(ValidationError, match="sound effects must be inside"):
+        SequenceBlock.model_validate(
+            {
+                "start_seconds": 5.0,
+                "end_seconds": 7.0,
+                "effects": [{"file": "boom.wav", "at_seconds": 2.0}],
+            }
+        )
+
+
+def test_a_clip_has_a_sequence_or_cuts_and_pad_ids_are_unique() -> None:
+    from clipper.domain.models import ManifestClip, PadPiece, RenderManifest
+
+    with pytest.raises(ValidationError, match="no cuts"):
+        ManifestClip.model_validate(
+            {
+                "rank": 1,
+                "start_seconds": 0.0,
+                "end_seconds": 10.0,
+                "score": 0.5,
+                "reasons": [],
+                "file": "a.mp4",
+                "cuts": [[2.0, 3.0]],
+                "sequence": [{"start_seconds": 0.0, "end_seconds": 5.0}],
+            }
+        )
+    piece = PadPiece(id="p1", name="crash", start_seconds=1.0, end_seconds=2.0)
+    with pytest.raises(ValidationError, match="ids must be unique"):
+        RenderManifest(
+            source="v.mp4",
+            analysis="a.json",
+            detector=None,
+            vertical=True,
+            captions=True,
+            titles=False,
+            clips=(),
+            pad=(piece, piece),
+        )

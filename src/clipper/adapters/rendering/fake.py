@@ -18,7 +18,8 @@ class FakeClipRenderer:
     The file is not a video. Calls are recorded in `calls`, the captions of
     each call in `captions`, its `vertical` flag in `vertical`, its crop
     path in `crops`, its cuts in `cuts`, its zooms in `zooms`, its hand
-    crops in `hands` and its audio mix in `audio`. Candidates
+    crops in `hands`, its audio mix in `audio` and its sequence in
+    `sequences`. Candidates
     in `fail_on` raise ClipRenderError and write nothing.
     """
 
@@ -32,6 +33,7 @@ class FakeClipRenderer:
         self.zooms: list[tuple[Zoom, ...]] = []
         self.hands: list[HandCropPlan | None] = []
         self.audio: list[AudioMix | None] = []
+        self.sequences: list[tuple[tuple[float, float], ...]] = []
         self.stills: list[tuple[float, Path, str | None, bool, CropPath | None]] = []
         self.fail_stills = False
         self.joins: list[
@@ -52,9 +54,11 @@ class FakeClipRenderer:
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
+        sequence: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip:
         self.calls.append((video_path, candidate, output_path))
         self.audio.append(audio)
+        self.sequences.append(sequence)
         self.zooms.append(zooms)
         self.hands.append(hand)
         self.cuts.append(cuts)

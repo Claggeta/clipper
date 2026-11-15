@@ -495,7 +495,11 @@ and planned code:
   block (fitted, own sound or silence, no captions). One encode:
   `trim`/`atrim` per block and `concat`, replacing `select`. Mock
   `docs/mockups/review-sequence.html`. Amends 0007, 0017, 0019, 0024,
-  0025, 0029, 0031.
+  0025, 0029, 0031. Core amendment (9n-2): sound effects are in source
+  seconds and follow every occurrence, blocks may have their own;
+  `BlockMap` in `core/sequence.py`; a block's own zooms or hand crops
+  replace the clip's there; clips without a sequence keep the cuts and
+  `select` path unchanged; framing after the join; manual step R21.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1486,9 +1490,11 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9n. Sequence track and pad (added 2026-11-14, the maintainer's
      choice; ADR 0034), next, in PRs, each with a manual step:
      - 9n-1. ~~ADR 0034 and the mock (docs).~~ (done)
-     - 9n-2. The core: blocks, the time map with repeats, block-only
+     - 9n-2. ~~The core: blocks, the time map with repeats, block-only
        zooms and crops, the renderer's `trim`/`concat` join, `sequence`
-       on manifest clip and label, `RenderManifest.pad`.
+       on manifest clip and label, `RenderManifest.pad`.~~ (done; an
+       input per block and `concat`; sound effects in source seconds,
+       blocks may have their own; manual step R21)
      - 9n-3. The Sequence lane in clip time (reorder, trim, delete,
        duplicate) and the preview through blocks.
      - 9n-4. The pad: a marked range sent with `P`, named, dragged onto
