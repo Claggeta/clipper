@@ -19,7 +19,7 @@ def test_blocks_play_in_turn_and_a_repeat_has_two_clip_times() -> None:
     blocks = BlockMap((DRIVE, CRASH, REPLAY))
 
     assert blocks.duration == 15.0
-    assert blocks.ranges == ((10.0, 16.0), (20.0, 26.0), (20.0, 23.0))
+    assert blocks.captioned == ((10.0, 16.0), (20.0, 26.0), (20.0, 23.0))
     assert blocks.clip_times(21.0) == [7.0, 13.0]
     assert blocks.clip_times(17.0) == []
     assert blocks.source_time(13.0) == 21.0
@@ -61,14 +61,16 @@ def test_a_range_across_a_cut_is_one_piece_but_across_a_reorder_two() -> None:
     ]
 
 
-def test_hand_windows_follow_the_blocks_in_clip_order() -> None:
+def test_hand_windows_are_given_per_block_from_its_start() -> None:
     hand = HandCrop(start_seconds=11.0, end_seconds=12.0, x=0.3)
     own = HandCrop(start_seconds=0.0, end_seconds=1.0, x=0.7)
 
-    windows = BlockMap((CRASH, _block(10.0, 16.0), REPLAY)).hands((hand,))
-    assert windows == [(7.0, 8.0, 0.3)]
-    windows = BlockMap((DRIVE, _block(20.0, 23.0, hand_crops=(own,)))).hands((hand,))
-    assert windows == [(1.0, 2.0, 0.3), (6.0, 7.0, 0.7)]
+    windows = BlockMap((CRASH, _block(10.0, 16.0), REPLAY)).block_hands((hand,))
+    assert windows == [[], [(1.0, 2.0, 0.3)], []]
+    windows = BlockMap((DRIVE, _block(20.0, 23.0, hand_crops=(own,)))).block_hands(
+        (hand,)
+    )
+    assert windows == [[(1.0, 2.0, 0.3)], [(0.0, 1.0, 0.7)]]
 
 
 def test_effects_play_at_every_occurrence_and_blocks_add_their_own() -> None:
@@ -85,22 +87,33 @@ def test_effects_play_at_every_occurrence_and_blocks_add_their_own() -> None:
     ]
 
 
-def test_face_crops_join_at_the_blocks_and_a_faceless_block_holds_the_centre() -> None:
-    first = CropPath(width=608, height=1080, points=((0.0, 100), (2.0, 300)))
-    blocks = BlockMap((DRIVE, CRASH, REPLAY))
+def test_some_source_block_must_have_a_face() -> None:
+    face = CropPath(width=608, height=1080, points=((0.0, 100),))
+    blocks = BlockMap((DRIVE, _block(0.0, 2.0, broll="drift.mp4")))
 
-    joined = blocks.join_crops((first, None, first), centre=656)
-
-    assert joined.points == (
-        (0.0, 100),
-        (2.0, 300),
-        (6.0, 656),
-        (12.0, 100),
-        (14.0, 300),
-    )
-    assert (joined.width, joined.height) == (608, 1080)
-
-
-def test_no_face_in_any_block_is_an_error() -> None:
+    blocks.check_faces((face, None))
     with pytest.raises(ClipRenderError, match="No face"):
-        BlockMap((DRIVE,)).join_crops((None,), centre=656)
+        blocks.check_faces((None, None))
+
+
+def test_a_broll_block_takes_no_source_time_edits_and_no_captions() -> None:
+    drift = _block(0.0, 2.0, broll="drift.mp4", sound=False)
+    pop = SoundEffect(file="pop.wav", at_seconds=0.5)
+    blocks = BlockMap(
+        (DRIVE, _block(0.0, 2.0, broll="drift.mp4", effects=(pop,)), CRASH)
+    )
+    zoom = Zoom(start_seconds=0.0, end_seconds=30.0)
+    boom = SoundEffect(file="boom.wav", at_seconds=1.0)
+
+    # The drift insert sits at 6-8 s; nothing in source seconds lands there.
+    assert [(z.start_seconds, z.end_seconds) for z in blocks.zooms((zoom,))] == [
+        (0.0, 6.0),
+        (8.0, 14.0),
+    ]
+    assert blocks.clip_times(1.0) == []
+    assert [(e.file, at) for e, at in blocks.effects((boom,))] == [("pop.wav", 6.5)]
+    assert blocks.captioned == ((10.0, 16.0), 2.0, (20.0, 26.0))
+    assert blocks.source_time(7.0) is None
+    assert BlockMap((DRIVE, drift)).block_hands(
+        (HandCrop(start_seconds=0.0, end_seconds=30.0),)
+    ) == [[(0.0, 6.0, 0.5)], []]

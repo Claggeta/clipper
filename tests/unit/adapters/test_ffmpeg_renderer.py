@@ -7,7 +7,15 @@ from clipper.adapters.rendering.ffmpeg import _VERTICAL_FILTER, FfmpegClipRender
 from clipper.core.framing import hand_crop_plan
 from clipper.core.interfaces import ClipRenderer
 from clipper.domain.errors import ClipRenderError
-from clipper.domain.models import AudioMix, ClipCandidate, CropPath, MixEffect, Zoom
+from clipper.domain.models import (
+    AudioMix,
+    ClipCandidate,
+    CropPath,
+    MixEffect,
+    RenderBlock,
+    RenderOverlay,
+    Zoom,
+)
 
 _CANDIDATE = ClipCandidate(
     start_seconds=32.5, end_seconds=73.25, score=0.5, reasons=("pace",)
@@ -707,8 +715,18 @@ def test_join_refuses_a_missing_clip(tmp_path: Path) -> None:
 # --- Sequences (ADR 0034) ---
 
 
+def _block(start: float, end: float, **fields: object) -> RenderBlock:
+    return RenderBlock.model_validate(
+        {"start_seconds": start, "end_seconds": end, **fields}
+    )
+
+
 def _sequence_command(
-    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kw: object
+    video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    blocks: tuple[RenderBlock, ...] | None = None,
+    **kw: object,
 ) -> list[str]:
     captured: list[list[str]] = []
     _patch_run(monkeypatch, captured)
@@ -716,13 +734,17 @@ def _sequence_command(
         video,
         _CANDIDATE,
         tmp_path / "c.mp4",
-        sequence=((40.0, 45.0), (32.5, 35.0), (40.0, 42.0)),
+        sequence=blocks or (_block(40.0, 45.0), _block(32.5, 35.0), _block(40.0, 42.0)),
         **kw,  # type: ignore[arg-type]
     )
     return captured[0]
 
 
-def test_a_sequence_seeks_each_block_and_joins_them_in_one_encode(
+def _graph(command: list[str]) -> list[str]:
+    return command[command.index("-filter_complex") + 1].split(";")
+
+
+def test_a_sequence_seeks_each_block_frames_it_and_joins_them(
     video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     command = _sequence_command(video, tmp_path, monkeypatch, vertical=True)
@@ -734,48 +756,147 @@ def test_a_sequence_seeks_each_block_and_joins_them_in_one_encode(
         "-ss", "32.500", "-t", "2.500", "-i", str(video),
         "-ss", "40.000", "-t", "2.000", "-i", str(video),
     ]  # fmt: skip
-    graph = command[command.index("-filter_complex") + 1]
-    assert graph == (
-        "[0:v:0][0:a:0][1:v:0][1:a:0][2:v:0][2:a:0]concat=n=3:v=1:a=1[vc][ac];"
-        f"[vc]{_VERTICAL_FILTER}[vout]"
+    graph = ";".join(_graph(command))
+    # Each block fitted on its own, with its own labels.
+    assert graph.startswith("[0:v:0]split[bgb0][fgb0];")
+    assert (
+        "[blurredb2][fittedb2]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v2]"
+        in graph
     )
+    assert "[0:a:0]anull[a0]" in graph
+    assert "[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[vc][ac]" in graph
+    assert graph.endswith("[vc]null[vout]")
     maps = [command[i + 1] for i, arg in enumerate(command) if arg == "-map"]
     assert maps == ["[vout]", "[ac]"]
     assert "-vf" not in command and "-af" not in command
 
 
-def test_a_sequence_without_a_frame_passes_the_video_through(
+def test_a_landscape_sequence_keeps_the_source_frame(
     video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    command = _sequence_command(video, tmp_path, monkeypatch)
-    graph = command[command.index("-filter_complex") + 1]
-    assert graph.endswith(";[vc]null[vout]")
+    graph = _graph(_sequence_command(video, tmp_path, monkeypatch))
+    assert graph[0] == "[0:v:0]setsar=1,format=yuv420p[v0]"
 
 
-def test_a_sequences_mix_takes_the_joined_sound_and_inputs_after_the_blocks(
+def test_face_and_hand_blocks_get_their_own_crop_commands(
     video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bed = tmp_path / "bed.mp3"
+    written: dict[str, str] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        folder = Path(str(kwargs["cwd"]))
+        written.update({f.name: f.read_text("utf-8") for f in folder.iterdir()})
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    face = CropPath(width=608, height=1080, points=((0.0, 100), (1.5, 300)))
+    hand = hand_crop_plan([(0.5, 1.5, 0.3)], 1920, 1080)
+    FfmpegClipRenderer().render(
+        video,
+        _CANDIDATE,
+        tmp_path / "c.mp4",
+        "[Script Info]",
+        vertical=True,
+        sequence=(_block(40.0, 43.0, crop=face), _block(50.0, 52.0, hand=hand)),
+    )
+    assert (
+        written["cropb0.cmd"] == "0.000 crop@faceb0 x 100;\n1.500 crop@faceb0 x 300;\n"
+    )
+    assert written["handb1.cmd"].startswith("0.000 crop@handb1 x ")
+    assert written["clip.ass"] == "[Script Info]"
+
+
+def test_broll_blocks_are_fitted_with_their_sound_or_silence(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    drift, skull = tmp_path / "drift.mp4", tmp_path / "skull.png"
     command = _sequence_command(
         video,
         tmp_path,
         monkeypatch,
+        (
+            _block(40.0, 45.0),
+            _block(1.0, 3.0, path=drift),
+            _block(0.0, 1.5, path=skull, still=True),
+            _block(2.0, 4.0, path=drift, sound=False),
+        ),
+        vertical=True,
+    )
+    i = command.index(str(drift.resolve()))
+    assert command[i - 5 : i + 1] == [
+        "-ss", "1.000", "-t", "2.000", "-i", str(drift.resolve())
+    ]  # fmt: skip
+    assert [
+        "-loop",
+        "1",
+        "-framerate",
+        "30",
+        "-t",
+        "1.500",
+        "-i",
+        str(skull.resolve()),
+    ] == command[command.index("-loop") : command.index("-loop") + 8]
+    graph = _graph(command)
+    assert "[1:a:0]anull[a1]" in graph
+    silence = "anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration="
+    assert f"{silence}1.500[a2]" in graph and f"{silence}2.000[a3]" in graph
+
+
+def test_overlays_follow_the_zooms_and_come_before_the_captions(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    drift, bed = tmp_path / "drift.mp4", tmp_path / "bed.mp3"
+    overlays = (
+        RenderOverlay(
+            path=drift, start_seconds=1.0, end_seconds=3.0, offset_seconds=4.0
+        ),
+        RenderOverlay(
+            path=drift,
+            start_seconds=5.0,
+            end_seconds=6.0,
+            mode="pip",
+            x=0.5,
+            y=0.25,
+            size=0.5,
+        ),
+    )
+    command = _sequence_command(
+        video,
+        tmp_path,
+        monkeypatch,
+        vertical=True,
+        zooms=(Zoom(start_seconds=0.5, end_seconds=2.0),),
+        overlays=overlays,
         audio=AudioMix(music=bed, duck=False),
     )
-    i = len(command) - 1 - command[::-1].index(str(video))
-    assert command[i + 1 : i + 5] == ["-stream_loop", "-1", "-i", str(bed.resolve())]
-    graph = command[command.index("-filter_complex") + 1]
-    # 9.5 s of blocks; the music is input 3, after the three blocks.
-    assert graph.endswith(
-        "[ac]volume=0.0dB[voice];"
-        "[3:a]volume=-18.0dB,afade=t=out:st=8.500:d=1.0[music];"
-        "[voice][music]amix=inputs=2:normalize=0:duration=first[aout]"
+    i = command.index("-filter_complex")
+    inputs = command[:i]
+    drift_path = str(drift.resolve())
+    assert inputs[-16:-4] == [
+        "-ss", "4.000", "-t", "2.000", "-i", drift_path,
+        "-ss", "0.000", "-t", "1.000", "-i", drift_path,
+    ]  # fmt: skip
+    graph = _graph(command)
+    zoom_at = next(n for n, part in enumerate(graph) if part.startswith("[vc]scale="))
+    assert graph[zoom_at].endswith("[vz]")
+    assert "[3:v:0]setpts=PTS-STARTPTS+1.000/TB,split[bgo0][fgo0]" in graph
+    assert any(
+        p.startswith("[vz][o0]overlay=0:0:enable='between(t,1.000,3.000)'")
+        for p in graph
     )
-    maps = [command[i + 1] for i, arg in enumerate(command) if arg == "-map"]
-    assert maps == ["[vout]", "[aout]"]
+    assert "[4:v:0]setpts=PTS-STARTPTS+5.000/TB,scale=540:-2,setsar=1[o1]" in graph
+    assert any(
+        p.startswith("[ov0][o1]overlay=x='540-w/2':y='480-h/2':enable=") for p in graph
+    )
+    assert "[ov1]null[vout]" in graph
+    # The music is the input after the blocks and overlays.
+    assert any(p.startswith("[5:a]volume=-18.0dB") for p in graph)
 
 
-def test_a_sequence_with_cuts_or_an_empty_block_is_refused(
+def test_a_sequence_with_cuts_or_an_empty_block_or_landscape_broll_is_refused(
     video: Path, tmp_path: Path
 ) -> None:
     renderer = FfmpegClipRenderer()
@@ -785,7 +906,23 @@ def test_a_sequence_with_cuts_or_an_empty_block_is_refused(
             _CANDIDATE,
             tmp_path / "c.mp4",
             cuts=((40.0, 45.0),),
-            sequence=((40.0, 45.0),),
+            sequence=(_block(40.0, 45.0),),
         )
     with pytest.raises(ClipRenderError, match="with a length"):
-        renderer.render(video, _CANDIDATE, tmp_path / "c.mp4", sequence=((40.0, 40.0),))
+        renderer.render(
+            video, _CANDIDATE, tmp_path / "c.mp4", sequence=(_block(40.0, 40.0),)
+        )
+    with pytest.raises(ClipRenderError, match="needs the frame size"):
+        renderer.render(
+            video,
+            _CANDIDATE,
+            tmp_path / "c.mp4",
+            sequence=(_block(0.0, 2.0, path=tmp_path / "a.mp4"),),
+        )
+    with pytest.raises(ClipRenderError, match="need the clip as a sequence"):
+        renderer.render(
+            video,
+            _CANDIDATE,
+            tmp_path / "c.mp4",
+            overlays=(RenderOverlay(path=video, start_seconds=0, end_seconds=1),),
+        )

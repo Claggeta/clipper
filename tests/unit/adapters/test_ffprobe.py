@@ -153,6 +153,7 @@ def test_video_only_fixture(media: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert info.duration_seconds == 97.04
     assert info.has_video is True
+    assert info.has_audio is False
 
 
 def test_video_and_audio_fixture(media: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -162,6 +163,8 @@ def test_video_and_audio_fixture(media: Path, monkeypatch: pytest.MonkeyPatch) -
 
     assert info.duration_seconds == 314.816145
     assert info.has_video is True
+    # B-roll's sound needs an audio stream (ADR 0034).
+    assert info.has_audio is True
     # No start_time in the output: the file starts at 0.
     assert info.start_seconds == 0.0
 

@@ -26,8 +26,10 @@ from clipper.domain.models import (
     FaceTrack,
     HandCropPlan,
     MediaInfo,
+    RenderBlock,
     RenderedClip,
     RenderManifest,
+    RenderOverlay,
     Transcript,
     VideoInfo,
     VideoSource,
@@ -451,7 +453,9 @@ class FaceFailingRenderer(FakeClipRenderer):
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
-        sequence: tuple[tuple[float, float], ...] = (),
+        sequence: tuple[RenderBlock, ...] = (),
+        overlays: tuple[RenderOverlay, ...] = (),
+        frame: tuple[int, int] | None = None,
     ) -> RenderedClip:
         if crop is not None:
             raise ClipRenderError("[face] crop failed")

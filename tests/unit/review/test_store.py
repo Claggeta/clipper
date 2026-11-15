@@ -1416,7 +1416,11 @@ def test_a_sequence_re_renders_through_its_blocks_and_is_recorded(
         1, SaveRequest(10.0, 40.0, None, None, zooms=(zoom,), sequence=sequence)
     )
 
-    assert env.renderer.sequences[-1] == ((12.0, 14.0), (10.0, 13.0), (12.0, 13.0))
+    assert [(b.start_seconds, b.end_seconds) for b in env.renderer.sequences[-1]] == [
+        (12.0, 14.0),
+        (10.0, 13.0),
+        (12.0, 13.0),
+    ]
     # The zoom's moment plays three times: in each block that shows it.
     assert [(z.start_seconds, z.end_seconds) for z in env.renderer.zooms[-1]] == [
         (0.5, 1.0),
@@ -1436,6 +1440,8 @@ def test_a_sequence_re_renders_through_its_blocks_and_is_recorded(
         "zooms": [],
         "hand_crops": [],
         "effects": [],
+        "broll": None,
+        "sound": True,
     }
     calls = len(env.renderer.calls)
     env.store.save(
@@ -1485,7 +1491,7 @@ def test_a_sequence_mixes_effects_at_each_occurrence_and_block_effects(
         env.store.save(1, SaveRequest(10.0, 40.0, None, None, sequence=missing))
 
 
-def test_a_face_sequence_tracks_each_block_and_joins_the_crops(tmp_path: Path) -> None:
+def test_a_face_sequence_frames_each_block_on_its_own(tmp_path: Path) -> None:
     env = _styled_env(tmp_path)
     sequence = (_block(12.0, 14.0), _block(30.0, 33.0))
 
@@ -1494,9 +1500,11 @@ def test_a_face_sequence_tracks_each_block_and_joins_the_crops(tmp_path: Path) -
     )
 
     assert result.render_error is None
-    [crop] = env.renderer.crops
-    assert crop is not None and crop.width == 608
-    assert [t for t, _ in crop.points] == [0.0]
+    # The blocks carry their crops; none is given for the whole clip.
+    assert env.renderer.crops == [None]
+    crops = [b.crop for b in env.renderer.sequences[-1]]
+    assert all(c is not None and c.width == 608 for c in crops)
+    assert all(c is not None and [t for t, _ in c.points] == [0.0] for c in crops)
 
 
 # --- The pad (ADR 0034) ---
@@ -1585,3 +1593,197 @@ def test_pad_bodies_are_checked() -> None:
     assert parse_pad_name({"name": " crash "}) == "crash"
     with pytest.raises(BadRequest, match="needs a name"):
         parse_pad_name({"name": "  "})
+
+
+# --- B-roll (ADR 0034, B-roll amendment) ---
+
+
+class FakeProbe:
+    """Lengths and sound by file name; a probe of anything else fails."""
+
+    def __init__(self, files: dict[str, tuple[float, bool]]) -> None:
+        self._files = files
+        self.calls: list[str] = []
+
+    def probe(self, media_path: Path):  # type: ignore[no-untyped-def]
+        from clipper.domain.models import MediaInfo
+
+        self.calls.append(media_path.name)
+        duration, sound = self._files[media_path.name]
+        return MediaInfo(duration_seconds=duration, has_video=True, has_audio=sound)
+
+
+def _broll_env(tmp_path: Path, probe: FakeProbe | None = None) -> Env:
+    env = Env(tmp_path)
+    broll = tmp_path / "broll"
+    broll.mkdir()
+    for name in ("drift.mp4", "quiet.mp4", "skull.png"):
+        (broll / name).write_bytes(b"x")
+    env.store._render = RenderInputs(  # noqa: SLF001
+        tmp_path / "talk.mp4",
+        env.renderer,
+        TRANSCRIPT,
+        frame_size=(1920, 1080),
+        broll_dir=broll,
+        probe=probe or FakeProbe({"drift.mp4": (8.0, True), "quiet.mp4": (5.0, False)}),
+    )
+    return env
+
+
+def test_broll_blocks_and_overlays_are_read_and_checked() -> None:
+    from clipper.review.store import parse_save
+
+    request = parse_save(
+        {
+            "start": 10.0,
+            "end": 40.0,
+            "sequence": [
+                {"start": 12.0, "end": 14.0},
+                {"start": 1.0, "end": 3.0, "broll": "drift.mp4", "sound": False},
+            ],
+            "broll": [
+                {"file": "skull.png", "start": 0.5, "end": 1.5, "mode": "pip", "x": 0.2}
+            ],
+        },
+        600.0,
+    )
+    assert (request.sequence[1].broll, request.sequence[1].sound) == (
+        "drift.mp4",
+        False,
+    )
+    assert (request.broll[0].file, request.broll[0].mode, request.broll[0].x) == (
+        "skull.png",
+        "pip",
+        0.2,
+    )
+    cases: list[tuple[dict[str, object], str]] = [
+        ({"sequence": [{"start": 0, "end": 2, "broll": "../x.mp4"}]}, "plain file"),
+        ({"sequence": [{"start": 0, "end": 2, "broll": "x.gif"}]}, "must be one of"),
+        ({"sequence": [{"start": 1, "end": 2, "broll": "s.png"}]}, "starts at 0"),
+        (
+            {
+                "sequence": [
+                    {
+                        "start": 0,
+                        "end": 2,
+                        "broll": "a.mp4",
+                        "zooms": [{"start": 0, "end": 1}],
+                    }
+                ]
+            },
+            "no zooms",
+        ),
+        ({"broll": [{"file": "a.mp4", "start": 2, "end": 1}]}, "end after it starts"),
+        (
+            {"broll": [{"file": "a.mp4", "start": 0, "end": 1, "mode": "wipe"}]},
+            "B-roll overlay",
+        ),
+        ({"broll": "x"}, "at most 10"),
+    ]
+    for body, message in cases:
+        sent: dict[str, object] = {"start": 10.0, "end": 40.0, **body}
+        with pytest.raises(BadRequest, match=message):
+            parse_save(sent, 600.0)
+
+
+def test_a_broll_insert_renders_with_sound_only_if_the_file_has_some(
+    tmp_path: Path,
+) -> None:
+    probe = FakeProbe({"drift.mp4": (8.0, True), "quiet.mp4": (5.0, False)})
+    env = _broll_env(tmp_path, probe)
+    sequence = (
+        _block(12.0, 14.0),
+        _block(1.0, 3.0, broll="drift.mp4"),
+        _block(0.0, 2.0, broll="quiet.mp4"),
+        _block(0.0, 1.5, broll="skull.png"),
+    )
+
+    saved = env.store.save(1, SaveRequest(10.0, 40.0, None, None, sequence=sequence))
+
+    assert saved.render_error is None
+    blocks = env.renderer.sequences[-1]
+    assert [(b.path.name if b.path else None, b.still, b.sound) for b in blocks] == [
+        (None, False, True),
+        ("drift.mp4", False, True),
+        ("quiet.mp4", False, False),
+        ("skull.png", True, False),
+    ]
+    # Captions skip the inserts: "Hello there." (12.0-13.4) is in block 1 only.
+    captions = env.renderer.captions[-1]
+    assert captions is not None and captions.count("Hello") == 2
+    assert probe.calls.count("drift.mp4") == 1
+    [label] = load_labels(env.labels_path).labels
+    assert label.sequence == sequence
+
+
+def test_overlays_on_a_clip_without_a_sequence_render_it_as_its_kept_parts(
+    tmp_path: Path,
+) -> None:
+    from clipper.domain.models import BrollOverlay
+
+    env = _broll_env(tmp_path)
+    overlay = BrollOverlay(file="drift.mp4", start_seconds=2.0, end_seconds=4.0)
+
+    saved = env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, cuts=((15.0, 18.0),), broll=(overlay,))
+    )
+
+    assert saved.render_error is None
+    assert env.renderer.cuts[-1] == ()
+    assert [(b.start_seconds, b.end_seconds) for b in env.renderer.sequences[-1]] == [
+        (10.0, 15.0),
+        (18.0, 40.0),
+    ]
+    [shown] = env.renderer.overlays[-1]
+    assert (shown.path.name, shown.start_seconds, shown.mode) == (
+        "drift.mp4",
+        2.0,
+        "cutaway",
+    )
+    assert saved.clip.broll == (overlay,) and saved.clip.cuts == ((15.0, 18.0),)
+    [label] = load_labels(env.labels_path).labels
+    assert label.broll == (overlay,)
+    calls = len(env.renderer.calls)
+    env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, cuts=((15.0, 18.0),), broll=(overlay,))
+    )
+    assert len(env.renderer.calls) == calls
+
+
+def test_broll_that_is_missing_too_short_or_past_the_end_writes_nothing(
+    tmp_path: Path,
+) -> None:
+    from clipper.domain.models import BrollOverlay
+
+    env = _broll_env(tmp_path)
+    for request, message in [
+        (
+            SaveRequest(
+                10.0, 40.0, None, None, sequence=(_block(0.0, 2.0, broll="nope.mp4"),)
+            ),
+            "No B-roll file nope.mp4",
+        ),
+        (
+            SaveRequest(
+                10.0, 40.0, None, None, sequence=(_block(6.0, 9.0, broll="drift.mp4"),)
+            ),
+            "8.0 s long",
+        ),
+        (
+            SaveRequest(
+                10.0,
+                40.0,
+                None,
+                None,
+                broll=(
+                    BrollOverlay(
+                        file="drift.mp4", start_seconds=29.0, end_seconds=31.0
+                    ),
+                ),
+            ),
+            "past the clip's 30.0 s",
+        ),
+    ]:
+        with pytest.raises(JudgingError, match=message):
+            env.store.save(1, request)
+    assert not env.labels_path.exists()

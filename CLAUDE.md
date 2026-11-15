@@ -506,6 +506,10 @@ and planned code:
   Pad amendment (9n-4): `Shift+P` or To pad (Cut in mark to playhead,
   else the span), `Shift`-drag on the strip; `/api/pad`; named by the
   first words; a panel below the clip list; manual step RV28.
+  B-roll amendment (9m-1): `data/broll/` (`CLIPPER_BROLL_DIR`) videos
+  and stills, `/api/broll`; `SequenceBlock.broll` inserts with `sound`;
+  `BrollOverlay` cutaway or picture-in-picture in clip seconds; blocks
+  framed one by one before the join; manual step R22.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1492,7 +1496,14 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      full-frame cutaway or a picture-in-picture box placed by dragging
      on the preview; the clip's audio continues) or an inserted block
      with its own sound or silence (ADR 0034); drawn in the live preview
-     and burned in the one encode. Manual step. After 9n.
+     and burned in the one encode. After 9n, in PRs:
+     - 9m-1. ~~The core: files and `/api/broll`, inserts and overlays
+       on manifest and label, blocks framed one by one before the join,
+       Save's checks.~~ (done; manual step R22)
+     - 9m-2. The page: B-roll in the pad panel, inserts on the
+       Sequence lane with a sound toggle, a B-roll lane of overlays,
+       picture-in-picture dragged on the preview, the preview playing
+       inserts in a second player. Manual step RV29.
    - 9n. Sequence track and pad (added 2026-11-14, the maintainer's
      choice; ADR 0034), next, in PRs, each with a manual step:
      - 9n-1. ~~ADR 0034 and the mock (docs).~~ (done)

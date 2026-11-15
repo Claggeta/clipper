@@ -1260,6 +1260,8 @@ def review(
             peaks_path=peaks_file(settings.cache_dir, video),
             music_dir=settings.music_dir,
             sfx_dir=settings.sfx_dir,
+            broll_dir=settings.broll_dir,
+            probe=build.probe(),
             title_writer=_review_title_writer(build, settings),
             story_writer=_review_story_writer(build, settings),
         )

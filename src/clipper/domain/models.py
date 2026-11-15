@@ -197,6 +197,8 @@ class MediaInfo(BaseModel):
     start_seconds: float = Field(default=0.0, allow_inf_nan=False)
     width: int | None = Field(default=None, gt=0)
     height: int | None = Field(default=None, gt=0)
+    # Whether it has an audio stream; B-roll's sound needs one (ADR 0034).
+    has_audio: bool = False
 
 
 class CropPath(BaseModel):
@@ -553,6 +555,27 @@ class ClipAudio(BaseModel):
 MAX_BLOCKS = 30
 MAX_PAD_PIECES = 50
 PAD_NAME_LIMIT = 60
+# B-roll (ADR 0034, B-roll amendment): the maintainer's own files, video
+# or still images; overlays per clip, and the longest an image is shown.
+BROLL_VIDEO_SUFFIXES = (".mp4", ".mov", ".webm")
+BROLL_IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg")
+MAX_OVERLAYS = 10
+MAX_STILL_SECONDS = 30.0
+
+
+def broll_file(name: str) -> str:
+    """A B-roll file name: plain, with a video or image suffix."""
+    if Path(name).name != name or not name.strip():
+        raise ValueError("a B-roll file must be a plain file name")
+    suffixes = BROLL_VIDEO_SUFFIXES + BROLL_IMAGE_SUFFIXES
+    if Path(name).suffix.lower() not in suffixes:
+        raise ValueError(f"a B-roll file must be one of {', '.join(suffixes)}")
+    return name
+
+
+def is_still(name: str) -> bool:
+    """True for a B-roll image, shown as a still."""
+    return Path(name).suffix.lower() in BROLL_IMAGE_SUFFIXES
 
 
 class SequenceBlock(BaseModel):
@@ -560,7 +583,12 @@ class SequenceBlock(BaseModel):
     (ADR 0034). A range may repeat in other blocks. `zooms`, `hand_crops`
     and `effects` are the block's own, in seconds from the block's start,
     and apply to it alone; in a block with its own zooms or hand crops, the
-    clip's (in source seconds) do not apply."""
+    clip's (in source seconds) do not apply.
+
+    With `broll`, the block is that B-roll file instead (B-roll amendment):
+    `start_seconds` and `end_seconds` are times in the file (0 to the
+    length shown for a still), `sound` plays its audio or silence, and it
+    has no zooms or hand crops of its own; its own effects may play."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -569,11 +597,26 @@ class SequenceBlock(BaseModel):
     zooms: tuple[Zoom, ...] = Field(default=(), max_length=MAX_ZOOMS)
     hand_crops: tuple[HandCrop, ...] = Field(default=(), max_length=MAX_HAND_CROPS)
     effects: tuple[SoundEffect, ...] = Field(default=(), max_length=MAX_EFFECTS)
+    broll: str | None = None
+    sound: bool = True
+
+    _broll = field_validator("broll")(
+        lambda value: None if value is None else broll_file(value)
+    )
 
     @model_validator(mode="after")
     def _own_edits_inside(self) -> "SequenceBlock":
         if self.end_seconds <= self.start_seconds:
             raise ValueError("a block must end after it starts")
+        if self.broll is not None:
+            if self.zooms or self.hand_crops:
+                raise ValueError("a B-roll block has no zooms or hand crops")
+            if is_still(self.broll) and self.start_seconds != 0:
+                raise ValueError("a still B-roll block starts at 0")
+            if is_still(self.broll) and self.end_seconds > MAX_STILL_SECONDS:
+                raise ValueError(
+                    f"a still is shown for at most {MAX_STILL_SECONDS:g} s"
+                )
         length = self.end_seconds - self.start_seconds
         for items, what in ((self.zooms, "zoom"), (self.hand_crops, "hand crop")):
             previous = 0.0
@@ -590,6 +633,36 @@ class SequenceBlock(BaseModel):
     @property
     def duration_seconds(self) -> float:
         return self.end_seconds - self.start_seconds
+
+
+BrollMode = Literal["cutaway", "pip"]
+
+
+class BrollOverlay(BaseModel):
+    """A B-roll file over a stretch of the clip, in the finished clip's
+    seconds like texts (ADR 0034, B-roll amendment), from `offset_seconds`
+    into the file: a `cutaway` over the whole frame, fitted on a blurred
+    fill, or a `pip` box centred at `x`, `y` (fractions of the frame),
+    `size` of the frame's width. The clip's own sound continues."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    file: str
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    end_seconds: float = Field(allow_inf_nan=False)
+    offset_seconds: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    mode: BrollMode = "cutaway"
+    x: float = Field(default=0.5, ge=0, le=1)
+    y: float = Field(default=0.3, ge=0, le=1)
+    size: float = Field(default=0.45, ge=0.15, le=1)
+
+    _file = field_validator("file")(broll_file)
+
+    @model_validator(mode="after")
+    def _ends_after_start(self) -> "BrollOverlay":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("an overlay must end after it starts")
+        return self
 
 
 class PadPiece(BaseModel):
@@ -616,6 +689,45 @@ def _check_sequence(
     """A clip has blocks or cuts, not both (ADR 0034)."""
     if sequence and cuts:
         raise ValueError("a clip with a sequence has no cuts")
+
+
+class RenderBlock(BaseModel):
+    """One block for the renderer, framed on its own before the join (ADR
+    0034, B-roll amendment): a range of the source, or of a B-roll `path`
+    (a `still` image shown for the range's length) with or without its
+    `sound`. A source block in the face style has its `crop`, or the fit
+    style its `hand` windows, both in seconds from the block's start."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    path: Path | None = None
+    still: bool = False
+    sound: bool = True
+    crop: CropPath | None = None
+    hand: HandCropPlan | None = None
+
+    @property
+    def duration_seconds(self) -> float:
+        return self.end_seconds - self.start_seconds
+
+
+class RenderOverlay(BaseModel):
+    """An overlay for the renderer: a B-roll file resolved, in the joined
+    clip's seconds (ADR 0034, B-roll amendment)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: Path
+    still: bool = False
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    offset_seconds: float = 0.0
+    mode: BrollMode = "cutaway"
+    x: float = 0.5
+    y: float = 0.3
+    size: float = 0.45
 
 
 class MixEffect(BaseModel):
@@ -695,7 +807,7 @@ class ManifestClip(BaseModel):
     volume, music and sound effects (ADR 0007, audio amendment), None when
     as cut. `sequence` is its blocks in play order when they are not just
     the span less its cuts (ADR 0034); a clip has a sequence or cuts, not
-    both.
+    both. `broll` is its B-roll overlays (B-roll amendment).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -724,6 +836,7 @@ class ManifestClip(BaseModel):
     hand_crops: tuple[HandCrop, ...] = ()
     audio: ClipAudio | None = None
     sequence: tuple[SequenceBlock, ...] = Field(default=(), max_length=MAX_BLOCKS)
+    broll: tuple[BrollOverlay, ...] = Field(default=(), max_length=MAX_OVERLAYS)
 
     @model_validator(mode="after")
     def _sequence_or_cuts(self) -> "ManifestClip":
@@ -989,7 +1102,8 @@ class Label(Span):
     are its punch-ins and hand-placed windows (ADR 0016 and 0025), and
     `audio` its volume, music and sound effects (ADR 0007). `sequence` is
     its blocks in play order (ADR 0034), with no cuts; the span stays the
-    moment, so `eval` reads only the span.
+    moment, so `eval` reads only the span. `broll` is its B-roll
+    overlays (ADR 0034, B-roll amendment).
     """
 
     note: str | None = None
@@ -1005,6 +1119,7 @@ class Label(Span):
     hand_crops: tuple[HandCrop, ...] = ()
     audio: ClipAudio | None = None
     sequence: tuple[SequenceBlock, ...] = Field(default=(), max_length=MAX_BLOCKS)
+    broll: tuple[BrollOverlay, ...] = Field(default=(), max_length=MAX_OVERLAYS)
 
     @model_validator(mode="after")
     def _sequence_or_cuts(self) -> "Label":

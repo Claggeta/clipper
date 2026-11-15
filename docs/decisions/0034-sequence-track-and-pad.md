@@ -209,6 +209,41 @@ goes next, then 9m on top of it.
   onto the Sequence lane as a copy of its range.
 - Manual step RV28.
 
+## Amended by B-roll in the core (V7 item 9m-1)
+
+9m is in two PRs: the core (this) and the page (9m-2).
+
+- **Files**: `data/broll/` (`CLIPPER_BROLL_DIR`), `.mp4`, `.mov` and
+  `.webm` videos and `.png`, `.jpg` and `.jpeg` stills. `GET
+  /api/broll` lists them with each video's length and whether it has
+  sound (`MediaInfo.has_audio`, probed once per run; an unreadable file
+  is listed with no length); `/broll/<name>` serves listed names only.
+- **Inserts**: `SequenceBlock.broll` names the file; its `start` and
+  `end` are times in the file (a still starts at 0, at most 30 s), and
+  `sound` plays the file's audio, or silence when off, for a still, or
+  for a file without audio. It takes no zooms or hand crops; its own
+  effects play. Source-time edits and captions skip it.
+- **Overlays**: `broll` on the manifest clip and label, `BrollOverlay`
+  of `file`, `start_seconds` and `end_seconds` (the finished clip's),
+  `offset_seconds` into the file, `mode` (`cutaway` fitted on a blurred
+  fill over the whole frame, or `pip`, a box of `size` of the frame's
+  width centred at `x`, `y`). Silent; the clip's sound continues. A
+  clip with overlays and no sequence renders as its span less its cuts,
+  as blocks.
+- **Framing per block** replaces 9n-2's framing after the join, as the
+  design said: a face crop after the join would cut a landscape insert
+  to its middle third. Each source block is fitted, face-cropped (its
+  own tracked crop, its own `cropb<n>.cmd`) or hand-cropped on its own,
+  each B-roll block fitted on a blurred fill (to the source frame in a
+  landscape clip, which then needs the frame size), all `yuv420p`; then
+  `concat`, the zooms, the overlays (`overlay=enable`, the input shifted
+  to its start), the captions. Clips without a sequence or overlays
+  keep the single-input path.
+- **Save** refuses, before writing, a missing file, a block or overlay
+  needing more of a video than it has, and an overlay past the clip's
+  end. Labels write `broll` and `sound` only on B-roll blocks.
+- Manual step R22.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.

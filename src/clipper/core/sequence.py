@@ -25,7 +25,8 @@ class BlockMap:
 
     A clip time is in exactly one block, so it has one source time; a
     source time is in every block that repeats it, so it has a list of
-    clip times.
+    clip times. A B-roll block (B-roll amendment) shows no source time, so
+    no edit in source seconds lands on it.
     """
 
     def __init__(self, blocks: Sequence[SequenceBlock]) -> None:
@@ -39,32 +40,46 @@ class BlockMap:
         self.placed = tuple(placed)
         self.duration = at
 
+    def _shows_source(self, index: int) -> bool:
+        return self.placed[index].block.broll is None
+
     @property
-    def ranges(self) -> tuple[Range, ...]:
-        """Each block's source range, in play order."""
-        return tuple((p.block.start_seconds, p.block.end_seconds) for p in self.placed)
+    def captioned(self) -> tuple[Range | float, ...]:
+        """Each block for the captions, in play order: its source range, or
+        the length of a B-roll block, which has no speech."""
+        return tuple(
+            p.block.duration_seconds
+            if p.block.broll is not None
+            else (p.block.start_seconds, p.block.end_seconds)
+            for p in self.placed
+        )
 
     def clip_times(self, seconds: float) -> list[float]:
         """Every time in the clip that shows this source second."""
         return [
             p.at + seconds - p.block.start_seconds
-            for p in self.placed
-            if p.block.start_seconds <= seconds < p.block.end_seconds
+            for i, p in enumerate(self.placed)
+            if self._shows_source(i)
+            and p.block.start_seconds <= seconds < p.block.end_seconds
         ]
 
-    def source_time(self, seconds: float) -> float:
-        """The source second shown at this time in the clip."""
-        for p in self.placed:
+    def source_time(self, seconds: float) -> float | None:
+        """The source second shown at this time in the clip; None in a
+        B-roll block."""
+        for i, p in enumerate(self.placed):
             if seconds < p.at + p.block.duration_seconds:
+                if not self._shows_source(i):
+                    return None
                 return p.block.start_seconds + max(seconds - p.at, 0.0)
         last = self.placed[-1].block
-        return last.end_seconds
+        return None if last.broll is not None else last.end_seconds
 
     def pieces(
         self, start: float, end: float, skip: Callable[[int], bool]
     ) -> list[Range]:
         """A source range at every block it falls in, in clip seconds, in play
-        order, leaving out blocks for which `skip(index)` is true.
+        order, leaving out B-roll blocks and blocks for which `skip(index)`
+        is true.
 
         Where the range runs across the join of two blocks in source order
         (a cut, not a reorder), the two pieces are one, as a range across a
@@ -72,7 +87,7 @@ class BlockMap:
         """
         found: list[tuple[int, Range]] = []
         for index, (block, at) in enumerate(self.placed):
-            if skip(index):
+            if skip(index) or not self._shows_source(index):
                 continue
             a = max(start, block.start_seconds)
             b = min(end, block.end_seconds)
@@ -122,24 +137,29 @@ class BlockMap:
             ]
         return tuple(sorted(placed, key=lambda zoom: zoom.start_seconds))
 
-    def hands(self, hands: Sequence[HandCrop]) -> list[HandWindow]:
-        """Hand windows as `zooms` places zooms: `(start, end, x)` in clip
-        seconds, in order."""
-
-        def own(index: int) -> bool:
-            return bool(self.placed[index].block.hand_crops)
-
-        windows: list[HandWindow] = [
-            (a, b, hand.x)
-            for hand in hands
-            for a, b in self.pieces(hand.start_seconds, hand.end_seconds, own)
-        ]
-        for block, at in self.placed:
-            windows += [
-                (at + h.start_seconds, at + h.end_seconds, h.x)
-                for h in block.hand_crops
-            ]
-        return sorted(windows)
+    def block_hands(self, hands: Sequence[HandCrop]) -> list[list[HandWindow]]:
+        """Each block's hand windows, `(start, end, x)` in seconds from the
+        block's start, in order, for framing the block on its own: the
+        clip's (source seconds) where they fall, or the block's own, which
+        replace them there. None on a B-roll block."""
+        windows: list[list[HandWindow]] = []
+        for index, (block, _) in enumerate(self.placed):
+            if not self._shows_source(index):
+                windows.append([])
+            elif block.hand_crops:
+                windows.append(
+                    [(h.start_seconds, h.end_seconds, h.x) for h in block.hand_crops]
+                )
+            else:
+                windows.append(
+                    sorted(
+                        (a - block.start_seconds, b - block.start_seconds, hand.x)
+                        for hand in hands
+                        if (a := max(hand.start_seconds, block.start_seconds))
+                        < (b := min(hand.end_seconds, block.end_seconds))
+                    )
+                )
+        return windows
 
     def effects(
         self, effects: Sequence[SoundEffect]
@@ -155,22 +175,10 @@ class BlockMap:
             placed += [(effect, at + effect.at_seconds) for effect in block.effects]
         return sorted(placed, key=lambda pair: pair[1])
 
-    def join_crops(self, crops: Sequence[CropPath | None], centre: int) -> CropPath:
-        """One face crop path for the clip from each block's own (times from
-        the block's start), joined at the blocks' places; a block with no
-        face holds the window at `centre`. Raises `ClipRenderError` when no
-        block has a face."""
-        found = [crop for crop in crops if crop is not None]
-        if not found:
+    def check_faces(self, crops: Sequence[CropPath | None]) -> None:
+        """Raise `ClipRenderError` when no source block has a face to frame
+        in the face style; a block without one is held in the middle."""
+        if not any(
+            crop is not None for i, crop in enumerate(crops) if self._shows_source(i)
+        ):
             raise ClipRenderError("No face in any block to frame in the face style")
-        width, height = found[0].width, found[0].height
-        points: list[tuple[float, int]] = []
-        for (_, at), crop in zip(self.placed, crops, strict=True):
-            block_points = crop.points if crop is not None else ((0.0, centre),)
-            for seconds, left in block_points:
-                time = round(at + seconds, 3)
-                if points and points[-1][0] == time:
-                    points[-1] = (time, left)
-                elif not points or points[-1][1] != left:
-                    points.append((time, left))
-        return CropPath(width=width, height=height, points=tuple(points))
