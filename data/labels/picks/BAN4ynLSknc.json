@@ -1,0 +1,86 @@
+{
+  "source": "BAN4ynLSknc.mp4",
+  "labels": [
+    {
+      "start": "0:31:48.89",
+      "end": "0:32:15.08",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "good",
+      "people": [
+        "Lacy"
+      ],
+      "texts": [
+        {
+          "text": "Lacy Reacts 400 Flights Stuck in Air! ✈️",
+          "start_seconds": 0.0,
+          "end_seconds": 26.2,
+          "place": "top",
+          "colour": "cyan",
+          "look": "outline",
+          "fade": true
+        }
+      ],
+      "caption_edits": {
+        "fixes": [
+          {
+            "start_seconds": 1908.89,
+            "text": "400"
+          }
+        ],
+        "keys": [],
+        "highlight": "cyan"
+      },
+      "note": "Good clip. Big global news."
+    },
+    {
+      "start": "2:26:44.63",
+      "end": "2:27:04.79",
+      "verdict": "fix",
+      "draft": {
+        "start": "2:26:33.97",
+        "end": "2:27:07.61"
+      },
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Lacy"
+      ],
+      "note": "Funny clip"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:06:53.62",
+      "end": "0:07:16.98"
+    },
+    {
+      "start": "0:29:28.44",
+      "end": "0:29:48.04"
+    },
+    {
+      "start": "0:36:24.14",
+      "end": "0:36:54.74"
+    },
+    {
+      "start": "0:37:25.24",
+      "end": "0:37:44.11"
+    },
+    {
+      "start": "1:40:39.37",
+      "end": "1:41:17.25"
+    },
+    {
+      "start": "2:55:39.59",
+      "end": "2:56:22.84"
+    },
+    {
+      "start": "5:35:52.15",
+      "end": "5:36:11.57"
+    },
+    {
+      "start": "6:02:08.67",
+      "end": "6:02:52.25"
+    }
+  ]
+}

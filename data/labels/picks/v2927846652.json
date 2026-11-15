@@ -1,0 +1,127 @@
+{
+  "source": "v2927846652.mp4",
+  "labels": [
+    {
+      "start": "0:16:45.97",
+      "end": "0:17:12.35",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:16:45.97",
+        "end": "0:17:30.41"
+      },
+      "style": "fit",
+      "rating": "good",
+      "people": [
+        "Jason"
+      ],
+      "cuts": [
+        {
+          "start": "0:17:08.8",
+          "end": "0:17:09.52"
+        },
+        {
+          "start": "0:17:10.3",
+          "end": "0:17:11.38"
+        }
+      ]
+    },
+    {
+      "start": "0:50:31.28",
+      "end": "0:51:20.24",
+      "verdict": "fix",
+      "draft": {
+        "start": "0:50:31.28",
+        "end": "0:51:14.24"
+      },
+      "style": "fit",
+      "rating": "good",
+      "people": [
+        "Jason"
+      ]
+    },
+    {
+      "start": "1:03:00.89",
+      "end": "1:03:49.51",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:03:00.89",
+        "end": "1:03:43.83"
+      },
+      "style": "fit",
+      "rating": "good",
+      "cuts": [
+        {
+          "start": "1:03:03.54",
+          "end": "1:03:03.9"
+        },
+        {
+          "start": "1:03:13.92",
+          "end": "1:03:14.36"
+        },
+        {
+          "start": "1:03:15.36",
+          "end": "1:03:16.76"
+        },
+        {
+          "start": "1:03:24.2",
+          "end": "1:03:24.52"
+        },
+        {
+          "start": "1:03:36.46",
+          "end": "1:03:37.26"
+        }
+      ],
+      "texts": [
+        {
+          "text": "*The Time Joe Got Scammed*",
+          "start_seconds": 0.0,
+          "end_seconds": 45.3,
+          "place": "top",
+          "colour": "orange",
+          "fade": true
+        }
+      ],
+      "caption_edits": {
+        "fixes": [],
+        "keys": [],
+        "highlight": "orange"
+      },
+      "note": "Interesting Story. A big collab with another large streamer"
+    },
+    {
+      "start": "1:20:16.56",
+      "end": "1:20:58.1",
+      "verdict": "post"
+    },
+    {
+      "start": "1:53:33.06",
+      "end": "1:53:59.49",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "Funny short clip. Not much else besides the comedic fall."
+    }
+  ],
+  "rejected": [
+    {
+      "start": "0:07:50.27",
+      "end": "0:08:15.56"
+    },
+    {
+      "start": "0:10:33.2",
+      "end": "0:11:14.78"
+    },
+    {
+      "start": "1:00:50.15",
+      "end": "1:01:30.57"
+    },
+    {
+      "start": "1:01:32.39",
+      "end": "1:02:14.57"
+    },
+    {
+      "start": "2:59:15.93",
+      "end": "2:59:56.12"
+    }
+  ]
+}

@@ -20,6 +20,13 @@
       "note": "Ron is talking about popular new technology. Interesting to the viewer. Funny ending."
     },
     {
+      "start": "0:34:48.02",
+      "end": "0:35:29.5",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "0:54:15.97",
       "end": "0:54:58.17",
       "verdict": "fix",
@@ -52,10 +59,32 @@
       "note": "Interesting food. OK clip"
     },
     {
+      "start": "1:51:31.22",
+      "end": "1:52:12.54",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "good",
+      "note": "needs to be a little longer"
+    },
+    {
       "start": "1:51:59.58",
       "end": "1:52:29.16",
       "verdict": "post",
       "note": "Funny clip. Interesting Food."
+    },
+    {
+      "start": "2:03:30.92",
+      "end": "2:04:13.72",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "good"
+    },
+    {
+      "start": "2:04:33.34",
+      "end": "2:05:13.82",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
     },
     {
       "start": "2:29:16",
@@ -114,16 +143,34 @@
       "note": "Semi-funny clip"
     },
     {
+      "start": "4:37:47.56",
+      "end": "4:38:26.45",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "4:38:50.57",
       "end": "4:39:27.59",
       "verdict": "post",
       "note": "Funny clip with Kai Cenat"
+    },
+    {
+      "start": "4:44:04.65",
+      "end": "4:44:42.81",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "good"
     }
   ],
   "rejected": [
     {
       "start": "0:03:43.25",
       "end": "0:03:57.21"
+    },
+    {
+      "start": "0:13:17.23",
+      "end": "0:13:55.01"
     },
     {
       "start": "0:31:46.53",
@@ -135,9 +182,18 @@
       "note": "Not enough context"
     },
     {
+      "start": "2:03:15.88",
+      "end": "2:03:51.93",
+      "note": "Needs to be a little longer"
+    },
+    {
       "start": "3:33:45.04",
       "end": "3:34:29.06",
       "note": "Nothing really happened"
+    },
+    {
+      "start": "4:08:15.02",
+      "end": "4:08:59.16"
     },
     {
       "start": "4:14:35.08",

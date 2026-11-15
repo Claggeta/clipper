@@ -31,6 +31,20 @@
       "note": "Funny Clip."
     },
     {
+      "start": "1:05:49.05",
+      "end": "1:06:32.25",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
+      "start": "1:08:24.46",
+      "end": "1:09:01.76",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "1:14:50.82",
       "end": "1:15:20.68",
       "verdict": "post",
@@ -52,6 +66,20 @@
       "note": "intense and entertaining clip"
     },
     {
+      "start": "1:46:39.54",
+      "end": "1:47:14.28",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
+      "start": "3:26:48.44",
+      "end": "3:27:31.34",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "3:27:15.88",
       "end": "3:27:55.21",
       "verdict": "fix",
@@ -61,6 +89,14 @@
       },
       "style": "fit",
       "note": "Good clip. Entertaining"
+    },
+    {
+      "start": "4:03:59.47",
+      "end": "4:04:28.93",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "good",
+      "note": "need to be a little longer."
     }
   ],
   "rejected": [
@@ -75,6 +111,22 @@
     {
       "start": "1:37:35.35",
       "end": "1:37:54.14"
+    },
+    {
+      "start": "2:37:48.31",
+      "end": "2:38:16.62"
+    },
+    {
+      "start": "3:20:15.04",
+      "end": "3:20:46.04"
+    },
+    {
+      "start": "3:32:19.86",
+      "end": "3:33:01"
+    },
+    {
+      "start": "3:39:07.74",
+      "end": "3:39:47.18"
     }
   ]
 }

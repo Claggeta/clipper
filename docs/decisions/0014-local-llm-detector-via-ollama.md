@@ -331,6 +331,49 @@ The shared client takes an optional `num_ctx` for a long prompt (the
 story's beats request), with checks that the prompt fits; detection and
 titles do not pass it, so their requests are unchanged.
 
+## Amended by the finer score (V7 item 5): measured, not adopted
+
+**Tried.** Every window of ten judged streamer VODs scored twice by
+`qwen3.5:9b`, once with the current prompt and once with a rubric (a whole
+number from 0 to 9 with a written anchor per band: filler, needs context,
+interesting without a hook or payoff, a hook and a complete moment, a
+standout). Each request also asked Ollama for token log probabilities
+(`logprobs`, `top_logprobs: 10`), which Ollama 0.40.13 returns; the score's
+digits are one token each, so a second score per window is the expected
+value over the digit alternatives. Four rankings, each through
+`select_top` at top 10: A (now), A-p (A's probabilities), B (rubric), B-p
+(rubric's probabilities). Scratch scripts in `D:\Clippett\spikes\score`,
+not committed. The 69 windows A-p and B-p put in a top 10 that had never
+been judged were rendered and judged by the maintainer in `review`: 37
+saved (6 rated `good`), 31 rejected, 1 a repeat.
+
+**Measured** at top 10 on 3Sbj_BZORr4, v2922695332, v2917872953,
+v2922589775, v2918956109, v2922292514, GBCYViJBuCI, v2924380274,
+ANoZNWQXYZ4 and v2910908943:
+
+| Variant | Keepers | Rejected | Ends early | VODs ahead / level / behind A | Distinct scores per VOD | Tied at the cut |
+|---|---|---|---|---|---|---|
+| A (now) | 70 | 30 | 17 | | 10 to 14 | 3 to 37 |
+| A-p | 66 | 34 | 14 | 2 / 4 / 4 | 261 to 1,132 | 1 |
+| B | 41 (41 unjudged) | 18 | 15 | 0 / 0 / 10 | 6 to 9 | 9 to 122 |
+| B-p | 70 | 30 | 13 | 3 / 4 / 3 | 258 to 1,194 | 1 |
+
+- Probabilities end the ties, but the order they give finds no more
+  keepers: B-p ties A exactly, A-p is behind. The rubric alone still
+  clusters (154 of 265 windows at 3 on 3Sbj_BZORr4).
+- Model time is unchanged: 9,535 s for the current prompt and 8,831 s for
+  the rubric over the ten VODs; probabilities cost nothing extra.
+- `good` cannot be compared: B-p's top 10 holds 6, but nearly all of A's
+  keepers were judged before ratings existed.
+- The 69 new windows were judged after the maintainer moved to posting 1
+  to 2 Shorts a day: Save by the earlier "postable" bar, `good` for what
+  would be posted now.
+
+**Decision.** Not adopted; no code merged. Decision 4's 0 to 1 score and
+the earlier-start tie rule stand. The new judged labels stay. Revisit if
+ratings build up enough to compare `good` picks in the top few ranks,
+where B-p's ordering might differ from A's.
+
 ## Related
 
 - 0012: evaluation

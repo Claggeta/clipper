@@ -2,6 +2,13 @@
   "source": "GBCYViJBuCI.mp4",
   "labels": [
     {
+      "start": "0:55:49.64",
+      "end": "0:56:18.88",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "2:11:15.81",
       "end": "2:12:12.36",
       "verdict": "fix",
@@ -10,6 +17,14 @@
         "end": "2:11:51.49"
       },
       "style": "fit"
+    },
+    {
+      "start": "2:12:00.2",
+      "end": "2:12:43.38",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "Needs better start point"
     },
     {
       "start": "2:13:30.36",
@@ -64,6 +79,13 @@
       "note": "OK clip. Kind of funny"
     },
     {
+      "start": "3:02:00.54",
+      "end": "3:02:41.02",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "3:02:31.4",
       "end": "3:03:13.18",
       "verdict": "post",
@@ -88,12 +110,20 @@
       "end": "0:08:26.1"
     },
     {
+      "start": "0:24:48.03",
+      "end": "0:25:27.73"
+    },
+    {
       "start": "2:04:16.44",
       "end": "2:04:58.64"
     },
     {
       "start": "2:18:34.63",
       "end": "2:19:14.65"
+    },
+    {
+      "start": "2:34:03.71",
+      "end": "2:34:44.62"
     },
     {
       "start": "3:03:30.02",
