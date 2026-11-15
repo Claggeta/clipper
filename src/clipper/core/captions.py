@@ -404,6 +404,7 @@ def build_ass(
     cuts: tuple[Cut, ...] = (),
     texts: tuple[OnScreenText, ...] = (),
     edits: CaptionEdits | None = None,
+    sequence: tuple[Cut, ...] = (),
 ) -> Captions:
     """Build styled ASS captions for the part of `transcript` inside the clip.
 
@@ -429,8 +430,45 @@ def build_ass(
     (ADR 0017, caption editing amendment); segments without word times are
     left as they are.
 
+    `sequence` is the clip's blocks as source ranges in play order (ADR
+    0034), in place of the span and cuts: each block is captioned as a clip
+    of its own and moved to its place, so a chunk never spans a join, and
+    a repeated range is captioned, with its edits, each time it plays.
+
     The text is "" when no event remains. The caller decides what that means.
     """
+    highlight = _colour_tag(edits.highlight) if edits else _HIGHLIGHT
+    if sequence:
+        events, from_segments, length = _sequence_events(
+            transcript, sequence, edits, highlight
+        )
+    else:
+        events, from_segments, length = _clip_events(
+            transcript, candidate, cuts, edits, highlight
+        )
+    speech = bool(events)
+    text_layout = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
+    layout = _VERTICAL if vertical else _SOURCE
+    pairs = [
+        (t, e) for t in texts if (e := _text_event(t, text_layout, layout, length))
+    ]
+    events.extend(event for _, event in pairs)
+    if not events:
+        return Captions("", from_segments=False)
+    outlined = any(t.look == "outline" for t, _ in pairs)
+    header = _header(layout, text_layout if pairs else None, outlined)
+    return Captions(header + "".join(events), from_segments, speech)
+
+
+def _clip_events(
+    transcript: Transcript,
+    candidate: ClipCandidate,
+    cuts: tuple[Cut, ...],
+    edits: CaptionEdits | None,
+    highlight: str,
+) -> tuple[list[str], bool, int]:
+    """The caption events of one span less its cuts, whether any came from
+    a segment without words, and the clip's length in milliseconds."""
     clip_start = _to_ms(candidate.start_seconds)
     clip_end = _to_ms(candidate.end_seconds)
     time_map = (
@@ -448,22 +486,45 @@ def build_ass(
                 from_segments = True
             continue
         words = _words_in_clip(segment.words, clip_start, clip_end, time_map, edits)
-        highlight = _colour_tag(edits.highlight) if edits else _HIGHLIGHT
         for chunk in _chunks(words):
             events.extend(_word_events(chunk, highlight))
-    speech = bool(events)
-    text_layout = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
-    layout = _VERTICAL if vertical else _SOURCE
     length = round(time_map.duration) if time_map else clip_end - clip_start
-    pairs = [
-        (t, e) for t in texts if (e := _text_event(t, text_layout, layout, length))
-    ]
-    events.extend(event for _, event in pairs)
-    if not events:
-        return Captions("", from_segments=False)
-    outlined = any(t.look == "outline" for t, _ in pairs)
-    header = _header(layout, text_layout if pairs else None, outlined)
-    return Captions(header + "".join(events), from_segments, speech)
+    return events, from_segments, length
+
+
+def _sequence_events(
+    transcript: Transcript,
+    sequence: tuple[Cut, ...],
+    edits: CaptionEdits | None,
+    highlight: str,
+) -> tuple[list[str], bool, int]:
+    """As `_clip_events`, for blocks played in turn (ADR 0034)."""
+    events: list[str] = []
+    from_segments = False
+    at = 0
+    for start, end in sequence:
+        clip_start, clip_end = _to_ms(start), _to_ms(end)
+        for segment in transcript.segments:
+            if not segment.words:
+                a = max(_to_ms(segment.start_seconds), clip_start)
+                b = min(_to_ms(segment.end_seconds), clip_end)
+                text = _clean(segment.text)
+                if b > a and text:
+                    event = _event(at + a - clip_start, at + b - clip_start, text)
+                    if event:
+                        events.append(event)
+                        from_segments = True
+                continue
+            words = [
+                w._replace(start=w.start + at, end=w.end + at)
+                for w in _words_in_clip(
+                    segment.words, clip_start, clip_end, None, edits
+                )
+            ]
+            for chunk in _chunks(words):
+                events.extend(_word_events(chunk, highlight))
+        at += clip_end - clip_start
+    return events, from_segments, at
 
 
 def _text_event(

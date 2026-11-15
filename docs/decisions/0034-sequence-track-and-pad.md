@@ -120,6 +120,49 @@ goes next, then 9m on top of it.
 - Combine (0032) and Summarize (0033) are unchanged: they join rendered
   clips and beats.
 
+## Amended by the core (V7 item 9n-2)
+
+- **Sound effects are in source seconds**, not clip seconds as decision
+  3 said: `SoundEffect.at_seconds` is a moment of the source (ADR 0007,
+  audio amendment). In a sequence an effect plays at every block that
+  shows its moment, and a block may have its own effects, in seconds
+  from its start, which play there as well (needed for an effect on a
+  repeat, and in 9m on a B-roll insert). Only on-screen texts and the
+  music are in clip seconds.
+- **Model.** `SequenceBlock` (a source range, its own `zooms`,
+  `hand_crops` and `effects`), `sequence` on `ManifestClip` and `Label`
+  (at most 30 blocks, never with `cuts`), and `PadPiece` in
+  `RenderManifest.pad` (unique ids, at most 50). Blocks are written in
+  seconds, like zooms. B-roll blocks come with 9m.
+- **Time map.** `BlockMap` in `core/sequence.py`. A zoom or hand crop in
+  source seconds is placed in every block it falls in; in a block with
+  its own zooms (or hand crops), the clip's do not apply there. A range
+  across the join of two blocks in source order is one piece, so a
+  smooth zoom across a cut eases once.
+- **Cut clips are unchanged.** A clip with no sequence keeps the span,
+  cuts, `TimeMap` and `select` path as before, so its files and labels
+  are byte for byte what they were; only a clip with a sequence takes
+  the block path. That is two paths in the store and renderer, kept for
+  safety rather than folding cuts into blocks.
+- **Captions.** `build_ass(..., sequence=)` captions each block as a
+  clip of its own and moves it to its place; edits apply at every
+  occurrence.
+- **Face crop.** Each block is tracked and framed on its own (cached per
+  range); a block with no face holds the window in the middle, and no
+  face in any block is an error, as before.
+- **Renderer.** Decision 6's choice: the frame, crops, zooms and
+  captions run after the join, on clip-time expressions, as they ran
+  after `select`. Each block is an input of its own (`-ss`, `-t`), joined
+  by `concat` in `-filter_complex`; the mix takes the joined sound and
+  the music and effects as inputs after the blocks.
+- **Save** takes `sequence` (blocks of `start`, `end` and their own
+  edits); with one, the clip's zooms, hand crops and effects may lie
+  anywhere between the earliest and latest second its span or blocks
+  cover. Re-rendered when the sequence changes.
+- Manual step R21, run 2026-11-15 on 3Sbj_BZORr4: three blocks (a
+  repeat with its own 2.0x zoom), face style, captions, music and two
+  effects; 14.03 s, 6.9 s to render, frames as expected.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.

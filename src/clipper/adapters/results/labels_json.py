@@ -54,7 +54,7 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
 
     Overwrites `path`; the caller decides whether that is allowed. Verdicts,
     drafts, styles, ratings, people, cuts, texts, caption edits, zooms, hand
-    crops, audio and rejected spans are written only when present.
+    crops, audio, sequences and rejected spans are written only when present.
     """
     labels = []
     for label in labeled.labels:
@@ -81,6 +81,8 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
             entry["hand_crops"] = [crop.model_dump() for crop in label.hand_crops]
         if label.audio is not None:
             entry["audio"] = label.audio.model_dump()
+        if label.sequence:
+            entry["sequence"] = [block.model_dump() for block in label.sequence]
         if label.note is not None:
             entry["note"] = label.note
         labels.append(entry)

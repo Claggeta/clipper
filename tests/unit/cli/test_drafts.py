@@ -451,6 +451,7 @@ class FaceFailingRenderer(FakeClipRenderer):
         zooms: tuple[Zoom, ...] = (),
         hand: HandCropPlan | None = None,
         audio: AudioMix | None = None,
+        sequence: tuple[tuple[float, float], ...] = (),
     ) -> RenderedClip:
         if crop is not None:
             raise ClipRenderError("[face] crop failed")

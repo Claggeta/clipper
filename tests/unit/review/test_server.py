@@ -404,6 +404,7 @@ def test_save_unchanged_writes_a_post_label_and_the_title(
         "zooms": [],
         "hand_crops": [],
         "audio": None,
+        "sequence": [],
     }
     [label] = load_labels(_labels_path(tmp_path)).labels
     assert (label.verdict, label.start_seconds, label.end_seconds) == (
@@ -582,6 +583,7 @@ def test_add_creates_a_clip_and_trash_removes_it(base_url: str, tmp_path: Path) 
         "zooms": [],
         "hand_crops": [],
         "audio": None,
+        "sequence": [],
     }
     assert (clip["render_error"], clip["model_title"]) == (None, None)
     listed = json.loads(_get(base_url + "/api/clips")[2])["clips"]

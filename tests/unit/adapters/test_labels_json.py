@@ -398,3 +398,43 @@ def test_bad_texts_are_refused(text: dict[str, object], message: str) -> None:
 
     with pytest.raises(ValidationError, match=message):
         OnScreenText.model_validate(text)
+
+
+def test_a_sequence_round_trips_in_seconds(tmp_path: Path) -> None:
+    block = {
+        "start_seconds": 70.0,
+        "end_seconds": 72.5,
+        "zooms": [
+            {
+                "start_seconds": 0.5,
+                "end_seconds": 2.0,
+                "scale": 2.0,
+                "x": 0.5,
+                "y": 0.5,
+                "smooth": False,
+            }
+        ],
+        "hand_crops": [],
+        "effects": [{"file": "boom.wav", "at_seconds": 1.0, "level_db": 0.0}],
+    }
+    labeled = LabeledVideo.model_validate(
+        {
+            "source": "v.mp4",
+            "labels": [
+                {
+                    "start": "0:01:00",
+                    "end": "0:01:40",
+                    "verdict": "post",
+                    "sequence": [
+                        {"start_seconds": 60.0, "end_seconds": 65.0},
+                        block,
+                    ],
+                }
+            ],
+        }
+    )
+    path = tmp_path / "v.json"
+    save_labels(labeled, path)
+    entry = json.loads(path.read_text(encoding="utf-8"))["labels"][0]
+    assert entry["sequence"][1] == block
+    assert load_labels(path) == labeled

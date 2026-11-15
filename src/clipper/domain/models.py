@@ -549,6 +549,75 @@ class ClipAudio(BaseModel):
         return self.gain_db == 0 and self.music is None and not self.effects
 
 
+# A clip's blocks and a drafts folder's pad (ADR 0034), at most.
+MAX_BLOCKS = 30
+MAX_PAD_PIECES = 50
+PAD_NAME_LIMIT = 60
+
+
+class SequenceBlock(BaseModel):
+    """One block of a clip's sequence: a range of the source, played in turn
+    (ADR 0034). A range may repeat in other blocks. `zooms`, `hand_crops`
+    and `effects` are the block's own, in seconds from the block's start,
+    and apply to it alone; in a block with its own zooms or hand crops, the
+    clip's (in source seconds) do not apply."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    end_seconds: float = Field(allow_inf_nan=False)
+    zooms: tuple[Zoom, ...] = Field(default=(), max_length=MAX_ZOOMS)
+    hand_crops: tuple[HandCrop, ...] = Field(default=(), max_length=MAX_HAND_CROPS)
+    effects: tuple[SoundEffect, ...] = Field(default=(), max_length=MAX_EFFECTS)
+
+    @model_validator(mode="after")
+    def _own_edits_inside(self) -> "SequenceBlock":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("a block must end after it starts")
+        length = self.end_seconds - self.start_seconds
+        for items, what in ((self.zooms, "zoom"), (self.hand_crops, "hand crop")):
+            previous = 0.0
+            for item in items:
+                if item.start_seconds < previous or item.end_seconds > length:
+                    raise ValueError(
+                        f"a block's {what}s must be in order, apart and inside it"
+                    )
+                previous = item.end_seconds
+        if any(effect.at_seconds >= length for effect in self.effects):
+            raise ValueError("a block's sound effects must be inside it")
+        return self
+
+    @property
+    def duration_seconds(self) -> float:
+        return self.end_seconds - self.start_seconds
+
+
+class PadPiece(BaseModel):
+    """A range of the source kept on a drafts folder's pad, to drop into a
+    clip's sequence later (ADR 0034). `id` is unique in the pad."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str = Field(min_length=1, max_length=32)
+    name: str = Field(max_length=PAD_NAME_LIMIT)
+    start_seconds: float = Field(ge=0, allow_inf_nan=False)
+    end_seconds: float = Field(allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _ends_after_start(self) -> "PadPiece":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("a pad piece must end after it starts")
+        return self
+
+
+def _check_sequence(
+    sequence: tuple[SequenceBlock, ...], cuts: tuple[object, ...]
+) -> None:
+    """A clip has blocks or cuts, not both (ADR 0034)."""
+    if sequence and cuts:
+        raise ValueError("a clip with a sequence has no cuts")
+
+
 class MixEffect(BaseModel):
     """A sound effect for the renderer: its file and its time in the cut clip."""
 
@@ -624,7 +693,9 @@ class ManifestClip(BaseModel):
     `zooms` and `hand_crops` are its punch-ins and hand-placed windows
     (ADR 0016 and 0025 amendments), in source seconds. `audio` is its
     volume, music and sound effects (ADR 0007, audio amendment), None when
-    as cut.
+    as cut. `sequence` is its blocks in play order when they are not just
+    the span less its cuts (ADR 0034); a clip has a sequence or cuts, not
+    both.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -652,6 +723,12 @@ class ManifestClip(BaseModel):
     zooms: tuple[Zoom, ...] = ()
     hand_crops: tuple[HandCrop, ...] = ()
     audio: ClipAudio | None = None
+    sequence: tuple[SequenceBlock, ...] = Field(default=(), max_length=MAX_BLOCKS)
+
+    @model_validator(mode="after")
+    def _sequence_or_cuts(self) -> "ManifestClip":
+        _check_sequence(self.sequence, self.cuts)
+        return self
 
     @model_validator(mode="after")
     def _variants_have_the_file(self) -> "ManifestClip":
@@ -807,7 +884,8 @@ class RenderManifest(BaseModel):
     `styles` are the vertical styles rendered, in order (ADR 0025); empty for
     a landscape run or an older manifest. `combined` is the clips joined in
     the review page, if made (ADR 0032), and `story` the VOD's summary in
-    beats, planned and perhaps rendered (ADR 0033).
+    beats, planned and perhaps rendered (ADR 0033). `pad` is the ranges
+    kept to drop into clips' sequences (ADR 0034).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -825,6 +903,13 @@ class RenderManifest(BaseModel):
         default=None, validation_alias=AliasChoices("combined", "summary")
     )
     story: Story | None = None
+    pad: tuple[PadPiece, ...] = Field(default=(), max_length=MAX_PAD_PIECES)
+
+    @model_validator(mode="after")
+    def _pad_ids_unique(self) -> "RenderManifest":
+        if len({piece.id for piece in self.pad}) != len(self.pad):
+            raise ValueError("pad piece ids must be unique")
+        return self
 
 
 def _parse_timestamp(value: object) -> float:
@@ -902,7 +987,9 @@ class Label(Span):
     it (ADR 0030). `caption_edits` are its caption fixes, key words and
     colour (ADR 0017, caption editing amendment). `zooms` and `hand_crops`
     are its punch-ins and hand-placed windows (ADR 0016 and 0025), and
-    `audio` its volume, music and sound effects (ADR 0007).
+    `audio` its volume, music and sound effects (ADR 0007). `sequence` is
+    its blocks in play order (ADR 0034), with no cuts; the span stays the
+    moment, so `eval` reads only the span.
     """
 
     note: str | None = None
@@ -917,6 +1004,12 @@ class Label(Span):
     zooms: tuple[Zoom, ...] = ()
     hand_crops: tuple[HandCrop, ...] = ()
     audio: ClipAudio | None = None
+    sequence: tuple[SequenceBlock, ...] = Field(default=(), max_length=MAX_BLOCKS)
+
+    @model_validator(mode="after")
+    def _sequence_or_cuts(self) -> "Label":
+        _check_sequence(self.sequence, self.cuts)
+        return self
 
     @field_validator("people")
     @classmethod

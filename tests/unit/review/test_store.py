@@ -17,6 +17,8 @@ from clipper.domain.models import (
     OnScreenText,
     RenderManifest,
     Segment,
+    SequenceBlock,
+    SoundEffect,
     StoryBeat,
     Transcript,
     Word,
@@ -1337,3 +1339,161 @@ def test_a_rendered_story_is_titled_thumbnailed_and_trashed(tmp_path: Path) -> N
 def test_bad_beats_are_refused(beats: object, message: str) -> None:
     with pytest.raises(BadRequest, match=message):
         parse_story_beats(beats, 600.0)
+
+
+# --- Sequences (ADR 0034) ---
+
+
+def _block(start: float, end: float, **own: object) -> SequenceBlock:
+    return SequenceBlock.model_validate(
+        {"start_seconds": start, "end_seconds": end, **own}
+    )
+
+
+def test_a_sequence_in_the_body_is_read_and_checked() -> None:
+    from clipper.review.store import parse_save
+
+    body = {
+        "start": 10.0,
+        "end": 40.0,
+        "sequence": [
+            {"start": 30.0, "end": 35.0},
+            {
+                "start": 70.0,
+                "end": 73.0,
+                "zooms": [{"start": 0.5, "end": 2.0, "scale": 2.0}],
+                "effects": [{"file": "boom.wav", "at_seconds": 1.0}],
+            },
+        ],
+        # Outside the span, but inside the second block.
+        "zooms": [{"start": 71.0, "end": 72.0}],
+    }
+    request = parse_save(body, 600.0)
+    assert [(b.start_seconds, b.end_seconds) for b in request.sequence] == [
+        (30.0, 35.0),
+        (70.0, 73.0),
+    ]
+    assert request.sequence[1].zooms[0].scale == 2.0
+    assert request.zooms[0].start_seconds == 71.0
+    for sequence, extra, message in [
+        ([{"start": 30.0, "end": 30.0}], {}, "inside the video, with a length"),
+        ([{"start": 590.0, "end": 610.0}], {}, "inside the video"),
+        ([{"start": 30.0, "end": 35.0}], {"cuts": [[12.0, 13.0]]}, "no cuts"),
+        (
+            [{"start": 30.0, "end": 32.0, "zooms": [{"start": 1.0, "end": 3.0}]}],
+            {},
+            "in order, apart",
+        ),
+        (
+            [
+                {
+                    "start": 30.0,
+                    "end": 32.0,
+                    "effects": [{"file": "a.wav", "at_seconds": 5}],
+                }
+            ],
+            {},
+            "inside it",
+        ),
+        ("x", {}, "at most 30 blocks"),
+    ]:
+        with pytest.raises(BadRequest, match=message):
+            parse_save(
+                {"start": 10.0, "end": 40.0, "sequence": sequence, **extra}, 600.0
+            )
+
+
+def test_a_sequence_re_renders_through_its_blocks_and_is_recorded(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    env.store._render = RenderInputs(  # noqa: SLF001
+        tmp_path / "talk.mp4", env.renderer, TRANSCRIPT, frame_size=(1920, 1080)
+    )
+    sequence = (_block(12.0, 14.0), _block(10.0, 13.0), _block(12.0, 13.0))
+    zoom = Zoom(start_seconds=12.5, end_seconds=13.0, scale=1.5)
+    saved = env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, zooms=(zoom,), sequence=sequence)
+    )
+
+    assert env.renderer.sequences[-1] == ((12.0, 14.0), (10.0, 13.0), (12.0, 13.0))
+    # The zoom's moment plays three times: in each block that shows it.
+    assert [(z.start_seconds, z.end_seconds) for z in env.renderer.zooms[-1]] == [
+        (0.5, 1.0),
+        (4.5, 5.0),
+        (5.5, 6.0),
+    ]
+    # "Hello there." is captioned at each of the three blocks that show it,
+    # one event per word, each showing the chunk.
+    captions = env.renderer.captions[-1]
+    assert captions is not None and captions.count("Hello") == 6
+    assert saved.clip.sequence == sequence and saved.clip.cuts == ()
+    [label] = load_labels(env.labels_path).labels
+    assert (label.verdict, label.sequence) == ("post", sequence)
+    assert env.store.judgment(saved.clip)["sequence"][0] == {  # type: ignore[index]
+        "start": 12.0,
+        "end": 14.0,
+        "zooms": [],
+        "hand_crops": [],
+        "effects": [],
+    }
+    calls = len(env.renderer.calls)
+    env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, zooms=(zoom,), sequence=sequence)
+    )
+    assert len(env.renderer.calls) == calls
+    env.store.save(1, SaveRequest(10.0, 40.0, None, None, zooms=(zoom,)))
+    assert not env.renderer.sequences[-1]
+    assert env.store.manifest.clips[0].sequence == ()
+
+
+def test_a_sequence_mixes_effects_at_each_occurrence_and_block_effects(
+    tmp_path: Path,
+) -> None:
+    env = _audio_env(tmp_path)
+    (tmp_path / "sfx" / "pop.wav").write_bytes(b"wav")
+    pop = SoundEffect(file="pop.wav", at_seconds=0.5)
+    sequence = (_block(19.0, 21.0), _block(19.0, 21.0, effects=(pop,)))
+    env.store.save(
+        1,
+        SaveRequest(
+            10.0,
+            40.0,
+            None,
+            None,
+            audio=ClipAudio.model_validate(
+                {"effects": [{"file": "boom.wav", "at_seconds": 20.0}]}
+            ),
+            sequence=sequence,
+        ),
+    )
+    mix = env.renderer.audio[-1]
+    assert mix is not None
+    assert [(e.path.name, e.at_seconds) for e in mix.effects] == [
+        ("boom.wav", 1.0),
+        ("pop.wav", 2.5),
+        ("boom.wav", 3.0),
+    ]
+    # A block's own effect alone still makes a mix; a missing file refuses.
+    env.store.save(1, SaveRequest(10.0, 40.0, None, None, sequence=sequence))
+    alone = env.renderer.audio[-1]
+    assert alone is not None and [e.path.name for e in alone.effects] == ["pop.wav"]
+    missing = (
+        _block(19.0, 21.0, effects=(SoundEffect(file="nope.wav", at_seconds=0),)),
+    )
+    with pytest.raises(JudgingError, match="nope.wav"):
+        env.store.save(1, SaveRequest(10.0, 40.0, None, None, sequence=missing))
+
+
+def test_a_face_sequence_tracks_each_block_and_joins_the_crops(tmp_path: Path) -> None:
+    env = _styled_env(tmp_path)
+    sequence = (_block(12.0, 14.0), _block(30.0, 33.0))
+
+    result = env.store.save(
+        1, SaveRequest(10.0, 40.0, None, None, "face", sequence=sequence)
+    )
+
+    assert result.render_error is None
+    [crop] = env.renderer.crops
+    assert crop is not None and crop.width == 608
+    assert [t for t, _ in crop.points] == [0.0]

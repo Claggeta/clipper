@@ -702,3 +702,90 @@ def test_join_without_cards_or_music_passes_the_joined_clip_through(
 def test_join_refuses_a_missing_clip(tmp_path: Path) -> None:
     with pytest.raises(ClipRenderError, match="not found"):
         FfmpegClipRenderer().join([tmp_path / "gone.mp4"], tmp_path / "s.mp4")
+
+
+# --- Sequences (ADR 0034) ---
+
+
+def _sequence_command(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kw: object
+) -> list[str]:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+    FfmpegClipRenderer().render(
+        video,
+        _CANDIDATE,
+        tmp_path / "c.mp4",
+        sequence=((40.0, 45.0), (32.5, 35.0), (40.0, 42.0)),
+        **kw,  # type: ignore[arg-type]
+    )
+    return captured[0]
+
+
+def test_a_sequence_seeks_each_block_and_joins_them_in_one_encode(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command = _sequence_command(video, tmp_path, monkeypatch, vertical=True)
+
+    assert command.count("-i") == 3
+    first = command.index("-ss")
+    assert command[first : first + 18] == [
+        "-ss", "40.000", "-t", "5.000", "-i", str(video),
+        "-ss", "32.500", "-t", "2.500", "-i", str(video),
+        "-ss", "40.000", "-t", "2.000", "-i", str(video),
+    ]  # fmt: skip
+    graph = command[command.index("-filter_complex") + 1]
+    assert graph == (
+        "[0:v:0][0:a:0][1:v:0][1:a:0][2:v:0][2:a:0]concat=n=3:v=1:a=1[vc][ac];"
+        f"[vc]{_VERTICAL_FILTER}[vout]"
+    )
+    maps = [command[i + 1] for i, arg in enumerate(command) if arg == "-map"]
+    assert maps == ["[vout]", "[ac]"]
+    assert "-vf" not in command and "-af" not in command
+
+
+def test_a_sequence_without_a_frame_passes_the_video_through(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command = _sequence_command(video, tmp_path, monkeypatch)
+    graph = command[command.index("-filter_complex") + 1]
+    assert graph.endswith(";[vc]null[vout]")
+
+
+def test_a_sequences_mix_takes_the_joined_sound_and_inputs_after_the_blocks(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bed = tmp_path / "bed.mp3"
+    command = _sequence_command(
+        video,
+        tmp_path,
+        monkeypatch,
+        audio=AudioMix(music=bed, duck=False),
+    )
+    i = len(command) - 1 - command[::-1].index(str(video))
+    assert command[i + 1 : i + 5] == ["-stream_loop", "-1", "-i", str(bed.resolve())]
+    graph = command[command.index("-filter_complex") + 1]
+    # 9.5 s of blocks; the music is input 3, after the three blocks.
+    assert graph.endswith(
+        "[ac]volume=0.0dB[voice];"
+        "[3:a]volume=-18.0dB,afade=t=out:st=8.500:d=1.0[music];"
+        "[voice][music]amix=inputs=2:normalize=0:duration=first[aout]"
+    )
+    maps = [command[i + 1] for i, arg in enumerate(command) if arg == "-map"]
+    assert maps == ["[vout]", "[aout]"]
+
+
+def test_a_sequence_with_cuts_or_an_empty_block_is_refused(
+    video: Path, tmp_path: Path
+) -> None:
+    renderer = FfmpegClipRenderer()
+    with pytest.raises(ClipRenderError, match="no cuts"):
+        renderer.render(
+            video,
+            _CANDIDATE,
+            tmp_path / "c.mp4",
+            cuts=((40.0, 45.0),),
+            sequence=((40.0, 45.0),),
+        )
+    with pytest.raises(ClipRenderError, match="with a length"):
+        renderer.render(video, _CANDIDATE, tmp_path / "c.mp4", sequence=((40.0, 40.0),))

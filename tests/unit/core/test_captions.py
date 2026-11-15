@@ -518,3 +518,51 @@ def test_an_outlined_text_uses_its_own_style() -> None:
     assert fields[0] == "TextOutline"
     assert (fields[5], fields[15], fields[16]) == ("&H00000000", "1", "5")
     assert _text_lines(captions)[0].split(",")[3] == "TextOutline"
+
+
+def test_a_sequence_captions_each_block_in_play_order_and_repeats() -> None:
+    seg = _wseg((10.0, 10.4, "go."), (20.0, 20.4, "crash."), (20.5, 21.0, "wow."))
+    captions = build_ass(
+        _t(seg),
+        _c(10.0, 21.0),
+        vertical=True,
+        sequence=((20.0, 21.0), (10.0, 11.0), (20.0, 21.0)),
+    )
+    # A chunk of the last block never runs on into the next.
+    assert _events(captions) == [
+        f"0:00:00.00,0:00:00.40,{_hl(['crash.'], 0)}",
+        f"0:00:00.50,0:00:01.00,{_hl(['wow.'], 0)}",
+        f"0:00:01.00,0:00:01.40,{_hl(['go.'], 0)}",
+        f"0:00:02.00,0:00:02.40,{_hl(['crash.'], 0)}",
+        f"0:00:02.50,0:00:03.00,{_hl(['wow.'], 0)}",
+    ]
+
+
+def test_a_sequence_applies_word_fixes_at_every_occurrence() -> None:
+    seg = _wseg((20.0, 20.4, "rode."))
+    edits = CaptionEdits.model_validate(
+        {"fixes": [{"start_seconds": 20.0, "text": "road."}]}
+    )
+    captions = build_ass(
+        _t(seg),
+        _c(20.0, 21.0),
+        vertical=True,
+        edits=edits,
+        sequence=((20.0, 21.0), (20.0, 21.0)),
+    )
+    assert [e.rsplit(",", 1)[1] for e in _events(captions)] == [_hl(["road."], 0)] * 2
+
+
+def test_a_sequence_segment_cue_and_texts_use_the_joined_length() -> None:
+    captions = build_ass(
+        _t(_seg(10.0, 18.0, "hello")),
+        _c(10.0, 20.0),
+        vertical=True,
+        texts=(_text("Hook", 0.0, 9.0),),
+        sequence=((30.0, 32.0), (12.0, 15.0)),
+    )
+    events = _events(captions)
+    assert events[0] == "0:00:02.00,0:00:05.00,hello"
+    # The text is clamped to the 5 s the two blocks last.
+    assert events[1].startswith("0:00:00.00,0:00:05.00,")
+    assert captions.from_segments is True
