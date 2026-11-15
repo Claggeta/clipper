@@ -170,14 +170,20 @@ function canvasSize() {
   return [Math.max(Math.round(width), 1), Math.max(Math.round(height), 1)];
 }
 
-function drawFit(context, width, height) {
-  const sourceWidth = player.videoWidth;
-  const sourceHeight = player.videoHeight;
+// `media` is the source player, or a B-roll insert's video or still
+// (ADR 0034), fitted inside the frame as the renderer fits it.
+function drawFit(context, width, height, media = player, size = null) {
+  const sourceWidth = size ? size[0] : player.videoWidth;
+  const sourceHeight = size ? size[1] : player.videoHeight;
   if (!isVertical) {
     const scale = Math.min(width / sourceWidth, height / sourceHeight);
     const w = sourceWidth * scale;
     const h = sourceHeight * scale;
-    context.drawImage(player, (width - w) / 2, (height - h) / 2, w, h);
+    if (media !== player) {
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, width, height);
+    }
+    context.drawImage(media, (width - w) / 2, (height - h) / 2, w, h);
     return;
   }
   // The fill: the frame covering the canvas, drawn tiny and scaled up.
@@ -187,7 +193,7 @@ function drawFit(context, width, height) {
   const cover = Math.max(small[0] / sourceWidth, small[1] / sourceHeight);
   const blur = blurCanvas.getContext("2d");
   blur.drawImage(
-    player,
+    media,
     (small[0] - sourceWidth * cover) / 2,
     (small[1] - sourceHeight * cover) / 2,
     sourceWidth * cover,
@@ -196,9 +202,12 @@ function drawFit(context, width, height) {
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.drawImage(blurCanvas, 0, 0, width, height);
-  // The picture across the width, centred (ADR 0016).
-  const h = (width * sourceHeight) / sourceWidth;
-  context.drawImage(player, 0, (height - h) / 2, width, h);
+  // The picture fitted inside the frame, centred (ADR 0016): across the
+  // width for a landscape source, the height for a tall insert.
+  const fit = Math.min(width / sourceWidth, height / sourceHeight);
+  const w = sourceWidth * fit;
+  const h = sourceHeight * fit;
+  context.drawImage(media, (width - w) / 2, (height - h) / 2, w, h);
 }
 
 function cropLeft(seconds) {
@@ -409,7 +418,14 @@ function drawPreview() {
   context.fillStyle = "#000";
   context.fillRect(0, 0, width, height);
   const seconds = player.currentTime;
-  if (player.videoWidth) {
+  const shown = insert ? insertFrame() : null;
+  if (insert) {
+    // A B-roll insert, fitted on its blurred copy; no captions or zooms
+    // land on it (ADR 0034, B-roll amendment).
+    if (shown) {
+      drawFit(context, width, height, shown.media, [shown.width, shown.height]);
+    }
+  } else if (player.videoWidth) {
     // A zoom scales the frame around its centre, as the renderer does:
     // scaled by Z, then cropped at (Z - 1) times its centre (ADR 0016).
     const zoomed = isVertical ? activeZoom(seconds) : null;
@@ -429,7 +445,7 @@ function drawPreview() {
     }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
   }
-  if (burnsCaptions) {
+  if (burnsCaptions && !insert) {
     drawCaptions(context, width, height, seconds);
   }
   drawOnScreenTexts(context, width, height, seconds);
@@ -458,12 +474,16 @@ function drawPreviewNow() {
 // Play the span through its cuts from the playhead, or from the start
 // handle when the playhead is outside it; pause when playing.
 function togglePreviewPlay() {
+  if (insertPlaying()) {
+    pauseInsert();
+    return;
+  }
   if (!player.paused) {
     player.pause();
     return;
   }
   if (ownSequence(current)) {
-    playSequence();
+    playSequence(insert ? insert.index : null);
     return;
   }
   const at = player.currentTime;

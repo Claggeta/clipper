@@ -1443,9 +1443,13 @@ document.getElementById("preview").addEventListener("click", () => {
   }
   // A seek fires one `seeking` event of its own; any later one is the
   // user's and cancels the preview.
+  // Setting the time it already has fires `seeking` too, so only a real
+  // seek is made.
   const seeks = Math.abs(player.currentTime - span.start) > 0.01;
   preview = { end: span.end, settling: seeks };
-  player.currentTime = span.start;
+  if (seeks) {
+    player.currentTime = span.start;
+  }
   player.play().catch(() => {
     preview = null;
   });
@@ -1482,11 +1486,20 @@ player.addEventListener("seeking", () => {
     preview.settling = false;
   } else {
     preview = null;
+    // A seek of the user's ends any B-roll insert on show (ADR 0034).
+    stopInsert();
   }
 });
 
 player.addEventListener("pause", () => {
-  preview = null;
+  // At an insert the source pauses for it; that pause is the page's own.
+  if (preview && preview.handoff) {
+    preview.handoff = false;
+    return;
+  }
+  if (!insertPlaying()) {
+    preview = null;
+  }
 });
 
 player.addEventListener("timeupdate", () => {

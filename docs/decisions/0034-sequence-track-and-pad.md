@@ -244,6 +244,31 @@ goes next, then 9m on top of it.
   end. Labels write `broll` and `sound` only on B-roll blocks.
 - Manual step R22.
 
+## Amended by B-roll inserts in the page (V7 item 9m-2a)
+
+- **The pad** lists `/api/broll` under its pieces: first frame, length
+  or "still", 🔊 when the file has sound. `Insert` puts a file after the
+  selected block, a drag drops it on the Sequence lane: the first 3 s of
+  a video (all of it if shorter) or 2 s of a still, sound on when the
+  file has any.
+- **On the lane** an insert is green with its file name. Its edges trim
+  within the file (to its length; a still keeps 0 as its start, at most
+  30 s), unsnapped. `Sound on`/`Sound off` in the lane's bar toggles the
+  selected insert, greyed out for a still or a file without sound.
+  `B` splits an insert at the time shown; a still is not split. A
+  sequence with an insert is always sent as a sequence.
+- **Preview**: clicking an insert cues it in a hidden second player (an
+  image for a still); playing the blocks hands over to that player at an
+  insert, the source waiting, and back at the next block. The preview
+  draws the insert fitted on its blurred copy, with no captions, zooms
+  or crops; texts and music go on in clip time. A still's end is timed
+  as well as watched per frame, since a page drawing no frames would
+  otherwise wait.
+- **Fix**: setting the source player to the time it already has fires
+  `seeking`, which ended a preview that had just begun; Preview span
+  and playing the blocks now set the time only when it changes.
+- Manual step RV29a.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.

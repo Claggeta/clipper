@@ -265,7 +265,12 @@ function syncPreviewAudio() {
   const graph = audioGraph;
   const seconds = player.currentTime;
   const inSpan = current && span && seconds >= span.start && seconds < span.end;
-  const playing = !player.paused && shownScreen() === "preview" && inSpan;
+  // A clip with its own sequence plays wherever its blocks are, and on
+  // through a B-roll insert while the source waits (ADR 0034).
+  const inClip =
+    current && span && ownSequence(current) ? Number.isFinite(clipSeconds(seconds)) : inSpan;
+  const playing =
+    shownScreen() === "preview" && (insertPlaying() || (!player.paused && inClip));
   const audio = current ? audioOf(current) : null;
   if (graph) {
     graph.clipGain.gain.value =

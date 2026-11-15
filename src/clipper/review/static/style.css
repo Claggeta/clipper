@@ -1200,3 +1200,19 @@ kbd {
 .piece-actions button { padding: 2px 8px; font-size: 12px; }
 
 .sequence-lane.dropping { outline: 2px dashed var(--accent); }
+
+/* B-roll (ADR 0034, B-roll amendment): inserts on the lane and files on
+   the pad. */
+.sequence-lane .block.broll { border-color: #5ad18a; background: #23432f; }
+
+.piece-title {
+  overflow: hidden;
+  padding: 1px 4px;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.broll-file .piece-thumb { object-fit: cover; }
+
+#seq-sound[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
