@@ -2,6 +2,14 @@
   "source": "ANoZNWQXYZ4.mp4",
   "labels": [
     {
+      "start": "0:00:00",
+      "end": "0:00:43.57",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "needs to be cut shorter after the introduction."
+    },
+    {
       "start": "0:03:00.92",
       "end": "0:03:44.88",
       "verdict": "post",
@@ -66,6 +74,14 @@
       "note": "Interesting seeing the difference in meal prices"
     },
     {
+      "start": "0:44:15.12",
+      "end": "0:44:58.56",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "Needs to be a little longerr"
+    },
+    {
       "start": "0:46:48.96",
       "end": "0:47:59.51",
       "verdict": "fix",
@@ -82,6 +98,21 @@
       "verdict": "post",
       "style": "fit",
       "note": "OK Clip"
+    },
+    {
+      "start": "1:02:15.66",
+      "end": "1:02:59.26",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "good",
+      "note": "Needs to be a little longer"
+    },
+    {
+      "start": "1:07:01.23",
+      "end": "1:07:44.67",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
     }
   ]
 }

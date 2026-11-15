@@ -117,6 +117,11 @@ and planned code:
   rejected excerpts from other videos in the system prompt; on four VODs
   at top 10, keepers 29 to 25 (27), rejects 11 to 12; the examples
   reshuffled the top 10 rather than sharpening it.
+  Finer score amendment (V7 5, not adopted): a 0 to 9 rubric and token
+  probabilities from Ollama (`logprobs`) on ten VODs at top 10; the
+  rubric's probabilities tied the current prompt (keepers 70, rejects
+  30, 3 VODs ahead, 3 behind), the current prompt's were behind (66,
+  34), the rubric alone clustered; probabilities end ties at no cost.
   Shared client amendment (V7 4): `OllamaClient` and `TextGenerator` in
   `adapters/llm/ollama.py`, raising `LlmError`, which the detector and
   title writer turn into their own errors with the message kept.
@@ -695,6 +700,14 @@ From the review editor questions on 2026-11-13:
 - A "Summarize" button that condenses a VOD's clips into one longer
   Short, for episodes of iterative games that ramp from boring tasks to
   huge goals; each clip can still be posted alone.
+
+From the item 5 judging on 2026-11-14:
+
+- Mass posting Shorts did not bring views; 1 to 2 a day works better, so
+  the maintainer saves fewer drafts. Judging from here: Save by the
+  earlier "postable" bar, `good` for what would be posted now, `ok` for
+  the rest. Picking measures should come to count `good` picks in the
+  top few ranks, once ratings are enough.
 
 ## Current state
 
@@ -1346,11 +1359,15 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
 4. ~~Move `OllamaClient` to a shared adapter module with its own error,
    behaviour-neutral (Parked), before item 5 changes the prompt.~~ (done;
    `adapters/llm/ollama.py`, `LlmError`; ADR 0014 amendment)
-5. A finer LLM score (Parked): a scoring rubric in the prompt, so scores
+5. ~~A finer LLM score (Parked): a scoring rubric in the prompt, so scores
    stop clustering on round values; token probabilities only if Ollama
    returns them (unverified). Measured on the judged VODs at top 10
    against the current prompt, with the time per VOD and the count of
-   distinct scores. ADR 0014 amendment. May end in nothing.
+   distinct scores. ADR 0014 amendment. May end in nothing.~~ (done;
+   ended in nothing: Ollama returns `logprobs`; on ten VODs the rubric's
+   probabilities tied the current prompt at 70 keepers and 30 rejects,
+   the others did worse; 69 new windows judged, labels committed; ADR
+   0014 amendment; no code)
 6. The facecam split (ADR 0025), in PRs:
    - 6a. Spike: find a fixed facecam box per clip on a few gaming VODs,
      checked against boxes marked by hand. Ends in an ADR 0025 amendment
@@ -1541,7 +1558,8 @@ Later, not scheduled:
   put a label in its top 5 there. Options: token probabilities (whether
   Ollama returns them is unverified) or a scoring rubric in the prompt. Needs
   an ADR 0014 amendment and `eval` results. Part of V5 item 11 if ties
-  decide the detector choice. Scheduled as V7 item 5.
+  decide the detector choice. Scheduled as V7 item 5; measured and not
+  adopted (ADR 0014 finer score amendment).
 - Labels may hinge on what is seen, not said. Several `oFbD0Ot7nQ8.json`
   labels name visual moments ("Biz Hits a Long Putt"), which a
   transcript-only detector cannot see. Unverified as the cause of the LLM's

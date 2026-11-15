@@ -41,6 +41,13 @@
       "note": "Good clip. Interesting food."
     },
     {
+      "start": "0:22:15.54",
+      "end": "0:22:58.1",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "0:24:30.76",
       "end": "0:25:13.78",
       "verdict": "post",
@@ -71,11 +78,26 @@
       "style": "fit"
     },
     {
+      "start": "0:44:39",
+      "end": "0:45:00.84",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
+    },
+    {
       "start": "1:12:09.67",
       "end": "1:12:40.99",
       "verdict": "post",
       "style": "fit",
       "note": "Good clip"
+    },
+    {
+      "start": "1:16:32.18",
+      "end": "1:17:11.47",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "need to be longer"
     },
     {
       "start": "1:17:46.65",
@@ -87,6 +109,13 @@
       },
       "style": "fit",
       "note": "Good clip. Interesting food."
+    },
+    {
+      "start": "1:40:50.61",
+      "end": "1:41:24.49",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok"
     }
   ],
   "rejected": [
