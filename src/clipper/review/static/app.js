@@ -35,6 +35,17 @@ const MIN_LENGTH = 15;
 const MAX_LENGTH = 90;
 // How long Trash waits for its confirming second click, in milliseconds.
 const CONFIRM_MS = 3000;
+// Why a draft is trashed (ADR 0012, trash reason amendment): optional,
+// picked while Trash is armed, by button or keys 1 to 5, which wait longer.
+const TRASH_REASONS = [
+  ["nothing_happening", "Nothing happening"],
+  ["needs_context", "Needs context"],
+  ["seen_not_said", "Seen not said"],
+  ["bad_cut", "Bad cut"],
+  ["other", "Other"],
+];
+const TRASH_REASON_MS = 8000;
+const trashReasons = document.getElementById("trash-reasons");
 // The strip's first view: a clip plus this much either side (the server's
 // RANGE_SECONDS, for clips made in the page).
 const RANGE_SECONDS = 120;
@@ -847,8 +858,9 @@ function select(clip, button) {
   playingBlock = 0;
   disarmTrash();
   notice("");
+  const why = clip.judgment && reasonName(clip.judgment.reason);
   judgeNotice(
-    clip.reviewed === "trashed" ? "Trashed. Save renders it again." : "",
+    clip.reviewed === "trashed" ? `Trashed${why ? `: ${why.toLowerCase()}` : ""}. Save renders it again.` : "",
   );
   document.getElementById("empty").hidden = true;
   document.getElementById("details").hidden = false;
@@ -1333,16 +1345,48 @@ function disarmTrash() {
   trashArmed = null;
   trashButton.textContent = "Trash";
   trashButton.classList.remove("armed");
+  trashReasons.hidden = true;
 }
 
-trashButton.addEventListener("click", async () => {
+function reasonName(reason) {
+  const found = TRASH_REASONS.find(([value]) => value === reason);
+  return found ? found[1] : null;
+}
+
+trashButton.addEventListener("click", () => {
   if (trashArmed === null) {
     trashButton.textContent = "Confirm trash";
     trashButton.classList.add("armed");
-    trashArmed = setTimeout(disarmTrash, CONFIRM_MS);
+    // An added clip is removed outright, with no rejected span to give a reason.
+    const reasons = Boolean(current) && !current.isNew && !current.added;
+    trashReasons.hidden = !reasons;
+    trashArmed = setTimeout(disarmTrash, reasons ? TRASH_REASON_MS : CONFIRM_MS);
     return;
   }
   disarmTrash();
+  trashClip(null);
+});
+
+// Keys 1 to 5 while Trash is armed (keys.js): trash with that reason.
+function trashFor(index) {
+  if (trashArmed === null || trashReasons.hidden) {
+    return false;
+  }
+  disarmTrash();
+  trashClip(TRASH_REASONS[index][0]);
+  return true;
+}
+
+TRASH_REASONS.forEach(([, label], index) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = `${index + 1} ${label}`;
+  button.title = `Trash it: ${label.toLowerCase()} (${index + 1})`;
+  button.addEventListener("click", () => trashFor(index));
+  trashReasons.append(button);
+});
+
+async function trashClip(reason) {
   const clip = current;
   if (clip.isNew) {
     removeClip(clip);
@@ -1351,6 +1395,7 @@ trashButton.addEventListener("click", async () => {
   try {
     const reply = await post(`/api/clips/${clip.rank}/trash`, {
       note: noteBox.value,
+      reason,
     });
     if (reply.removed !== undefined) {
       removeClip(clip);
@@ -1358,12 +1403,14 @@ trashButton.addEventListener("click", async () => {
       return;
     }
     judged(clip, reply);
-    judgeNotice("Trashed; the clip's files are deleted.");
-    announceJudged(clip, "Trashed; the clip's files are deleted.");
+    const why = reason ? ` (${reasonName(reason).toLowerCase()})` : "";
+    const message = `Trashed${why}; the clip's files are deleted.`;
+    judgeNotice(message);
+    announceJudged(clip, message);
   } catch (error) {
     judgeNotice(error.message, true);
   }
-});
+}
 
 // Take a clip out of the list: an unsaved new one, or an added one the
 // server removed.

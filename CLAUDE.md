@@ -94,7 +94,10 @@ and planned code:
   early or starts late past `CUT_SHORT_SECONDS = 1.0`. Draft span
   amendment: a candidate also hits a `fix` label whose `draft` is its exact
   span, however far the fix moved it. Overlap amendment (V7 2): judged
-  labels may overlap, ordered by start; clip labels may not.
+  labels may overlap, ordered by start; clip labels may not. Trash reason
+  amendment (V7 2a): a rejected span may carry `reason`
+  (`nothing_happening`, `needs_context`, `seen_not_said`, `bad_cut`,
+  `other`), optional; `eval` unchanged.
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
@@ -312,6 +315,8 @@ and planned code:
   toggles, Preview over cuts, Save with `cuts`; manual step RV12.
   Overlap amendment (V7 2): Save and Add clip refuse only an overlap
   that would be a hit (half the shorter span); manual step RV15.
+  Trash reason amendment (V7 2a): reason buttons and keys `1` to `5`
+  while Trash is armed (8 s), `reason` on the trash request; RV31.
 - `0025` — vertical styles: `fit` (0016, the default) and `face`, a
   full-height crop on the largest face, faces found once per clip by
   OpenCV YuNet (5 samples a second, cached); `drafts` renders both and the
@@ -1379,12 +1384,13 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    `eval` still counts them apart, and refuses above that (409, as now).
    ADR 0024 amendment, unit tests, manual step.~~ (done; ADR 0024 and
    0012 amendments, `spans_hit`, manual step RV15)
-2a. A reason on Trash (added 2026-11-14, the maintainer's choice): one of
+2a. ~~A reason on Trash (added 2026-11-14, the maintainer's choice): one of
    a fixed set (first guess: nothing happening, needs context, seen not
    said, bad cut, other), picked by a key, optional, saved on the
    rejected span (ADR 0012 and 0024 amendments). For learning: bad cuts
    are noisy negatives for a ranker, and the counts say which lever
-   (text score, frames) fits the bad picks. Manual step.
+   (text score, frames) fits the bad picks. Manual step.~~ (done; keys
+   `1` to `5` while Trash is armed; manual step RV31)
 3. Manual cuts (ADR 0029 "later"), in PRs:
    - 3a. ~~Cut in and out at the playhead, by buttons and keys, added to the
      cut list beside the pause cuts, toggled, previewed and saved in

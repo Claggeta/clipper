@@ -153,6 +153,13 @@ def test_trash_replaces_a_label_with_a_rejected_span() -> None:
     ]
 
 
+def test_trash_keeps_the_reason_picked() -> None:
+    labeled = trash_judgment(None, "t.mp4", ONE, None, "seen_not_said")
+    labeled = trash_judgment(labeled, "t.mp4", TWO, "dull")
+
+    assert [r.reason for r in labeled.rejected] == ["seen_not_said", None]
+
+
 def test_save_after_trash_removes_the_rejected_span() -> None:
     labeled = trash_judgment(None, "t.mp4", ONE, None)
     labeled = save_judgment(labeled, "t.mp4", ONE, 100.0004, 145.2, None)

@@ -1303,3 +1303,14 @@ kbd {
 }
 
 .block-only { display: block; margin-bottom: 6px; }
+
+/* Why a draft is trashed (ADR 0012, trash reason amendment): shown while
+   Trash is armed. */
+.trash-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.trash-reasons button { padding: 3px 8px; font-size: 12px; }

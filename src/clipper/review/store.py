@@ -14,6 +14,7 @@ import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import get_args
 
 from pydantic import ValidationError
 
@@ -75,6 +76,7 @@ from clipper.domain.models import (
     Story,
     StoryBeat,
     Transcript,
+    TrashReason,
     Zoom,
     format_timestamp,
     is_still,
@@ -669,11 +671,17 @@ def pad_payload(pad: tuple[PadPiece, ...]) -> list[dict[str, object]]:
     ]
 
 
-def parse_trash(data: object) -> str | None:
-    """Check a Trash body and return its note."""
+def parse_trash(data: object) -> tuple[str | None, TrashReason | None]:
+    """Check a Trash body and return its note and reason (ADR 0012, trash
+    reason amendment)."""
     if not isinstance(data, dict):
         raise BadRequest("the body must be a JSON object")
-    return _text(data, "note")
+    reason = data.get("reason")
+    if reason is not None and reason not in get_args(TrashReason):
+        raise BadRequest(
+            "reason must be one of " + ", ".join(get_args(TrashReason)) + " or null"
+        )
+    return _text(data, "note"), reason
 
 
 def _first_write(clip: ManifestClip) -> dict[str, object]:
@@ -768,7 +776,7 @@ class ReviewStore:
                 }
         for span in self.labels.rejected:
             if is_own_rejection(span, clip):
-                return {"verdict": "trashed", "note": span.note}
+                return {"verdict": "trashed", "note": span.note, "reason": span.reason}
         return None
 
     def save(self, rank: int, request: SaveRequest) -> SaveResult:
@@ -1757,8 +1765,11 @@ class ReviewStore:
         assert writer is not None
         return writer.write(text)
 
-    def trash(self, rank: int, note: str | None) -> ManifestClip | None:
-        """Write a rejected span, delete the clip's file, then mark it trashed.
+    def trash(
+        self, rank: int, note: str | None, reason: TrashReason | None = None
+    ) -> ManifestClip | None:
+        """Write a rejected span (with the reason picked, if any), delete the
+        clip's file, then mark it trashed.
 
         A clip added in the page was never a draft, so it is removed instead:
         its label, its file and its manifest entry; then None is returned.
@@ -1771,7 +1782,7 @@ class ReviewStore:
             if clip.added:
                 labels = remove_judgment(self.labels, source, clip)
             else:
-                labels = trash_judgment(self.labels, source, clip, note)
+                labels = trash_judgment(self.labels, source, clip, note, reason)
             self._files.save_labels(labels, self._labels_path)
             self.labels = labels
             self._delete_file(clip)
