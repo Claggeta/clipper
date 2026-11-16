@@ -1672,9 +1672,9 @@ confirmation first.
      people marked again per clip, a misheard word fixed per occurrence, a
      second text's times and style typed again, tab switches; the
      maintainer picked draggable effect markers)
-   - 4b. Draggable sound effect markers: press to select and seek, drag
+   - 4b. ~~Draggable sound effect markers: press to select and seek, drag
      to move (snapping to word starts), `Backspace` removes the selected
-     one. ADR 0031 amendment, manual step RV33.
+     one. ADR 0031 amendment, manual step RV33.~~ (done; #259)
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).
