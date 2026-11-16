@@ -178,7 +178,7 @@ def test_saved_judged_labels_keep_verdicts_drafts_and_rejected(
         ],
         "rejected": [
             {"start": "0:12:00", "end": "0:12:45", "note": "nothing happening"},
-            {"start": "0:12:10", "end": "0:12:55"},
+            {"start": "0:12:10", "end": "0:12:55", "reason": "bad_cut"},
         ],
     }
     labeled = LabeledVideo.model_validate(data)

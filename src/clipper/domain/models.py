@@ -1162,10 +1162,19 @@ class Label(Span):
         return self
 
 
+# Why a draft was trashed, picked in `review` (ADR 0012, trash reason
+# amendment): for learning, which lever fits the bad picks.
+TrashReason = Literal[
+    "nothing_happening", "needs_context", "seen_not_said", "bad_cut", "other"
+]
+
+
 class RejectedSpan(Span):
-    """A draft the maintainer judged and dropped (ADR 0012, V5 amendment)."""
+    """A draft the maintainer judged and dropped (ADR 0012, V5 amendment),
+    with an optional reason picked from a fixed set."""
 
     note: str | None = None
+    reason: TrashReason | None = None
 
 
 def _same_span(a: Span, b: Span) -> bool:

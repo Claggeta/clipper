@@ -24,6 +24,7 @@ from clipper.domain.models import (
     RenderManifest,
     SequenceBlock,
     Span,
+    TrashReason,
     Zoom,
     format_timestamp,
 )
@@ -185,11 +186,15 @@ def trash_judgment(
     source: str,
     clip: ManifestClip,
     note: str | None,
+    reason: TrashReason | None = None,
 ) -> LabeledVideo:
-    """The labels with `clip`'s draft rejected, replacing its earlier judgment."""
+    """The labels with `clip`'s draft rejected, replacing its earlier judgment,
+    with the reason picked, if any."""
     labels, rejected = _without_clip(labeled, clip)
     rejected.append(
-        RejectedSpan.model_validate({**_times(*clip.draft_span), "note": note})
+        RejectedSpan.model_validate(
+            {**_times(*clip.draft_span), "note": note, "reason": reason}
+        )
     )
     rejected.sort(key=lambda span: span.start_seconds)
     return LabeledVideo(source=source, labels=tuple(labels), rejected=tuple(rejected))

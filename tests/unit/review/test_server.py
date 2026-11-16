@@ -497,12 +497,34 @@ def test_trash_deletes_the_file_and_writes_a_rejected_span(
 
     assert status == 200
     assert (clip["reviewed"], clip["file"]) == ("trashed", None)
-    assert clip["judgment"] == {"verdict": "trashed", "note": "boring"}
+    assert clip["judgment"] == {"verdict": "trashed", "note": "boring", "reason": None}
     assert not (_folder(tmp_path) / "talk_2.mp4").exists()
     labels = load_labels(_labels_path(tmp_path))
     assert labels.labels == ()
     assert [(r.start_seconds, r.note) for r in labels.rejected] == [(400.0, "boring")]
     assert load_manifest(_folder(tmp_path)).clips[1].reviewed == "trashed"
+
+
+def test_trash_keeps_its_reason(base_url: str, tmp_path: Path) -> None:
+    status, clip = _post(
+        base_url, "/api/clips/2/trash", {"note": "", "reason": "needs_context"}
+    )
+
+    assert status == 200
+    assert clip["judgment"]["reason"] == "needs_context"
+    labels = load_labels(_labels_path(tmp_path))
+    assert [r.reason for r in labels.rejected] == ["needs_context"]
+
+
+def test_an_unknown_trash_reason_is_a_bad_request(
+    base_url: str, tmp_path: Path
+) -> None:
+    status, reply = _post(base_url, "/api/clips/2/trash", {"reason": "meh"})
+
+    assert status == 400
+    assert "reason must be one of" in str(reply["error"])
+    assert not _labels_path(tmp_path).exists()
+    assert (_folder(tmp_path) / "talk_2.mp4").exists()
 
 
 def test_trash_after_save_replaces_the_label(base_url: str, tmp_path: Path) -> None:

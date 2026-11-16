@@ -417,6 +417,19 @@ names it.
 - The span form of the rule is `spans_hit` in `core/evaluation.py`;
   `is_hit` calls it.
 
+## Amended by a reason on Trash (V7 item 2a)
+
+- A rejected span may carry `reason`, one of `nothing_happening`,
+  `needs_context`, `seen_not_said`, `bad_cut` or `other`, picked in
+  `review`; optional, written only when given; older files load
+  unchanged. `note` stays for free text.
+- Why: for learning. A `bad_cut` reject is the right moment cut badly,
+  a noisy negative for a ranker; `seen_not_said` is a moment the
+  transcript cannot see. The counts say which lever (text score, frames,
+  boundaries) fits the bad picks.
+- `eval` is unchanged; counting reasons per VOD can come once there are
+  enough.
+
 ## Related
 
 - 0013: detector choice on the CLI

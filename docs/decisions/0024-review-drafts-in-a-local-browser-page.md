@@ -495,6 +495,18 @@ served as listed names. Manual step RV25.
 `/thumbnail` and `/suggest`; `/api/clips` carries `story`. Manual step
 RV26.
 
+## Amended by a reason on Trash (ADR 0012, V7 item 2a)
+
+- While Trash is armed, five reason buttons show under it, and keys `1`
+  to `5` pick one (`1` and `2` rate Good and OK otherwise); a reason
+  trashes the clip with it, a second Trash or `Delete` trashes it with
+  none. Armed with reasons, Trash waits 8 s instead of 3. An added clip
+  is removed outright, so it shows none.
+- `POST /api/clips/<rank>/trash` takes `reason` (one of the five or
+  null; anything else is 400 and nothing is written); the clip's
+  judgment carries it, and the "Trashed" notice names it.
+- Manual step RV31.
+
 ## Related
 
 - 0011: render's failure policy

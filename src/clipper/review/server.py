@@ -719,7 +719,7 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                     )
                     reply = clip_payload(session, store, clip) | {"note": note}
                 elif verb == "trash":
-                    trashed = store.trash(rank, parse_trash(data))
+                    trashed = store.trash(rank, *parse_trash(data))
                     if trashed is None:
                         reply = {"removed": rank}
                     else:

@@ -101,6 +101,8 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
             entry = _span(span)
             if span.note is not None:
                 entry["note"] = span.note
+            if span.reason is not None:
+                entry["reason"] = span.reason
             rejected.append(entry)
         data["rejected"] = rejected
     text = json.dumps(data, indent=2, ensure_ascii=False)

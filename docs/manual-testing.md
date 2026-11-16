@@ -3595,6 +3595,33 @@ zoom on block 2 and the effect on block 3, and frames of the re-rendered
 file at 4 and 14 s (the same footage in blocks 1 and 2) were plain and
 zoomed 1.3x. The effect was not heard and the draft was not watched.
 
+### RV31. A reason on Trash
+
+Covers trash reasons in `review` ([ADR 0012](decisions/0012-evaluate-detectors-against-hand-labels.md)
+and [ADR 0024](decisions/0024-review-drafts-in-a-local-browser-page.md),
+trash reason amendments, V7 item 2a). Use a scratch copy of a drafts
+folder and a scratch `CLIPPER_LABELS_DIR`; untick "Move on after
+Save/Trash".
+
+1. Choose a clip and press `1`. Pass: it is rated Good (again clears
+   it). Press `Delete`. Pass: "Confirm trash", with five buttons under
+   it: Nothing happening, Needs context, Seen not said, Bad cut, Other,
+   numbered 1 to 5; they stay about 8 s.
+2. Press `3`. Pass: "Trashed (seen not said)"; the labels file's
+   rejected span for that draft has `"reason": "seen_not_said"`.
+3. On another clip press `Delete` twice. Pass: "Trashed"; its rejected
+   span has no `reason`.
+4. On another press Trash, then the "Bad cut" button. Pass: trashed with
+   `bad_cut`.
+5. Choose the clip from step 2 again. Pass: the notice reads "Trashed:
+   seen not said. Save renders it again." Press `4` without Trash armed.
+   Pass: nothing happens.
+6. Press Trash on a clip made with "Add clip here". Pass: no reason
+   buttons; a second press removes it as before.
+
+Run 2026-11-15 in headless Edge over CDP: steps 1 to 5 as above, the
+labels file checked after each trash. Step 6 not run.
+
 ## Record your run
 
 | Field | Value |
