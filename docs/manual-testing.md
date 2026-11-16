@@ -1423,6 +1423,47 @@ Remove-Item Env:CLIPPER_CLIPS_DIR -ErrorAction SilentlyContinue
 
 `tests/unit/core/test_config.py::test_clips_dir_default` fails if it is set.
 
+### R23. `--vertical --style facecam`: the cam over the gameplay
+
+Covers the facecam style ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md),
+facecam style amendment, V7 item 6b). The tests fake the finder and
+ffmpeg, so nothing in CI finds a real box. Use a gaming VOD with a
+bordered cam (`DQP3pmyJX4o`, Sonoket Gaming, was used) and an IRL VOD,
+each with an analysis JSON, and R19's `Invoke-Titles` helper.
+
+```powershell
+$Game = "data\videos\DQP3pmyJX4o.mp4"; $GameJson = "data\output\DQP3pmyJX4o.json"
+$Irl = "data\videos\<an IRL stream>.mp4"; $IrlJson = "data\output\<its id>.json"
+$R23 = @{ CLIPPER_CLIPS_DIR = "$S\clips-r23" }
+Invoke-Titles $Game $GameJson "--rank 1 --rank 2 --vertical --style facecam --captions" $R23
+Invoke-Titles $Game $GameJson "--rank 1 --vertical --style facecam --cam bottom --captions" $R23
+Invoke-Titles $Irl $IrlJson "--rank 1 --vertical --style facecam" $R23
+Invoke-Titles $Game $GameJson "--rank 1 --vertical --cam bottom" $R23
+Get-ChildItem "$S\clips-r23" -Recurse -Filter *.mp4 | ForEach-Object { ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 $_.FullName }
+```
+
+Pass:
+
+1. The first run exits 0 with `(vertical, facecam, captions)` per clip
+   and 1080x1920 `.facecam.mp4` files. Watch them: the cam fills the top
+   at its own shape, not stretched, with no gameplay inside it; the
+   gameplay fills the rest; captions sit on the gameplay. The manifest's
+   variants have `"style": "facecam"`, a `box` and `"cam": "top"`.
+2. The second puts the cam at the bottom (`"cam": "bottom"`); its
+   captions cover the cam (known, ADR 0025).
+3. The IRL run notes `has no facecam box; rendered in fit` and writes a
+   plain fit file.
+4. The fourth exits 1 with `Error: --cam is for --style facecam`.
+5. In `clipper review` on the first folder: the facecam draft plays;
+   Save without moving the span keeps it (the manifest keeps its `box`);
+   moving a handle and saving is refused with "The facecam draft can be
+   kept as it is, not re-rendered".
+
+Run 2026-11-16 by the assistant: steps 1 to 3 as above on two
+`DQP3pmyJX4o` clips and one `3Sbj_BZORr4` clip, frames checked by eye; a
+sliver of the cam's left edge showed at the gameplay's right on one clip.
+Steps 4 and 5 not run by hand (step 4 is a unit test).
+
 ### C0. Setup
 
 ```powershell

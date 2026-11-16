@@ -355,7 +355,12 @@ and planned code:
   solid lasting edge each side, at least three real borders; a bordered
   cam boxed right on 18 of 20 stretches, none wrong, no box on 12
   without a cam; a borderless cam with changing layouts mostly missed,
-  2 of 10 wrong.
+  2 of 10 wrong. Facecam style amendment (6b): `--style facecam` (opt-in)
+  and `--cam top|bottom` on `render` and `drafts`; `FacecamFinder`,
+  cached under `<cache dir>/facecam/`; the cam at full width over a
+  centre crop of the gameplay, `vstack`; no box renders `fit`; variant
+  `box` and `cam`; review keeps, never re-renders, a facecam draft until
+  6c; captions cover a bottom cam.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -1426,10 +1431,11 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      or in nothing.~~ (done; bordered cam 18 of 20 right and none wrong,
      borderless cam mostly missed, no false box without a cam; ADR 0025
      amendment; no code)
-   - 6b. If 6a says so: a `facecam` style in `render` and `drafts`, the
+   - 6b. ~~If 6a says so: a `facecam` style in `render` and `drafts`, the
      box stacked above or below the gameplay (a choice, added 2026-11-14
      at the maintainer's ask; the default decided in the item); a clip
-     with no box is a note and renders in `fit`. Manual step.
+     with no box is a note and renders in `fit`. Manual step.~~ (done;
+     opt-in, cam on top by default, `--cam bottom`; manual step R23)
    - 6c. The `facecam` style in the review page's style switch, with the
      cam's position, top or bottom, per clip (ADR 0024 amendment).
      Manual step.

@@ -21,6 +21,7 @@ from clipper.domain.models import (
     ClipTitle,
     CropPath,
     FaceBox,
+    FacecamBox,
     FaceSample,
     FaceTrack,
     ManifestClip,
@@ -65,6 +66,7 @@ class RaisingRenderer:
         *,
         vertical: bool = False,
         crop: object = None,
+        facecam: object = None,
     ):
         raise ClipRenderError("[aist#0:0/pcm_s16le] [/bogus] bad")
 
@@ -882,3 +884,98 @@ def test_a_landscape_render_has_no_styles(env: Env) -> None:
     assert manifest.styles == ()
     assert manifest.clips[0].variants == ()
     assert manifest.clips[0].file == "talk_000010-000020.mp4"
+
+
+# The facecam style (ADR 0025, facecam style amendment), on a constructed box.
+_BOX = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+
+
+class FakeFacecamFinder:
+    """Finds `_BOX` in every span but those starting in `none`."""
+
+    def __init__(self, none: tuple[float, ...] = (), fail: bool = False) -> None:
+        self.spans: list[tuple[float, float]] = []
+        self._none = none
+        self._fail = fail
+
+    def find(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FacecamBox | None:
+        self.spans.append((start_seconds, end_seconds))
+        if self._fail:
+            raise FaceError("ffmpeg failed (exit 1): [bad] frames")
+        return None if start_seconds in self._none else _BOX
+
+
+def _use_facecam(env: Env, finder: FakeFacecamFinder) -> None:
+    env.use_probe(FakeProbe(_SIZED))
+    env.context = dataclasses.replace(env.context, facecam_finder=lambda s: finder)
+
+
+def test_the_facecam_style_stacks_the_cam_over_the_gameplay(env: Env) -> None:
+    finder = FakeFacecamFinder()
+    _use_facecam(env, finder)
+    result = env.run("--vertical", "--style", "facecam", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert finder.spans == [(10.0, 20.0)]
+    [layout] = env.renderer.facecams
+    assert layout is not None
+    assert (layout.cam, layout.position) == ((1402, 616, 498, 312), "top")
+    assert env.renderer.crops == [None]
+    assert " (vertical, facecam)" in result.output
+    [variant] = env.manifest().clips[0].variants
+    assert (variant.style, variant.box, variant.cam) == ("facecam", _BOX, "top")
+    assert variant.file == "talk_000010-000020.facecam.mp4"
+
+
+def test_cam_bottom_puts_the_cam_under_the_gameplay(env: Env) -> None:
+    _use_facecam(env, FakeFacecamFinder())
+    result = env.run(
+        "--vertical", "--style", "facecam", "--cam", "bottom", "--rank", "1"
+    )
+    assert result.exit_code == 0, result.output
+    [layout] = env.renderer.facecams
+    assert layout is not None and layout.position == "bottom"
+    assert env.manifest().clips[0].variants[0].cam == "bottom"
+
+
+def test_a_clip_with_no_facecam_box_renders_in_fit(env: Env) -> None:
+    _use_facecam(env, FakeFacecamFinder(none=(10.0,)))
+    result = env.run("--vertical", "--style", "facecam", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert "has no facecam box; rendered in fit" in result.output
+    assert env.renderer.facecams == [None]
+    [variant] = env.manifest().clips[0].variants
+    assert (variant.style, variant.file) == ("fit", "talk_000010-000020.mp4")
+
+
+def test_a_facecam_finder_failure_fails_a_facecam_only_clip(env: Env) -> None:
+    _use_facecam(env, FakeFacecamFinder(fail=True))
+    result = env.run("--vertical", "--style", "facecam", "--rank", "1")
+    assert result.exit_code == 1
+    assert "Failed: #1 0:00:10-0:00:20: ffmpeg failed (exit 1)" in result.output
+    assert env.manifest().clips[0].error == "ffmpeg failed (exit 1): [bad] frames"
+
+
+def test_cam_needs_the_facecam_style(env: Env) -> None:
+    _use_facecam(env, FakeFacecamFinder())
+    env.assert_failed_before_cutting(
+        env.run("--vertical", "--cam", "bottom"), "--cam is for --style facecam"
+    )
+
+
+def test_the_facecam_style_needs_vertical(env: Env) -> None:
+    _use_facecam(env, FakeFacecamFinder())
+    env.assert_failed_before_cutting(
+        env.run("--style", "facecam"), "--style facecam needs --vertical"
+    )
+
+
+def test_the_facecam_style_needs_the_frame_size(env: Env) -> None:
+    finder = FakeFacecamFinder()
+    _use_facecam(env, finder)
+    env.use_probe(FakeProbe(MediaInfo(duration_seconds=100.0, has_video=True)))
+    env.assert_failed_before_cutting(
+        env.run("--vertical", "--style", "facecam"), "Cannot tell the frame size"
+    )
+    assert finder.spans == []

@@ -10,6 +10,7 @@ from clipper.domain.models import (
     AudioMix,
     ClipCandidate,
     CropPath,
+    FacecamLayout,
     HandCropPlan,
     RenderBlock,
     RenderedClip,
@@ -82,6 +83,22 @@ def _still_crop(crop: CropPath) -> str:
     """The face style's window, held where it starts (ADR 0030)."""
     left = crop.points[0][1]
     return f"crop={crop.width}:{crop.height}:{left}:0,scale=1080:1920,setsar=1"
+
+
+def _facecam_filter(layout: FacecamLayout) -> str:
+    """ADR 0025, facecam style amendment: the cam box scaled to the full
+    width, stacked over (or under) a centre crop of the gameplay."""
+    cx, cy, cw, ch = layout.cam
+    gx, gy, gw, gh = layout.game
+    game_height = 1920 - layout.cam_height
+    order = "[cam][game]" if layout.position == "top" else "[game][cam]"
+    return (
+        "split[camsrc][gamesrc];"
+        f"[camsrc]crop={cw}:{ch}:{cx}:{cy},scale=1080:{layout.cam_height},"
+        "setsar=1[cam];"
+        f"[gamesrc]crop={gw}:{gh}:{gx}:{gy},scale=1080:{game_height},setsar=1[game];"
+        f"{order}vstack,setsar=1"
+    )
 
 
 # ADR 0025, hand crop amendment: the fit style's hand-placed window moves
@@ -301,9 +318,14 @@ class FfmpegClipRenderer:
         sequence: tuple[RenderBlock, ...] = (),
         overlays: tuple[RenderOverlay, ...] = (),
         frame: tuple[int, int] | None = None,
+        facecam: FacecamLayout | None = None,
     ) -> RenderedClip:
         if not video_path.is_file():
             raise ClipRenderError(f"Input file not found: {video_path}")
+        if facecam is not None and (crop or hand or zooms or sequence):
+            raise ClipRenderError(
+                "The facecam style has no face crop, hand crops, zooms or sequence"
+            )
         if output_path.resolve() == video_path.resolve():
             raise ClipRenderError(
                 f"Output path is the input file, refusing to overwrite: {video_path}"
@@ -345,7 +367,9 @@ class FfmpegClipRenderer:
             filters.append(video_cut)
         # UTF-8 with no BOM and LF line endings, whatever the platform.
         files: dict[str, bytes] = {}
-        if crop is not None:
+        if facecam is not None:
+            filters.append(_facecam_filter(facecam))
+        elif crop is not None:
             filters.append(_face_filter(crop))
             files[_CROP_NAME] = _crop_commands(crop).encode("utf-8")
         elif hand is not None:

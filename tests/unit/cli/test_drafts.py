@@ -22,6 +22,8 @@ from clipper.domain.models import (
     ClipTitle,
     CropPath,
     FaceBox,
+    FacecamBox,
+    FacecamLayout,
     FaceSample,
     FaceTrack,
     HandCropPlan,
@@ -107,6 +109,20 @@ class FakeProbe:
         )
 
 
+class FakeFacecamFinder:
+    """A facecam box at the bottom right in every span; `box=False` finds none."""
+
+    def __init__(self, box: bool = True) -> None:
+        self.spans: list[tuple[float, float]] = []
+        self._box = box
+
+    def find(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FacecamBox | None:
+        self.spans.append((start_seconds, end_seconds))
+        return FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29) if self._box else None
+
+
 class FakeFaceTracker:
     """A face at the frame's centre in every span; `faces=False` finds none."""
 
@@ -152,6 +168,7 @@ class Env:
         self.download_error: str | None = None
         self.download_fail_on: tuple[str, ...] = ()
         self.tracker = FakeFaceTracker()
+        self.finder = FakeFacecamFinder()
         for name in ("output", "clips", "videos", "cache"):
             monkeypatch.setenv(f"CLIPPER_{name.upper()}_DIR", str(tmp_path / name))
         self.channels = tmp_path / "channels.txt"
@@ -182,6 +199,7 @@ class Env:
             ),
             video_info=lambda s: FakeVideoInfo(),
             face_tracker=lambda s: self.tracker,
+            facecam_finder=lambda s: self.finder,
         )
         if real_title_writer:
             context = AppContext(
@@ -192,6 +210,7 @@ class Env:
                 downloader=context.downloader,
                 video_info=context.video_info,
                 face_tracker=context.face_tracker,
+                facecam_finder=context.facecam_finder,
             )
         return context
 
@@ -421,6 +440,38 @@ def test_one_style_can_be_chosen(env: Env) -> None:
     assert [len(c.variants) for c in manifest.clips] == [1, 1]
 
 
+def test_fit_and_facecam_render_each_clip_twice(env: Env) -> None:
+    result = env.run(
+        str(env.video), "--style", "fit", "--style", "facecam", "--cam", "bottom"
+    )
+    assert result.exit_code == 0, result.output
+    assert env.finder.spans == [(0.0, 4.5), (4.5, 9.0)]
+    manifest = env.manifest("talk")
+    assert manifest.styles == ("fit", "facecam")
+    first = manifest.clips[0]
+    assert [(v.style, v.cam) for v in first.variants] == [
+        ("fit", None),
+        ("facecam", "bottom"),
+    ]
+    assert [f is not None for f in env.renderer.facecams] == [False, True] * 2
+
+
+def test_no_facecam_box_leaves_only_fit(env: Env) -> None:
+    env.finder = FakeFacecamFinder(box=False)
+    result = env.run(str(env.video), "--style", "fit", "--style", "facecam")
+    assert result.exit_code == 0, result.output
+    assert "has no facecam box; not rendered in the facecam style" in result.output
+    manifest = env.manifest("talk")
+    assert [[v.style for v in c.variants] for c in manifest.clips] == [["fit"]] * 2
+
+
+def test_cam_without_the_facecam_style_fails_before_any_download(env: Env) -> None:
+    result = env.run(_URL, "--cam", "top")
+    assert result.exit_code == 1
+    assert "Error: --cam is for --style facecam" in result.output
+    assert env.log.stages == []
+
+
 def test_no_vertical_renders_landscape_without_styles(env: Env) -> None:
     result = env.run(str(env.video), "--no-vertical")
     assert result.exit_code == 0, result.output
@@ -456,6 +507,7 @@ class FaceFailingRenderer(FakeClipRenderer):
         sequence: tuple[RenderBlock, ...] = (),
         overlays: tuple[RenderOverlay, ...] = (),
         frame: tuple[int, int] | None = None,
+        facecam: FacecamLayout | None = None,
     ) -> RenderedClip:
         if crop is not None:
             raise ClipRenderError("[face] crop failed")

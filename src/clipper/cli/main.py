@@ -1,6 +1,6 @@
 import logging
 import statistics
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from enum import StrEnum
 from pathlib import Path
@@ -45,7 +45,7 @@ from clipper.core.captions import build_ass, clip_text
 from clipper.core.channels import ABOUT_LIMIT, channel_about
 from clipper.core.config import Settings
 from clipper.core.evaluation import boundary_gaps, evaluate
-from clipper.core.framing import plan_face_crop
+from clipper.core.framing import plan_face_crop, plan_facecam
 from clipper.core.interfaces import StoryWriter, TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
@@ -79,9 +79,13 @@ from clipper.domain.errors import (
 )
 from clipper.domain.models import (
     AnalysisResult,
+    CamPosition,
     ClipCandidate,
     ClipVariant,
+    CropPath,
     Evaluation,
+    FacecamBox,
+    FacecamLayout,
     ManifestClip,
     MediaInfo,
     PostRecord,
@@ -108,6 +112,25 @@ class VerticalStyle(StrEnum):
 
     FIT = "fit"
     FACE = "face"
+    FACECAM = "facecam"
+
+
+class CamPlace(StrEnum):
+    """Where --style facecam puts the cam (ADR 0025, facecam style amendment)."""
+
+    TOP = "top"
+    BOTTOM = "bottom"
+
+
+CamOption = Annotated[
+    CamPlace | None,
+    typer.Option(
+        "--cam",
+        help="With --style facecam: the cam above the gameplay (top, the "
+        "default) or below it (bottom).",
+        show_default=False,
+    ),
+]
 
 
 AboutOption = Annotated[
@@ -464,10 +487,12 @@ def render(
         VerticalStyle,
         typer.Option(
             "--style",
-            help="With --vertical: fit (the whole frame on a blurred fill) or "
-            "face (a full-height crop that follows the largest face).",
+            help="With --vertical: fit (the whole frame on a blurred fill), "
+            "face (a full-height crop that follows the largest face) or "
+            "facecam (a streamer's cam box over the gameplay).",
         ),
     ] = VerticalStyle.FIT,
+    cam: CamOption = None,
     titles: Annotated[
         bool,
         typer.Option(
@@ -483,13 +508,13 @@ def render(
     build = _context(ctx)
     try:
         about = _check_about(about, titles)
-        face = style is VerticalStyle.FACE
-        if face and not vertical:
-            raise ClipRenderError("--style face needs --vertical")
+        if style is not VerticalStyle.FIT and not vertical:
+            raise ClipRenderError(f"--style {style.value} needs --vertical")
+        cam_position = _check_cam(cam, (style,))
         result = load_analysis_result(result_json)
         check_source_matches(result, video)
         plan = _plan_render(settings, build, video, result, rank)
-        _check_frame_size((style,) if face else (), plan.media, video)
+        _check_frame_size((style,) if vertical else (), plan.media, video)
         channels = load_channel_abouts(settings.channels_file) if titles else {}
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
@@ -503,6 +528,7 @@ def render(
         about=about,
         styles=(style,) if vertical else (),
         channels=channels,
+        cam=cam_position,
     )
     if _cut_clips(
         settings, build, video, result, result_json, plan, writer, flags
@@ -560,6 +586,8 @@ class _RenderFlags(NamedTuple):
     styles: tuple[VerticalStyle, ...] = ()
     # Saved about text by channel, used when `about` is None (ADR 0018).
     channels: Mapping[str, str] | None = None
+    # Where the facecam style puts the cam (ADR 0025).
+    cam: CamPosition = "top"
 
 
 def _drafts_styles(
@@ -580,11 +608,22 @@ def _drafts_styles(
 def _check_frame_size(
     styles: tuple[VerticalStyle, ...], media: MediaInfo, video: Path
 ) -> None:
-    """The face style needs the frame size; fail before cutting without it."""
-    if VerticalStyle.FACE in styles and (media.width is None or media.height is None):
-        raise ClipRenderError(
-            f"Cannot tell the frame size of {video}, which --style face needs"
-        )
+    """The face and facecam styles need the frame size; fail before cutting
+    without it."""
+    for style in (VerticalStyle.FACE, VerticalStyle.FACECAM):
+        if style in styles and (media.width is None or media.height is None):
+            raise ClipRenderError(
+                f"Cannot tell the frame size of {video}, which --style "
+                f"{style.value} needs"
+            )
+
+
+def _check_cam(cam: CamPlace | None, styles: Sequence[VerticalStyle]) -> CamPosition:
+    """Where the cam goes: top unless --cam says. Raises `ClipRenderError`
+    for --cam without the facecam style."""
+    if cam is not None and VerticalStyle.FACECAM not in styles:
+        raise ClipRenderError("--cam is for --style facecam")
+    return "bottom" if cam is CamPlace.BOTTOM else "top"
 
 
 def _check_about(about: str | None, titles: bool) -> str | None:
@@ -668,10 +707,11 @@ def _cut_clips(
     cannot be written is `Error:` and exit 1.
     """
     ranks, selected, folder, paths, media = plan
-    captions, vertical, titles, about, styles, channels = flags
+    captions, vertical, titles, about, styles, channels, cam = flags
     renderer = build.renderer(settings)
     face_only = styles == (VerticalStyle.FACE,)
     tracker = build.face_tracker(settings) if VerticalStyle.FACE in styles else None
+    finder = build.facecam_finder(settings) if VerticalStyle.FACECAM in styles else None
     video_info = _title_context(video) if writer else None
     if writer and about is None and video_info is not None:
         about = channel_about(channels or {}, video_info)
@@ -720,6 +760,33 @@ def _cut_clips(
                     if face_only:
                         entries.append(ManifestClip(**entry, error="no face found"))
                         continue
+        box: FacecamBox | None = None
+        layout: FacecamLayout | None = None
+        if finder is not None:
+            # No box renders in `fit` instead (ADR 0025, facecam style).
+            try:
+                box = finder.find(video, candidate.start_seconds, candidate.end_seconds)
+            except ClipperError as exc:
+                if styles == (VerticalStyle.FACECAM,):
+                    failures.append(f"#{number} {span}: {escape(str(exc))}")
+                    entries.append(ManifestClip(**entry, error=str(exc)))
+                    continue
+                failures.append(f"#{number} {span} (facecam): {escape(str(exc))}")
+            else:
+                if box is None:
+                    instead = (
+                        "not rendered in the facecam style"
+                        if VerticalStyle.FIT in styles
+                        else "rendered in fit"
+                    )
+                    console.print(
+                        f"[yellow]Note:[/yellow] #{number} {span} has no facecam "
+                        f"box; {instead}",
+                        soft_wrap=True,
+                    )
+                else:
+                    assert media.width is not None and media.height is not None
+                    layout = plan_facecam(box, media.width, media.height, cam)
         built = (
             build_ass(result.transcript, candidate, vertical=vertical)
             if captions
@@ -755,7 +822,11 @@ def _cut_clips(
             continue
         # A landscape run renders once, with no style and no variants.
         wanted: list[VerticalStyle | None] = (
-            [s for s in styles if s is not VerticalStyle.FACE or crop is not None]
+            [
+                s
+                for s in dict.fromkeys(_rendered_style(s, crop, layout) for s in styles)
+                if s is not None
+            ]
             if styles
             else [None]
         )
@@ -772,6 +843,7 @@ def _cut_clips(
                     captions=ass or None,
                     vertical=vertical,
                     crop=crop if style is VerticalStyle.FACE else None,
+                    facecam=layout if style is VerticalStyle.FACECAM else None,
                 )
             except ClipperError as exc:
                 label = f" ({style.value})" if style and len(wanted) > 1 else ""
@@ -779,11 +851,16 @@ def _cut_clips(
                 error = str(exc)
                 break
             files.append(name)
-            if style is not None:
+            if style is VerticalStyle.FACECAM:
+                variants.append(
+                    ClipVariant(style=style.value, file=name, box=box, cam=cam)
+                )
+            elif style is not None:
                 variants.append(ClipVariant(style=style.value, file=name))
             shown = (
                 ("vertical", vertical),
                 ("face", style is VerticalStyle.FACE),
+                ("facecam", style is VerticalStyle.FACECAM),
                 ("captions", ass),
                 ("titles", title),
             )
@@ -839,6 +916,18 @@ def _cut_clips(
     return _CutResult(bool(failures), rendered, len(selected))
 
 
+def _rendered_style(
+    style: VerticalStyle, crop: CropPath | None, layout: FacecamLayout | None
+) -> VerticalStyle | None:
+    """The style a clip renders for a chosen one: none for the face style
+    without a face, fit for the facecam style without a box (ADR 0025)."""
+    if style is VerticalStyle.FACE and crop is None:
+        return None
+    if style is VerticalStyle.FACECAM and layout is None:
+        return VerticalStyle.FIT
+    return style
+
+
 @app.command()
 def drafts(
     ctx: typer.Context,
@@ -882,10 +971,12 @@ def drafts(
         typer.Option(
             "--style",
             help="A vertical style to render; repeat for several. Default: fit "
-            "and face, so each clip comes in both to pick from.",
+            "and face, so each clip comes in both to pick from. facecam is a "
+            "streamer's cam box over the gameplay, for gaming streams.",
             show_default=False,
         ),
     ] = None,
+    cam: CamOption = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     detector: DetectorOption = DetectorName.LLM,
     top: Annotated[
@@ -923,6 +1014,7 @@ def drafts(
                 "Set CLIPPER_LLM_MODEL to an Ollama model name to use --detector llm"
             )
         styles = _drafts_styles(style, vertical)
+        cam_position = _check_cam(cam, styles)
         about = _check_about(about, titles)
         queue = _queue(sources or [], list_file, about)
         checked = _check_queue(queue, titles)
@@ -939,6 +1031,7 @@ def drafts(
         titles=titles,
         styles=styles,
         channels=channels,
+        cam=cam_position,
     )
     if len(checked) == 1:
         item = checked[0]

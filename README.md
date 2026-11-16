@@ -125,7 +125,10 @@ This renders every candidate. Options:
   full-height 9:16 window that follows the largest face instead (faces
   found with OpenCV, cached under the cache dir); a clip with no face is
   skipped with a note. It suits podcasts and webcam streams; on groups it
-  cuts people out.
+  cuts people out. `--style facecam` is for gaming streams with a cam box:
+  the box is found from the footage (a still face inside a bordered box)
+  and stacked over a centre crop of the gameplay, or under it with `--cam
+  bottom`. A clip with no box found renders in `fit`, with a note.
 - `--titles` suggests a title and a hook line per clip with a local model
   through [Ollama](https://ollama.com), the same server and model as
   `--detector llm` (`CLIPPER_LLM_MODEL`, default `qwen3.5:9b`). They are
@@ -194,7 +197,9 @@ with `Drafts: <clips dir>/<channel>/<MM-DD-YYYY>/<video name>`: a folder with ev
 vertical, captioned clip, and a suggested title and hook for each in the
 manifest. Each clip comes in two styles to pick from: `<name>.mp4` fits the
 whole frame, and `<name>.face.mp4` crops on the largest face (a clip with no
-face gets only the first). `--style fit` or `--style face` renders one.
+face gets only the first). `--style fit` or `--style face` renders one;
+`--style facecam` (repeat `--style` for several) adds the gaming stream
+layout above.
 Give several sources, or `--list sources.txt` (one per line, `#` for
 comments, and `| <about text>` after a source for its own `--about`), to
 queue them: every source is checked first, then they run one after another,

@@ -283,6 +283,40 @@ committed.
   review page's style switch. 6b may build on these rules; whether the
   cam goes above or below the gameplay is decided there.
 
+## Amended by the facecam style (V7 item 6b)
+
+- A third vertical style, `facecam`, in `render` and `drafts` (opt-in:
+  `--style facecam`; `drafts`' default stays fit and face). `--cam
+  top|bottom` puts the cam above the gameplay (the default) or below it;
+  `--cam` without the facecam style is an error.
+- The box: a `FacecamFinder` Protocol in `core/`, `OpenCvFacecamFinder`
+  in `adapters/media/facecam.py` with the facecam spike's rules and
+  settings, its answer (box or none) cached per span under
+  `<cache dir>/facecam/` as the faces are; `FacecamBox` (fractions of the
+  frame) in `domain/`; `AppContext.facecam_finder`. YuNet's loading is
+  shared with the face tracker (`load_face_model`).
+- The frame: `plan_facecam` in `core/framing.py` gives a `FacecamLayout`:
+  the box cropped and scaled to 1080 wide at its own shape, up to 960
+  high; the gameplay a centre crop of the whole source at the shape of the
+  rest; stacked by `vstack` in the one encode (ADR 0007), before captions.
+  A cam near the frame's edge mostly falls outside the centre crop; a
+  sliver of it can show at the gameplay's side.
+- No box: a note, and the clip renders in `fit` (or only in `fit` when
+  `fit` is also chosen). A finder failure is a failure, as the face
+  tracker's: the clip fails if facecam is its only style, else the other
+  styles still render and the run exits 1.
+- The manifest's facecam variant keeps `box` and `cam` (ADR 0019);
+  `Label.style` and the review page's styles to keep take `facecam`. The
+  page keeps a facecam draft as it is but does not re-render it (a Save
+  that would is refused, nothing written) until 6c, which also brings the
+  style switch's cam position.
+- The renderer refuses the facecam style with a face crop, hand crops,
+  zooms or a sequence.
+- Known: captions sit 420 px above the frame's bottom, so with `--cam
+  bottom` they cover the cam (seen on a Sonoket clip); 6c or later can
+  move them above it. Measured on `DQP3pmyJX4o`: two 42 s clips with
+  captions in 28 s, finder included. Manual step R23.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

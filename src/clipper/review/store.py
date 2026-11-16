@@ -86,7 +86,7 @@ logger = logging.getLogger(__name__)
 
 MAX_TITLE = 200
 # The styles a Save may keep (ADR 0025).
-STYLES = ("fit", "face")
+STYLES = ("fit", "face", "facecam")
 # A keeper's rating: worth posting, or for the backlog (ADR 0024).
 RATINGS = ("good", "ok")
 # The reason listed for a clip added in the page (ADR 0019, 3e amendment).
@@ -852,6 +852,13 @@ class ReviewStore:
             reasons=clip.reasons,
         )
         style = self._style(clip, request.style)
+        if style == "facecam" and needs_render:
+            # The page cannot re-render the facecam style yet (V7 6c); it
+            # keeps the drafted file only (ADR 0025, facecam style).
+            raise JudgingError(
+                "The facecam draft can be kept as it is, not re-rendered; "
+                "pick fit or face to change this clip"
+            )
         name = clip_file_name(self._render.video, candidate)
         if style is not None:
             name = variant_file_name(name, style)
@@ -911,9 +918,10 @@ class ReviewStore:
                 changes["variants"] = _kept(style, name)
         elif style is not None:
             # The same span in the kept style: the other styles go (ADR 0025).
-            kept = next(v.file for v in clip.variants if v.style == style)
-            warning = self._delete_others(clip, kept, "Saved")
-            changes |= {"file": kept, "variants": _kept(style, kept)}
+            # The variant is kept whole, so a facecam box and cam stay.
+            variant = next(v for v in clip.variants if v.style == style)
+            warning = self._delete_others(clip, variant.file, "Saved")
+            changes |= {"file": variant.file, "variants": (variant,)}
         if clip.added:
             # An added clip's own label is found by its last saved span.
             changes["draft_start_seconds"] = request.start
