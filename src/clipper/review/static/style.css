@@ -652,8 +652,14 @@ button[aria-pressed="true"] {
   margin-left: -5px;
   border-radius: 50%;
   background: var(--accent);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+  /* Above the span's handles, so a marker at the end can still be dragged. */
+  z-index: 2;
 }
+
+.effect-mark.selected { box-shadow: 0 0 0 2px #fff; }
+.effect-row.selected { outline: 1px solid var(--accent); }
 
 /* Thumbnails (ADR 0030). */
 .thumb-row {

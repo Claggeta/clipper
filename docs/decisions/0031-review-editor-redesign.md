@@ -290,6 +290,17 @@ asked for a chat box that turns a described edit into the page's edits.
   play, title, rate, thumbnail or trash the result; the page's keys wait
   while it is open, and Esc closes it. Manual step RV25.
 
+## Amended by draggable effect markers (V8 item 4b)
+
+- From the click audit (V8 item 4a): moving a sound effect meant typing
+  its time in the Audio tab. A press on its marker under the strip now
+  selects it (ringed, its row outlined) and seeks to it; a drag past
+  4 px moves it inside the span, snapping to word starts as the handles
+  do (Alt or the snap toggle frees it). `Backspace` removes the selected
+  effect, else the selected block as before; `Delete` stays Trash. Only
+  the clip's own effects are on this lane; a block's own stay on the
+  Sequence lane. Nothing saved changes. Manual step RV33.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

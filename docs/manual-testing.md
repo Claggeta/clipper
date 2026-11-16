@@ -3708,6 +3708,31 @@ and a scratch `CLIPPER_LABELS_DIR`; untick "Move on after Save/Trash".
 Run 2026-11-16 in headless Edge over CDP on a `DQP3pmyJX4o` folder:
 steps 1 to 5 as above, frames of the re-rendered files checked by eye.
 
+### RV33. Drag a sound effect marker
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s draggable
+effect markers amendment (V8 item 4b). Same scratch copy and labels dir
+as RV12, with a short sound effect in `data\sfx\`.
+
+1. Choose a clip, open `Audio` and add two effects at different
+   moments. Pass: two markers under the strip.
+2. Press one marker without moving. Pass: the playhead jumps to it, the
+   marker is ringed and its row in the tab is outlined; nothing shows
+   `Unsaved` beyond what step 1 did.
+3. Drag the marker a few seconds along. Pass: it follows the pointer,
+   the playhead with it, and lands on a word start near where you let
+   go; the row's time in the tab shows the new place. Hold Alt while
+   dragging. Pass: it lands where you let go.
+4. Drag it past the span's end. Pass: it stops just inside the end.
+5. With it selected, press `Backspace`. Pass: that effect is gone from
+   the lane and the tab, the other stays, and no block is removed. Press
+   `Backspace` again with no marker selected on a clip with two blocks.
+   Pass: the selected block is removed, as before.
+6. Play the preview over the moved effect, then Save. Pass: the effect
+   plays at its new moment in the preview and in the re-rendered draft.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |
