@@ -2218,8 +2218,10 @@ function Invoke-Fetch {
   $script:Code = $LASTEXITCODE
   $script:Seconds = [Math]::Round($t.TotalSeconds, 1)
   $script:Text = Get-Content "$S\last.txt" -Raw -Encoding UTF8
+  # One line at a time, the exit line last, so `Select-Object -Last N` keeps
+  # the end of the output and the exit code.
+  $Text.TrimEnd() -split "\r?\n"
   "exit $Code, $Seconds s"
-  $Text
 }
 # Helper: what ffprobe says about a fetched file's streams and length.
 function Show-Video([string]$Path) {

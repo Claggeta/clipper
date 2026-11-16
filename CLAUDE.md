@@ -1431,9 +1431,11 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      (done; as the labels and manifest loaders already did)
    - 7c. Letterboxed sources under `--vertical`: fit only the picture area
      (`cropdetect`, untried here). ADR 0016 amendment, manual step.
-   - 7d. Docs and housekeeping: `docs/architecture.md` drift and code
+   - 7d. ~~Docs and housekeeping: `docs/architecture.md` drift and code
      fences, mojibake in `docs/roadmap.md` and `docs/architecture.md`,
-     duplicate `.gitignore` entries, the D9 and D10 pipe.
+     duplicate `.gitignore` entries, the D9 and D10 pipe.~~ (done; no
+     mojibake found, both files valid UTF-8; `Invoke-Fetch` prints lines,
+     exit last)
    - 7e. ~~On-screen text that wraps (added 2026-11-13, found by the
      maintainer): one box behind all lines, not a box per line that
      overlaps its neighbour. ADR 0030 amendment, manual steps.~~ (done;
@@ -1585,15 +1587,6 @@ Later, not scheduled:
 - Twitch clip labels for v2924046310 (`data/labels/v2924046310.json`) may
   be 64 s off, if Twitch counts that VOD from 0 and the download began
   64 s in (its file was later remuxed to start at 0); unverified.
-- Docs drift in `docs/architecture.md`: omits `AudioExtractor` from core
-  interfaces; says the CLI depends on core, but it imports adapters; promises
-  CLI config flags that don't exist; says ffmpeg is checked at startup, when
-  the check is lazy. The diagram and layer text also need code fences so
-  GitHub renders them correctly. Scheduled as V7 item 7d.
-- Possible mojibake in `docs/roadmap.md` and `docs/architecture.md`.
-  Scheduled as V7 item 7d.
-- `.gitignore` duplicate entries (`.venv`, `dist/`, `__pycache__/`).
-  Scheduled as V7 item 7d.
 - Opt-in model-load test: needs a marker, `--strict-markers`, and
   deselecting by default.
 - Captions on a build without libass: every selected clip fails with the same
@@ -1649,10 +1642,6 @@ Later, not scheduled:
   come from Twitch clips, which many viewers made. Fix: word it by source, or
   drop "one labeler"; how `eval` would know the source is undecided (a field
   in the labels file, or the note prefix). Seen in manual step T5.
-- Manual steps D9 and D10 pipe `Invoke-Fetch` into
-  `Select-Object -Last N`, which does nothing: the helper returns the text as
-  one string. Fix: split the text into lines, or drop the pipe. Scheduled
-  as V7 item 7d.
 - `fetch` makes two yt-dlp requests for a new video: the download, then a
   `--skip-download` request for `<id>.info.json` (ADR 0020, video info
   amendment; skipped once the info file exists). yt-dlp's
