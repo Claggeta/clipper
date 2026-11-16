@@ -115,8 +115,12 @@ def test_unreadable_file_raises(
 
 @pytest.mark.parametrize("content", ["", "{", "not json", b"\xff\xfe\x00"])
 def test_invalid_json_raises(tmp_path: Path, content: str | bytes) -> None:
-    with pytest.raises(AnalysisResultError, match="Invalid JSON in analysis result"):
+    with pytest.raises(
+        AnalysisResultError, match="Invalid JSON in analysis result"
+    ) as excinfo:
         load_analysis_result(_write(tmp_path, content))
+
+    assert "Invalid JSON:" not in str(excinfo.value)
 
 
 @pytest.mark.parametrize("content", ["[]", "null", "3", "{}"])

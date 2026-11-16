@@ -22,8 +22,9 @@ def load_analysis_result(path: Path) -> AnalysisResult:
         errors = exc.errors()
         first = errors[0]
         if first["type"] == "json_invalid":
+            detail = first["msg"].removeprefix("Invalid JSON: ")
             raise AnalysisResultError(
-                f"Invalid JSON in analysis result {path}: {first['msg']}"
+                f"Invalid JSON in analysis result {path}: {detail}"
             ) from exc
         location = ".".join(str(part) for part in first["loc"]) or "<root>"
         more = f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""
