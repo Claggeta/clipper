@@ -351,6 +351,11 @@ and planned code:
   only) with a button per style; Save keeps one style, re-rendering in it
   if the span moved (face tracking in `review`), deletes the other, and
   records `style` on the judged label (0012, 0019, 0024).
+  Facecam spike amendment (V7 6a): a still YuNet face, then the nearest
+  solid lasting edge each side, at least three real borders; a bordered
+  cam boxed right on 18 of 20 stretches, none wrong, no box on 12
+  without a cam; a borderless cam with changing layouts mostly missed,
+  2 of 10 wrong.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -1416,9 +1421,11 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    the others did worse; 69 new windows judged, labels committed; ADR
    0014 amendment; no code)
 6. The facecam split (ADR 0025), in PRs:
-   - 6a. Spike: find a fixed facecam box per clip on a few gaming VODs,
+   - 6a. ~~Spike: find a fixed facecam box per clip on a few gaming VODs,
      checked against boxes marked by hand. Ends in an ADR 0025 amendment
-     or in nothing.
+     or in nothing.~~ (done; bordered cam 18 of 20 right and none wrong,
+     borderless cam mostly missed, no false box without a cam; ADR 0025
+     amendment; no code)
    - 6b. If 6a says so: a `facecam` style in `render` and `drafts`, the
      box stacked above or below the gameplay (a choice, added 2026-11-14
      at the maintainer's ask; the default decided in the item); a clip
