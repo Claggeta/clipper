@@ -2,7 +2,7 @@
 
 AI-assisted tool that finds clip-worthy moments in long-form video.
 
-**Status:** V1 to V6 work locally as a command-line tool (v0.6.0).
+**Status:** V1 to V7 work locally as a command-line tool (v0.7.0).
 `clipper drafts` takes a YouTube or Twitch URL, or a local file, to a folder of
 vertical clips with word-by-word captions and a suggested title and hook for
 each. `clipper review` opens a local page to judge, trim, cut, add text to and
@@ -233,9 +233,16 @@ from the playhead's frame. Save writes a judged label to
 changed; Trash deletes it and records a rejected span; "Add clip here" saves
 a moment no draft proposed. The page fits one screen: the clip list (☰ hides
 it), a live 9:16 preview of the clip (cuts skipped, framed, captions and text
-drawn) beside the source and draft players, an inspector with Clip, Captions (fix, hide or highlight words), Text and
-Frame tabs,
-and the film strip across the bottom. Most actions have a key (`?` lists
+drawn) beside the source and draft players, an inspector with Clip,
+Captions (fix, hide or highlight words), Text (colour, box or outline,
+size, fade, dragged position), Frame (style, zooms, hand crops) and Audio
+(volume, a music bed from `data/music/` lowered under speech, sound
+effects from `data/sfx/`) tabs, and the film strip across the bottom.
+Mark cuts by hand with `[` and `]` or by dragging on the strip. A Sequence
+lane plays a clip as blocks in any order, a pad keeps ranges marked
+anywhere in the VOD (`Shift+P`), and B-roll from `data/broll/` goes in as
+a block or over the clip. A `facecam` draft gets a cam toggle (top or
+bottom). While Trash is armed, keys `1` to `5` record why. Most actions have a key (`?` lists
 them), and after Save or Trash the page moves on to the next clip without a
 verdict. `Combine` joins the saved clips into one longer Short with
 optional "Hour N" cards and music, and `Summarize video` has the local model
