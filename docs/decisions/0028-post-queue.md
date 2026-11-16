@@ -123,6 +123,28 @@ planned to match them by title, length and date.
   queue item's `kind` is `clip`, `combined` or `summary`.
 - `posted` takes the summary's title or file. Manual step Q3.
 
+## Amended by upload names (V7 item 7h)
+
+- Each run of `queue` puts a copy of every queued clip, combined clip and
+  summary, named after its title, in `<clips dir>/upload/`, with its
+  thumbnail beside it as `<name>.jpg`; `queue.md` shows that file (and
+  the clip's own path as `Clip:`). The maintainer was told file names can
+  matter to the platforms; YouTube does not say they do, so this is for
+  finding the file as much as for ranking.
+- The name: the title folded to lowercase ASCII words joined by `-`,
+  apostrophes and emoji dropped, cut at a word to 80 characters;
+  `<video>-<rank>` (or `-combined`, `-summary`) without a title; `-2`,
+  `-3` on repeats in one run.
+- A copy is a hard link, a plain copy where the file system has none
+  (the maintainer's exFAT drive). The run first removes the `.mp4` and
+  `.jpg` files the folder holds, so a posted clip's copy goes and an
+  edited title's name follows on the next run; other files are left.
+- Clipper's own names, the manifest, `posted` and `data/posts.json` are
+  unchanged: renaming the clips would break the posts record and the
+  style files, and titles change in review after the drafts. The cost is
+  two names per clip, the copy's matching the title only as of the last
+  `queue`. Manual step Q4.
+
 ## Revisit when
 
 - Posting from the review page would save a step.

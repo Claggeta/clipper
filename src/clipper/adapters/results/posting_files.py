@@ -1,4 +1,7 @@
 import logging
+import os
+import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -48,6 +51,38 @@ def save_posts(posts: PostLog, path: Path) -> None:
         path.write_bytes(posts.model_dump_json(indent=2).encode("utf-8") + b"\n")
     except OSError as exc:
         raise QueueError(f"Cannot write posts file {path}: {exc}") from exc
+
+
+def write_uploads(folder: Path, files: Sequence[tuple[Path, str]]) -> None:
+    """Fill the upload folder: each source under its new name, as a hard
+    link (a copy where one cannot be made), after removing the `.mp4` and
+    `.jpg` files a previous queue left there (ADR 0028, upload names).
+
+    A missing source is skipped with a warning. Raises `QueueError` naming
+    the file that cannot be removed or written.
+    """
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        old = [p for p in folder.iterdir() if p.suffix.lower() in (".mp4", ".jpg")]
+    except OSError as exc:
+        raise QueueError(f"Cannot open upload folder {folder}: {exc}") from exc
+    for path in old:
+        try:
+            path.unlink()
+        except OSError as exc:
+            raise QueueError(f"Cannot remove {path}: {exc}") from exc
+    for source, name in files:
+        target = folder / name
+        if not source.is_file():
+            logger.warning("No file to upload at %s", source)
+            continue
+        try:
+            os.link(source, target)
+        except OSError:
+            try:
+                shutil.copy2(source, target)
+            except OSError as exc:
+                raise QueueError(f"Cannot write {target}: {exc}") from exc
 
 
 def load_drafts_folders(

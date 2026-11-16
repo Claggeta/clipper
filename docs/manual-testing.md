@@ -2593,6 +2593,27 @@ A summary made in RV26 and rated `Good` is listed the same way as
 `summary`, with the people marked on the clips its beats overlap, and
 `posted "<its title>" <link>` takes it out.
 
+### Q4. Upload copies named after titles
+
+Covers [ADR 0028](decisions/0028-post-queue.md)'s upload names amendment (V7
+item 7h), with at least two saved clips rated `Good`, one with a thumbnail:
+
+```powershell
+uv run clipper queue --out "$env:TEMP\q4.md"
+Get-ChildItem "data\clips\upload"
+```
+
+Pass: the run ends with `Upload copies: <clips dir>\upload`. The folder
+holds one `.mp4` per queued clip, named after its title in lowercase with
+hyphens and no emoji, and a `.jpg` of the same name for the clip with a
+thumbnail; each plays as its clip. In `q4.md` each entry's file is the
+upload copy, with `Clip:` giving the clip's own path. Record one with
+`posted` against a scratch `CLIPPER_POSTS_FILE` and run `queue` again: its
+copy is gone.
+
+Run 2026-11-16 by the assistant on the maintainer's clips (exFAT, so
+copies rather than hard links): 2 clips and a thumbnail, names as above.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`

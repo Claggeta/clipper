@@ -34,6 +34,7 @@ from clipper.adapters.results.posting_files import (
     load_drafts_folders,
     load_posts,
     save_posts,
+    write_uploads,
 )
 from clipper.adapters.results.video_info_json import (
     load_video_info,
@@ -56,9 +57,11 @@ from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths, variant_file_name
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.posting import (
+    UPLOAD_FOLDER,
     build_queue,
     clip_key,
     match_title,
+    plan_uploads,
     queue_markdown,
     record_post,
     schedule,
@@ -1439,10 +1442,20 @@ def queue_(
             build_queue(folders, campaigns, posts, include_ok), first, per_day
         )
         page = out or settings.clips_dir / "queue.md"
+        # Each queued clip and its thumbnail get a copy named after the title,
+        # to upload (ADR 0028, upload names amendment).
+        clips_dir = settings.clips_dir.resolve()
+        uploads = plan_uploads([item for _, item in scheduled])
+        files: list[tuple[Path, str]] = []
+        for (_, item), stem in zip(scheduled, uploads, strict=True):
+            files.append((clips_dir / item.path, f"{stem}.mp4"))
+            if item.thumbnail is not None:
+                files.append((clips_dir / item.thumbnail, f"{stem}.jpg"))
+        write_uploads(clips_dir / UPLOAD_FOLDER, files)
         try:
             page.parent.mkdir(parents=True, exist_ok=True)
             page.write_text(
-                queue_markdown(scheduled, settings.clips_dir.resolve()) + "\n",
+                queue_markdown(scheduled, clips_dir, uploads) + "\n",
                 encoding="utf-8",
                 newline="\n",
             )
@@ -1466,6 +1479,9 @@ def queue_(
                 escape(", ".join(c.name for c in item.eligible.campaigns)),
             )
         console.print(table)
+        console.print(
+            f"Upload copies: {escape(str(clips_dir / UPLOAD_FOLDER))}", soft_wrap=True
+        )
     console.print(f"Queue: {escape(str(page))}", soft_wrap=True)
 
 

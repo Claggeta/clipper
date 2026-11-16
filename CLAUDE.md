@@ -412,7 +412,11 @@ and planned code:
   (0033) the same, as `summary`, with the people of the clips its beats
   overlap. Title amendment (V7 7g): `posted`
   also takes the title as the queue shows it, after trying a path; one
-  match only, else an error listing matches or close titles. Relative paths amendment (V7 7f): a path relative
+  match only, else an error listing matches or close titles. Upload
+  names amendment (V7 7h): `queue` fills `<clips dir>/upload/` with a
+  copy of each queued clip (hard link, else a copy) and thumbnail named
+  after the title (lowercase ASCII, hyphens, 80 characters), its old
+  videos and images removed first; Clipper's own names unchanged; Q4. Relative paths amendment (V7 7f): a path relative
   to the current folder or the clips dir too, if it is a file under the
   clips dir; the record stays `<stem>/<file>`.
 - `0029` — cuts: the review page proposes cutting pauses in speech (word
@@ -1473,6 +1477,10 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 7g. ~~`clipper posted "<title>" <link>` (added 2026-11-13, the
      maintainer's ask): the title as the queue shows it. ADR 0028
      amendment, manual step.~~ (done; Q1 extended)
+   - 7h. ~~Upload copies named after titles (added 2026-11-16, the
+     maintainer's ask): `queue` puts a title-named copy of each queued
+     clip in `<clips dir>/upload/`. ADR 0028 amendment, manual step.~~
+     (done; manual step Q4)
 8. Release notes and tag `v0.7.0`.
 9. The review editor (ADR 0031), before item 5, in PRs, each with a
    manual step:

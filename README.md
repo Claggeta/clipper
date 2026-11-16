@@ -268,7 +268,11 @@ folder after another (newest first), two a day from today (`--per-day`,
 ready to copy, the people marked in review and the campaigns from
 `data/campaigns.txt` it qualifies for. `posted` records a clip's YouTube
 link in `data/posts.json`, and it leaves the queue; name the clip by its
-title as the queue shows it, or by `<video name>/<clip file>` or its path. See
+title as the queue shows it, or by `<video name>/<clip file>` or its path.
+Each `queue` run also puts a copy of every queued clip, named after its
+title (`ron-shocked-at-the-gas-pump.mp4`), and its thumbnail in
+`<clips dir>/upload/`, to upload from; `queue.md` points at those copies,
+and the folder's videos and images are replaced on each run. See
 [ADR 0028](docs/decisions/0028-post-queue.md).
 
 ### Evaluating detectors
