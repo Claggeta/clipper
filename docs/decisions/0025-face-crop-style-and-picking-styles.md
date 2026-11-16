@@ -242,6 +242,47 @@ label, so the picks over time show which style wins on which videos.
 - Times move to the cut clip through the time map; the run needs the
   frame size. Vertical folders only. Manual step RV23.
 
+## Amended by the facecam spike (V7 item 6a)
+
+A fixed facecam box per clip, found from the footage, for a later
+`facecam` style (6b). Spike scripts in the session scratchpad, not
+committed.
+
+- Method, per 45 s stretch, frames at 2 a second scaled to 1280x720:
+  1. YuNet faces (the face style's model and threshold); a face that
+     stays put (centre within 4% of the frame width) in at least half
+     the frames. Several such faces are tried, most frames first.
+  2. From that face outward on each side, out to 6 face sizes, the
+     nearest lasting straight edge: mean |Sobel| over the stretch at
+     least 2.5 times the profile's median, and at least half its own
+     strength along 80% of the side. The frame edge if none. First
+     along the face's own extent, then along the box's sides clear of
+     its corners.
+  3. Kept if at least 15% of the frame each way, under half its area,
+     not spanning its width or height, with at least three real
+     borders (not the frame's edges). Else no box.
+- Test set: 42 stretches. Facecam: two Sonoket Gaming VODs (a bordered
+  cam, bottom right, moving between two positions during a stream) and
+  stableronaldo's Fortnite day `v2922292514` (a borderless cam, top
+  left, its layout changing: one cam, two stacked, full-screen webcam,
+  desktop). No facecam: Floydsonson's Moon Sweepers (gameplay only), two
+  CORE and one Lacy IRL VOD, the Iced Coffee Hour podcast. Boxes marked
+  by hand on a pixel grid by the assistant, not the maintainer; a second
+  set of 15 stretches checked by eye after the rules were set.
+- Results: the bordered cam, 18 of 20 stretches boxed right (overlap
+  with the marked box 0.83 to 0.99 on the 10 marked), 2 missed, none
+  wrong. The borderless cam, of 10 stretches: 2 full-screen webcam
+  stretches rightly given no box, 1 about right, 2 wrong (one where the
+  layout changes inside the stretch), 5 missed. No box on any of the 12
+  stretches without a facecam. About 3 s per 45 s stretch.
+- Of the maintainer's 8 recorded posts, one is from a facecam VOD
+  (`DQP3pmyJX4o`, the bordered cam); the other seven are IRL.
+- So the box is found reliably for a bordered, fixed cam, and a miss
+  falls back to `fit`. A borderless cam with changing layouts is mostly
+  missed and sometimes wrong; a wrong box costs a pick of `fit` in the
+  review page's style switch. 6b may build on these rules; whether the
+  cam goes above or below the gameplay is decided there.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it
