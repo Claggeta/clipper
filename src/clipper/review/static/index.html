@@ -135,10 +135,11 @@
           <span class="field-label">Style</span>
           <div id="styles" class="toggle-row" role="group" aria-label="Style"></div>
           <p id="styles-none" class="muted">This clip has one style.</p>
-          <span class="field-label">Zooms <span class="muted">(seconds into the span)</span></span>
+          <label class="fade block-only" title="Zooms and hand crops for the selected block alone; they replace the clip's there"><input type="checkbox" id="frame-block-only"> This block only <span id="frame-block-name" class="muted"></span></label>
+          <span class="field-label">Zooms <span id="zooms-unit" class="muted">(seconds into the span)</span></span>
           <div id="zooms" class="ranges"></div>
           <div><button type="button" id="add-zoom" title="A punch-in at the playhead">Add zoom at playhead</button></div>
-          <span class="field-label">Hand crops <span class="muted">(a 9:16 window placed by hand)</span></span>
+          <span class="field-label">Hand crops <span id="hands-unit" class="muted">(a 9:16 window placed by hand)</span></span>
           <div id="hands" class="ranges"></div>
           <div><button type="button" id="add-hand" title="A window placed by hand from the playhead">Crop by hand from here</button></div>
           <p id="frame-note" class="muted"></p>

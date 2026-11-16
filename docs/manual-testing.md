@@ -3554,6 +3554,47 @@ Run 2026-11-15 in headless Edge over CDP, R22's test files: steps 1 to
 at 5.5 and 26 s matched the preview, the box where it was dragged. The
 draft was not watched.
 
+### RV30. Zooms, hand crops and sound effects for one block
+
+Covers "This block only" in `review` ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
+block edits amendment, V7 item 9n-5). Use a scratch copy of a vertical
+drafts folder with captions, a scratch `CLIPPER_LABELS_DIR`, and a sound
+effect in `data/sfx`.
+
+1. Choose a clip. Put the playhead 10 s in and press `B`; select the
+   first block and press `Shift+D`. Pass: three blocks, the first two the
+   same footage.
+2. Select block 2 a few seconds in. In the Frame tab tick `This block
+   only`. Pass: it names block 2, and the Zooms heading reads "block 2
+   only, seconds into the block". Press `Add zoom at playhead` and `Crop
+   by hand from here`. Pass: a row each, timed from the block's start;
+   a purple and a green bar along the foot of block 2 on the Sequence
+   lane.
+3. Untick the box. Pass: the clip's own zooms show (none), and the note
+   says a block has its own, which replace these there. Select a B-roll
+   insert, if any. Pass: the box is greyed out.
+4. On the Preview view, click block 2 inside its zoom. Pass: the frame
+   is zoomed. Click block 1 at the same point. Pass: not zoomed.
+5. Drag the end of block 2's zoom bar on the lane. Pass: the bar and its
+   row follow, inside the block.
+6. Select block 3. In the Audio tab tick `This block only` and press
+   `Add effect at playhead`. Pass: a row under "block 3 only", a yellow
+   tick in block 3. Play the blocks. Pass: the effect sounds when block 3
+   reaches it.
+7. Drag block 2's start edge right by less than its zoom's start. Pass:
+   the zoom stays on the same footage (its time in the block falls by as
+   much). Drag it past the zoom. Pass: a notice says the edits that no
+   longer fit were dropped. Undo the drag by dragging back.
+8. Save. Pass: re-rendered; the Draft view shows the zoom in block 2
+   only and plays the effect in block 3; the label's `sequence` holds
+   them on their blocks.
+
+Run 2026-11-15 in headless Edge over CDP: steps 1 to 5 and 7 as above
+(drags scripted), step 6's row and tick, and step 8: the label held the
+zoom on block 2 and the effect on block 3, and frames of the re-rendered
+file at 4 and 14 s (the same footage in blocks 1 and 2) were plain and
+zoomed 1.3x. The effect was not heard and the draft was not watched.
+
 ## Record your run
 
 | Field | Value |

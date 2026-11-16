@@ -2,8 +2,10 @@
 // volume, a music bed and sound effects from the maintainer's own files),
 // effect markers on the timeline, and playback in the live preview through
 // the browser's audio engine. The preview's ducking dips the music during
-// the transcript's words; the burn-in ducks on the real sound. Loaded after
-// app.js, precision.js and frame.js, before preview.js.
+// the transcript's words; the burn-in ducks on the real sound. With "This
+// block only" (ADR 0034, V7 item 9n-5) effects go on the selected block,
+// in seconds from its start, and play wherever it plays. Loaded after
+// app.js, precision.js, sequence.js and frame.js, before preview.js.
 "use strict";
 
 const audioBox = document.getElementById("audio-editor");
@@ -20,6 +22,8 @@ const MUSIC_LEVELS = [-30, -27, -24, -21, -18, -15, -12, -9, -6, -3, 0];
 const EFFECT_LEVELS = [-20, -16, -12, -8, -4, 0, 2, 4, 6];
 let audioGraph = null; // {context, clipGain, musicGain}, made on first play
 let lastAudioTime = null; // the source time of the last preview frame
+let lastAudioClip = NaN; // and the finished clip's, for blocks' own effects
+let effectsBlockOnly = false; // "This block only" in the Audio tab
 
 function decibels(db) {
   return Math.pow(10, db / 20);
@@ -77,6 +81,8 @@ function sameAudio(clip) {
 function audioChanged() {
   drawUnsaved();
   drawAudioLane();
+  // A block's own effects are marked on the Sequence lane.
+  drawSequenceSoft();
 }
 
 // --- The tab ---
@@ -150,9 +156,32 @@ function drawAudioEditor(clip) {
     audioBox.append(row);
   }
 
+  // The effects edited: the clip's (source seconds, shown from the span's
+  // start) or the selected block's own (seconds from its start).
+  const block = blockTarget(effectsBlockOnly, true);
+  const list = block ? block.effects : audio.effects;
+  const base = block ? 0 : span.start;
+  const chosen = blocksOf(clip)[selectedBlock];
+  const only = document.createElement("label");
+  only.className = "fade block-only";
+  only.title = "Sound effects for the selected block alone, wherever it plays";
+  const onlyBox = document.createElement("input");
+  onlyBox.type = "checkbox";
+  onlyBox.id = "effect-block-only";
+  onlyBox.checked = effectsBlockOnly;
+  onlyBox.disabled = !chosen;
+  onlyBox.addEventListener("change", () => {
+    effectsBlockOnly = onlyBox.checked;
+    drawAudioEditor(clip);
+  });
+  const onlyName = document.createElement("span");
+  onlyName.className = "muted";
+  onlyName.textContent = chosen ? ` (block ${selectedBlock + 1})` : "";
+  only.append(onlyBox, " This block only", onlyName);
+  audioBox.append(only);
   const effects = document.createElement("div");
   effects.className = "ranges";
-  audio.effects.forEach((effect, index) => {
+  list.forEach((effect, index) => {
     const row = document.createElement("div");
     row.className = "effect-row";
     const file = selectInput(
@@ -163,11 +192,11 @@ function drawAudioEditor(clip) {
         audioChanged();
       },
     );
-    const at = numberInput(round(effect.at_seconds - span.start), (relative) => {
-      effect.at_seconds = span.start + relative;
+    const at = numberInput(round(effect.at_seconds - base), (relative) => {
+      effect.at_seconds = base + relative;
       audioChanged();
     });
-    at.title = "At (s into the span)";
+    at.title = block ? "At (s into the block)" : "At (s into the span)";
     const level = selectInput(
       EFFECT_LEVELS.map((db) => [String(db), `${db} dB`]),
       String(effect.level_db),
@@ -181,24 +210,37 @@ function drawAudioEditor(clip) {
       at,
       level,
       removeButton(() => {
-        audio.effects.splice(index, 1);
+        list.splice(index, 1);
         drawAudioEditor(clip);
         audioChanged();
       }),
     );
     effects.append(row);
   });
-  audioBox.append(labelled("Sound effects (seconds into the span)", effects));
+  const heading = block
+    ? `Sound effects (block ${selectedBlock + 1} only, seconds into the block)`
+    : "Sound effects (seconds into the span)";
+  audioBox.append(labelled(heading, effects));
   const add = document.createElement("button");
   add.type = "button";
   add.textContent = "Add effect at playhead";
-  add.disabled = !audioFiles.sfx.length || audio.effects.length >= 10;
+  add.disabled = !audioFiles.sfx.length || list.length >= 10;
   add.addEventListener("click", () => {
-    audio.effects.push({
-      file: audioFiles.sfx[0],
-      at_seconds: round(clamp(player.currentTime, span.start, span.end - 0.1)),
-      level_db: 0,
-    });
+    const own = blockTarget(effectsBlockOnly, true, true);
+    if (own) {
+      own.effects.push({
+        file: audioFiles.sfx[0],
+        at_seconds: round(clamp(timeInBlock(selectedBlock), 0, blockLength(own) - 0.1)),
+        level_db: 0,
+      });
+      own.effects.sort((a, b) => a.at_seconds - b.at_seconds);
+    } else {
+      audio.effects.push({
+        file: audioFiles.sfx[0],
+        at_seconds: round(clamp(player.currentTime, span.start, span.end - 0.1)),
+        level_db: 0,
+      });
+    }
     drawAudioEditor(clip);
     audioChanged();
   });
@@ -305,13 +347,32 @@ function syncPreviewAudio() {
   if (playing && audio && lastAudioTime !== null && seconds > lastAudioTime) {
     for (const effect of audio.effects) {
       if (lastAudioTime < effect.at_seconds && effect.at_seconds <= seconds) {
-        const sound = new Audio(`/sfx/${encodeURIComponent(effect.file)}`);
-        sound.volume = Math.min(decibels(effect.level_db), 1);
-        sound.play().catch(() => {});
+        playEffect(effect);
       }
     }
   }
   lastAudioTime = playing ? seconds : null;
+  // Blocks' own effects, by the finished clip's time, inserts too.
+  const clipNow = playing && ownSequence(current) ? clipSeconds(seconds) : NaN;
+  if (Number.isFinite(clipNow) && Number.isFinite(lastAudioClip) && clipNow > lastAudioClip) {
+    const blocks = blocksOf(current);
+    const starts = blockStarts(blocks);
+    blocks.forEach((block, i) => {
+      for (const effect of block.effects) {
+        const at = starts[i] + effect.at_seconds;
+        if (lastAudioClip < at && at <= clipNow) {
+          playEffect(effect);
+        }
+      }
+    });
+  }
+  lastAudioClip = clipNow;
+}
+
+function playEffect(effect) {
+  const sound = new Audio(`/sfx/${encodeURIComponent(effect.file)}`);
+  sound.volume = Math.min(decibels(effect.level_db), 1);
+  sound.play().catch(() => {});
 }
 
 // Made and resumed on a real press (a pointer or a key), which the browser

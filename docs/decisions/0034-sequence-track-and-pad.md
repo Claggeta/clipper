@@ -295,6 +295,29 @@ goes next, then 9m on top of it.
   Reset include it.
 - Manual step RV29b.
 
+## Amended by block edits in the page (V7 item 9n-5)
+
+- **This block only**: a box in the Frame tab and one in the Audio
+  tab. Ticked, the rows are the selected block's own zooms, hand crops
+  or sound effects, in seconds from its start, and Add puts the new one
+  there at the playhead's time in the block (its start if the playhead
+  is elsewhere); the sequence becomes the clip's own. The Frame box is
+  greyed out on a B-roll insert; the Audio box takes any block. Unticked,
+  the rows are the clip's, and a note says how many blocks have zooms or
+  crops of their own, which replace the clip's there.
+- **On the lane**: a block's own zooms and hand crops are bars along
+  its foot, whose ends drag inside the block, clear of the others in
+  the same list; its effects are ticks. A click on either selects the
+  block there.
+- **Preview**: in a block with zooms (or hand crops) of its own, those
+  alone are drawn and panned, as the renderer has it; its own effects
+  play by the finished clip's time, in an insert too.
+- **Trimming** a block keeps its own edits on the same footage (a start
+  moved later moves them earlier in the block) and drops those no longer
+  inside it, with a notice. Split and duplicate carry them as before.
+- The unsaved check compares a block's own edits to the millisecond.
+- Manual step RV30.
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.
