@@ -11,6 +11,7 @@ from clipper.domain.models import (
     AudioMix,
     ClipCandidate,
     CropPath,
+    FacecamLayout,
     MixEffect,
     RenderBlock,
     RenderOverlay,
@@ -926,3 +927,54 @@ def test_a_sequence_with_cuts_or_an_empty_block_or_landscape_broll_is_refused(
             tmp_path / "c.mp4",
             overlays=(RenderOverlay(path=video, start_seconds=0, end_seconds=1),),
         )
+
+
+# The facecam style (ADR 0025, facecam style amendment).
+_FACECAM = FacecamLayout(
+    cam=(1402, 616, 498, 312), game=(492, 0, 936, 1080), cam_height=676
+)
+
+
+def test_facecam_stacks_the_cam_over_the_game(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+
+    FfmpegClipRenderer().render(
+        video, _CANDIDATE, tmp_path / "c.mp4", "[Script Info]", facecam=_FACECAM
+    )
+
+    command = captured[0]
+    assert command[command.index("-vf") + 1] == (
+        "split[camsrc][gamesrc];"
+        "[camsrc]crop=498:312:1402:616,scale=1080:676,setsar=1[cam];"
+        "[gamesrc]crop=936:1080:492:0,scale=1080:1244,setsar=1[game];"
+        "[cam][game]vstack,setsar=1,subtitles=clip.ass:charenc=UTF-8"
+    )
+
+
+def test_facecam_at_the_bottom_stacks_the_game_first(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[list[str]] = []
+    _patch_run(monkeypatch, captured)
+    bottom = _FACECAM.model_copy(update={"position": "bottom"})
+
+    FfmpegClipRenderer().render(video, _CANDIDATE, tmp_path / "c.mp4", facecam=bottom)
+
+    assert "[game][cam]vstack" in captured[0][captured[0].index("-vf") + 1]
+
+
+def test_facecam_refuses_a_face_crop_or_zooms(video: Path, tmp_path: Path) -> None:
+    crop = CropPath(width=608, height=1080, points=((0.0, 0),))
+    zoom = Zoom(start_seconds=1.0, end_seconds=2.0)
+    for extra in ({"crop": crop}, {"zooms": (zoom,)}):
+        with pytest.raises(ClipRenderError, match="facecam style has no face crop"):
+            FfmpegClipRenderer().render(
+                video,
+                _CANDIDATE,
+                tmp_path / "c.mp4",
+                facecam=_FACECAM,
+                **extra,
+            )

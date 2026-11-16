@@ -1,7 +1,14 @@
 import statistics
 from collections.abc import Sequence
 
-from clipper.domain.models import CropPath, FaceTrack, HandCropPlan
+from clipper.domain.models import (
+    CamPosition,
+    CropPath,
+    FacecamBox,
+    FacecamLayout,
+    FaceTrack,
+    HandCropPlan,
+)
 
 # A hand crop in the cut clip's seconds: start, end, and its centre as a
 # fraction of the source width (ADR 0025, hand crop amendment).
@@ -197,3 +204,45 @@ def hand_crop_plan(
         path=CropPath(width=window, height=frame_height // 2 * 2, points=tuple(points)),
         ranges=tuple((a, b) for a, b, _ in hands),
     )
+
+
+# ADR 0025, facecam style amendment: the cam fills the frame's width at its
+# own shape, up to half the frame's height, and the gameplay fills the rest as
+# a centre crop of the whole source.
+FACECAM_WIDTH = 1080
+FACECAM_HEIGHT = 1920
+MAX_CAM_HEIGHT = FACECAM_HEIGHT // 2
+
+
+def plan_facecam(
+    box: FacecamBox,
+    frame_width: int,
+    frame_height: int,
+    position: CamPosition = "top",
+) -> FacecamLayout:
+    """The facecam style's frame: the box over the gameplay, or under it."""
+    cam_w = _even(box.w * frame_width, frame_width)
+    cam_h = _even(box.h * frame_height, frame_height)
+    cam_x = min(round(box.x * frame_width), frame_width - cam_w)
+    cam_y = min(round(box.y * frame_height), frame_height - cam_h)
+    cam_height = min(
+        _even(FACECAM_WIDTH * cam_h / cam_w, FACECAM_HEIGHT), MAX_CAM_HEIGHT
+    )
+    game_height = FACECAM_HEIGHT - cam_height
+    game_w = _even(frame_height * FACECAM_WIDTH / game_height, frame_width)
+    game_h = frame_height // 2 * 2
+    if game_w >= frame_width:
+        game_h = _even(frame_width * game_height / FACECAM_WIDTH, frame_height)
+    game_x = (frame_width - game_w) // 2
+    game_y = (frame_height - game_h) // 2
+    return FacecamLayout(
+        cam=(cam_x, cam_y, cam_w, cam_h),
+        game=(game_x, game_y, game_w, game_h),
+        cam_height=cam_height,
+        position=position,
+    )
+
+
+def _even(value: float, limit: int) -> int:
+    """`value` rounded down to an even number of pixels, from 2 to `limit`."""
+    return max(2, min(int(value), limit) // 2 * 2)

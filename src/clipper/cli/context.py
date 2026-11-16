@@ -11,6 +11,11 @@ from clipper.adapters.download.ytdlp import (
 )
 from clipper.adapters.llm.ollama import OllamaClient
 from clipper.adapters.llm.story import OllamaStoryWriter
+from clipper.adapters.media.facecam import (
+    FINDER_NAME,
+    CachingFacecamFinder,
+    OpenCvFacecamFinder,
+)
 from clipper.adapters.media.faces import (
     TRACKER_NAME,
     CachingFaceTracker,
@@ -33,6 +38,7 @@ from clipper.core.interfaces import (
     ClipLookup,
     ClipRenderer,
     Downloader,
+    FacecamFinder,
     FaceTracker,
     FrameExtractor,
     MediaProbe,
@@ -95,6 +101,14 @@ def build_face_tracker(settings: Settings) -> FaceTracker:
     """Compose the face tracker, cached per span under the cache dir (ADR 0025)."""
     return CachingFaceTracker(
         OpenCvFaceTracker(), settings.cache_dir / "faces", TRACKER_NAME
+    )
+
+
+def build_facecam_finder(settings: Settings) -> FacecamFinder:
+    """Compose the facecam finder, cached per span under the cache dir (ADR 0025,
+    facecam style amendment)."""
+    return CachingFacecamFinder(
+        OpenCvFacecamFinder(), settings.cache_dir / "facecam", FINDER_NAME
     )
 
 
@@ -166,6 +180,7 @@ class AppContext:
     frames: Callable[[], FrameExtractor] = build_frames
     peaks: Callable[[], PeaksExtractor] = build_peaks
     face_tracker: Callable[[Settings], FaceTracker] = build_face_tracker
+    facecam_finder: Callable[[Settings], FacecamFinder] = build_facecam_finder
     review_files: Callable[[], ReviewFiles] = build_review_files
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer
     story_writer: Callable[[Settings], StoryWriter] = build_story_writer

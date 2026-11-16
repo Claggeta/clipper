@@ -9,6 +9,8 @@ from clipper.domain.models import (
     ClipInfo,
     ClipTitle,
     CropPath,
+    FacecamBox,
+    FacecamLayout,
     FaceTrack,
     HandCropPlan,
     LabeledVideo,
@@ -142,6 +144,10 @@ class ClipRenderer(Protocol):
     B-roll over stretches of the joined clip, and `frame` the source's
     width and height, for B-roll in a landscape clip. A source block needs
     the source's audio stream.
+
+    `facecam` is the facecam style instead of the fit or a crop: the cam box
+    over or under a centre crop of the gameplay (ADR 0025, facecam style
+    amendment); not with `crop`, `hand`, `zooms` or `sequence`.
     """
 
     def render(
@@ -160,6 +166,7 @@ class ClipRenderer(Protocol):
         sequence: tuple[RenderBlock, ...] = (),
         overlays: tuple[RenderOverlay, ...] = (),
         frame: tuple[int, int] | None = None,
+        facecam: FacecamLayout | None = None,
     ) -> RenderedClip: ...
 
     def join(
@@ -261,3 +268,16 @@ class FaceTracker(Protocol):
     def track(
         self, video_path: Path, start_seconds: float, end_seconds: float
     ) -> FaceTrack: ...
+
+
+@runtime_checkable
+class FacecamFinder(Protocol):
+    """Finds a streamer's fixed facecam box over one span of a video.
+
+    None when there is no box to find. Raises `FaceError` on failure (see
+    docs/decisions/0025, facecam style amendment).
+    """
+
+    def find(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FacecamBox | None: ...

@@ -157,6 +157,12 @@ burned-in subtitle lost both ends. Nothing had been released with it.
   ffmpeg run per clip, a box every crop path works in, and a risk of
   trimming a dark clip, for no current gain. No code.
 
+## Amended by the facecam style (V7 item 6b, ADR 0025)
+
+- A third vertical frame beside fit and face: a streamer's cam box over
+  (or under) a centre crop of the gameplay, stacked at 1080x1920 in the
+  same encode, before captions. See ADR 0025's facecam style amendment.
+
 ## Revisit when
 
 - A source the maintainer clips is letterboxed (the rule above is the

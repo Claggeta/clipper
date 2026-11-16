@@ -7,10 +7,17 @@ from clipper.core.framing import (
     hand_crop_plan,
     hand_left,
     plan_face_crop,
+    plan_facecam,
     window_width,
     with_hand_crops,
 )
-from clipper.domain.models import CropPath, FaceBox, FaceSample, FaceTrack
+from clipper.domain.models import (
+    CropPath,
+    FaceBox,
+    FacecamBox,
+    FaceSample,
+    FaceTrack,
+)
 
 # Constructed tracks on a 1920x1080 frame, 5 samples a second: the window is
 # 608 px wide. A face 96 px wide (0.05) is inside the window while its centre
@@ -160,3 +167,36 @@ def test_hand_crop_plan_moves_one_window_at_each_stretch() -> None:
     assert plan.path.points == ((0.0, 176), (4.0, 656))
     assert plan.ranges == ((1.0, 2.0), (4.0, 5.0))
     assert hand_crop_plan([], 1920, 1080) is None
+
+
+# The facecam style's frame (ADR 0025, facecam style amendment), on a
+# constructed box like a streamer's at the bottom right of a 1920x1080 frame.
+def test_plan_facecam_stacks_the_cam_over_a_centre_crop() -> None:
+    box = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+    layout = plan_facecam(box, W, H)
+    assert layout.cam == (1402, 616, 498, 312)
+    # 1080 * 312 / 498 = 676.6, down to even; the game fills the other 1244.
+    assert layout.cam_height == 676
+    assert layout.game == (492, 0, 936, 1080)
+    assert layout.position == "top"
+
+
+def test_plan_facecam_keeps_the_position() -> None:
+    box = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+    assert plan_facecam(box, W, H, "bottom").position == "bottom"
+
+
+def test_a_tall_cam_takes_at_most_half_the_frame() -> None:
+    layout = plan_facecam(FacecamBox(x=0.0, y=0.0, w=0.2, h=1.0), W, H)
+    assert layout.cam_height == 960
+    assert layout.game == (353, 0, 1214, 1080)
+
+
+def test_a_narrow_source_crops_the_game_by_height() -> None:
+    layout = plan_facecam(FacecamBox(x=0.1, y=0.1, w=0.8, h=0.3), 600, 1080)
+    _, gy, gw, gh = layout.game
+    assert gw == 600
+    assert gh < 1080 and gh % 2 == 0
+    assert gy == (1080 - gh) // 2
+    # The crop has the game area's shape, 1080 wide by the rest of 1920.
+    assert abs(gw / gh - 1080 / (1920 - layout.cam_height)) < 0.01

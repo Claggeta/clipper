@@ -99,20 +99,25 @@ class OpenCvFaceTracker:
         )
 
     def _detector(self) -> cv2.FaceDetectorYN:
-        if not self._model.is_file():
-            raise FaceError(f"Face model not found: {self._model}")
-        # OpenCV 5 warns on every load that its new engine ignores targets;
-        # only errors are worth showing.
-        cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
-        try:
-            return cv2.FaceDetectorYN.create(
-                str(self._model),
-                "",
-                (FRAME_WIDTH, FRAME_HEIGHT),
-                score_threshold=MIN_SCORE,
-            )
-        except cv2.error as exc:
-            raise FaceError(f"Cannot load face model {self._model}: {exc}") from exc
+        return load_face_model(self._model)
+
+
+def load_face_model(model: Path = MODEL_PATH) -> cv2.FaceDetectorYN:
+    """YuNet at 1280x720 and MIN_SCORE. Raises `FaceError` if it cannot load."""
+    if not model.is_file():
+        raise FaceError(f"Face model not found: {model}")
+    # OpenCV 5 warns on every load that its new engine ignores targets;
+    # only errors are worth showing.
+    cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
+    try:
+        return cv2.FaceDetectorYN.create(
+            str(model),
+            "",
+            (FRAME_WIDTH, FRAME_HEIGHT),
+            score_threshold=MIN_SCORE,
+        )
+    except cv2.error as exc:
+        raise FaceError(f"Cannot load face model {model}: {exc}") from exc
 
 
 def _boxes(found: object) -> tuple[FaceBox, ...]:

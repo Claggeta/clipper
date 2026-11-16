@@ -6,6 +6,7 @@ from clipper.domain.models import (
     AudioMix,
     ClipCandidate,
     CropPath,
+    FacecamLayout,
     HandCropPlan,
     RenderBlock,
     RenderedClip,
@@ -21,7 +22,8 @@ class FakeClipRenderer:
     each call in `captions`, its `vertical` flag in `vertical`, its crop
     path in `crops`, its cuts in `cuts`, its zooms in `zooms`, its hand
     crops in `hands`, its audio mix in `audio` and its sequence in
-    `sequences`, and its B-roll overlays in `overlays`. Candidates
+    `sequences`, its B-roll overlays in `overlays` and its facecam
+    layout in `facecams`. Candidates
     in `fail_on` raise ClipRenderError and write nothing.
     """
 
@@ -37,6 +39,7 @@ class FakeClipRenderer:
         self.audio: list[AudioMix | None] = []
         self.sequences: list[tuple[RenderBlock, ...]] = []
         self.overlays: list[tuple[RenderOverlay, ...]] = []
+        self.facecams: list[FacecamLayout | None] = []
         self.stills: list[tuple[float, Path, str | None, bool, CropPath | None]] = []
         self.fail_stills = False
         self.joins: list[
@@ -60,8 +63,10 @@ class FakeClipRenderer:
         sequence: tuple[RenderBlock, ...] = (),
         overlays: tuple[RenderOverlay, ...] = (),
         frame: tuple[int, int] | None = None,
+        facecam: FacecamLayout | None = None,
     ) -> RenderedClip:
         self.calls.append((video_path, candidate, output_path))
+        self.facecams.append(facecam)
         self.audio.append(audio)
         self.sequences.append(sequence)
         self.overlays.append(overlays)

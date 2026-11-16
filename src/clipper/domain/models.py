@@ -222,6 +222,48 @@ class CropPath(BaseModel):
         return self
 
 
+# Where the facecam style puts the cam, above or below the gameplay (ADR 0025,
+# facecam style amendment).
+CamPosition = Literal["top", "bottom"]
+
+
+class FacecamBox(BaseModel):
+    """A streamer's facecam box, fixed over one clip, as fractions of the frame.
+
+    `x` and `y` are the top-left corner. See docs/decisions/0025 (facecam
+    spike and facecam style amendments).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    w: float = Field(gt=0, le=1)
+    h: float = Field(gt=0, le=1)
+
+    @model_validator(mode="after")
+    def _inside_the_frame(self) -> "FacecamBox":
+        if self.x + self.w > 1 + 1e-9 or self.y + self.h > 1 + 1e-9:
+            raise ValueError("the box must lie inside the frame")
+        return self
+
+
+class FacecamLayout(BaseModel):
+    """The facecam style's 1080x1920 frame, in pixels.
+
+    `cam` and `game` are crops of the source as (x, y, width, height); the cam
+    is scaled to 1080 x `cam_height` and the game to the rest, stacked with
+    the cam at `position`. See docs/decisions/0025.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    cam: tuple[int, int, int, int]
+    game: tuple[int, int, int, int]
+    cam_height: int = Field(gt=0, lt=1920)
+    position: CamPosition = "top"
+
+
 class RenderedClip(BaseModel):
     """A clip candidate and the video file it was rendered to."""
 
@@ -320,7 +362,7 @@ class ClipTitle(BaseModel):
         return value
 
 
-VerticalStyleName = Literal["fit", "face"]
+VerticalStyleName = Literal["fit", "face", "facecam"]
 
 # Where an on-screen text sits (ADR 0030): below the area YouTube's own
 # interface covers, or the middle. Never the bottom, the captions' place.
@@ -763,6 +805,9 @@ class ClipVariant(BaseModel):
 
     style: VerticalStyleName
     file: str = Field(min_length=1)
+    # The facecam style's box and where the cam went (ADR 0025).
+    box: FacecamBox | None = None
+    cam: CamPosition | None = None
 
 
 class ManifestClip(BaseModel):

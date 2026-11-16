@@ -11,6 +11,7 @@ from clipper.domain.models import (
     ClipAudio,
     ClipCandidate,
     ClipVariant,
+    FacecamBox,
     HandCrop,
     ManifestClip,
     MusicBed,
@@ -549,6 +550,43 @@ def test_a_face_re_render_needs_the_tracker(tmp_path: Path) -> None:
     )
 
 
+def _facecam_env(tmp_path: Path) -> Env:
+    """A clip drafted in fit and facecam (ADR 0025, facecam style amendment)."""
+    box = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+    variants = (
+        ClipVariant(style="fit", file="talk_1.mp4"),
+        ClipVariant(style="facecam", file="talk_1.facecam.mp4", box=box, cam="top"),
+    )
+    clip = _clip(1, 10.0, 40.0, "talk_1.mp4").model_copy(update={"variants": variants})
+    env = Env(tmp_path, clip)
+    (env.folder / "talk_1.facecam.mp4").write_bytes(b"facecam")
+    return env
+
+
+def test_keeping_the_facecam_draft_keeps_its_box(tmp_path: Path) -> None:
+    env = _facecam_env(tmp_path)
+
+    result = env.store.save(1, SaveRequest(10.0, 40.0, None, None, "facecam"))
+
+    [variant] = result.clip.variants
+    assert (variant.style, variant.file, variant.cam) == (
+        "facecam",
+        "talk_1.facecam.mp4",
+        "top",
+    )
+    assert variant.box is not None
+    assert env.renderer.calls == []
+    assert not (env.folder / "talk_1.mp4").exists()
+
+
+def test_the_facecam_draft_is_not_re_rendered(tmp_path: Path) -> None:
+    env = _facecam_env(tmp_path)
+    with pytest.raises(JudgingError, match="facecam draft can be kept as it is"):
+        env.store.save(1, SaveRequest(9.0, 42.0, None, None, "facecam"))
+    assert not env.labels_path.exists()
+    assert env.renderer.calls == []
+
+
 def test_a_style_the_clip_lacks_is_refused(tmp_path: Path) -> None:
     env = Env(tmp_path)
     with pytest.raises(JudgingError, match="no face draft"):
@@ -561,7 +599,7 @@ def test_a_bad_style_in_the_body_is_refused(style: object) -> None:
     from clipper.review.store import BadRequest, parse_save
 
     body = {"start": 1.0, "end": 20.0, "style": style}
-    with pytest.raises(BadRequest, match="the style must be one of fit, face"):
+    with pytest.raises(BadRequest, match="the style must be one of fit, face, facecam"):
         parse_save(body, 100.0)
 
 
