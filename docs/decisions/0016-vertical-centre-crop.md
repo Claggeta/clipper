@@ -135,8 +135,32 @@ burned-in subtitle lost both ends. Nothing had been released with it.
 - Measured on v2924392099, 8 s rendered vertical: 2.4 s plain, 2.8 s with
   a smooth zoom and a hand crop. Manual step RV23.
 
+## Amended by the letterbox spike (V7 item 7c, not adopted)
+
+- Letterboxed sources keep their bars under `--vertical` (manual step
+  R15). The fix tried: ffmpeg's `cropdetect` (`limit=24:round=2`, 3 s at
+  each of 8 points spread over the video) to find the picture area, and
+  fit only that.
+- `test_input.mp4` (1280x720): bars of 86 px top and bottom on 6 of 8
+  samples, 88 px on a seventh; its near-black end card gave a false
+  466x98 box.
+- The maintainer's 30 VODs (all 1920x1080): no bars on any; the full
+  frame was the most common box on each, on 5 to 8 of 8 samples. Most
+  other samples trimmed 2 to 34 px from one edge, but dark scenes gave
+  three large false boxes: 1272 px and 1514x1032 wide on `BAN4ynLSknc`,
+  1566 px wide on `v2917438534`.
+- A rule that would keep the real bars and drop every false box above:
+  bars equal on both sides (top and bottom, or left and right, within
+  4 px) and more than a few pixels each, agreed by most samples over the
+  clip.
+- Not built: no source the maintainer clips has bars, and it would add an
+  ffmpeg run per clip, a box every crop path works in, and a risk of
+  trimming a dark clip, for no current gain. No code.
+
 ## Revisit when
 
+- A source the maintainer clips is letterboxed (the rule above is the
+  starting point).
 - Real clips lose their subject often enough to matter. That is the case for
   tracking, and its own ADR.
 - Upscaled 720p clips look visibly worse on a platform than native size.

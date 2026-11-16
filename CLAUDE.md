@@ -143,6 +143,9 @@ and planned code:
   0011. Zoom amendment (V7 9h): punch-ins over source-time stretches,
   1.1 to 2.0x, a centre, cut-in or smooth, by per-frame `scale` and a
   `crop` whose offsets are expressions of `t`; vertical only.
+  Letterbox spike amendment (V7 7c, not adopted): `cropdetect` found
+  `test_input.mp4`'s bars but none on 30 real VODs, with large false boxes
+  in dark scenes; a symmetric-bars rule is recorded for when one is.
 - `0017` — word timestamps (`Segment.words`, default empty) and styled ASS
   captions from one pure builder that replaces `build_srt`. The transcriber's
   name gains `+words`, so old cache entries are re-transcribed. Segments
@@ -1429,8 +1432,11 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      amendment, F4 and R14 updated)
    - 7b. ~~The repeated prefix in `render`'s malformed-JSON message.~~
      (done; as the labels and manifest loaders already did)
-   - 7c. Letterboxed sources under `--vertical`: fit only the picture area
-     (`cropdetect`, untried here). ADR 0016 amendment, manual step.
+   - 7c. ~~Letterboxed sources under `--vertical`: fit only the picture area
+     (`cropdetect`, untried here). ADR 0016 amendment, manual step.~~
+     (done; ended in nothing: bars found on `test_input.mp4`, none on 30
+     real VODs, large false boxes in dark scenes; ADR 0016 amendment; no
+     code)
    - 7d. ~~Docs and housekeeping: `docs/architecture.md` drift and code
      fences, mojibake in `docs/roadmap.md` and `docs/architecture.md`,
      duplicate `.gitignore` entries, the D9 and D10 pipe.~~ (done; no
@@ -1623,9 +1629,10 @@ Later, not scheduled:
   Not hit since `think: false` (ADR 0014).
 - Letterboxed sources keep their bars under `--vertical` (ADR 0016, manual
   step R15): `test_input.mp4` has black bars in its 1280x720 frame, and they
-  show inside the fitted picture and blurred in the fill. Fix: detect the
-  picture area first (ffmpeg's `cropdetect`, untried here) and fit only that.
-  An ADR 0016 amendment. Scheduled as V7 item 7c.
+  show inside the fitted picture and blurred in the fill. Spiked as V7 item
+  7c and not built: none of 30 real VODs has bars. Build it, with the
+  symmetric-bars rule in ADR 0016's letterbox amendment, when a source the
+  maintainer clips is letterboxed.
 - `llama3.1:8b` worded 2 of 6 reasons differently across two runs at
   temperature 0 and seed 0 (ADR 0015 "revisit when"). Not the default model.
 - Title quality after the prompt fix (#114, `qwen3.5:9b`): lengths are
