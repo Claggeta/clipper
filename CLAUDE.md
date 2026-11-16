@@ -1427,7 +1427,8 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 7a. ~~ffmpeg exit codes: signed `AVERROR` values, with short names for
      invalid data, no stream and permission denied.~~ (done; ADR 0004
      amendment, F4 and R14 updated)
-   - 7b. The repeated prefix in `render`'s malformed-JSON message.
+   - 7b. ~~The repeated prefix in `render`'s malformed-JSON message.~~
+     (done; as the labels and manifest loaders already did)
    - 7c. Letterboxed sources under `--vertical`: fit only the picture area
      (`cropdetect`, untried here). ADR 0016 amendment, manual step.
    - 7d. Docs and housekeeping: `docs/architecture.md` drift and code
@@ -1584,10 +1585,6 @@ Later, not scheduled:
 - Twitch clip labels for v2924046310 (`data/labels/v2924046310.json`) may
   be 64 s off, if Twitch counts that VOD from 0 and the download began
   64 s in (its file was later remuxed to start at 0); unverified.
-- The `render` message for a malformed analysis JSON repeats the prefix:
-  `Invalid JSON in analysis result <path>: Invalid JSON: ...`. The second
-  part is pydantic's own message (manual step R11). Drop one of the two.
-  Scheduled as V7 item 7b.
 - Docs drift in `docs/architecture.md`: omits `AudioExtractor` from core
   interfaces; says the CLI depends on core, but it imports adapters; promises
   CLI config flags that don't exist; says ffmpeg is checked at startup, when
