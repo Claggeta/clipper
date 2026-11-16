@@ -193,10 +193,8 @@ $Text -match 'configuration:|built with'
 
 Pass: exit 1. The first three matches are `True`. The last is `False` (no
 banner). The `[in#0 @ ...]` prefixes are visible, not swallowed as rich markup.
-
-Do not fail this step on the exit number. On Windows it shows as the unsigned
-`3199971767`. That is the known, parked issue in `CLAUDE.md` and the README's
-Known limitations.
+On Windows the message reads `ffmpeg failed (exit -1094995529, invalid
+data)`, not the unsigned `3199971767` (V7 item 7a).
 
 Fail: a message dominated by banner or stream metadata (the failure ADR 0004
 fixed), or a `MarkupError` traceback.
@@ -842,9 +840,9 @@ Pass:
   delete a folder, which must be logged and not raised, so the last command
   prints `True`.
 
-The exit number may show as an unsigned 32-bit value on Windows. That is the
-parked issue in `CLAUDE.md`. Do not fail the step on it. If ffmpeg unexpectedly
-succeeds here, record that and the contents of the folder.
+On Windows the exit reads `-13, permission denied`, not the unsigned
+`4294967283` (V7 item 7a). If ffmpeg unexpectedly succeeds here, record that
+and the contents of the folder.
 
 ### R15. `--vertical` fits the frame into 9:16 at 1080x1920
 

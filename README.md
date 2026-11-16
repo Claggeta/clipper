@@ -456,9 +456,6 @@ maintainer would not post.
   cluster low (above, 0.03 to 0.26) and the pace signal carries most of the
   weight. This is signal quality, not a bug, and it is the baseline future
   approaches are measured against.
-- **Windows ffmpeg exit codes.** When ffmpeg fails, its exit code is shown
-  as an unsigned 32-bit number on Windows, for example `exit 3199971767`
-  for invalid data. The error message itself is readable.
 - **Long videos are slow on CPU.** A 5:04:01 stream took 20:59 to analyse
   cold with the Whisper `base` model on CPU (one run, model already
   downloaded), against 14.3 s for the 5:14 video above. A rerun with the

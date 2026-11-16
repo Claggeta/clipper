@@ -83,6 +83,25 @@ def test_format_failure_with_empty_stderr() -> None:
     assert format_failure("tool", _completed(1, "  \n")) == "tool failed (exit 1): "
 
 
+@pytest.mark.parametrize(
+    ("code", "shown"),
+    [
+        (3199971767, "-1094995529, invalid data"),
+        (2913709064, "-1381258232, stream not found"),
+        (4294967283, "-13, permission denied"),
+        (4294967295, "-1"),
+        (-13, "-13"),
+        (1, "1"),
+    ],
+)
+def test_format_failure_signs_and_names_windows_exit_codes(
+    code: int, shown: str
+) -> None:
+    message = format_failure("ffmpeg", _completed(code, "cause"))
+
+    assert message == f"ffmpeg failed (exit {shown}): cause"
+
+
 def test_cwd_is_passed_to_the_child(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
