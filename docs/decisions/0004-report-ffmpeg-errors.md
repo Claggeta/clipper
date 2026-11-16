@@ -124,6 +124,17 @@ surfaced ffmpeg's stderr only to have the console mangle it.
   places that format ffmpeg output, so V2 item 2 extracts the shared function
   before either is written.
 
+## Amended by signed exit codes (V7 item 7a)
+
+- Windows reports ffmpeg's negative `AVERROR` exit codes as unsigned 32-bit
+  values (`3199971767`). `format_failure` shows a code of 2**31 or above as
+  its signed value, named for the codes this tool has met:
+  `exit -1094995529, invalid data`, `-1381258232, stream not found`,
+  `-13, permission denied`; any other as the bare signed number.
+- Codes below 2**31 are shown unchanged: on POSIX a negative code is a
+  signal (-13 is SIGPIPE), not an `AVERROR`.
+- The message is otherwise the same: `<tool> failed (exit N): <cause>`.
+
 ## Related
 
 - 0002: Use faster-whisper for transcription

@@ -47,6 +47,8 @@ and planned code:
   "adapter stays agnostic" clause is amended by 0005. The PATH check, the
   full-stderr INFO log and the 10-line failure message live in
   `adapters/media/_process.py`; new ffmpeg-family adapters reuse them.
+  Exit codes amendment (V7 7a): Windows' unsigned codes shown signed,
+  with names for invalid data, stream not found and permission denied.
 - `0005` — no-audio classification. The ffmpeg extractor matches
   `does not contain any stream` and raises `NoAudioStreamError`; anything else
   stays a generic `AudioExtractionError`. The command uses `-map 0:a:0?`, not
@@ -1422,8 +1424,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      cam's position, top or bottom, per clip (ADR 0024 amendment).
      Manual step.
 7. Small fixes from "Parked", each its own PR:
-   - 7a. ffmpeg exit codes: signed `AVERROR` values, with short names for
-     invalid data, no stream and permission denied.
+   - 7a. ~~ffmpeg exit codes: signed `AVERROR` values, with short names for
+     invalid data, no stream and permission denied.~~ (done; ADR 0004
+     amendment, F4 and R14 updated)
    - 7b. The repeated prefix in `render`'s malformed-JSON message.
    - 7c. Letterboxed sources under `--vertical`: fit only the picture area
      (`cropdetect`, untried here). ADR 0016 amendment, manual step.
@@ -1581,14 +1584,6 @@ Later, not scheduled:
 - Twitch clip labels for v2924046310 (`data/labels/v2924046310.json`) may
   be 64 s off, if Twitch counts that VOD from 0 and the download began
   64 s in (its file was later remuxed to start at 0); unverified.
-- ffmpeg's exit code prints as an unsigned 32-bit value on Windows, e.g.
-  `exit 3199971767` for invalid data. Fix: normalise negative `AVERROR`
-  values to signed form before display, and map the few codes this tool
-  actually produces (invalid data, no stream, permission denied) to a short
-  name, falling back to the bare signed number. `-1094995529` alone is no
-  friendlier than `3199971767`. Seen again in manual step R14: exit
-  `4294967283` is -13 (`EACCES`), cause "Permission denied". Scheduled as
-  V7 item 7a.
 - The `render` message for a malformed analysis JSON repeats the prefix:
   `Invalid JSON in analysis result <path>: Invalid JSON: ...`. The second
   part is pydantic's own message (manual step R11). Drop one of the two.
