@@ -689,6 +689,30 @@ trash reasons, the facecam style and the Parked fixes landed; the finer
 LLM score (item 5) and the letterbox fix (7c) ended in nothing. The
 assistant (9j) stays open, waiting on the maintainer's example requests.
 
+## V8 scope
+
+Input: the same sources and drafts folders as V7, the maintainer's
+judgments in `review` (now with trash reasons), and a set of edit
+requests written by the maintainer. Output: picks changed only where a
+measured signal helps, a review page that takes fewer clicks per clip,
+and maybe a local-LLM assistant that turns a typed request into the
+page's edits. Interface: changes to `review`, the detector if a signal
+is adopted, and small fixes from "Parked".
+
+Every picking change is measured as in V5 to V7: per VOD at top 10
+against the judged labels, keepers and rejects, keepers cut short and end
+gaps, unjudged drafts judged first, against the current default; and,
+once ratings are enough, `good` picks in the top few ranks.
+
+Non-goals for V8: the performance work (no Studio CSV export yet; ADRs
+0026 and 0027 still stand), posting or uploads, the YouTube or Twitch
+APIs, hosted or paid models, speaker detection, the movies/TV niche, a
+URL box in the review page, channel watching or scheduling, a database,
+user accounts, a JavaScript framework or build step for the page, and
+any dependency that fails ADR 0003's check (frame embeddings only after
+cheap signals show something, and only without PyTorch if it can be
+avoided).
+
 ## Maintainer's goals
 
 As stated: a personal tool, used daily and eventually mostly unattended, that
@@ -783,6 +807,16 @@ From the item 5 judging on 2026-11-14:
   earlier "postable" bar, `good` for what would be posted now, `ok` for
   the rest. Picking measures should come to count `good` picks in the
   top few ranks, once ratings are enough.
+
+From the V8 questions on 2026-11-16:
+
+- V8 is about the review assistant (9j) and better picks. No Studio CSV
+  export yet, so the performance work stays out.
+- What slows daily use most: judging picks (too many to trash) and
+  editing in review, which takes too many clicks and feels clunky.
+- The small Parked fixes ride along, each its own PR.
+- The judged labels then: 196 labels (13 rated `good`) and 168 rejected
+  spans on 24 VODs, no trash reasons yet (V7 2a had just landed).
 
 ## Current state
 
@@ -1533,8 +1567,7 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9j. Assistant: a spike first on requests the maintainer writes (the
      local LLM turning them into the page's edits), then an Assist tab
      if it is right often enough. ADR 0014 and 0031 amendments. May end
-     in nothing. (Open after `v0.7.0`: waits on the maintainer's 15 to
-     20 example requests.)
+     in nothing. (Moved to V8 item 2.)
    - 9k. Combine, first called Summarize (added 2026-11-13, the
      maintainer's choice; renamed the same day): a button in `review`
      that joins a VOD's kept clips, as edited, in VOD order into one
@@ -1601,6 +1634,48 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      - 9n-5. ~~"This block only" zooms, hand crops and sound effects in
        the Frame and Audio tabs (the core takes them since 9n-2).~~
        (done; manual step RV30)
+
+## V8 list
+
+Each item is one PR, and each code item states its design and waits for
+confirmation first.
+
+1. ADRs and scope (one docs PR): the V8 scope, goals and list. ADRs come
+   with each item as amendments.
+2. The review assistant (was V7 9j): a spike first on 15 to 20 requests
+   the maintainer writes (clip, request, what counts as right; spread
+   over trims, cuts, captions, text, zoom and framing, audio, several
+   edits at once, and a request the page cannot do), the local LLM
+   turning each into the page's edits, scored against the maintainer's
+   answers; then an Assist tab if it is right often enough. ADR 0014
+   and 0031 amendments. May end in nothing. Waits on the requests.
+3. Better picks, in steps, each may end in nothing:
+   - 3a. Not code: after a week or two of judging, the trash reasons
+     counted per VOD (`nothing_happening`, `needs_context`,
+     `seen_not_said`, `bad_cut`, `other`); the counts choose 3b or 3c
+     first, or a boundary change for bad cuts.
+   - 3b. Visual spike: cheap per-second signals from ffmpeg (scene
+     changes, motion) against keepers, rejected spans and random spans,
+     as the loudness spike; frame embeddings only if those show
+     something, after ADR 0003's check. Ends in an ADR or in nothing.
+   - 3c. Rerun the ranker spike (ADR 0026): rejected spans have nearly
+     doubled since V6 item 5 (90 to 168), labels 144 to 196.
+4. Fewer clicks in `review`, in PRs, each with a manual step:
+   - 4a. Not code: a click audit in headless Edge of a typical clip
+     (trim, a caption fix, a title text, a rating, Save), counting clicks,
+     keys, tab switches and scrolls per step, written up with the worst
+     five and a proposed fix for each; the maintainer picks which to
+     build. ADR 0031 amendments with each fix.
+5. Small fixes from "Parked", each its own PR:
+   - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
+     amendment).
+   - 5b. A check, before cutting, that ffmpeg has the `subtitles` filter
+     when captions are on (ADR 0010 and 0011 amendments).
+   - 5c. `OllamaClient` reads `done_reason` and says a reply was cut off
+     at the length limit (ADR 0014).
+   - 5d. `eval`'s closing note worded by where the labels came from
+     (ADR 0012).
+6. Release notes and tag `v0.8.0`.
 
 Later, not scheduled:
 
