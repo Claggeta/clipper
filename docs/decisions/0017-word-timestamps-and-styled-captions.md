@@ -213,6 +213,14 @@ as expected after the re-split.
   word and a pink key word burned into the re-rendered draft. Manual
   step RV21.
 
+## Amended by the facecam style's captions (V7 item 6c, ADR 0025)
+
+- `build_ass` takes `caption_margin_v`, an optional distance of the
+  captions from the canvas's bottom in place of the layout's (420 on the
+  vertical frame). The facecam style passes the cam's height plus 60 when
+  the cam is at the bottom, so captions sit above it. Nothing else
+  changes.
+
 ## Revisit when
 
 - Word times are visibly off on real clips. Then compare a larger Whisper

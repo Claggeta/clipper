@@ -1449,15 +1449,14 @@ Pass:
    at its own shape, not stretched, with no gameplay inside it; the
    gameplay fills the rest; captions sit on the gameplay. The manifest's
    variants have `"style": "facecam"`, a `box` and `"cam": "top"`.
-2. The second puts the cam at the bottom (`"cam": "bottom"`); its
-   captions cover the cam (known, ADR 0025).
+2. The second puts the cam at the bottom (`"cam": "bottom"`), with the
+   captions just above it (6c).
 3. The IRL run notes `has no facecam box; rendered in fit` and writes a
    plain fit file.
 4. The fourth exits 1 with `Error: --cam is for --style facecam`.
 5. In `clipper review` on the first folder: the facecam draft plays;
-   Save without moving the span keeps it (the manifest keeps its `box`);
-   moving a handle and saving is refused with "The facecam draft can be
-   kept as it is, not re-rendered".
+   Save without moving the span keeps it (the manifest keeps its `box`).
+   Re-rendering in facecam is RV32.
 
 Run 2026-11-16 by the assistant: steps 1 to 3 as above on two
 `DQP3pmyJX4o` clips and one `3Sbj_BZORr4` clip, frames checked by eye; a
@@ -3662,6 +3661,31 @@ Save/Trash".
 
 Run 2026-11-15 in headless Edge over CDP: steps 1 to 5 as above, the
 labels file checked after each trash. Step 6 not run.
+
+### RV32. Facecam in the review page
+
+Covers the facecam style in `review` ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md),
+review page amendment, V7 item 6c). Use a scratch drafts folder made with
+`--style fit --style facecam` from a gaming VOD with a bordered cam (R23)
+and a scratch `CLIPPER_LABELS_DIR`; untick "Move on after Save/Trash".
+
+1. Choose a clip and open the Frame tab. Pass: Fit and Facecam buttons;
+   no cam toggle while Fit is picked.
+2. Press Facecam. Pass: "Cam on top" (pressed) and "Cam at the bottom"
+   show; Add zoom and Crop by hand are off, with "The facecam style has no
+   zooms or hand crops". The Preview view draws the cam across the top and
+   the gameplay below, as the draft.
+3. Press "Cam at the bottom". Pass: the preview swaps them and draws the
+   captions above the cam; Save is marked unsaved.
+4. Save. Pass: "Saved as post, Facecam kept; re-rendered."; the labels
+   file has `"style": "facecam"` and `"cam": "bottom"`; the new file has
+   the cam at the bottom and captions above it.
+5. On another clip pick Facecam, move the start a few seconds and Save.
+   Pass: "Saved as fix, Facecam kept; re-rendered." and a facecam file
+   for the new span.
+
+Run 2026-11-16 in headless Edge over CDP on a `DQP3pmyJX4o` folder:
+steps 1 to 5 as above, frames of the re-rendered files checked by eye.
 
 ## Record your run
 

@@ -507,6 +507,13 @@ RV26.
   judgment carries it, and the "Trashed" notice names it.
 - Manual step RV31.
 
+## Amended by facecam in the page (ADR 0025, V7 item 6c)
+
+- The style switch takes Facecam, with a cam toggle (top or bottom) while
+  it is picked; Save sends `cam`, recorded on the label and manifest; a
+  facecam re-render finds the box again over the new span, else keeps the
+  draft's. `review` composes the facecam finder. Manual step RV32.
+
 ## Related
 
 - 0011: render's failure policy

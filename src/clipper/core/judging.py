@@ -120,6 +120,7 @@ def save_judgment(
     audio: ClipAudio | None = None,
     sequence: tuple[SequenceBlock, ...] = (),
     broll: tuple[BrollOverlay, ...] = (),
+    cam: str | None = None,
 ) -> LabeledVideo:
     """The labels with `clip` saved as `post` (span unchanged) or `fix`, or
     as `added` for a clip added in the page, whatever its span. `style` is the
@@ -129,8 +130,8 @@ def save_judgment(
     0030), `caption_edits` its caption fixes (ADR 0017), and `zooms` and
     `hand_crops` its punch-ins and hand windows (ADR 0016, 0025), and
     `audio` its volume, music and effects (ADR 0007), and `sequence` its
-    blocks and `broll` its B-roll overlays (ADR 0034), none of which
-    changes the verdict.
+    blocks and `broll` its B-roll overlays (ADR 0034), and `cam` where the
+    facecam style's cam went (ADR 0025), none of which changes the verdict.
 
     Replaces the clip's earlier label or rejected span. Raises `JudgingError`
     if the span overlaps another label by the hit rule (half the shorter
@@ -149,6 +150,8 @@ def save_judgment(
     fields: dict[str, object] = {**_times(start, end), "note": note}
     if style is not None:
         fields["style"] = style
+    if cam is not None:
+        fields["cam"] = cam
     if rating is not None:
         fields["rating"] = rating
     if people:

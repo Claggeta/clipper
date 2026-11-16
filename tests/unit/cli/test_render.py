@@ -979,3 +979,24 @@ def test_the_facecam_style_needs_the_frame_size(env: Env) -> None:
         env.run("--vertical", "--style", "facecam"), "Cannot tell the frame size"
     )
     assert finder.spans == []
+
+
+def test_captions_sit_above_a_cam_at_the_bottom(env: Env) -> None:
+    _use_facecam(env, FakeFacecamFinder())
+    env.save(transcript=_SPEECH)
+    result = env.run(
+        "--vertical",
+        "--style",
+        "facecam",
+        "--cam",
+        "bottom",
+        "--captions",
+        "--rank",
+        "1",
+    )
+    assert result.exit_code == 0, result.output
+    [layout] = env.renderer.facecams
+    [ass] = env.renderer.captions
+    assert layout is not None and ass is not None
+    # CAPTION_GAP above the cam, in place of the layout's 420 (ADR 0025).
+    assert f",60,60,{layout.cam_height + 60},1" in ass

@@ -405,6 +405,7 @@ def build_ass(
     texts: tuple[OnScreenText, ...] = (),
     edits: CaptionEdits | None = None,
     sequence: tuple[Cut | float, ...] = (),
+    caption_margin_v: int | None = None,
 ) -> Captions:
     """Build styled ASS captions for the part of `transcript` inside the clip.
 
@@ -437,6 +438,10 @@ def build_ass(
     bare number is a block of that many seconds with no speech, a B-roll
     insert (B-roll amendment).
 
+    `caption_margin_v` raises the captions to that many canvas pixels above
+    the bottom, in place of the layout's; the facecam style lifts them over
+    a cam at the bottom (ADR 0025, facecam style amendment).
+
     The text is "" when no event remains. The caller decides what that means.
     """
     highlight = _colour_tag(edits.highlight) if edits else _HIGHLIGHT
@@ -451,6 +456,8 @@ def build_ass(
     speech = bool(events)
     text_layout = _VERTICAL_TEXT if vertical else _SOURCE_TEXT
     layout = _VERTICAL if vertical else _SOURCE
+    if caption_margin_v is not None:
+        layout = layout._replace(margin_v=caption_margin_v)
     pairs = [
         (t, e) for t in texts if (e := _text_event(t, text_layout, layout, length))
     ]

@@ -211,6 +211,49 @@ function drawFit(context, width, height, media = player, size = null) {
   context.drawImage(media, (width - w) / 2, (height - h) / 2, w, h);
 }
 
+// The facecam frame for the cam picked, in the probed frame's pixels, or
+// null when the style is not facecam (ADR 0025, facecam style amendment).
+function facecamFrame(clip) {
+  const drafted = isVertical && chosenStyle(clip) === "facecam" ? facecamDraft(clip) : null;
+  if (!drafted || !drafted.layouts) {
+    return null;
+  }
+  const cam = camOf(clip);
+  return { ...drafted.layouts[cam], frame: drafted.frame, position: cam };
+}
+
+// The cam box across the width at its own shape, over (or under) a centre
+// crop of the gameplay, as the renderer stacks them.
+function drawFacecam(context, width, height, frame) {
+  const scale = player.videoWidth / frame.frame[0];
+  const camHeight = (frame.cam_height / 1920) * height;
+  const top = frame.position === "top";
+  const [cx, cy, cw, ch] = frame.cam;
+  const [gx, gy, gw, gh] = frame.game;
+  context.drawImage(
+    player,
+    cx * scale,
+    cy * scale,
+    cw * scale,
+    ch * scale,
+    0,
+    top ? 0 : height - camHeight,
+    width,
+    camHeight,
+  );
+  context.drawImage(
+    player,
+    gx * scale,
+    gy * scale,
+    gw * scale,
+    gh * scale,
+    0,
+    top ? camHeight : 0,
+    width,
+    height - camHeight,
+  );
+}
+
 function cropLeft(seconds) {
   const at = seconds - span.start;
   let left = crop.points[0][1];
@@ -327,7 +370,10 @@ function drawCaptions(context, width, height, seconds) {
   }));
   const lines = balancedWrap(context, words, width - previewLayout.caption_margin_h * 2 * scale);
   const space = context.measureText(" ").width;
-  let baseline = height - previewLayout.caption_margin_v * scale - (lines.length - 1) * size;
+  // Over a cam at the bottom, captions sit above it (ADR 0025).
+  const facecam = facecamFrame(current);
+  const marginV = (facecam && facecam.caption_margin_v) || previewLayout.caption_margin_v;
+  let baseline = height - marginV * scale - (lines.length - 1) * size;
   for (const line of lines) {
     const lineWidth = context.measureText(line.map((w) => w.text).join(" ")).width;
     let x = (width - lineWidth) / 2;
@@ -426,6 +472,8 @@ function drawPreview() {
     if (shown) {
       drawFit(context, width, height, shown.media, [shown.width, shown.height]);
     }
+  } else if (player.videoWidth && facecamFrame(current)) {
+    drawFacecam(context, width, height, facecamFrame(current));
   } else if (player.videoWidth) {
     // A zoom scales the frame around its centre, as the renderer does:
     // scaled by Z, then cropped at (Z - 1) times its centre (ADR 0016).

@@ -45,7 +45,11 @@ from clipper.core.captions import build_ass, clip_text
 from clipper.core.channels import ABOUT_LIMIT, channel_about
 from clipper.core.config import Settings
 from clipper.core.evaluation import boundary_gaps, evaluate
-from clipper.core.framing import plan_face_crop, plan_facecam
+from clipper.core.framing import (
+    facecam_caption_margin,
+    plan_face_crop,
+    plan_facecam,
+)
 from clipper.core.interfaces import StoryWriter, TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
@@ -835,12 +839,26 @@ def _cut_clips(
         error = ""
         for style in wanted:
             name = variant_file_name(path.name, (style or VerticalStyle.FIT).value)
+            style_ass = ass
+            margin = (
+                facecam_caption_margin(layout)
+                if layout is not None and style is VerticalStyle.FACECAM
+                else None
+            )
+            if ass and margin is not None:
+                # Over a cam at the bottom, captions sit above it (ADR 0025).
+                style_ass = build_ass(
+                    result.transcript,
+                    candidate,
+                    vertical=vertical,
+                    caption_margin_v=margin,
+                ).text
             try:
                 clip = renderer.render(
                     video,
                     candidate,
                     path.with_name(name),
-                    captions=ass or None,
+                    captions=style_ass or None,
                     vertical=vertical,
                     crop=crop if style is VerticalStyle.FACE else None,
                     facecam=layout if style is VerticalStyle.FACECAM else None,
@@ -1345,6 +1363,7 @@ def review(
             renderer=build.renderer(settings),
             transcript=transcript,
             face_tracker=build.face_tracker(settings),
+            facecam_finder=build.facecam_finder(settings),
             frame_size=(info.width, info.height)
             if info.width is not None and info.height is not None
             else None,

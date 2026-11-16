@@ -71,6 +71,7 @@ const buttons = new Map(); // key -> the clip's button in the list
 const clipsByKey = new Map(); // key -> the clip, for moving between clips
 const edits = new Map(); // key -> {start, end}, kept while the page is open
 const chosen = new Map(); // key -> the style picked and not yet saved
+const chosenCams = new Map(); // key -> the facecam cam picked, "top" or "bottom"
 const versions = new Map(); // key -> bumped after a Save, so the draft reloads
 const marks = new Map(); // key -> the rating and people set, not yet saved
 // key -> [{start, end, on, manual}], the cuts shown (ADR 0029)
@@ -660,6 +661,7 @@ function drawUnsaved() {
     mark.rating !== savedMark.rating ||
     chosenPeople(current).join(",") !== savedMark.people.join(",") ||
     chosenStyle(current) !== (current.style || null) ||
+    camChanged(current) ||
     !sameTime(span.start, saved.start) ||
     !sameTime(span.end, saved.end) ||
     !sameCuts(sentShape(current).cuts, savedCuts(current)) ||
@@ -789,7 +791,8 @@ for (const button of ratingBox.querySelectorAll("button")) {
 
 // --- The rendered draft and its styles (ADR 0025) ---
 
-const STYLE_NAMES = { fit: "Fit", face: "Face" };
+const STYLE_NAMES = { fit: "Fit", face: "Face", facecam: "Facecam" };
+const camBox = document.getElementById("cams");
 
 // The rendered files to show: each style, or the one file of a clip without
 // styles, or none (a new, failed or trashed clip).
@@ -803,6 +806,44 @@ function draftsOf(clip) {
 // The style Save keeps: the one picked, else the clip's own.
 function chosenStyle(clip) {
   return chosen.has(clip.key) ? chosen.get(clip.key) : (clip.style || null);
+}
+
+// The clip's facecam draft, with its box's frame for either cam (ADR 0025).
+function facecamDraft(clip) {
+  return (clip.variants || []).find((variant) => variant.style === "facecam") || null;
+}
+
+// Where the facecam style puts the cam: the one picked, else the draft's.
+function camOf(clip) {
+  const drafted = facecamDraft(clip);
+  return chosenCams.get(clip.key) || (drafted && drafted.cam) || "top";
+}
+
+// Whether the cam picked differs from the facecam draft's, which re-renders.
+function camChanged(clip) {
+  const drafted = facecamDraft(clip);
+  return chosenStyle(clip) === "facecam" && camOf(clip) !== ((drafted && drafted.cam) || "top");
+}
+
+// Top or bottom, while the facecam style is picked.
+function drawCams(clip) {
+  camBox.replaceChildren();
+  camBox.hidden = chosenStyle(clip) !== "facecam" || !facecamDraft(clip);
+  if (camBox.hidden) {
+    return;
+  }
+  for (const [cam, label] of [["top", "Cam on top"], ["bottom", "Cam at the bottom"]]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.setAttribute("aria-pressed", String(camOf(clip) === cam));
+    button.addEventListener("click", () => {
+      chosenCams.set(clip.key, cam);
+      drawCams(clip);
+      drawUnsaved();
+    });
+    camBox.append(button);
+  }
 }
 
 function drawDraft(clip) {
@@ -829,11 +870,13 @@ function drawDraft(clip) {
       button.addEventListener("click", () => {
         chosen.set(clip.key, option.style);
         drawDraft(clip);
+        drawFrameEditor(clip);
         drawUnsaved();
       });
       styleBox.append(button);
     }
   }
+  drawCams(clip);
   const src = `/clips/${encodeURIComponent(shown.file)}?v=${versions.get(clip.key) || 0}`;
   if (draft.getAttribute("src") !== src) {
     draft.setAttribute("src", src);
@@ -1223,6 +1266,7 @@ function drawJudged(clip) {
 function rendersOnSave(clip) {
   return (
     !clip.file ||
+    camChanged(clip) ||
     !sameTime(span.start, clip.start) ||
     !sameTime(span.end, clip.end) ||
     !sameCuts(sentShape(clip).cuts, clip.cuts || []) ||
@@ -1265,6 +1309,7 @@ async function post(path, body) {
 function judged(clip, reply) {
   Object.assign(clip, reply);
   chosen.delete(clip.key);
+  chosenCams.delete(clip.key);
   marks.delete(clip.key);
   textEdits.delete(clip.key);
   captionEdits.delete(clip.key);
@@ -1305,6 +1350,7 @@ saveButton.addEventListener("click", async () => {
       title: titleBox.value,
       note: noteBox.value,
       style: chosenStyle(clip),
+      cam: chosenStyle(clip) === "facecam" ? camOf(clip) : null,
       rating: marksOf(clip).rating,
       people: chosenPeople(clip),
       ...sentShape(clip),

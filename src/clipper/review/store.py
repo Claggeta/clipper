@@ -22,13 +22,16 @@ from clipper.core.captions import build_ass, clip_text
 from clipper.core.cuts import Cut, TimeMap, check_cuts, cut_crop
 from clipper.core.framing import (
     HandWindow,
+    facecam_caption_margin,
     hand_crop_plan,
     plan_face_crop,
+    plan_facecam,
     window_width,
     with_hand_crops,
 )
 from clipper.core.interfaces import (
     ClipRenderer,
+    FacecamFinder,
     FaceTracker,
     MediaProbe,
     ReviewFiles,
@@ -59,6 +62,8 @@ from clipper.domain.models import (
     Combined,
     CombinedPart,
     CropPath,
+    FacecamBox,
+    FacecamLayout,
     HandCrop,
     HandCropPlan,
     LabeledVideo,
@@ -87,6 +92,8 @@ logger = logging.getLogger(__name__)
 MAX_TITLE = 200
 # The styles a Save may keep (ADR 0025).
 STYLES = ("fit", "face", "facecam")
+# Where the facecam style's cam goes (ADR 0025, facecam style amendment).
+CAMS = ("top", "bottom")
 # A keeper's rating: worth posting, or for the backlog (ADR 0024).
 RATINGS = ("good", "ok")
 # The reason listed for a clip added in the page (ADR 0019, 3e amendment).
@@ -149,6 +156,8 @@ class SaveRequest:
     sequence: tuple[SequenceBlock, ...] = ()
     # B-roll over stretches of the finished clip (ADR 0034).
     broll: tuple[BrollOverlay, ...] = ()
+    # Where the facecam style puts the cam; None keeps the draft's (ADR 0025).
+    cam: str | None = None
 
 
 def _text(data: dict[str, object], key: str) -> str | None:
@@ -212,6 +221,9 @@ def parse_save(
     style = data.get("style")
     if style is not None and style not in STYLES:
         raise BadRequest(f"the style must be one of {', '.join(STYLES)}")
+    cam = data.get("cam")
+    if cam is not None and cam not in CAMS:
+        raise BadRequest(f"the cam must be one of {', '.join(CAMS)}")
     rating = data.get("rating")
     if rating is not None and rating not in RATINGS:
         raise BadRequest(f"the rating must be one of {', '.join(RATINGS)}")
@@ -258,6 +270,7 @@ def parse_save(
         parse_audio(data.get("audio"), low, high),
         sequence,
         _overlays(data.get("broll", [])),
+        cam,
     )
 
 
@@ -722,6 +735,8 @@ class RenderInputs:
     # (ADR 0034, B-roll amendment).
     broll_dir: Path | None = None
     probe: MediaProbe | None = None
+    # Finds the cam box for a facecam re-render (ADR 0025).
+    facecam_finder: FacecamFinder | None = None
 
 
 class ReviewStore:
@@ -852,13 +867,20 @@ class ReviewStore:
             reasons=clip.reasons,
         )
         style = self._style(clip, request.style)
-        if style == "facecam" and needs_render:
-            # The page cannot re-render the facecam style yet (V7 6c); it
-            # keeps the drafted file only (ADR 0025, facecam style).
-            raise JudgingError(
-                "The facecam draft can be kept as it is, not re-rendered; "
-                "pick fit or face to change this clip"
-            )
+        cam = None
+        if style == "facecam":
+            # The facecam frame has no zooms, hand crops, sequence or B-roll
+            # (ADR 0025, facecam style amendment); a new cam re-renders.
+            if request.zooms or request.hand_crops or request.sequence:
+                raise JudgingError(
+                    "The facecam style has no zooms, hand crops or sequence; "
+                    "pick fit or face for those"
+                )
+            if request.broll:
+                raise JudgingError("The facecam style has no B-roll overlays")
+            drafted = _facecam_variant(clip)
+            cam = request.cam or (drafted.cam if drafted else None) or "top"
+            needs_render = needs_render or (drafted is not None and drafted.cam != cam)
         name = clip_file_name(self._render.video, candidate)
         if style is not None:
             name = variant_file_name(name, style)
@@ -882,6 +904,7 @@ class ReviewStore:
             request.audio,
             request.sequence,
             request.broll,
+            cam,
         )
         self._files.save_labels(labels, self._labels_path)
         self.labels = labels
@@ -908,6 +931,7 @@ class ReviewStore:
                     request.audio,
                     request.sequence,
                     request.broll,
+                    cam,
                 )
             except ClipperError as exc:
                 render_error = str(exc)
@@ -915,7 +939,8 @@ class ReviewStore:
                     changes["error"] = render_error
             else:
                 warning = self._delete_others(clip, name, "Re-rendered")
-                changes["variants"] = _kept(style, name)
+                box = changes.pop("facecam_box", None)
+                changes["variants"] = _kept(style, name, box, cam)
         elif style is not None:
             # The same span in the kept style: the other styles go (ADR 0025).
             # The variant is kept whole, so a facecam box and cam stay.
@@ -1035,6 +1060,7 @@ class ReviewStore:
         audio: ClipAudio | None = None,
         sequence: tuple[SequenceBlock, ...] = (),
         broll: tuple[BrollOverlay, ...] = (),
+        cam: str | None = None,
     ) -> dict[str, object]:
         """Render to a temporary file, then rename it into place.
 
@@ -1045,7 +1071,9 @@ class ReviewStore:
         B-roll overlays, the clip renders as blocks, each framed on its own,
         and every source-time edit is placed at each block it falls in (ADR
         0034); a clip with overlays and no sequence is its span less its
-        cuts as blocks.
+        cuts as blocks. The facecam style finds its box again over the new
+        span, else keeps the draft's, and the box goes back as `facecam_box`
+        (ADR 0025).
         """
         manifest = self.manifest
         time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
@@ -1082,6 +1110,12 @@ class ReviewStore:
                 crop = with_hand_crops(crop, hands, size[0])
             elif size is not None:
                 hand = hand_crop_plan(hands, *size)
+        box: FacecamBox | None = None
+        layout: FacecamLayout | None = None
+        if style == "facecam":
+            box = self._facecam_box(clip, candidate)
+            assert size is not None
+            layout = plan_facecam(box, *size, "bottom" if cam == "bottom" else "top")
         ass = ""
         burned: str | None = None
         captioned = manifest.captions and self._render.transcript is not None
@@ -1096,6 +1130,7 @@ class ReviewStore:
                 texts=texts,
                 edits=caption_edits,
                 sequence=blocks.captioned if blocks is not None else (),
+                caption_margin_v=facecam_caption_margin(layout) if layout else None,
             )
             ass = built.text
             if built.speech:
@@ -1117,6 +1152,7 @@ class ReviewStore:
                 sequence=render_blocks,
                 overlays=tuple(self._overlay(o) for o in broll),
                 frame=size,
+                facecam=layout,
             )
             try:
                 os.replace(temp, target)
@@ -1140,7 +1176,23 @@ class ReviewStore:
             "audio": audio,
             "sequence": sequence,
             "broll": broll,
+            **({"facecam_box": box} if box is not None else {}),
         }
+
+    def _facecam_box(self, clip: ManifestClip, candidate: ClipCandidate) -> FacecamBox:
+        """The cam box over the span: found again, else the draft's (ADR 0025)."""
+        finder, size = self._render.facecam_finder, self._render.frame_size
+        if finder is None or size is None:
+            raise ReviewError("A facecam re-render needs the finder and frame size")
+        box = finder.find(
+            self._render.video, candidate.start_seconds, candidate.end_seconds
+        )
+        drafted = _facecam_variant(clip)
+        if box is None and drafted is not None:
+            box = drafted.box
+        if box is None:
+            raise ReviewError("No facecam box in this span; pick fit or face")
+        return box
 
     def _render_blocks(
         self, blocks: BlockMap, style: str | None, hand_crops: tuple[HandCrop, ...]
@@ -1912,8 +1964,22 @@ def _same_cuts(a: tuple[Cut, ...], b: tuple[Cut, ...]) -> bool:
     return len(a) == len(b) and all(same_span(x, y) for x, y in zip(a, b, strict=True))
 
 
-def _kept(style: str | None, file: str) -> tuple[ClipVariant, ...]:
-    """A saved clip's variants: the one style kept, or none (ADR 0025)."""
+def _kept(
+    style: str | None,
+    file: str,
+    box: object = None,
+    cam: str | None = None,
+) -> tuple[ClipVariant, ...]:
+    """A saved clip's variants: the one style kept, or none; a facecam one
+    keeps its box and cam (ADR 0025)."""
     if style is None:
         return ()
-    return (ClipVariant.model_validate({"style": style, "file": file}),)
+    fields: dict[str, object] = {"style": style, "file": file}
+    if style == "facecam":
+        fields |= {"box": box, "cam": cam}
+    return (ClipVariant.model_validate(fields),)
+
+
+def _facecam_variant(clip: ManifestClip) -> ClipVariant | None:
+    """The clip's facecam draft, if it has one (ADR 0025)."""
+    return next((v for v in clip.variants if v.style == "facecam"), None)

@@ -887,6 +887,31 @@ def test_the_payload_lists_each_clips_styles(tmp_path: Path) -> None:
     assert (plain["style"], plain["variants"]) == (None, [])
 
 
+def test_a_facecam_style_carries_its_frame_for_either_cam(tmp_path: Path) -> None:
+    import dataclasses
+
+    from clipper.domain.models import ClipVariant, FacecamBox
+    from clipper.review.server import clip_payload
+
+    session = dataclasses.replace(_session(tmp_path), frame_size=(1920, 1080))
+    store = make_store(session)
+    box = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+    variant = ClipVariant(style="facecam", file="talk_1.facecam.mp4", box=box)
+    clip = MANIFEST.clips[0].model_copy(update={"variants": (variant,)})
+    variants = clip_payload(session, store, clip)["variants"]
+    assert isinstance(variants, list)
+    [shown] = variants
+    assert (shown["cam"], shown["frame"]) == ("top", [1920, 1080])
+    top, bottom = shown["layouts"]["top"], shown["layouts"]["bottom"]
+    assert top == {
+        "cam": [1402, 616, 498, 312],
+        "game": [492, 0, 936, 1080],
+        "cam_height": 676,
+        "caption_margin_v": None,
+    }
+    assert bottom["caption_margin_v"] == 676 + 60
+
+
 def test_the_page_scripts_declare_each_function_once() -> None:
     # A second `function drawMarks` silently replaced the strip's, so the
     # handles stopped drawing (V6 4a); JavaScript does not complain. The
