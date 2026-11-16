@@ -4,6 +4,8 @@ Pure functions over manifests, judged labels and the posts record; reading
 and writing them is the caller's. See docs/decisions/0028.
 """
 
+import re
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -24,6 +26,11 @@ from clipper.domain.models import (
 
 # Every caption ends with this, after the campaigns' hashtags.
 SHORTS_TAG = "#Shorts"
+# Queued clips get a copy named after their title here, under the clips dir,
+# to upload; at most this many characters before the extension (ADR 0028,
+# upload names amendment).
+UPLOAD_FOLDER = "upload"
+MAX_UPLOAD_NAME = 80
 
 
 def parse_campaigns(text: str) -> tuple[Campaign, ...]:
@@ -376,17 +383,60 @@ def record_post(posts: PostLog, record: PostRecord) -> tuple[PostLog, bool]:
     return PostLog(posts=(*kept, record)), replaced
 
 
-def queue_markdown(scheduled: Sequence[tuple[date, QueueItem]], clips_dir: Path) -> str:
+def upload_stem(title: str | None, fallback: str) -> str:
+    """A title as a file name to upload under: lowercase ASCII words joined
+    by hyphens, apostrophes and emoji dropped, cut at a word to
+    `MAX_UPLOAD_NAME`; `fallback` when nothing is left."""
+    text = unicodedata.normalize("NFKD", title or "")
+    text = text.encode("ascii", "ignore").decode("ascii").casefold()
+    text = re.sub(r"['`]", "", text)
+    stem = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    if len(stem) > MAX_UPLOAD_NAME:
+        cut = stem[: MAX_UPLOAD_NAME + 1]
+        stem = cut[: cut.rfind("-")] if "-" in cut else cut[:MAX_UPLOAD_NAME]
+    return stem or fallback
+
+
+def plan_uploads(items: Sequence[QueueItem]) -> list[str]:
+    """An upload name (without extension) per item, in order: its title's,
+    or `<video>-<place>` without a title, with `-2`, `-3` on repeats."""
+    stems: list[str] = []
+    for item in items:
+        fallback = upload_stem(f"{item.folder}-{item.place}", "clip")
+        stem = upload_stem(item.title, fallback)
+        name, count = stem, 1
+        while name in stems:
+            count += 1
+            name = f"{stem}-{count}"
+        stems.append(name)
+    return stems
+
+
+def queue_markdown(
+    scheduled: Sequence[tuple[date, QueueItem]],
+    clips_dir: Path,
+    uploads: Sequence[str] = (),
+) -> str:
     """The queue as a page to post from: per clip its day, file, title and
-    caption in code blocks for copying, and its campaigns."""
+    caption in code blocks for copying, and its campaigns. With `uploads`
+    (from `plan_uploads`), the file shown is the copy to upload, named after
+    the title, and the thumbnail beside it."""
     lines = ["# Post queue", ""]
     if not scheduled:
         lines.append("Nothing to post: no saved clip rated good is left.")
     for number, (day, item) in enumerate(scheduled, start=1):
+        upload = clips_dir / UPLOAD_FOLDER / uploads[number - 1] if uploads else None
+        thumbnail = (
+            None
+            if item.thumbnail is None
+            else upload.with_suffix(".jpg")
+            if upload is not None
+            else clips_dir / item.thumbnail
+        )
         lines += [
             f"## {number}. {day.isoformat()}: {item.folder} {item.place}",
             "",
-            f"`{clips_dir / item.path}`",
+            f"`{upload.with_suffix('.mp4') if upload else clips_dir / item.path}`",
             "",
             "```text",
             item.title or "(no title)",
@@ -398,11 +448,8 @@ def queue_markdown(scheduled: Sequence[tuple[date, QueueItem]], clips_dir: Path)
             "",
             f"- Campaigns: {_campaign_list(item)}",
             f"- On screen: {', '.join(item.people) or 'not marked'}",
-            *(
-                [f"- Thumbnail: `{clips_dir / item.thumbnail}`"]
-                if item.thumbnail
-                else []
-            ),
+            *([f"- Thumbnail: `{thumbnail}`"] if thumbnail else []),
+            *([f"- Clip: `{clips_dir / item.path}`"] if upload else []),
             f"- Rating: {item.rating}",
             "",
         ]

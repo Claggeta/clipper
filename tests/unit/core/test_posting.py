@@ -4,15 +4,18 @@ from pathlib import Path
 import pytest
 
 from clipper.core.posting import (
+    MAX_UPLOAD_NAME,
     DraftsFolder,
     build_queue,
     caption,
     clip_key,
     eligibility,
     parse_campaigns,
+    plan_uploads,
     queue_markdown,
     record_post,
     schedule,
+    upload_stem,
 )
 from clipper.domain.errors import QueueError
 from clipper.domain.models import (
@@ -227,3 +230,47 @@ def test_queue_markdown_lists_a_thumbnail_when_there_is_one() -> None:
     page = queue_markdown(schedule(queue, date(2026, 11, 12), 2), Path("clips"))
     assert page.count("- Thumbnail: ") == 1
     assert f"`{Path('clips') / 'v' / 'c1.thumb.jpg'}`" in page
+
+
+# --- Upload names (ADR 0028, upload names amendment) ---
+
+
+@pytest.mark.parametrize(
+    ("title", "stem"),
+    [
+        ("Ron shocked at the gas pump", "ron-shocked-at-the-gas-pump"),
+        ("Ron’s got new tech \U0001f4f1\U0001f525", "rons-got-new-tech"),
+        ("Lacy's $134 tank?!", "lacys-134-tank"),
+        ("Café résumé: 5 > 3", "cafe-resume-5-3"),
+        ("\U0001f602\U0001f602", "v-1"),
+        (None, "v-1"),
+    ],
+)
+def test_upload_stem(title: str | None, stem: str) -> None:
+    assert upload_stem(title, "v-1") == stem
+
+
+def test_upload_stem_cuts_a_long_title_at_a_word() -> None:
+    stem = upload_stem("word " * 30, "x")
+    assert len(stem) <= MAX_UPLOAD_NAME
+    assert stem.endswith("word")
+    assert upload_stem("a" * 100, "x") == "a" * MAX_UPLOAD_NAME
+
+
+def test_plan_uploads_numbers_repeats_and_names_untitled_clips() -> None:
+    folder = _folder(
+        "v",
+        (
+            _clip(1, 0.0, title="Same title"),
+            _clip(2, 60.0, title="Same  title!"),
+            _clip(3, 120.0, title=None),
+        ),
+        (_label(0.0, "good"), _label(60.0, "good"), _label(120.0, "good")),
+    )
+    queue = build_queue([folder], CAMPAIGNS, PostLog())
+    assert plan_uploads(queue) == ["same-title", "same-title-2", "v-3"]
+    page = queue_markdown(
+        schedule(queue, date(2026, 11, 12), 3), Path("clips"), plan_uploads(queue)
+    )
+    assert f"`{Path('clips', 'upload', 'same-title-2.mp4')}`" in page
+    assert f"- Clip: `{Path('clips', 'v', 'c2.mp4')}`" in page

@@ -266,7 +266,8 @@ def test_a_good_combined_is_queued_after_its_clips_with_their_people(env: Env) -
     # Clip 1 has Ron and Lacy marked, so the combined clip fits CORE; with no hook
     # the caption opens with the title, as for any clip without one.
     assert "v1 all of it With Ron and Lacy. #CORE #Shorts" in page
-    assert "v1_combined.thumb.jpg" in page
+    thumbnail = env.clips.resolve() / "upload" / "v1-all-of-it.jpg"
+    assert f"- Thumbnail: `{thumbnail}`" in page
 
 
 def test_an_ok_or_unrated_combined_waits(env: Env) -> None:
@@ -377,3 +378,42 @@ def test_an_unrated_summary_waits_and_a_posted_one_leaves(env: Env) -> None:
     assert result.exit_code == 0, result.output
     assert "Posted v1/v1_summary.mp4" in result.output
     assert "whole story" not in env.run("queue").output
+
+
+# --- Upload copies named after titles (ADR 0028, upload names amendment) ---
+
+
+def test_queue_puts_a_copy_named_after_each_title_in_the_upload_folder(
+    env: Env,
+) -> None:
+    folder = env.folder("v1", ["good", "good", "ok"])
+    for n in (1, 2, 3):
+        (folder / f"v1_{n}.mp4").write_bytes(b"clip %d" % n)
+    upload = env.clips / "upload"
+    upload.mkdir(parents=True)
+    (upload / "posted-before.mp4").write_bytes(b"old")
+    (upload / "notes.txt").write_text("mine", encoding="utf-8")
+
+    result = env.run("queue")
+
+    assert result.exit_code == 0, result.output
+    assert sorted(p.name for p in upload.iterdir()) == [
+        "notes.txt",
+        "v1-title-1.mp4",
+        "v1-title-2.mp4",
+    ]
+    assert (upload / "v1-title-2.mp4").read_bytes() == b"clip 2"
+    page = (env.clips / "queue.md").read_text(encoding="utf-8")
+    assert f"`{env.clips.resolve() / 'upload' / 'v1-title-1.mp4'}`" in page
+    assert f"- Clip: `{env.clips.resolve() / 'v1' / 'v1_1.mp4'}`" in page
+    assert "Upload copies: " in result.output
+
+
+def test_an_empty_queue_empties_the_upload_folder(env: Env) -> None:
+    env.folder("v1", [None])
+    upload = env.clips / "upload"
+    upload.mkdir(parents=True)
+    (upload / "posted-before.mp4").write_bytes(b"old")
+    result = env.run("queue")
+    assert result.exit_code == 0, result.output
+    assert list(upload.iterdir()) == []
