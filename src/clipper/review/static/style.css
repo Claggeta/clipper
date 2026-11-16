@@ -1274,3 +1274,32 @@ kbd {
 .broll-row { margin-top: 6px; }
 
 .broll-row input[type="range"] { width: 110px; vertical-align: middle; }
+
+/* A block's own zooms, hand crops and effects (ADR 0034, V7 item 9n-5),
+   along the foot of its block on the Sequence lane. */
+.sequence-lane .block-mark {
+  position: absolute;
+  bottom: 1px;
+  height: 8px;
+  min-width: 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sequence-lane .block-mark.zoom { background: #b59cff; }
+
+.sequence-lane .block-mark.hand { background: #5ad18a; }
+
+.sequence-lane .block-mark .grip { width: 4px; background: rgb(0 0 0 / 0.45); }
+
+.sequence-lane .block-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #f5c542;
+  cursor: pointer;
+}
+
+.block-only { display: block; margin-bottom: 6px; }

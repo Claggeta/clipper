@@ -1,7 +1,9 @@
 // Zooms and hand crops (ADR 0016 and 0025 amendments; V7 item 9h): rows in
 // the Frame tab, bars on the timeline whose ends drag, and (in preview.js)
 // drawing and panning on the preview. Times are source seconds, shown as
-// seconds into the span. Kept per clip until Save, which re-renders.
+// seconds into the span; with "This block only" (ADR 0034, V7 item 9n-5)
+// the selected block's own, in seconds from its start, kept on the block.
+// Kept per clip until Save, which re-renders.
 // Loaded after app.js and before preview.js.
 "use strict";
 
@@ -9,6 +11,7 @@ const zoomsBox = document.getElementById("zooms");
 const handsBox = document.getElementById("hands");
 const frameNote = document.getElementById("frame-note");
 const frameLane = document.getElementById("frame-lane");
+const frameBlockOnly = document.getElementById("frame-block-only");
 // key -> {zooms: [{start, end, scale, x, y, smooth}], hands: [{start, end, x}]}
 const frameEdits = new Map();
 // A new zoom or hand crop lasts this long, in seconds, if the span allows.
@@ -68,12 +71,26 @@ function sameFrame(clip) {
 function frameChanged() {
   drawUnsaved();
   drawFrameLane();
+  // A block's own zooms and crops are marked on the Sequence lane.
+  drawSequenceSoft();
+}
+
+// The lists the tab edits: the clip's, in source seconds shown from the
+// span's start, or with "This block only" the selected block's own, in
+// seconds from its start (ADR 0034, block edits amendment).
+function frameTarget(clip) {
+  const block = blockTarget(frameBlockOnly, false);
+  if (block) {
+    return { zooms: block.zooms, hands: block.hand_crops, base: 0, low: 0, high: blockLength(block), block };
+  }
+  const edits = frameOf(clip);
+  return { zooms: edits.zooms, hands: edits.hands, base: span.start, low: span.start, high: span.end, block: null };
 }
 
 // --- The rows ---
 
-function relativeInput(seconds, onChange) {
-  return numberInput(round(seconds - span.start), (relative) => onChange(span.start + relative));
+function relativeInput(seconds, onChange, base = span.start) {
+  return numberInput(round(seconds - base), (relative) => onChange(base + relative));
 }
 
 function removeButton(onClick) {
@@ -85,21 +102,32 @@ function removeButton(onClick) {
 }
 
 function drawFrameEditor(clip) {
-  const edits = frameOf(clip);
+  const edits = frameTarget(clip);
+  const base = edits.base;
+  const into = edits.block ? "s into the block" : "s into the span";
+  drawFrameBlockOnly(edits.block);
   zoomsBox.replaceChildren();
   edits.zooms.forEach((zoom, index) => {
     const row = document.createElement("div");
     row.className = "range-row";
-    const start = relativeInput(zoom.start, (seconds) => {
-      zoom.start = seconds;
-      frameChanged();
-    });
-    start.title = "From (s into the span)";
-    const end = relativeInput(zoom.end, (seconds) => {
-      zoom.end = seconds;
-      frameChanged();
-    });
-    end.title = "To (s into the span)";
+    const start = relativeInput(
+      zoom.start,
+      (seconds) => {
+        zoom.start = seconds;
+        frameChanged();
+      },
+      base,
+    );
+    start.title = `From (${into})`;
+    const end = relativeInput(
+      zoom.end,
+      (seconds) => {
+        zoom.end = seconds;
+        frameChanged();
+      },
+      base,
+    );
+    end.title = `To (${into})`;
     const scale = selectInput(
       ZOOM_SCALES.map((value) => [String(value), `${value}×`]),
       String(zoom.scale),
@@ -136,16 +164,24 @@ function drawFrameEditor(clip) {
   edits.hands.forEach((hand, index) => {
     const row = document.createElement("div");
     row.className = "range-row";
-    const start = relativeInput(hand.start, (seconds) => {
-      hand.start = seconds;
-      frameChanged();
-    });
-    start.title = "From (s into the span)";
-    const end = relativeInput(hand.end, (seconds) => {
-      hand.end = seconds;
-      frameChanged();
-    });
-    end.title = "To (s into the span)";
+    const start = relativeInput(
+      hand.start,
+      (seconds) => {
+        hand.start = seconds;
+        frameChanged();
+      },
+      base,
+    );
+    start.title = `From (${into})`;
+    const end = relativeInput(
+      hand.end,
+      (seconds) => {
+        hand.end = seconds;
+        frameChanged();
+      },
+      base,
+    );
+    end.title = `To (${into})`;
     const where = document.createElement("span");
     where.className = "muted";
     where.textContent = `centre ${Math.round(hand.x * 100)}%`;
@@ -164,16 +200,49 @@ function drawFrameEditor(clip) {
   const vertical = isVertical;
   document.getElementById("add-zoom").disabled = !vertical || edits.zooms.length >= 10;
   document.getElementById("add-hand").disabled = !vertical || edits.hands.length >= 10;
-  frameNote.textContent = vertical
-    ? "Drag on the preview to move a zoom's centre or a hand crop's window."
-    : "Zooms and hand crops need a vertical drafts folder.";
+  const others = blocksOf(clip).filter((b) => b.zooms.length || b.hand_crops.length).length;
+  frameNote.textContent = !vertical
+    ? "Zooms and hand crops need a vertical drafts folder."
+    : !edits.block && others
+      ? `${others} block${others > 1 ? "s have their" : " has its"} own zooms or crops, which replace these there.`
+      : "Drag on the preview to move a zoom's centre or a hand crop's window.";
   drawFrameLane();
 }
 
-// A new stretch at the playhead, in the span, apart from the others.
-function addRange(list, length, make) {
-  const from = clamp(player.currentTime, span.start, span.end - MIN_RANGE);
-  const to = Math.min(from + length, span.end);
+// The "This block only" box: usable while a block of the source is
+// selected; the headings say whose seconds the rows are in.
+function drawFrameBlockOnly(block) {
+  const chosen = blocksOf(current)[selectedBlock];
+  frameBlockOnly.disabled = !chosen || Boolean(chosen.broll);
+  document.getElementById("frame-block-name").textContent = chosen
+    ? chosen.broll
+      ? "(a B-roll insert takes none)"
+      : `(block ${selectedBlock + 1})`
+    : "";
+  const unit = block ? `(block ${selectedBlock + 1} only, seconds into the block)` : "(seconds into the span)";
+  document.getElementById("zooms-unit").textContent = unit;
+  document.getElementById("hands-unit").textContent = block
+    ? unit
+    : "(a 9:16 window placed by hand)";
+}
+
+// A new stretch at the playhead, in the span (or in the block, for its
+// own), apart from the others.
+function addRange(kind, length, make) {
+  const block = blockTarget(frameBlockOnly, false, true);
+  let list;
+  let from;
+  let to;
+  if (block) {
+    list = kind === "zoom" ? block.zooms : block.hand_crops;
+    const blockEnd = blockLength(block);
+    from = clamp(timeInBlock(selectedBlock), 0, blockEnd - MIN_RANGE);
+    to = Math.min(from + length, blockEnd);
+  } else {
+    list = kind === "zoom" ? frameOf(current).zooms : frameOf(current).hands;
+    from = clamp(player.currentTime, span.start, span.end - MIN_RANGE);
+    to = Math.min(from + length, span.end);
+  }
   if (list.some((item) => from < item.end && item.start < to)) {
     frameNote.textContent = "That overlaps another; move the playhead first.";
     return;
@@ -185,7 +254,7 @@ function addRange(list, length, make) {
 }
 
 document.getElementById("add-zoom").addEventListener("click", () => {
-  addRange(frameOf(current).zooms, NEW_ZOOM_SECONDS, (start, end) => ({
+  addRange("zoom", NEW_ZOOM_SECONDS, (start, end) => ({
     start,
     end,
     scale: 1.3,
@@ -196,7 +265,13 @@ document.getElementById("add-zoom").addEventListener("click", () => {
 });
 
 document.getElementById("add-hand").addEventListener("click", () => {
-  addRange(frameOf(current).hands, NEW_HAND_SECONDS, (start, end) => ({ start, end, x: 0.5 }));
+  addRange("hand", NEW_HAND_SECONDS, (start, end) => ({ start, end, x: 0.5 }));
+});
+
+frameBlockOnly.addEventListener("change", () => {
+  if (current) {
+    drawFrameEditor(current);
+  }
 });
 
 // --- The timeline lane: a bar per zoom and hand crop, ends dragged ---
@@ -266,17 +341,22 @@ function grip(item, edge) {
 
 // --- What the preview draws at a source time ---
 
-// The zoom in force at `seconds` and how far in (0 to 1), or null.
+// The zoom in force at `seconds` and how far in (0 to 1), or null. In a
+// block with zooms of its own, only those, in seconds from its start, as
+// the renderer has it (ADR 0034).
 function activeZoom(seconds) {
   if (!current) {
     return null;
   }
-  for (const zoom of frameOf(current).zooms) {
-    if (seconds >= zoom.start && seconds <= zoom.end) {
+  const block = playingSourceBlock(seconds);
+  const own = Boolean(block && block.zooms.length);
+  const at = own ? seconds - block.start : seconds;
+  for (const zoom of own ? block.zooms : frameOf(current).zooms) {
+    if (at >= zoom.start && at <= zoom.end) {
       let weight = 1;
       if (zoom.smooth) {
         const ease = Math.min(ZOOM_EASE_SECONDS, (zoom.end - zoom.start) / 2);
-        weight = clamp(Math.min((seconds - zoom.start) / ease, (zoom.end - seconds) / ease), 0, 1);
+        weight = clamp(Math.min((at - zoom.start) / ease, (zoom.end - at) / ease), 0, 1);
       }
       return { zoom, weight };
     }
@@ -287,6 +367,11 @@ function activeZoom(seconds) {
 function activeHand(seconds) {
   if (!current) {
     return null;
+  }
+  const block = playingSourceBlock(seconds);
+  if (block && block.hand_crops.length) {
+    const at = seconds - block.start;
+    return block.hand_crops.find((hand) => at >= hand.start && at <= hand.end) || null;
   }
   return frameOf(current).hands.find((hand) => seconds >= hand.start && seconds <= hand.end) || null;
 }

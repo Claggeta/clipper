@@ -516,6 +516,9 @@ and planned code:
   Overlays amendment (9m-2b): a "B-roll over" lane in clip time, mode and
   size per overlay, the box dragged on the preview, a muted third player;
   manual step RV29b.
+  Block edits amendment (9n-5): "This block only" in the Frame and Audio
+  tabs, bars and ticks on the block, trims keep them on the footage or
+  drop them; manual step RV30.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1527,8 +1530,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      - 9n-4. ~~The pad: a marked range sent to it (key decided in the
        item, `P` is Preview span), named, dragged onto the sequence.~~
        (done; `Shift+P`, `Shift`-drag, Add; manual step RV28)
-     - 9n-5. "This block only" zooms, hand crops and sound effects in
-       the Frame and Audio tabs (the core takes them since 9n-2).
+     - 9n-5. ~~"This block only" zooms, hand crops and sound effects in
+       the Frame and Audio tabs (the core takes them since 9n-2).~~
+       (done; manual step RV30)
 
 Later, not scheduled:
 

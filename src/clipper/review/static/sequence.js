@@ -5,8 +5,10 @@
 // block may repeat. While a clip has its own sequence, cuts are off and
 // the handles set only the span the label keeps. A block may be a B-roll
 // insert (B-roll amendment, V7 item 9m-2a), played in a second player
-// while the source player waits. Loaded after app.js and precision.js,
-// before preview.js.
+// while the source player waits. A block may have zooms, hand crops and
+// sound effects of its own (V7 item 9n-5), added in the Frame and Audio
+// tabs with "This block only" and marked inside it here. Loaded after
+// app.js and precision.js, before preview.js.
 "use strict";
 
 const sequenceBox = document.getElementById("sequence");
@@ -33,6 +35,9 @@ let insert = null;
 let lastWatch = 0; // when the frame loop last stepped the blocks
 // While an edge is dragged, the lane is not rebuilt under the pointer.
 let laneDragging = false;
+// The block the Frame and Audio tabs last drew for, to redraw them when
+// another is selected.
+let editorsBlock = -1;
 
 function copyBlock(block) {
   return {
@@ -192,6 +197,7 @@ function drawSequence() {
     if (block.broll && isStill(block.broll)) {
       startGrip.hidden = true;
     }
+    drawBlockMarks(element, block, index);
     sequenceLane.append(element);
   });
   const chosen = blocks[selectedBlock];
@@ -205,6 +211,148 @@ function drawSequence() {
   if (typeof drawOverlayLane === "function") {
     drawOverlayLane();
   }
+  // "This block only" edits the selected block's: redraw on a new one.
+  if (selectedBlock !== editorsBlock && typeof drawAudioEditor === "function") {
+    editorsBlock = selectedBlock;
+    drawFrameEditor(current);
+    drawAudioEditor(current);
+  }
+}
+
+// A block's own zooms and hand crops as bars along its foot, ends
+// dragged in the block's seconds; its own effects as ticks (ADR 0034).
+function drawBlockMarks(element, block, index) {
+  const length = blockLength(block);
+  const items = [
+    ...block.zooms.map((item) => ["zoom", item, block.zooms]),
+    ...block.hand_crops.map((item) => ["hand", item, block.hand_crops]),
+  ];
+  for (const [kind, item, list] of items) {
+    const mark = document.createElement("div");
+    mark.className = `block-mark ${kind}`;
+    const place = () => {
+      mark.style.left = `${(item.start / length) * 100}%`;
+      mark.style.width = `${((item.end - item.start) / length) * 100}%`;
+      mark.title = `${kind === "zoom" ? `Zoom ${item.scale}×` : "Hand crop"}, this block only: ${item.start.toFixed(1)} - ${item.end.toFixed(1)} s into it`;
+    };
+    place();
+    mark.append(markGrip(element, mark, item, list, "start", place), markGrip(element, mark, item, list, "end", place));
+    mark.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || event.target !== mark) {
+        return;
+      }
+      event.stopPropagation();
+      event.preventDefault();
+      selectBlock(index, block.start + item.start);
+    });
+    element.append(mark);
+  }
+  for (const effect of block.effects) {
+    const tick = document.createElement("div");
+    tick.className = "block-tick";
+    tick.style.left = `${(effect.at_seconds / length) * 100}%`;
+    tick.title = `${effect.file}, this block only: ${effect.at_seconds.toFixed(1)} s into it`;
+    tick.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      selectBlock(index, block.start + effect.at_seconds);
+    });
+    element.append(tick);
+  }
+}
+
+// An end of a block's own zoom or crop, dragged inside the block and
+// clear of its neighbours in the same list.
+function markGrip(element, mark, item, list, edge, place) {
+  const handle = document.createElement("i");
+  handle.className = `grip ${edge}`;
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.stopPropagation();
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    const fromX = event.clientX;
+    const from = item[edge];
+    const length = Number.parseFloat(element.style.flexGrow);
+    const perPixel = length / element.getBoundingClientRect().width;
+    const others = list.filter((other) => other !== item);
+    const onMove = (moveEvent) => {
+      laneDragging = true;
+      const moved = from + (moveEvent.clientX - fromX) * perPixel;
+      if (edge === "start") {
+        const floor = Math.max(0, ...others.filter((o) => o.end <= item.start).map((o) => o.end));
+        item.start = round(clamp(moved, floor, item.end - MIN_RANGE));
+      } else {
+        const ceiling = Math.min(length, ...others.filter((o) => o.start >= item.end).map((o) => o.start));
+        item.end = round(clamp(moved, item.start + MIN_RANGE, ceiling));
+      }
+      place();
+      drawUnsaved();
+    };
+    const onUp = () => {
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+      laneDragging = false;
+      blockEditsChanged();
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  });
+  return handle;
+}
+
+// After a block's own edit: the lane, the tabs and the unsaved mark.
+function blockEditsChanged() {
+  drawUnsaved();
+  drawSequence();
+  drawFrameEditor(current);
+  drawAudioEditor(current);
+}
+
+// The selected block, when the "This block only" box is ticked and the
+// block can take its own edits: any block for effects (`brollOk`), a
+// block of the source for zooms and crops. With `make`, the sequence
+// becomes the clip's own first, as any edit on the lane does.
+function blockTarget(box, brollOk, make = false) {
+  const ticked = box instanceof HTMLInputElement ? box.checked && !box.disabled : Boolean(box);
+  if (!current || !span || !ticked) {
+    return null;
+  }
+  const blocks = make ? makeOwn(current) : blocksOf(current);
+  const block = blocks[selectedBlock];
+  if (!block || (block.broll && !brollOk)) {
+    return null;
+  }
+  return block;
+}
+
+// Seconds into block `index` at the playhead: the source's or the insert's
+// time when that block is on show, else its start.
+function timeInBlock(index) {
+  const block = blocksOf(current)[index];
+  if (block.broll) {
+    return insert && insert.index === index ? insertTime() - block.start : 0;
+  }
+  const seconds = player.currentTime;
+  const showing = !insert && playingBlock === index && seconds >= block.start && seconds <= block.end;
+  return showing ? seconds - block.start : 0;
+}
+
+// The block of the source playing at `seconds` in a clip with its own
+// sequence, for its own zooms and crops; null otherwise.
+function playingSourceBlock(seconds) {
+  if (!current || !span || insert || !ownSequence(current)) {
+    return null;
+  }
+  if (!Number.isFinite(sequenceClipTime(seconds))) {
+    return null;
+  }
+  const block = blocksOf(current)[playingBlock];
+  return block && !block.broll ? block : null;
 }
 
 function blockTitle(block) {
@@ -350,6 +498,7 @@ function trimBlock(grip, index, edge) {
     selectedBlock = index;
     const fromX = event.clientX;
     const from = blocksOf(current)[index][edge];
+    const fromStart = blocksOf(current)[index].start;
     const perPixel = sequenceLength() / sequenceLane.getBoundingClientRect().width;
     grip.setPointerCapture(event.pointerId);
     const onMove = (moveEvent) => {
@@ -384,7 +533,13 @@ function trimBlock(grip, index, edge) {
       grip.removeEventListener("pointerup", onUp);
       grip.removeEventListener("pointercancel", onUp);
       laneDragging = false;
+      const dropped = ownSequence(current) ? fitOwnEdits(blocksOf(current)[index], fromStart) : 0;
       sequenceChanged();
+      if (dropped) {
+        sequenceNotice(`Dropped ${dropped} of the block's own edit${dropped > 1 ? "s" : ""} that no longer fit${dropped > 1 ? "" : "s"} in it.`);
+      }
+      drawFrameEditor(current);
+      drawAudioEditor(current);
     };
     grip.addEventListener("pointermove", onMove);
     grip.addEventListener("pointerup", onUp);
@@ -394,6 +549,31 @@ function trimBlock(grip, index, edge) {
 
 function sequenceNotice(message) {
   notice(message);
+}
+
+// After a trim: a block's own edits stay on the same footage (its start
+// moved from `fromStart`), and those no longer inside it are dropped.
+// Returns how many were dropped.
+function fitOwnEdits(block, fromStart) {
+  const shift = block.start - fromStart;
+  const length = blockLength(block);
+  let dropped = 0;
+  const keep = (items, inside) => {
+    const kept = items.filter(inside);
+    dropped += items.length - kept.length;
+    return kept;
+  };
+  const moved = (items) =>
+    items.map((item) => ({ ...item, start: round(item.start - shift), end: round(item.end - shift) }));
+  if (!block.broll) {
+    block.zooms = keep(moved(block.zooms), (z) => z.start >= 0 && z.end <= length + 0.001);
+    block.hand_crops = keep(moved(block.hand_crops), (h) => h.start >= 0 && h.end <= length + 0.001);
+  }
+  block.effects = keep(
+    block.effects.map((e) => ({ ...e, at_seconds: round(e.at_seconds - shift) })),
+    (e) => e.at_seconds >= 0 && e.at_seconds < length,
+  );
+  return dropped;
 }
 
 // Split the block at the playhead in two; the second half is selected.
@@ -783,10 +963,19 @@ function sameSequence(a, b) {
         sameTime(block.end, b[i].end) &&
         (block.broll || null) === (b[i].broll || null) &&
         (block.sound !== false) === (b[i].sound !== false) &&
-        JSON.stringify([block.zooms || [], block.hand_crops || [], block.effects || []]) ===
-          JSON.stringify([b[i].zooms || [], b[i].hand_crops || [], b[i].effects || []]),
+        ownEditsText(block) === ownEditsText(b[i]),
     )
   );
+}
+
+// A block's own edits as text, to the millisecond, for comparing.
+function ownEditsText(block) {
+  const ms = (value) => Math.round(value * 1000);
+  return JSON.stringify([
+    (block.zooms || []).map((z) => [ms(z.start), ms(z.end), z.scale, ms(z.x), ms(z.y), Boolean(z.smooth)]),
+    (block.hand_crops || []).map((h) => [ms(h.start), ms(h.end), ms(h.x)]),
+    (block.effects || []).map((e) => [e.file, ms(e.at_seconds), e.level_db]),
+  ]);
 }
 
 // A Save went through, or the clip was reset: back to what is on disk.
@@ -801,6 +990,7 @@ function resetSequence(clip, toSpan = false) {
   }
   selectedBlock = 0;
   playingBlock = 0;
+  editorsBlock = -1;
   if (clip === current) {
     drawSequence();
   }
