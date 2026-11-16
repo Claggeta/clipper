@@ -1640,8 +1640,8 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
 Each item is one PR, and each code item states its design and waits for
 confirmation first.
 
-1. ADRs and scope (one docs PR): the V8 scope, goals and list. ADRs come
-   with each item as amendments.
+1. ~~ADRs and scope (one docs PR): the V8 scope, goals and list. ADRs come
+   with each item as amendments.~~ (done; #258)
 2. The review assistant (was V7 9j): a spike first on 15 to 20 requests
    the maintainer writes (clip, request, what counts as right; spread
    over trims, cuts, captions, text, zoom and framing, audio, several
