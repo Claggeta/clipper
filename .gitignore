@@ -7,11 +7,7 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
-
 .venv/
-__pycache__/
-*.pyc
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
@@ -24,6 +20,5 @@ data/*
 !data/people.txt
 !data/campaigns.txt
 !data/posts.json
-dist/
 
 clipper-reference.md
