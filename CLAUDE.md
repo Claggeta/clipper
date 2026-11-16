@@ -194,7 +194,9 @@ and planned code:
   member only when the transcript does).
   Emoji amendment (V6 3b, the maintainer's choice): titles end with one
   or two fitting emoji (110 of 110; hooks got none); naming the person 68
-  to 61, the maintainer's person 36 to 34 of 65.
+  to 61, the maintainer's person 36 to 34 of 65. No emoji amendment (V7
+  7i, the maintainer's choice): back to "no emoji", added by hand in
+  review; the 3a wording (naming 68 of 110).
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run (since V6 4d `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, an
   existing folder reused). File names inside are unchanged. Amends 0008. Item 4a amendment:
@@ -1481,6 +1483,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      maintainer's ask): `queue` puts a title-named copy of each queued
      clip in `<clips dir>/upload/`. ADR 0028 amendment, manual step.~~
      (done; manual step Q4)
+   - 7i. ~~No emoji in titles (added 2026-11-16, the maintainer's
+     choice): the title prompt goes back to "no emoji". ADR 0018
+     amendment.~~ (done; R19c updated)
 8. Release notes and tag `v0.7.0`.
 9. The review editor (ADR 0031), before item 5, in PRs, each with a
    manual step:

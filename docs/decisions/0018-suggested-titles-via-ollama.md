@@ -407,6 +407,14 @@ them (2026-11-11), reversing the title prompt amendment's "no emoji".
 **Decision.** Adopted, the first wording, as the maintainer's choice; the
 naming cost is recorded so it can be weighed again.
 
+## Amended by no emoji in titles (V7 item 7i)
+
+The maintainer will add emoji in review where wanted (2026-11-16), so the
+prompt goes back to "No hashtags and no emoji.", the wording measured as
+"no emoji (3a)" above: 0 of 110 titles with emoji, 68 naming a person, 36
+of 65 the maintainer's person. Nothing else changes; titles already in
+manifests keep their emoji. Manual step R19c.
+
 ## Revisit when
 
 - Titles need a different model from the detector.
