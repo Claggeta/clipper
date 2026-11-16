@@ -198,12 +198,18 @@ function drawFrameEditor(clip) {
     handsBox.append(row);
   });
   const vertical = isVertical;
-  document.getElementById("add-zoom").disabled = !vertical || edits.zooms.length >= 10;
-  document.getElementById("add-hand").disabled = !vertical || edits.hands.length >= 10;
+  // The facecam frame has no zooms or hand crops (ADR 0025, facecam style).
+  const facecam = chosenStyle(clip) === "facecam";
+  document.getElementById("add-zoom").disabled =
+    !vertical || facecam || edits.zooms.length >= 10;
+  document.getElementById("add-hand").disabled =
+    !vertical || facecam || edits.hands.length >= 10;
   const others = blocksOf(clip).filter((b) => b.zooms.length || b.hand_crops.length).length;
   frameNote.textContent = !vertical
     ? "Zooms and hand crops need a vertical drafts folder."
-    : !edits.block && others
+    : facecam
+      ? "The facecam style has no zooms or hand crops; pick fit or face for those."
+      : !edits.block && others
       ? `${others} block${others > 1 ? "s have their" : " has its"} own zooms or crops, which replace these there.`
       : "Drag on the preview to move a zoom's centre or a hand crop's window.";
   drawFrameLane();

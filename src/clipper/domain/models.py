@@ -1155,6 +1155,8 @@ class Label(Span):
     verdict: Verdict | None = None
     draft: Span | None = None
     style: VerticalStyleName | None = None
+    # Where the facecam style's cam went (ADR 0025, facecam style amendment).
+    cam: CamPosition | None = None
     rating: Rating | None = None
     people: tuple[str, ...] = ()
     cuts: tuple[Span, ...] = ()

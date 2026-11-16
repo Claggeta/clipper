@@ -65,6 +65,8 @@ def save_labels(labeled: LabeledVideo, path: Path) -> None:
             entry["draft"] = _span(label.draft)
         if label.style is not None:
             entry["style"] = label.style
+        if label.cam is not None:
+            entry["cam"] = label.cam
         if label.rating is not None:
             entry["rating"] = label.rating
         if label.people:

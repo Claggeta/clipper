@@ -309,13 +309,41 @@ committed.
   `Label.style` and the review page's styles to keep take `facecam`. The
   page keeps a facecam draft as it is but does not re-render it (a Save
   that would is refused, nothing written) until 6c, which also brings the
-  style switch's cam position.
+  style switch's cam position. (6c amendment: it re-renders now.)
 - The renderer refuses the facecam style with a face crop, hand crops,
   zooms or a sequence.
 - Known: captions sit 420 px above the frame's bottom, so with `--cam
   bottom` they cover the cam (seen on a Sonoket clip); 6c or later can
-  move them above it. Measured on `DQP3pmyJX4o`: two 42 s clips with
+  move them above it. (6c amendment: they sit above it now.) Measured on `DQP3pmyJX4o`: two 42 s clips with
   captions in 28 s, finder included. Manual step R23.
+
+## Amended by facecam in the review page (V7 item 6c)
+
+- The style switch shows Facecam beside the other drafts, and while it is
+  picked, "Cam on top" and "Cam at the bottom". The live preview draws the
+  facecam frame from the source player: the draft's box at full width over
+  (or under) the centre crop, from a layout the server sends for either
+  cam (`plan_facecam`, so the page does no layout maths). A new cam is an
+  unsaved change and re-renders on Save.
+- Save sends `cam` (top or bottom; anything else is 400) and records it on
+  the judged label (`Label.cam`, ADR 0012) and the manifest's variant. A
+  re-render in facecam finds the box again over the new span with the
+  review run's finder, and keeps the draft's box if it finds none; with
+  neither, the render fails as any re-render does. This replaces 6b's
+  refusal.
+- Captions over a cam at the bottom sit `CAPTION_GAP = 60` px above it
+  (`facecam_caption_margin`), in `review` and in `render`/`drafts` alike,
+  through `build_ass`'s `caption_margin_v` (ADR 0017); the preview draws
+  them there too. This settles 6b's known clash.
+- The facecam style has no zooms, hand crops, sequence or B-roll overlays:
+  the Frame tab turns its add buttons off and says so, and a Save with any
+  is refused (409) before anything is written.
+- A thumbnail of a facecam clip is still framed as fit.
+- Checked in headless Edge on a `DQP3pmyJX4o` drafts folder (fit and
+  facecam): the toggle, both preview layouts, Save with the cam moved to
+  the bottom (label `"cam": "bottom"`, captions above the cam in the
+  re-rendered file), and a moved span re-rendered in facecam. Manual step
+  RV32.
 
 ## Revisit when
 

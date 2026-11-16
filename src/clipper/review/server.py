@@ -29,9 +29,10 @@ from pydantic import ValidationError
 
 from clipper.core.captions import caption_chunks, preview_layout
 from clipper.core.cuts import find_pauses
-from clipper.core.framing import plan_face_crop
+from clipper.core.framing import facecam_caption_margin, plan_face_crop, plan_facecam
 from clipper.core.interfaces import (
     ClipRenderer,
+    FacecamFinder,
     FaceTracker,
     FrameExtractor,
     MediaProbe,
@@ -53,6 +54,7 @@ from clipper.domain.models import (
     BROLL_IMAGE_SUFFIXES,
     BROLL_VIDEO_SUFFIXES,
     ClipCandidate,
+    ClipVariant,
     LabeledVideo,
     ManifestClip,
     MusicBed,
@@ -182,6 +184,8 @@ class ReviewSession:
     face_tracker: FaceTracker | None = None
     frame_size: tuple[int, int] | None = None
     people: tuple[str, ...] = ()
+    # Finds the cam box for a facecam re-render (ADR 0025, facecam style).
+    facecam_finder: FacecamFinder | None = None
     peaks: PeaksExtractor | None = None
     peaks_path: Path | None = None
     music_dir: Path | None = None
@@ -314,6 +318,7 @@ def make_store(session: ReviewSession) -> ReviewStore:
             session.title_writer,
             broll_dir=session.broll_dir,
             probe=session.probe,
+            facecam_finder=session.facecam_finder,
         ),
     )
 
@@ -345,7 +350,7 @@ def clip_payload(
         "title": clip.title,
         "hook": clip.hook,
         "file": clip.file,
-        "variants": [{"style": v.style, "file": v.file} for v in clip.variants],
+        "variants": [_variant(session, v) for v in clip.variants],
         "style": clip.variants[0].style if clip.variants else None,
         "error": clip.error,
         "reviewed": clip.reviewed,
@@ -447,6 +452,29 @@ def captions_payload(session: ReviewSession, query: str) -> dict[str, object]:
     )
     chunks = caption_chunks(session.transcript, candidate, cuts, edits)
     return {"chunks": [[list(word) for word in chunk] for chunk in chunks]}
+
+
+def _variant(session: ReviewSession, variant: ClipVariant) -> dict[str, object]:
+    """A rendered style as the page sees it; a facecam one with its cam and
+    its frame for either cam, in the probed frame's pixels, for the preview
+    (ADR 0025, facecam style amendment)."""
+    shown: dict[str, object] = {"style": variant.style, "file": variant.file}
+    if variant.style != "facecam" or variant.box is None:
+        return shown
+    shown["cam"] = variant.cam or "top"
+    if session.frame_size is not None:
+        layouts = {}
+        for cam in ("top", "bottom"):
+            layout = plan_facecam(variant.box, *session.frame_size, cam)
+            layouts[cam] = {
+                "cam": list(layout.cam),
+                "game": list(layout.game),
+                "cam_height": layout.cam_height,
+                "caption_margin_v": facecam_caption_margin(layout),
+            }
+        shown["layouts"] = layouts
+        shown["frame"] = list(session.frame_size)
+    return shown
 
 
 def crop_payload(session: ReviewSession, query: str) -> dict[str, object]:

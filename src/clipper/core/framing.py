@@ -243,6 +243,18 @@ def plan_facecam(
     )
 
 
+# Captions over a cam at the bottom sit this far above it (ADR 0025).
+CAPTION_GAP = 60
+
+
+def facecam_caption_margin(layout: FacecamLayout) -> int | None:
+    """Where captions sit for the facecam frame: above a cam at the bottom,
+    as the layout's own (None) for a cam on top."""
+    if layout.position == "bottom":
+        return layout.cam_height + CAPTION_GAP
+    return None
+
+
 def _even(value: float, limit: int) -> int:
     """`value` rounded down to an even number of pixels, from 2 to `limit`."""
     return max(2, min(int(value), limit) // 2 * 2)

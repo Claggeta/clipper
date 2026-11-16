@@ -5,6 +5,7 @@ import pytest
 from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.adapters.results.labels_json import load_labels
 from clipper.adapters.results.review_files import JsonReviewFiles
+from clipper.core.framing import plan_facecam
 from clipper.domain.errors import JudgingError, ReviewError
 from clipper.domain.models import (
     CaptionEdits,
@@ -579,12 +580,91 @@ def test_keeping_the_facecam_draft_keeps_its_box(tmp_path: Path) -> None:
     assert not (env.folder / "talk_1.mp4").exists()
 
 
-def test_the_facecam_draft_is_not_re_rendered(tmp_path: Path) -> None:
-    env = _facecam_env(tmp_path)
-    with pytest.raises(JudgingError, match="facecam draft can be kept as it is"):
-        env.store.save(1, SaveRequest(9.0, 42.0, None, None, "facecam"))
+class FakeFacecamFinder:
+    """Finds `box` in every span, or nothing."""
+
+    def __init__(self, box: FacecamBox | None) -> None:
+        self.spans: list[tuple[float, float]] = []
+        self._box = box
+
+    def find(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FacecamBox | None:
+        self.spans.append((start_seconds, end_seconds))
+        return self._box
+
+
+_FOUND = FacecamBox(x=0.7, y=0.55, w=0.28, h=0.3)
+
+
+def _finding(env: Env, tmp_path: Path, finder: FakeFacecamFinder) -> Env:
+    env.store._render = RenderInputs(  # noqa: SLF001
+        tmp_path / "talk.mp4",
+        env.renderer,
+        TRANSCRIPT,
+        frame_size=(1920, 1080),
+        facecam_finder=finder,
+    )
+    return env
+
+
+def test_a_moved_facecam_clip_is_re_rendered_with_the_box_found_again(
+    tmp_path: Path,
+) -> None:
+    finder = FakeFacecamFinder(_FOUND)
+    env = _finding(_facecam_env(tmp_path), tmp_path, finder)
+
+    result = env.store.save(1, SaveRequest(9.0, 42.0, None, None, "facecam"))
+
+    assert result.render_error is None
+    assert finder.spans == [(9.0, 42.0)]
+    [layout] = env.renderer.facecams
+    assert layout == plan_facecam(_FOUND, 1920, 1080, "top")
+    [variant] = result.clip.variants
+    assert (variant.style, variant.box, variant.cam) == ("facecam", _FOUND, "top")
+    assert variant.file == "talk_000009-000042.facecam.mp4"
+    [label] = load_labels(env.labels_path).labels
+    assert (label.style, label.cam) == ("facecam", "top")
+
+
+def test_no_box_in_the_new_span_keeps_the_drafts(tmp_path: Path) -> None:
+    env = _finding(_facecam_env(tmp_path), tmp_path, FakeFacecamFinder(None))
+
+    result = env.store.save(1, SaveRequest(9.0, 42.0, None, None, "facecam"))
+
+    drafted = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+    assert result.clip.variants[0].box == drafted
+    assert env.renderer.facecams == [plan_facecam(drafted, 1920, 1080, "top")]
+
+
+def test_a_new_cam_alone_re_renders_with_captions_above_it(tmp_path: Path) -> None:
+    env = _finding(_facecam_env(tmp_path), tmp_path, FakeFacecamFinder(_FOUND))
+    request = SaveRequest(10.0, 40.0, None, None, "facecam", cam="bottom")
+
+    result = env.store.save(1, request)
+
+    [layout] = env.renderer.facecams
+    assert layout is not None and layout.position == "bottom"
+    assert result.clip.variants[0].cam == "bottom"
+    # Captions sit CAPTION_GAP above the cam (ADR 0025).
+    [ass] = env.renderer.captions
+    margin = layout.cam_height + 60
+    assert ass is not None and f",60,60,{margin},1" in ass
+
+
+def test_the_facecam_style_refuses_zooms(tmp_path: Path) -> None:
+    env = _finding(_facecam_env(tmp_path), tmp_path, FakeFacecamFinder(_FOUND))
+    zoom = Zoom(start_seconds=12.0, end_seconds=14.0)
+    with pytest.raises(JudgingError, match="facecam style has no zooms"):
+        env.store.save(1, SaveRequest(10.0, 40.0, None, None, "facecam", zooms=(zoom,)))
     assert not env.labels_path.exists()
-    assert env.renderer.calls == []
+
+
+def test_a_bad_cam_in_the_body_is_refused() -> None:
+    from clipper.review.store import BadRequest, parse_save
+
+    with pytest.raises(BadRequest, match="the cam must be one of top, bottom"):
+        parse_save({"start": 1.0, "end": 20.0, "cam": "left"}, 100.0)
 
 
 def test_a_style_the_clip_lacks_is_refused(tmp_path: Path) -> None:

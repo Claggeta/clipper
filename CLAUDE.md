@@ -322,6 +322,8 @@ and planned code:
   that would be a hit (half the shorter span); manual step RV15.
   Trash reason amendment (V7 2a): reason buttons and keys `1` to `5`
   while Trash is armed (8 s), `reason` on the trash request; RV31.
+  Facecam amendment (V7 6c): Facecam in the style switch with a cam
+  toggle, `cam` on Save; RV32.
 - `0025` — vertical styles: `fit` (0016, the default) and `face`, a
   full-height crop on the largest face, faces found once per clip by
   OpenCV YuNet (5 samples a second, cached); `drafts` renders both and the
@@ -360,7 +362,11 @@ and planned code:
   cached under `<cache dir>/facecam/`; the cam at full width over a
   centre crop of the gameplay, `vstack`; no box renders `fit`; variant
   `box` and `cam`; review keeps, never re-renders, a facecam draft until
-  6c; captions cover a bottom cam.
+  6c; captions cover a bottom cam. Review amendment (6c): a cam toggle,
+  preview from server-sent layouts, `cam` on label and variant, re-render
+  finds the box again else keeps the draft's, captions 60 px above a
+  bottom cam everywhere (ADR 0017 `caption_margin_v`); no zooms, crops,
+  sequence or B-roll in facecam.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -1436,9 +1442,10 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
      at the maintainer's ask; the default decided in the item); a clip
      with no box is a note and renders in `fit`. Manual step.~~ (done;
      opt-in, cam on top by default, `--cam bottom`; manual step R23)
-   - 6c. The `facecam` style in the review page's style switch, with the
+   - 6c. ~~The `facecam` style in the review page's style switch, with the
      cam's position, top or bottom, per clip (ADR 0024 amendment).
-     Manual step.
+     Manual step.~~ (done; re-renders in facecam, captions above a bottom
+     cam; manual step RV32)
 7. Small fixes from "Parked", each its own PR:
    - 7a. ~~ffmpeg exit codes: signed `AVERROR` values, with short names for
      invalid data, no stream and permission denied.~~ (done; ADR 0004
