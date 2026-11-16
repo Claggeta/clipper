@@ -1167,9 +1167,9 @@ Pass: the first run prints `About (saved for <channel>): <the file's
 text>` after `Title context:`, and its titles use that name. The second
 prints no `saved for` line. The third exits 1 with `Error: ...bad-channels.txt:
 Line 1: write it as <channel> | <about text>` and writes no folder. Record
-the first run's titles. Since the emoji amendment, each title ends with one
-to three emoji, shown as written in the console and in the review page's
-title box.
+the first run's titles. Since the no emoji amendment (V7 item 7i), titles
+have no emoji; any added by hand in review are shown as written in the
+console and in the review page's title box.
 
 ### R20. `--vertical --style face`: a crop that follows the face
 

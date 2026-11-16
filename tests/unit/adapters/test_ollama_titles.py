@@ -115,9 +115,10 @@ def test_the_prompt_prefers_the_about_names() -> None:
     assert "use its names over the channel's" in SYSTEM_PROMPT
 
 
-def test_the_prompt_asks_for_emoji_at_the_end_of_the_title() -> None:
-    assert "End the title with one or two emoji" in SYSTEM_PROMPT
-    assert "no emoji" not in SYSTEM_PROMPT
+def test_the_prompt_asks_for_no_emoji() -> None:
+    # The maintainer adds emoji in review (ADR 0018, no emoji amendment).
+    assert "No hashtags and no emoji." in SYSTEM_PROMPT
+    assert "End the title with" not in SYSTEM_PROMPT
 
 
 def test_a_title_with_emoji_is_kept_as_written() -> None:
