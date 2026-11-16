@@ -1653,6 +1653,15 @@ Later, not scheduled:
   `Select-Object -Last N`, which does nothing: the helper returns the text as
   one string. Fix: split the text into lines, or drop the pipe. Scheduled
   as V7 item 7d.
+- `fetch` makes two yt-dlp requests for a new video: the download, then a
+  `--skip-download` request for `<id>.info.json` (ADR 0020, video info
+  amendment; skipped once the info file exists). yt-dlp's
+  `--write-info-json` could save it in the download request, one request
+  fewer; a reused file without info would still need the separate one.
+  Untried here: its file is yt-dlp's whole dump, not the five fields
+  Clipper keeps, so it would be trimmed after the download, and its name
+  beside `<id>.mp4`. Needs an ADR 0020 amendment and manual step D10a
+  rerun.
 - yt-dlp warns on every YouTube request that no JavaScript runtime was found
   and "some formats may be missing" (it asks for deno). Downloads worked in
   manual step D1. Revisit if YouTube downloads fail or lose formats (ADR 0020
