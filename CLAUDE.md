@@ -656,7 +656,7 @@ V6 closed with item 11 on 2026-11-12. Daily-use editing in `review` (items
 5). The performance work (items 2 and 6 to 9) moved to a later version, at
 the maintainer's choice; ADRs 0026 and 0027 still stand for it.
 
-## V7 scope
+## V7 scope (shipped as `v0.7.0`)
 
 Input: the same sources and drafts folders as V6, and the maintainer's
 edits in `review`. Output: drafts picked by a finer LLM score if it
@@ -681,6 +681,13 @@ Twitch APIs, hosted or paid models, the movies/TV niche, a URL box in the
 review page, channel watching or scheduling, a database, user accounts,
 a JavaScript framework or build step for the page, downloaded or paid
 music and sound effects.
+
+V7 closed with item 8 on 2026-11-16. The review editor (item 9: keys,
+precision, live preview, caption, text, zoom and audio edits, Combine,
+Summarize, the sequence track and pad, B-roll), overlap and manual cuts,
+trash reasons, the facecam style and the Parked fixes landed; the finer
+LLM score (item 5) and the letterbox fix (7c) ended in nothing. The
+assistant (9j) stays open, waiting on the maintainer's example requests.
 
 ## Maintainer's goals
 
@@ -811,6 +818,13 @@ All merged to `main` with green CI:
   examples and a trained ranker measured and not adopted. Released as
   `v0.6.0` (pre-release, tag on 13935cf). Notes are in
   `docs/releases/v0.6.0.md`.
+- V7: the review page as a one-screen editor (keys, waveform and word
+  snapping, live preview, caption, text, zoom, crop and audio edits,
+  Combine, Summarize, a sequence track, pad and B-roll), overlap and
+  manual cuts, trash reasons, the `facecam` style, upload copies named
+  after titles, no emoji in titles; the finer LLM score and the letterbox
+  fix measured and not adopted. Released as `v0.7.0` (pre-release, tag on
+  b5d8f2a). Notes are in `docs/releases/v0.7.0.md`.
 
 In progress:
 
@@ -1404,8 +1418,8 @@ confirmation first. Review first (items 2, 3 and 9), then picking, then
 framing; the fixes in item 7 may land any time. Item 9 was added on
 2026-11-13 and goes before item 5.
 
-1. ADRs and scope (one docs PR): the V7 scope, goals and list. ADRs come
-   with each item as amendments.
+1. ~~ADRs and scope (one docs PR): the V7 scope, goals and list. ADRs come
+   with each item as amendments.~~ (done; #207)
 2. ~~Overlap on Save: `review` saves a span that overlaps another clip's
    label by less than half the shorter span (the hit rule, ADR 0012), so
    `eval` still counts them apart, and refuses above that (409, as now).
@@ -1486,7 +1500,9 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 7i. ~~No emoji in titles (added 2026-11-16, the maintainer's
      choice): the title prompt goes back to "no emoji". ADR 0018
      amendment.~~ (done; R19c updated)
-8. Release notes and tag `v0.7.0`.
+8. ~~Release notes and tag `v0.7.0`.~~ (done; notes #254, F1 run
+   2026-11-16 before tagging, tag `v0.7.0` and pre-release by the
+   maintainer)
 9. The review editor (ADR 0031), before item 5, in PRs, each with a
    manual step:
    - 9a. ~~ADR 0031, the scope and a layout mock (one docs PR).~~ (done)
@@ -1517,7 +1533,8 @@ framing; the fixes in item 7 may land any time. Item 9 was added on
    - 9j. Assistant: a spike first on requests the maintainer writes (the
      local LLM turning them into the page's edits), then an Assist tab
      if it is right often enough. ADR 0014 and 0031 amendments. May end
-     in nothing.
+     in nothing. (Open after `v0.7.0`: waits on the maintainer's 15 to
+     20 example requests.)
    - 9k. Combine, first called Summarize (added 2026-11-13, the
      maintainer's choice; renamed the same day): a button in `review`
      that joins a VOD's kept clips, as edited, in VOD order into one
@@ -1607,7 +1624,8 @@ Later, not scheduled:
   13e's picks show how often `face` loses to `fit` for it.
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
   first, and stack it above or below the gameplay. After V5 item 13e's
-  picks show how often facecam clips are posted. Scheduled as V7 item 6.
+  picks show how often facecam clips are posted. Scheduled as V7 item 6;
+  done (bordered cams only).
 - Audio and video-frame embeddings as ranker inputs (ADR 0026), for the
   visual moments a transcript cannot see. After V6 item 5 shows the
   transcript-only ranker works; a frame encoder likely brings PyTorch with
