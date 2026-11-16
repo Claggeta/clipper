@@ -495,6 +495,8 @@ and planned code:
   Audio amendment (9i): an Audio tab of clip volume, music and sound
   effects from `data/music/` and `data/sfx/`, previewed through the
   browser's audio engine (ADR 0007 amendment); `static/audio.js`; RV24.
+  Effect markers amendment (V8 4b): markers dragged to move (word
+  snapping), pressed to select, `Backspace` removes; RV33.
 - `0032` — Combine (first called Summarize, renamed 2026-11-13): a VOD's
   saved clips joined in VOD order into `<stem>_combined.mp4` by
   `ClipRenderer.join` (`concat`, label cards as on-screen texts, music as
@@ -1661,11 +1663,18 @@ confirmation first.
    - 3c. Rerun the ranker spike (ADR 0026): rejected spans have nearly
      doubled since V6 item 5 (90 to 168), labels 144 to 196.
 4. Fewer clicks in `review`, in PRs, each with a manual step:
-   - 4a. Not code: a click audit in headless Edge of a typical clip
+   - 4a. ~~Not code: a click audit in headless Edge of a typical clip
      (trim, a caption fix, a title text, a rating, Save), counting clicks,
      keys, tab switches and scrolls per step, written up with the worst
      five and a proposed fix for each; the maintainer picks which to
-     build. ADR 0031 amendments with each fix.
+     build. ADR 0031 amendments with each fix.~~ (done 2026-11-16, counted
+     from the page's code; worst five: sound effects 4 to 6 clicks each,
+     people marked again per clip, a misheard word fixed per occurrence, a
+     second text's times and style typed again, tab switches; the
+     maintainer picked draggable effect markers)
+   - 4b. Draggable sound effect markers: press to select and seek, drag
+     to move (snapping to word starts), `Backspace` removes the selected
+     one. ADR 0031 amendment, manual step RV33.
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).

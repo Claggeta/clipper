@@ -157,7 +157,8 @@ const CLIP_KEYS = {
   delete: () => press("trash"),
   d: (shift) => (shift ? press("seq-duplicate") : toggleScreen()),
   b: () => press("seq-split"),
-  backspace: () => press("seq-remove"),
+  // A selected sound effect marker first, else the selected block.
+  backspace: () => removeSelectedEffect() || press("seq-remove"),
   t: () => press("add-text"),
 };
 

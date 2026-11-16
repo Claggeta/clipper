@@ -24,6 +24,7 @@ let audioGraph = null; // {context, clipGain, musicGain}, made on first play
 let lastAudioTime = null; // the source time of the last preview frame
 let lastAudioClip = NaN; // and the finished clip's, for blocks' own effects
 let effectsBlockOnly = false; // "This block only" in the Audio tab
+let selectedEffect = null; // the clip effect whose marker was pressed (V8 item 4a)
 
 function decibels(db) {
   return Math.pow(10, db / 20);
@@ -184,6 +185,7 @@ function drawAudioEditor(clip) {
   list.forEach((effect, index) => {
     const row = document.createElement("div");
     row.className = "effect-row";
+    row.classList.toggle("selected", effect === selectedEffect);
     const file = selectInput(
       audioFiles.sfx.map((name) => [name, name]),
       effect.file,
@@ -254,6 +256,63 @@ function drawAudioEditor(clip) {
 
 // --- Effect markers on the timeline ---
 
+// A press on a marker selects its effect and seeks to it; a drag moves it
+// inside the span, snapping to word edges unless Alt is held (V8 item 4a).
+function dragEffect(mark, effect) {
+  mark.addEventListener("pointerdown", (event) => {
+    event.stopPropagation();
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    selectedEffect = effect;
+    player.currentTime = effect.at_seconds;
+    const fromX = event.clientX;
+    let dragging = false;
+    mark.setPointerCapture(event.pointerId);
+    const onMove = (moveEvent) => {
+      if (!dragging && Math.abs(moveEvent.clientX - fromX) < DRAG_PX) {
+        return;
+      }
+      dragging = true;
+      const at = snap(timeAt(moveEvent.clientX), "start", moveEvent.altKey);
+      effect.at_seconds = round(clamp(at, span.start, span.end - 0.1));
+      mark.style.left = `${percent(effect.at_seconds)}%`;
+      player.currentTime = effect.at_seconds;
+    };
+    const onUp = () => {
+      mark.removeEventListener("pointermove", onMove);
+      mark.removeEventListener("pointerup", onUp);
+      mark.removeEventListener("pointercancel", onUp);
+      drawAudioEditor(current);
+      if (dragging) {
+        audioChanged();
+      }
+    };
+    mark.addEventListener("pointermove", onMove);
+    mark.addEventListener("pointerup", onUp);
+    mark.addEventListener("pointercancel", onUp);
+  });
+  mark.addEventListener("click", (event) => event.stopPropagation());
+}
+
+// Backspace with a marker selected removes its effect; false when none is.
+function removeSelectedEffect() {
+  if (!current || !selectedEffect) {
+    return false;
+  }
+  const effects = audioOf(current).effects;
+  const at = effects.indexOf(selectedEffect);
+  selectedEffect = null;
+  if (at < 0) {
+    return false;
+  }
+  effects.splice(at, 1);
+  drawAudioEditor(current);
+  audioChanged();
+  return true;
+}
+
 function drawAudioLane() {
   audioLane.replaceChildren();
   if (!current || !span) {
@@ -261,17 +320,17 @@ function drawAudioLane() {
     return;
   }
   const effects = audioOf(current).effects;
+  if (!effects.includes(selectedEffect)) {
+    selectedEffect = null;
+  }
   audioLane.hidden = effects.length === 0;
   for (const effect of effects) {
     const mark = document.createElement("div");
     mark.className = "effect-mark";
+    mark.classList.toggle("selected", effect === selectedEffect);
     mark.style.left = `${percent(effect.at_seconds)}%`;
-    mark.title = `${effect.file} at ${fmtTenths(effect.at_seconds)}`;
-    mark.addEventListener("pointerdown", (event) => {
-      event.stopPropagation();
-      player.currentTime = effect.at_seconds;
-    });
-    mark.addEventListener("click", (event) => event.stopPropagation());
+    mark.title = `${effect.file} at ${fmtTenths(effect.at_seconds)}: drag to move, Backspace removes`;
+    dragEffect(mark, effect);
     audioLane.append(mark);
   }
 }
@@ -392,6 +451,7 @@ player.addEventListener("pause", syncPreviewAudio);
 
 // Called by app.js when a clip is chosen, saved or reset.
 function resetAudioEditor(clip, clear = false) {
+  selectedEffect = null;
   if (clear) {
     audioEdits.set(clip.key, { gain_db: 0, music: null, effects: [] });
   }
