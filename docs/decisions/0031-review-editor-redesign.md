@@ -312,6 +312,17 @@ asked for a chat box that turns a described edit into the page's edits.
   without it. Both respect "This block only" and the 10-effect limit.
   Nothing saved changes. Manual step RV34.
 
+## Amended by people carried over (V8 item 4d)
+
+- From the click audit (V8 item 4a): the same people were marked on
+  every clip of a VOD. A clip with no verdict yet (and a new one) now
+  starts with the people sent by the last successful Save from the same
+  video, kept in local storage per video name as a convenience; they
+  show as unsaved, with "(from the last clip saved)" until a person is
+  toggled, and only names still in the people file are carried. Saved
+  and trashed clips keep their own marks; nothing is written until Save
+  (ADR 0024, rating amendment). Manual step RV35.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

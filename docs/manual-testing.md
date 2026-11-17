@@ -3761,6 +3761,29 @@ with two or more sound effects in `data\sfx\`.
 
 Then delete the scratch folders.
 
+### RV35. People carried over to the next clip
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s people
+carried over amendment (V8 item 4d). Same scratch copy and labels dir as
+RV12, with two or more clips that have no verdict, and names in
+`data\people.txt`.
+
+1. Choose a clip with no verdict. Pass: nobody marked under `On screen`
+   (or the people from an earlier run's last Save of this video).
+2. Mark two people and Save. Pass: saved; move on (or choose) the next
+   clip with no verdict. Pass: the same two marked, `(from the last clip
+   saved)` beside `On screen`, and `Unsaved` showing.
+3. Toggle one person. Pass: the note goes; the marks follow your press.
+4. Choose a clip already saved with other people, or none. Pass: its own
+   marks, no note.
+5. Press `Add clip here`. Pass: the new clip starts with the people of
+   the last Save.
+6. Reload and choose a clip with no verdict. Pass: the last Save's people
+   are still carried. Open another drafts folder's video. Pass: nothing
+   carried from this one.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

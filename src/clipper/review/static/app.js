@@ -86,6 +86,7 @@ const draftTexts = document.getElementById("draft-texts");
 const MAX_TEXTS = 5;
 const HOOK_SECONDS = 3;
 let people = []; // the names the page offers as on screen
+let sourceName = ""; // the video's name, which keys the people carried over
 let trashArmed = null; // the timer while Trash waits for its second click
 let busy = false; // while a Save is waiting on the server (a re-render)
 let span = null; // the chosen clip's edited {start, end}
@@ -737,12 +738,40 @@ function savedMarks(clip) {
 }
 
 // The rating and people shown for a clip: saved, or changed and not saved.
+// A clip with no verdict yet starts with the people of the last clip saved
+// from this video, unsaved (V8 item 4d).
 function marksOf(clip) {
   if (!marks.has(clip.key)) {
     const saved = savedMarks(clip);
-    marks.set(clip.key, { rating: saved.rating, people: new Set(saved.people) });
+    const carried = clip.isNew || badgeText(clip) === "" ? lastPeople() : [];
+    marks.set(clip.key, {
+      rating: saved.rating,
+      people: new Set(carried.length ? carried : saved.people),
+      carried: carried.length > 0,
+    });
   }
   return marks.get(clip.key);
+}
+
+const PEOPLE_KEY = "clipper-review-people:";
+
+// The people last saved from this video, still on the list; kept in local
+// storage as a convenience.
+function lastPeople() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PEOPLE_KEY + sourceName));
+    return Array.isArray(saved) ? people.filter((name) => saved.includes(name)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberPeople(names) {
+  try {
+    localStorage.setItem(PEOPLE_KEY + sourceName, JSON.stringify(names));
+  } catch {
+    // Storage is blocked; the next clips start with nobody marked.
+  }
 }
 
 // The people marked for a clip, in the list's order.
@@ -768,11 +797,13 @@ function drawRating(clip) {
       } else {
         mark.people.add(name);
       }
+      mark.carried = false;
       drawRating(clip);
       drawUnsaved();
     });
     peopleBox.append(button);
   }
+  document.getElementById("people-carried").hidden = !mark.carried;
   document.getElementById("people-field").hidden = people.length === 0;
 }
 
@@ -1344,6 +1375,7 @@ saveButton.addEventListener("click", async () => {
   judgeNotice(rendered ? "Re-rendering the clip; this takes a few seconds." : "");
   try {
     const path = clip.isNew ? "/api/clips/add" : `/api/clips/${clip.rank}/save`;
+    const onScreen = chosenPeople(clip);
     const reply = await post(path, {
       start: span.start,
       end: span.end,
@@ -1352,7 +1384,7 @@ saveButton.addEventListener("click", async () => {
       style: chosenStyle(clip),
       cam: chosenStyle(clip) === "facecam" ? camOf(clip) : null,
       rating: marksOf(clip).rating,
-      people: chosenPeople(clip),
+      people: onScreen,
       ...sentShape(clip),
       broll: sentOverlays(clip),
       texts: sentTexts(clip),
@@ -1362,6 +1394,7 @@ saveButton.addEventListener("click", async () => {
       audio: sentAudio(clip),
     });
     clip.isNew = false;
+    rememberPeople(onScreen);
     judged(clip, reply);
     const [message, failed] = savedMessage(reply, rendered);
     if (clip === current) {
@@ -1753,6 +1786,7 @@ async function load() {
   duration = data.duration;
   framesKey = encodeURIComponent(data.frames_key);
   text("source", data.source);
+  sourceName = data.source;
   people = data.people || [];
   burnsCaptions = Boolean(data.captions);
   isVertical = Boolean(data.vertical);
