@@ -3784,6 +3784,26 @@ RV12, with two or more clips that have no verdict, and names in
 
 Then delete the scratch folders.
 
+### RV36. A second text at the playhead
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s texts at
+the playhead amendment (V8 item 4f). Same scratch copy and labels dir as
+RV12.
+
+1. Choose a clip with no texts and press `T`. Pass: the title at the top,
+   `0` to `3`, as before.
+2. Give it a colour, `Outline`, `Medium` and `Fade in`, and drag it on
+   the preview.
+3. Move the playhead about 10 s into the clip and press `T`. Pass: a new
+   row starting at about `10` and ending 3 s later, in the middle, with
+   the same colour, outline, size and fade, not at the dragged spot.
+4. Put the playhead in the last second of the clip and press `T`. Pass:
+   it starts 0.5 s before the end and ends at the end.
+5. Put the playhead before the span and press `T`. Pass: it starts at
+   `0`.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

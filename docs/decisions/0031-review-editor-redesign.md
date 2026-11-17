@@ -323,6 +323,16 @@ asked for a chat box that turns a described edit into the page's edits.
   and trashed clips keep their own marks; nothing is written until Save
   (ADR 0024, rating amendment). Manual step RV35.
 
+## Amended by texts at the playhead (V8 item 4f)
+
+- From the click audit (V8 item 4a): every text after the first started
+  at 0 to 3 s in the default look, so its times and look were set again.
+  The first text is still the title, 0 to 3 s at the top (ADR 0030);
+  later ones start at the playhead in the finished clip's seconds (0
+  outside the clip, at most 0.5 s before its end), last 3 s or to the
+  end, in the middle, with the last text's colour, look, size and fade
+  (not its dragged position). Manual step RV36.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).
