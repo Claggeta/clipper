@@ -3396,7 +3396,8 @@ music file you may post in `data\music\` and a short sound effect in
 `data\sfx\` first.
 
 1. Choose a clip and open `Audio`. Pass: a `Clip volume` slider at
-   `0 dB`, `Music` listing your file, `Add effect at playhead`, and a note
+   `0 dB`, `Music` listing your file, an `Add … at playhead (E)` button, a
+   button per sound (since V8 4c, RV34), and a note
    naming the folders. With both folders empty the note says where to
    put files.
 2. Set the volume to `+6 dB` and play the preview. Pass: louder than
@@ -3404,7 +3405,7 @@ music file you may post in `data\music\` and a short sound effect in
 3. Pick the music. Pass: it plays under the preview, quieter while
    people talk, and stops when the preview pauses; `Lower under speech`
    off keeps it level.
-4. Put the playhead on a moment, press `Add effect at playhead`. Pass: a
+4. Put the playhead on a moment, press `Add … at playhead`. Pass: a
    marker under the strip; the effect plays when the preview passes it.
 5. Save. Pass: "re-rendered"; the draft has the louder voice, the music
    dipping under speech and fading out at the end, and the effect at its
@@ -3730,6 +3731,33 @@ as RV12, with a short sound effect in `data\sfx\`.
    Pass: the selected block is removed, as before.
 6. Play the preview over the moved effect, then Save. Pass: the effect
    plays at its new moment in the preview and in the re-rendered draft.
+
+Then delete the scratch folders.
+
+### RV34. The sound palette and `E`
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s sound
+palette amendment (V8 item 4c). Same scratch copy and labels dir as RV12,
+with two or more sound effects in `data\sfx\`.
+
+1. Choose a clip and open `Audio`. Pass: under the add button, a button
+   per sound in `data\sfx\`, named without the extension.
+2. Put the playhead on a moment and press one sound's button. Pass: that
+   sound is added at the playhead in one press, a marker under the strip;
+   the button is outlined and the add button reads `Add <that sound> at
+   playhead (E)`.
+3. Change the new row's level to `-8 dB`. Open the `Clip` tab, move the
+   playhead and press `E`. Pass: the same sound at `-8 dB` at the new
+   playhead, without leaving `Clip`.
+4. Play the preview and press `E` on a beat. Pass: an effect where the
+   playhead was when pressed.
+5. Reload and choose another clip. Pass: the add button still names the
+   last sound; `E` adds it at its level.
+6. Add effects up to 10. Pass: the add button and palette are disabled
+   and `E` does nothing.
+7. Tick `This block only` on a clip with two blocks and press a sound.
+   Pass: the effect is on the selected block (a tick on the Sequence
+   lane), not under the strip.
 
 Then delete the scratch folders.
 

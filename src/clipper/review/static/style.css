@@ -658,6 +658,19 @@ button[aria-pressed="true"] {
   z-index: 2;
 }
 
+.sfx-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sfx-palette button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.sfx-palette button.last { border-color: var(--accent); }
+
 .effect-mark.selected { box-shadow: 0 0 0 2px #fff; }
 .effect-row.selected { outline: 1px solid var(--accent); }
 

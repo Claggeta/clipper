@@ -25,6 +25,10 @@ let lastAudioTime = null; // the source time of the last preview frame
 let lastAudioClip = NaN; // and the finished clip's, for blocks' own effects
 let effectsBlockOnly = false; // "This block only" in the Audio tab
 let selectedEffect = null; // the clip effect whose marker was pressed (V8 item 4a)
+// The sound and level last picked, which the next effect starts as (V8
+// item 4c); kept in local storage as a convenience.
+const LAST_EFFECT_KEY = "clipper-review-last-effect";
+let lastEffect = readLastEffect();
 
 function decibels(db) {
   return Math.pow(10, db / 20);
@@ -77,6 +81,62 @@ function audioText(audio) {
 
 function sameAudio(clip) {
   return audioText(sentAudio(clip)) === audioText(savedAudio(clip));
+}
+
+function readLastEffect() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_EFFECT_KEY));
+    if (saved && typeof saved.file === "string" && EFFECT_LEVELS.includes(saved.level_db)) {
+      return { file: saved.file, level_db: saved.level_db };
+    }
+  } catch {
+    // Storage is blocked or holds something else.
+  }
+  return null;
+}
+
+function rememberEffect(effect) {
+  lastEffect = { file: effect.file, level_db: effect.level_db };
+  try {
+    localStorage.setItem(LAST_EFFECT_KEY, JSON.stringify(lastEffect));
+  } catch {
+    // Storage is blocked; the choice lasts until the page reloads.
+  }
+}
+
+// The last sound picked while its file is still there, else the first.
+function nextEffect() {
+  if (lastEffect && audioFiles.sfx.includes(lastEffect.file)) {
+    return lastEffect;
+  }
+  return { file: audioFiles.sfx[0], level_db: 0 };
+}
+
+function soundName(file) {
+  return file.replace(/\.[^.]+$/, "").replaceAll("-", " ");
+}
+
+// A sound at the playhead: on the selected block with "This block only",
+// else on the clip.
+function addEffect(clip, file, level_db) {
+  const own = blockTarget(effectsBlockOnly, true, true);
+  if (own) {
+    own.effects.push({
+      file,
+      at_seconds: round(clamp(timeInBlock(selectedBlock), 0, blockLength(own) - 0.1)),
+      level_db,
+    });
+    own.effects.sort((a, b) => a.at_seconds - b.at_seconds);
+  } else {
+    audioOf(clip).effects.push({
+      file,
+      at_seconds: round(clamp(player.currentTime, span.start, span.end - 0.1)),
+      level_db,
+    });
+  }
+  rememberEffect({ file, level_db });
+  drawAudioEditor(clip);
+  audioChanged();
 }
 
 function audioChanged() {
@@ -191,6 +251,8 @@ function drawAudioEditor(clip) {
       effect.file,
       (value) => {
         effect.file = value;
+        rememberEffect(effect);
+        drawAudioEditor(clip);
         audioChanged();
       },
     );
@@ -204,6 +266,8 @@ function drawAudioEditor(clip) {
       String(effect.level_db),
       (value) => {
         effect.level_db = Number(value);
+        rememberEffect(effect);
+        drawAudioEditor(clip);
         audioChanged();
       },
     );
@@ -222,31 +286,36 @@ function drawAudioEditor(clip) {
   const heading = block
     ? `Sound effects (block ${selectedBlock + 1} only, seconds into the block)`
     : "Sound effects (seconds into the span)";
-  audioBox.append(labelled(heading, effects));
+  // The add button repeats the last sound and level (E); the palette adds
+  // any sound in one press, at the last level.
+  const full = list.length >= 10;
+  const next = audioFiles.sfx.length ? nextEffect() : null;
   const add = document.createElement("button");
   add.type = "button";
-  add.textContent = "Add effect at playhead";
-  add.disabled = !audioFiles.sfx.length || list.length >= 10;
-  add.addEventListener("click", () => {
-    const own = blockTarget(effectsBlockOnly, true, true);
-    if (own) {
-      own.effects.push({
-        file: audioFiles.sfx[0],
-        at_seconds: round(clamp(timeInBlock(selectedBlock), 0, blockLength(own) - 0.1)),
-        level_db: 0,
-      });
-      own.effects.sort((a, b) => a.at_seconds - b.at_seconds);
-    } else {
-      audio.effects.push({
-        file: audioFiles.sfx[0],
-        at_seconds: round(clamp(player.currentTime, span.start, span.end - 0.1)),
-        level_db: 0,
-      });
-    }
-    drawAudioEditor(clip);
-    audioChanged();
-  });
+  add.id = "add-effect";
+  add.textContent = next
+    ? `Add ${soundName(next.file)} at playhead (E)`
+    : "Add effect at playhead";
+  add.title = full ? "Up to 10 sound effects" : "The last sound and level picked";
+  add.disabled = !next || full;
+  add.addEventListener("click", () => addEffect(clip, next.file, next.level_db));
   audioBox.append(add);
+  if (audioFiles.sfx.length) {
+    const palette = document.createElement("div");
+    palette.className = "sfx-palette";
+    for (const file of audioFiles.sfx) {
+      const sound = document.createElement("button");
+      sound.type = "button";
+      sound.textContent = soundName(file);
+      sound.title = `Add ${file} at the playhead`;
+      sound.classList.toggle("last", file === next.file);
+      sound.disabled = full;
+      sound.addEventListener("click", () => addEffect(clip, file, next.level_db));
+      palette.append(sound);
+    }
+    audioBox.append(labelled("Add at playhead", palette));
+  }
+  audioBox.append(labelled(heading, effects));
   audioNote.textContent =
     audioFiles.music.length || audioFiles.sfx.length
       ? "Your own files, from data/music and data/sfx."
