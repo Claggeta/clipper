@@ -1686,9 +1686,9 @@ confirmation first.
    - 4b. ~~Draggable sound effect markers: press to select and seek, drag
      to move (snapping to word starts), `Backspace` removes the selected
      one. ADR 0031 amendment, manual step RV33.~~ (done; #259)
-   - 4c. The sound palette: a button per sound adds it at the playhead,
+   - 4c. ~~The sound palette: a button per sound adds it at the playhead,
      the add button and `E` (any tab) repeat the last sound and level.
-     ADR 0031 amendment, manual step RV34.
+     ADR 0031 amendment, manual step RV34.~~ (done; #262)
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).
