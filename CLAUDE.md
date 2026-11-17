@@ -930,7 +930,7 @@ In progress:
   the heuristic found 1 at top 5 and 3 at top 30, the LLM 1 at top 30. Clips
   and the maintainer's picks disagree, so clip labels are a weak stand-in
   for "worth posting"; trial notes count more. Small samples.
-- Campaign briefs read (2026-11-10 and 11-11), four so far. None asks
+- Campaign briefs read (2026-11-10, 11-11 and 11-16), five so far. None asks
   for a detector input; all ask for work at the edit and post stage.
   - Lacy (a pool campaign, paid by share of views): clips from Lacy's
     Twitch, YouTube and other accounts, Lacy the main focus, Lacy's name in
@@ -960,6 +960,15 @@ In progress:
   - JasonTheWeen (pool, 700,000 views minimum, ends 2026-11-30): any
     video featuring JasonTheWeen, on any channel; caption or overlay names
     JasonTheWeen, `#JasonTheWeen`.
+  - Fortnite creators (read 2026-11-16; 10,000 views minimum): footage
+    only from Sypher's, Replays' or Maddynf's VODs of their 2026-11-15
+    stream, inside the eligible timestamps the brief lists; the three
+    playing together as the main focus; caption or overlay names one of
+    them; `#fortnitecreative #uefn`; English only, no logos, no AI video,
+    not negative toward them or Fortnite, Epic or UEFN. In
+    `data/campaigns.txt` with `#fortnitecreative` only (one hashtag per
+    campaign); `#uefn` is added by hand at upload, the maintainer's
+    choice. The timestamps and "playing together" are checked in review.
 - Back burner, decided later: audience signals (YouTube "most replayed",
   chat activity, viewers over time, Twitch community clips). Checked
   2026-11-03 with yt-dlp metadata: a heatmap on 1 of 3 YouTube videos, no
