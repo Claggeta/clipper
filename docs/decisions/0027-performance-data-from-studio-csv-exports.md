@@ -69,6 +69,49 @@ video (0008, 0019), and no record says which draft became which Short.
 - Clips posted for campaigns are judged by the same numbers as the rest;
   campaign payouts are not imported.
 
+## Amended by the first export (V8 rescope, 2026-11-17)
+
+- Seen: one export of the channel's content, 2026-10-20 to 2026-11-17,
+  saved by Studio as a folder named `Content <from>_<to> <channel>`
+  holding three files:
+  - `Table data.csv`: a `Total` row, then one row per Short (69). Its
+    columns are those picked in Studio's column chooser; the default set
+    had no retention figures, so the maintainer added them and exported
+    again. The second export's 32 columns: `Content` (the YouTube video
+    ID), `Video title`, `Video publish time` (`Nov 11, 2026`), `Duration`
+    (whole seconds), `Engaged views`, `Average view duration` (`0:00:21`),
+    `Average percentage viewed (%)`, `Stayed to watch (%)`, `Unique
+    viewers`, `Unique reach`, `Views (co-viewed)`, `Average views per
+    viewer`, `New viewers`, `Returning viewers`, `Casual viewers`,
+    `Regular viewers`, `Subscribers gained`, `Subscribers lost`, `Likes`,
+    `Dislikes`, `Likes (vs. dislikes) (%)`, `Shares`, `Comments added`,
+    `Hypes`, `Hype points`, `Community clip views`, `Watch time from
+    community clips (hours)`, `Views`, `Watch time (hours)`,
+    `Subscribers`, `Thumbnail impressions`, `Thumbnail click-through rate
+    (%)`.
+  - `Chart data.csv`: views per Short per day (`Date`, `Content`, `Video
+    title`, `Video publish time`, `Duration`, then the chosen metric).
+  - `Totals.csv`: the channel's figure per day.
+- Blank cells are common: 7 Shorts have no counts at all, 8 to 10 no
+  retention figures, and the four viewer-type columns are blank on every
+  row. A blank is "not reported", not 0.
+- Both figures decision 2 prefers are present: `Stayed to watch (%)`
+  (viewed against swiped away) and `Average percentage viewed (%)`. The
+  parser reads columns by name and needs only `Content`, `Video title`,
+  `Video publish time` and `Duration`; any other column is kept if
+  present.
+- Linking (decision 3): `Content` is the video ID, which
+  `data/posts.json` already records for posts made with `clipper posted`
+  (8 of the 69, all in the export), so those join exactly. The other 61
+  go through the matching in decision 3.
+- First figures, for the record: views median 6 and max 1,439. Of the
+  60 Shorts posted on 2026-11-10 and 11, 2 passed 400 views; of the 9
+  posted from 2026-11-12 on, at 1 to 3 a day, 6 did (491 to 1,357).
+  Stayed to watch on the 8 over 400: 51 to 69%. Average
+  percentage viewed by length: 81.5% under 30 s (4 Shorts), 56.2% at 30
+  to 40 s (19), 53.6% at 40 to 50 s (27), 46.4% at 50 s or more (8).
+  1 share and 4 comments in all. Small samples.
+
 ## Revisit when
 
 - The export lacks figures the report needs, or matching leaves many
