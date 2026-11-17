@@ -501,6 +501,8 @@ and planned code:
   and level repeated by the add button and `E`; RV34.
   People amendment (V8 4d): an unjudged clip starts with the last Save's
   people from the same video, unsaved; RV35.
+  Texts amendment (V8 4f): texts after the first start at the playhead
+  for 3 s in the last text's look; RV36.
 - `0032` — Combine (first called Summarize, renamed 2026-11-13): a VOD's
   saved clips joined in VOD order into `<stem>_combined.mp4` by
   `ClipRenderer.join` (`concat`, label cards as on-screen texts, music as
@@ -1694,6 +1696,9 @@ confirmation first.
    - 4d. ~~People carried over: a clip with no verdict starts with the
      people of the last clip saved from the same video, unsaved. ADR
      0031 amendment, manual step RV35.~~ (done; #264)
+   - 4f. Texts at the playhead: a text after the first starts at the
+     playhead for 3 s in the last text's look. ADR 0031 amendment,
+     manual step RV36.
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).

@@ -580,15 +580,36 @@ thumbButton.addEventListener("click", async () => {
 });
 
 // The first text is a hook: the title, over the first seconds at the top.
+// Later ones start at the playhead, for HOOK_SECONDS, in the look of the
+// last text (V8 item 4e).
 document.getElementById("add-text").addEventListener("click", () => {
   const texts = textsOf(current);
-  const first = texts.length === 0;
-  texts.push({
-    text: first ? titleBox.value.trim() || current.title || "" : "",
-    start: 0,
-    end: HOOK_SECONDS,
-    place: first ? "top" : "middle",
-  });
+  if (texts.length === 0) {
+    texts.push({
+      text: titleBox.value.trim() || current.title || "",
+      start: 0,
+      end: HOOK_SECONDS,
+      place: "top",
+    });
+  } else {
+    const length = clipLength();
+    const at = clipSeconds(player.currentTime);
+    const start = round(clamp(Number.isFinite(at) ? at : 0, 0, Math.max(length - 0.5, 0)));
+    const last = texts[texts.length - 1];
+    const look = {};
+    for (const field of ["colour", "look", "size", "fade"]) {
+      if (last[field] !== undefined) {
+        look[field] = last[field];
+      }
+    }
+    texts.push({
+      text: "",
+      start,
+      end: round(Math.min(start + HOOK_SECONDS, length)),
+      place: "middle",
+      ...look,
+    });
+  }
   drawTexts(current);
   textsChanged();
 });
