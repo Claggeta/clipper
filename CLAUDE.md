@@ -499,6 +499,8 @@ and planned code:
   snapping), pressed to select, `Backspace` removes; RV33.
   Sound palette amendment (V8 4c): a button per sound, the last sound
   and level repeated by the add button and `E`; RV34.
+  People amendment (V8 4d): an unjudged clip starts with the last Save's
+  people from the same video, unsaved; RV35.
 - `0032` — Combine (first called Summarize, renamed 2026-11-13): a VOD's
   saved clips joined in VOD order into `<stem>_combined.mp4` by
   `ClipRenderer.join` (`concat`, label cards as on-screen texts, music as
@@ -1689,6 +1691,9 @@ confirmation first.
    - 4c. ~~The sound palette: a button per sound adds it at the playhead,
      the add button and `E` (any tab) repeat the last sound and level.
      ADR 0031 amendment, manual step RV34.~~ (done; #262)
+   - 4d. People carried over: a clip with no verdict starts with the
+     people of the last clip saved from the same video, unsaved. ADR
+     0031 amendment, manual step RV35.
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).
