@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     # The post queue's campaigns and posts record (ADR 0028).
     campaigns_file: Path = Path("data/campaigns.txt")
     posts_file: Path = Path("data/posts.json")
+    # Snapshots of YouTube Studio exports, out of git (ADR 0027).
+    performance_dir: Path = Path("data/performance")
     # Ollama's default address, and the model chosen from eval results
     # (ADR 0014, 7c amendment).
     llm_url: str = "http://127.0.0.1:11434"

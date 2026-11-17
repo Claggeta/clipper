@@ -2614,6 +2614,37 @@ copy is gone.
 Run 2026-11-16 by the assistant on the maintainer's clips (exFAT, so
 copies rather than hard links): 2 clips and a thumbnail, names as above.
 
+### P1. `clipper performance` on a Studio export
+
+Covers [ADR 0027](decisions/0027-performance-data-from-studio-csv-exports.md)'s
+import amendment (V8 item 6), with a YouTube Studio content export folder
+(Advanced mode, Content tab, with "Stayed to watch" and "Average percentage
+viewed" chosen as columns):
+
+```powershell
+Copy-Item data\posts.json "$env:TEMP\p1-posts.json"
+$env:CLIPPER_POSTS_FILE = "$env:TEMP\p1-posts.json"
+$env:CLIPPER_PERFORMANCE_DIR = "$env:TEMP\p1-performance"
+uv run clipper performance "D:\Clippett\YT_CSVs\Content 2026-10-20_2026-11-17 Stream-o-sphere"
+uv run clipper performance "D:\Clippett\YT_CSVs\Content 2026-10-20_2026-11-17 Stream-o-sphere" --link
+Remove-Item Env:CLIPPER_POSTS_FILE, Env:CLIPPER_PERFORMANCE_DIR
+```
+
+Pass: the first run prints a Shorts table whose views, stayed to watch and
+average percentage viewed match Studio's for a few Shorts, a blank figure
+as `-`; length bands in order; one row per channel (no repeated name);
+a "Not linked" table whose near titles carry `(<folder>/<file>)`; a
+`Linked:` count; and `Snapshot: <temp>\p1-performance\2026-11-17` holding
+the export's CSV files unchanged. The `--link` run says `Added <n>
+post(s)` for the `matched` count, and a third run counts them `by the
+posts record` and adds 0. Settle one near title with `clipper posted
+<folder>/<file> https://youtube.com/shorts/<id> --on <published>` against
+the same temp posts file; the next run counts it by the posts record.
+
+Run 2026-11-17 by the assistant on the maintainer's first export, against
+a temp posts file: 69 Shorts, 8 by the posts record, 7 matched, 54 not
+found; bands, channels and snapshot as above.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`

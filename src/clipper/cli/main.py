@@ -36,6 +36,7 @@ from clipper.adapters.results.posting_files import (
     save_posts,
     write_uploads,
 )
+from clipper.adapters.results.studio_files import load_studio_export, save_snapshot
 from clipper.adapters.results.video_info_json import (
     load_video_info,
     save_video_info,
@@ -55,6 +56,18 @@ from clipper.core.interfaces import StoryWriter, TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
 from clipper.core.labeling import clip_labels
 from clipper.core.naming import clip_folder, plan_clip_paths, variant_file_name
+from clipper.core.performance import (
+    BAND_NAMES,
+    Group,
+    ShortLink,
+    by_channel,
+    by_length,
+    by_style,
+    draft_clips,
+    group_shorts,
+    link_shorts,
+    matched_posts,
+)
 from clipper.core.pipeline import AnalysisPipeline
 from clipper.core.posting import (
     UPLOAD_FOLDER,
@@ -1544,6 +1557,165 @@ def posted(
         f"{action} {escape(key)}: {source.video_id} on {day.isoformat()}",
         soft_wrap=True,
     )
+
+
+@app.command()
+def performance(
+    folder: Annotated[
+        Path,
+        typer.Argument(
+            help="A YouTube Studio export folder, with its Table data.csv.",
+            show_default=False,
+        ),
+    ],
+    link: Annotated[
+        bool,
+        typer.Option(
+            "--link",
+            help="Add each Short matched to one draft to the posts record.",
+        ),
+    ] = False,
+) -> None:
+    """Report how posted Shorts do, from a YouTube Studio export (ADR 0027).
+
+    Keeps a snapshot of the export under the performance dir, links each
+    Short to its draft (by the posts record, else by title, length and
+    day), and prints stayed to watch, average percentage viewed and views
+    per Short and by length, channel and style.
+    """
+    settings = Settings()
+    try:
+        export = load_studio_export(folder)
+        day = export.last_day or date.today()
+        snapshot = settings.performance_dir / day.isoformat()
+        save_snapshot(folder, snapshot)
+        posts = load_posts(settings.posts_file)
+        folders = load_drafts_folders(
+            settings.clips_dir, settings.labels_dir, settings.videos_dir
+        )
+        links = link_shorts(export.rows, draft_clips(folders), posts)
+        added = matched_posts(links) if link else []
+        for record in added:
+            posts, _ = record_post(posts, record)
+        if added:
+            save_posts(posts, settings.posts_file)
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+
+    console.print(_shorts_table(links, day))
+    for title, name_of, order in (
+        ("By length", by_length, BAND_NAMES),
+        ("By channel", by_channel, ()),
+        ("By style", by_style, ()),
+    ):
+        groups = group_shorts(links, name_of, order)
+        if groups:
+            console.print(_groups_table(title, groups))
+    unlinked = [x for x in links if x.status in ("ambiguous", "none")]
+    if unlinked:
+        console.print(_unlinked_table(unlinked))
+        console.print(
+            "Settle one with: clipper posted <folder>/<file> "
+            "https://youtube.com/shorts/<id> --on <published>",
+            soft_wrap=True,
+        )
+    counts = {s: sum(x.status == s for x in links) for s in _LINK_WORDS}
+    console.print(
+        "Linked: " + ", ".join(f"{counts[s]} {w}" for s, w in _LINK_WORDS.items())
+    )
+    if link:
+        console.print(
+            f"Added {len(added)} post(s) to {escape(str(settings.posts_file))}",
+            soft_wrap=True,
+        )
+    console.print(f"Snapshot: {escape(str(snapshot))}", soft_wrap=True)
+
+
+_LINK_WORDS = {
+    "posted": "by the posts record",
+    "matched": "matched",
+    "ambiguous": "ambiguous",
+    "none": "not found",
+}
+
+
+def _figure(value: float | None, unit: str = "") -> str:
+    if value is None:
+        return "-"
+    return f"{value:.1f}{unit}" if unit else f"{value:g}"
+
+
+def _shorts_table(links: Sequence[ShortLink], day: date) -> Table:
+    table = Table(
+        "Published",
+        "Age",
+        "Length",
+        "Views",
+        "Stayed",
+        "Viewed",
+        "Likes",
+        "Link",
+        "Title",
+        title="Shorts",
+    )
+    for x in sorted(
+        links, key=lambda x: (x.row.published, x.row.views or 0), reverse=True
+    ):
+        row = x.row
+        table.add_row(
+            row.published.isoformat(),
+            f"{(day - row.published).days} d",
+            f"{row.duration_seconds} s",
+            _figure(row.views),
+            _figure(row.stayed_to_watch, "%"),
+            _figure(row.average_percentage_viewed, "%"),
+            _figure(row.likes),
+            x.status,
+            escape(row.title),
+        )
+    return table
+
+
+def _groups_table(title: str, groups: Sequence[Group]) -> Table:
+    table = Table(
+        "Group",
+        "Shorts",
+        "Views",
+        "Stayed",
+        "Viewed",
+        title=f"{title} (medians)",
+    )
+    for group in groups:
+        table.add_row(
+            escape(group.name),
+            str(group.shorts),
+            _figure(group.views),
+            _figure(group.stayed_to_watch, "%"),
+            _figure(group.average_percentage_viewed, "%"),
+        )
+    return table
+
+
+def _unlinked_table(links: Sequence[ShortLink]) -> Table:
+    table = Table(
+        "Video",
+        "Published",
+        "Status",
+        "Title",
+        "Drafts or close titles",
+        title="Not linked",
+    )
+    for x in links:
+        found = x.candidates if x.status == "ambiguous" else x.close
+        table.add_row(
+            x.row.video_id,
+            x.row.published.isoformat(),
+            x.status,
+            escape(x.row.title),
+            escape("; ".join(found)),
+        )
+    return table
 
 
 def _review_title_writer(build: AppContext, settings: Settings) -> TitleWriter | None:

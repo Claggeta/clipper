@@ -275,6 +275,23 @@ title (`ron-shocked-at-the-gas-pump.mp4`), and its thumbnail in
 and the folder's videos and images are replaced on each run. See
 [ADR 0028](docs/decisions/0028-post-queue.md).
 
+### How posted Shorts do
+
+```powershell
+uv run clipper performance "path\to\Content 2026-10-20_2026-11-17 <channel>"
+uv run clipper performance "path\to\<export folder>" --link
+```
+
+Reads a YouTube Studio content export (Advanced mode, Content tab, with
+"Stayed to watch" and "Average percentage viewed" chosen as columns),
+keeps a copy under `data/performance/<last day>/` (not committed), links
+each Short to its draft (by `data/posts.json`, else by title, length
+and day) and prints views, stayed to watch and average percentage viewed
+per Short and by length, channel and style. `--link` records each matched
+Short in `data/posts.json`; settle the rest with `clipper posted`. No
+YouTube login or API. See
+[ADR 0027](docs/decisions/0027-performance-data-from-studio-csv-exports.md).
+
 ### Evaluating detectors
 
 `eval` measures the detector against moments you labeled by hand. It reruns the
@@ -378,6 +395,7 @@ repo root or set absolute paths.
 | `CLIPPER_PEOPLE_FILE`  | `data/people.txt` | Names offered in `review` |
 | `CLIPPER_CAMPAIGNS_FILE`| `data/campaigns.txt` | Campaigns `queue` checks clips against |
 | `CLIPPER_POSTS_FILE`   | `data/posts.json` | Where `posted` records posts |
+| `CLIPPER_PERFORMANCE_DIR`| `data/performance` | Where `performance` keeps Studio export snapshots |
 | `CLIPPER_LLM_URL`      | `http://127.0.0.1:11434` | Ollama server for `--detector llm` |
 | `CLIPPER_LLM_MODEL`    | `qwen3.5:9b`  | Ollama model for `--detector llm`      |
 
