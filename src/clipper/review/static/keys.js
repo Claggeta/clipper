@@ -160,6 +160,7 @@ const CLIP_KEYS = {
   // A selected sound effect marker first, else the selected block.
   backspace: () => removeSelectedEffect() || press("seq-remove"),
   t: () => press("add-text"),
+  e: () => press("add-effect"),
 };
 
 // Keys that work with no clip chosen.

@@ -301,6 +301,17 @@ asked for a chat box that turns a described edit into the page's edits.
   the clip's own effects are on this lane; a block's own stay on the
   Sequence lane. Nothing saved changes. Manual step RV33.
 
+## Amended by the sound palette (V8 item 4c)
+
+- From the click audit (V8 item 4a): each effect started as the first
+  file at 0 dB, so a sound took 4 to 6 clicks. The Audio tab now has a
+  button per file in `data/sfx/` that adds it at the playhead in one
+  press, and the add button (`E`, from any tab) repeats the last sound
+  and level picked, by a button or a row's dropdowns; that choice is
+  kept in local storage as a convenience, the first file at 0 dB
+  without it. Both respect "This block only" and the 10-effect limit.
+  Nothing saved changes. Manual step RV34.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

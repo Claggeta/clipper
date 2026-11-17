@@ -497,6 +497,8 @@ and planned code:
   browser's audio engine (ADR 0007 amendment); `static/audio.js`; RV24.
   Effect markers amendment (V8 4b): markers dragged to move (word
   snapping), pressed to select, `Backspace` removes; RV33.
+  Sound palette amendment (V8 4c): a button per sound, the last sound
+  and level repeated by the add button and `E`; RV34.
 - `0032` — Combine (first called Summarize, renamed 2026-11-13): a VOD's
   saved clips joined in VOD order into `<stem>_combined.mp4` by
   `ClipRenderer.join` (`concat`, label cards as on-screen texts, music as
@@ -1684,6 +1686,9 @@ confirmation first.
    - 4b. ~~Draggable sound effect markers: press to select and seek, drag
      to move (snapping to word starts), `Backspace` removes the selected
      one. ADR 0031 amendment, manual step RV33.~~ (done; #259)
+   - 4c. The sound palette: a button per sound adds it at the playhead,
+     the add button and `E` (any tab) repeat the last sound and level.
+     ADR 0031 amendment, manual step RV34.
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).
