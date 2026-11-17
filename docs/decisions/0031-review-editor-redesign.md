@@ -377,6 +377,24 @@ asked for a chat box that turns a described edit into the page's edits.
   keys inside a closed menu (6 to 7 blocks), the checklist, Space with
   a checkbox focused. Manual step RV39.
 
+## Amended by the bin (V8 item 9b)
+
+- The pad and the B-roll list leave the clip list's column (the
+  maintainer's ask, V8 rescope) for a **bin** on the timeline's left,
+  beside the lanes they are dragged onto: tabs for Pad and B-roll, one
+  shown at a time and remembered in local storage, each scrolling within
+  the timeline's height. The clip list gets the sidebar's full height.
+  Below 1200 px the bin stacks under the lanes.
+- **Clear pad** takes every piece off the pad after a second press
+  within 3 s, one request per piece; clips that use a piece keep their
+  blocks, as with ×. Each edit can start with a blank pad.
+- To pad opens the Pad tab. Nothing else changes: the pad is still per
+  drafts folder (ADR 0034), and pieces and files are dragged or added
+  as before.
+- Checked in headless Edge on a scratch copy of v2924392099: two pieces
+  sent, one added to the sequence, Clear pad emptied it. Manual step
+  RV40.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).
