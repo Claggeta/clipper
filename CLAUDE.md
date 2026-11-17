@@ -1762,13 +1762,16 @@ confirmation first.
 Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
 3 and 5 wait.
 
-6. Studio import (ADR 0027; the command name decided in the item): read
+6. ~~Studio import (ADR 0027; the command name decided in the item): read
    an export folder by column name, keep a dated snapshot under
    `data/performance/` (out of git), link Shorts to drafts by video ID
    through `posts.json` and the rest by matching (decision 3), ambiguous
    ones confirmed by hand and kept, and report stayed to watch, average
    percentage viewed and views per Short and by length, style and
-   channel. Manual step.
+   channel. Manual step.~~ (done; #273; `clipper performance`, `--link`
+   adds matches to `posts.json`; first export 8 by the posts record, 7
+   matched, 54 not found, most titles rewritten at upload; manual step
+   P1)
 7. A Shorts recipe in `drafts`, in PRs, each judged on posted Shorts
    (and picking changes on judged labels too); each may end in nothing:
    - 7a. The first on-screen text is the model's hook, not the title
