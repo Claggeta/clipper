@@ -722,6 +722,105 @@ button[aria-pressed="true"] {
 
 .strip-bar .scale { margin-left: auto; font-size: 12px; }
 
+/* One bar (V8 item 9a): groups of buttons, and menus for the cut and
+   block actions. */
+.bar-group { display: flex; gap: 4px; }
+
+button.compact { min-width: 30px; padding: 6px 8px; }
+
+details.menu { position: relative; }
+
+details.menu > summary {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+details.menu > summary::-webkit-details-marker { display: none; }
+
+details.menu > summary::after { content: " ▾"; color: var(--muted); }
+
+details.menu[open] > summary { border-color: var(--accent); }
+
+.menu-items {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+.menu-items button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.menu-items button:disabled { opacity: 0.45; cursor: default; }
+
+.menu-items kbd {
+  color: var(--muted);
+  font: 12px ui-monospace, monospace;
+}
+
+.menu-note { max-width: 260px; margin: 2px 4px 4px; font-size: 12px; }
+
+/* "On screen": the people checklist opens in place, under its summary. */
+.people-menu > summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.people-menu .menu-items {
+  position: static;
+  flex-direction: row;
+  min-width: 0;
+  margin-top: 4px;
+  box-shadow: none;
+}
+
+.people-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.judge .menu-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.judge .menu-check input { width: auto; margin: 0; }
+
+/* The lanes under the strip, each named on the left (V8 item 9a). */
+.lane-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.lane-name { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+.lane-row .sequence-lane,
+.lane-row .broll-lane { margin-top: 0; }
+
+.lane-note:empty { display: none; }
+
+.lane-note { display: block; margin-top: 2px; font-size: 12px; }
+
 /* The film strip: frames, then the dimmed outside, the span, the playhead
    and the two handles on top. Only the handles take the pointer, so a
    click anywhere else reaches the frames and seeks. */
@@ -1094,8 +1193,6 @@ kbd {
   gap: 6px;
 }
 
-.sequence-name { font-size: 12px; font-weight: 600; color: var(--muted); }
-
 .sequence-bar .muted { font-size: 12px; }
 
 .sequence-lane {
@@ -1245,8 +1342,6 @@ kbd {
 
 /* B-roll overlays (ADR 0034, B-roll amendment): bars in clip time under
    the Sequence lane. */
-.overlay-head { margin-top: 6px; }
-
 .broll-lane {
   position: relative;
   height: 24px;
@@ -1258,7 +1353,14 @@ kbd {
   touch-action: none;
 }
 
-.broll-lane.empty { height: 16px; }
+/* Named apart from the page's `.empty` placeholder, whose padding it took. */
+.broll-lane.no-overlays::before {
+  content: attr(data-placeholder);
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 22px;
+}
 
 .broll-lane.dropping { outline: 2px dashed var(--accent); }
 

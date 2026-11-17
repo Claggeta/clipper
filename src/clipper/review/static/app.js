@@ -807,27 +807,64 @@ function drawRating(clip) {
   for (const button of ratingBox.querySelectorAll("button")) {
     button.setAttribute("aria-pressed", String(button.dataset.value === mark.rating));
   }
+  // A checklist in the "On screen" dropdown; its summary names who is marked
+  // (V8 item 9a). It stays open while names are ticked.
   peopleBox.replaceChildren();
   for (const name of people) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = name;
-    button.setAttribute("aria-pressed", String(mark.people.has(name)));
-    button.addEventListener("click", () => {
-      if (mark.people.has(name)) {
-        mark.people.delete(name);
-      } else {
+    const row = document.createElement("label");
+    row.className = "menu-check";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = mark.people.has(name);
+    box.addEventListener("change", () => {
+      if (box.checked) {
         mark.people.add(name);
+      } else {
+        mark.people.delete(name);
       }
       mark.carried = false;
       drawRating(clip);
       drawUnsaved();
     });
-    peopleBox.append(button);
+    row.append(box, ` ${name}`);
+    peopleBox.append(row);
   }
+  const chosen = chosenPeople(clip);
+  document.getElementById("people-summary").textContent = chosen.length
+    ? chosen.join(", ")
+    : "Nobody marked";
   document.getElementById("people-carried").hidden = !mark.carried;
   document.getElementById("people-field").hidden = people.length === 0;
 }
+
+// --- Menus (V8 item 9a) ---
+
+// The bar's menus close after an action, on a press elsewhere, or on Esc;
+// the people checklist stays open while names are ticked.
+for (const menu of document.querySelectorAll("details.menu")) {
+  menu.addEventListener("click", (event) => {
+    if (event.target.closest(".menu-items button")) {
+      menu.open = false;
+    }
+  });
+}
+
+document.addEventListener("pointerdown", (event) => {
+  for (const menu of document.querySelectorAll("details.menu[open]")) {
+    if (!menu.contains(event.target)) {
+      menu.open = false;
+    }
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") {
+    return;
+  }
+  for (const menu of document.querySelectorAll("details.menu[open]")) {
+    menu.open = false;
+  }
+});
 
 // A second press on the chosen rating clears it.
 for (const button of ratingBox.querySelectorAll("button")) {

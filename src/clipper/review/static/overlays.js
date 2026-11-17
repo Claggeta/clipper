@@ -163,7 +163,7 @@ function drawOverlayLane() {
   const list = overlaysOf(current);
   const total = clipLength();
   selectedOverlay = selectedOverlay < list.length ? selectedOverlay : -1;
-  overlayLane.classList.toggle("empty", list.length === 0);
+  overlayLane.classList.toggle("no-overlays", list.length === 0);
   list.forEach((item, index) => {
     const bar = document.createElement("div");
     bar.className = `overlay-bar ${item.mode}`;
