@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated, NamedTuple
 
 import typer
+from pydantic import ValidationError
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
@@ -98,9 +99,11 @@ from clipper.domain.errors import (
     TitleError,
 )
 from clipper.domain.models import (
+    SCREEN_HOOK_SECONDS,
     AnalysisResult,
     CamPosition,
     ClipCandidate,
+    ClipTitle,
     ClipVariant,
     CropPath,
     Evaluation,
@@ -108,6 +111,7 @@ from clipper.domain.models import (
     FacecamLayout,
     ManifestClip,
     MediaInfo,
+    OnScreenText,
     PostRecord,
     QueuedSource,
     RenderManifest,
@@ -807,24 +811,6 @@ def _cut_clips(
                 else:
                     assert media.width is not None and media.height is not None
                     layout = plan_facecam(box, media.width, media.height, cam)
-        built = (
-            build_ass(result.transcript, candidate, vertical=vertical)
-            if captions
-            else None
-        )
-        ass = built.text if built else ""
-        if captions and not ass:
-            console.print(
-                f"[yellow]Note:[/yellow] #{number} {span} has no speech in range; "
-                "rendered without captions",
-                soft_wrap=True,
-            )
-        elif built and built.from_segments:
-            console.print(
-                f"[yellow]Note:[/yellow] #{number} {span} has no word timings; "
-                "captions show whole segments",
-                soft_wrap=True,
-            )
         text = clip_text(result.transcript, candidate) if writer else ""
         if writer and not text:
             console.print(
@@ -840,6 +826,26 @@ def _cut_clips(
             failures.append(f"#{number} {span}: {escape(str(exc))}")
             entries.append(ManifestClip(**entry, error=str(exc)))
             continue
+        texts = _screen_hook_texts(title, candidate, f"#{number} {span}")
+        spoken = result.transcript if captions else _NO_SPEECH
+        built = (
+            build_ass(spoken, candidate, vertical=vertical, texts=texts)
+            if captions or texts
+            else None
+        )
+        ass = built.text if built else ""
+        if captions and not (built and built.speech):
+            console.print(
+                f"[yellow]Note:[/yellow] #{number} {span} has no speech in range; "
+                "rendered without captions",
+                soft_wrap=True,
+            )
+        elif built and built.from_segments:
+            console.print(
+                f"[yellow]Note:[/yellow] #{number} {span} has no word timings; "
+                "captions show whole segments",
+                soft_wrap=True,
+            )
         # A landscape run renders once, with no style and no variants.
         wanted: list[VerticalStyle | None] = (
             [
@@ -864,9 +870,10 @@ def _cut_clips(
             if ass and margin is not None:
                 # Over a cam at the bottom, captions sit above it (ADR 0025).
                 style_ass = build_ass(
-                    result.transcript,
+                    spoken,
                     candidate,
                     vertical=vertical,
+                    texts=texts,
                     caption_margin_v=margin,
                 ).text
             try:
@@ -895,7 +902,7 @@ def _cut_clips(
                 ("vertical", vertical),
                 ("face", style is VerticalStyle.FACE),
                 ("facecam", style is VerticalStyle.FACECAM),
-                ("captions", ass),
+                ("captions", built is not None and built.speech),
                 ("titles", title),
             )
             tags = [t for t, on in shown if on]
@@ -909,7 +916,7 @@ def _cut_clips(
             continue
         rendered += 1
         burned = None
-        if ass and built:
+        if built and built.speech:
             burned = "segments" if built.from_segments else "words"
         entries.append(
             ManifestClip(
@@ -918,12 +925,15 @@ def _cut_clips(
                 captions=burned,
                 title=title.title if title else None,
                 hook=title.hook if title else None,
+                screen_hook=title.screen_hook if title else None,
                 variants=tuple(variants),
+                texts=texts,
             )
         )
         if title:
             console.print(f"  Title: {escape(title.title)}", soft_wrap=True)
             console.print(f"  Hook: {escape(title.hook)}", soft_wrap=True)
+            console.print(f"  Screen hook: {escape(title.screen_hook)}", soft_wrap=True)
 
     for failure in failures:
         console.print(f"[red]Failed:[/red] {failure}", soft_wrap=True)
@@ -948,6 +958,35 @@ def _cut_clips(
         raise typer.Exit(code=1) from exc
     console.print(f"Manifest: {escape(str(written))}", soft_wrap=True)
     return _CutResult(bool(failures), rendered, len(selected))
+
+
+# No speech, for a screen hook alone in a run without captions.
+_NO_SPEECH = Transcript(segments=())
+
+
+def _screen_hook_texts(
+    title: ClipTitle | None, candidate: ClipCandidate, clip: str
+) -> tuple[OnScreenText, ...]:
+    """The clip's first text: its screen hook over the first seconds at the
+    top (ADR 0030, screen hook amendment), or nothing without a title. A
+    screen hook the text rules refuse is a note, not a failure."""
+    if title is None:
+        return ()
+    length = candidate.end_seconds - candidate.start_seconds
+    try:
+        hook = OnScreenText(
+            text=title.screen_hook,
+            start_seconds=0.0,
+            end_seconds=min(SCREEN_HOOK_SECONDS, length),
+        )
+    except ValidationError as exc:
+        console.print(
+            f"[yellow]Note:[/yellow] {clip} screen hook not burned: "
+            f"{escape(exc.errors()[0]['msg'])}",
+            soft_wrap=True,
+        )
+        return ()
+    return (hook,)
 
 
 def _rendered_style(

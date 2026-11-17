@@ -1171,6 +1171,28 @@ the first run's titles. Since the no emoji amendment (V7 item 7i), titles
 have no emoji; any added by hand in review are shown as written in the
 console and in the review page's title box.
 
+### R19d. A screen hook burned over the first seconds
+
+Covers the screen hook amendments to
+[ADR 0018](decisions/0018-suggested-titles-via-ollama.md) and
+[ADR 0030](decisions/0030-on-screen-text-and-thumbnails.md), with R19a's
+video and helpers:
+
+```powershell
+Invoke-Titles $Vod $Json "--titles --vertical --rank 1 --rank 2" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19d" }
+Invoke-Titles $Vod $Json "--titles --vertical --captions --rank 1" @{ CLIPPER_CLIPS_DIR = "$S\clips-r19d-captions" }
+```
+
+Pass: each clip prints `Screen hook: <at most 6 words>` after its title
+and hook. Played, each clip shows that text at the top for its first 3
+seconds in a half-dark box, and no word captions in the first run; the
+second run shows the hook above the word captions. In the manifest each
+clip has `screen_hook` and one `texts` entry from 0 to 3; `captions` is
+`null` in the first run. Then open the first folder with `clipper review`:
+the clip's text row shows the screen hook; delete it, press Add text, and
+the new first text starts as the screen hook again. Record the screen
+hooks.
+
 ### R20. `--vertical --style face`: a crop that follows the face
 
 Covers the face style ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)).

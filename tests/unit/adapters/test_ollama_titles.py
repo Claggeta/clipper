@@ -10,8 +10,10 @@ from clipper.domain.models import ClipTitle, VideoInfo
 # All replies here are constructed, not produced by a real model.
 
 
-def _reply(title: object = "A title", hook: object = "A hook.") -> str:
-    return json.dumps({"title": title, "hook": hook})
+def _reply(
+    title: object = "A title", hook: object = "A hook.", screen: object = "Why?"
+) -> str:
+    return json.dumps({"title": title, "hook": hook, "screen_hook": screen})
 
 
 class FakeGenerator:
@@ -31,15 +33,17 @@ def test_satisfies_protocol() -> None:
 def test_sends_the_prompt_the_clip_text_and_the_title_schema() -> None:
     generator = FakeGenerator()
     title = OllamaTitleWriter(generator).write("what was said")
-    assert title == ClipTitle(title="A title", hook="A hook.")
+    assert title == ClipTitle(title="A title", hook="A hook.", screen_hook="Why?")
     assert generator.calls == [
         (SYSTEM_PROMPT, "what was said", ClipTitle.model_json_schema())
     ]
 
 
 def test_title_and_hook_are_stripped() -> None:
-    writer = OllamaTitleWriter(FakeGenerator(_reply("  padded ", " hook  ")))
-    assert writer.write("text") == ClipTitle(title="padded", hook="hook")
+    writer = OllamaTitleWriter(FakeGenerator(_reply("  padded ", " hook  ", " s ")))
+    assert writer.write("text") == ClipTitle(
+        title="padded", hook="hook", screen_hook="s"
+    )
 
 
 @pytest.mark.parametrize(
@@ -52,6 +56,11 @@ def test_title_and_hook_are_stripped() -> None:
         (_reply(title="two\nlines"), "title: Value error, must be one line"),
         (json.dumps({"title": "A title"}), "hook: Field required"),
         (_reply(hook=3), "hook: Input should be a valid string"),
+        (
+            json.dumps({"title": "A title", "hook": "A hook."}),
+            "screen_hook: Field required",
+        ),
+        (_reply(screen=""), "screen_hook: String should have at least 1"),
     ],
 )
 def test_invalid_reply_raises_title_error(reply: str, detail: str) -> None:
@@ -93,6 +102,11 @@ def test_the_video_info_comes_before_the_clip_text() -> None:
 def test_the_prompt_says_how_to_use_the_video_info() -> None:
     assert "name them in the title" in SYSTEM_PROMPT
     assert "do not copy the video's title" in SYSTEM_PROMPT
+
+
+def test_the_prompt_asks_for_a_short_screen_hook() -> None:
+    assert '"screen_hook" of at most 6 words' in SYSTEM_PROMPT
+    assert '"title", "hook" and "screen_hook"' in SYSTEM_PROMPT
 
 
 def test_the_about_text_comes_first() -> None:

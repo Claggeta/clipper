@@ -10,9 +10,12 @@ SYSTEM_PROMPT = (
     "You write post text for short clips cut from long-form videos, such as "
     "streams, podcasts and talks. Each message is the transcript of one clip, "
     "transcribed automatically, so punctuation may be missing. Write a "
-    '"title" of at most 8 words, and a "hook": one sentence of at most 15 '
-    "words that makes a viewer want to watch, to open the post's caption. Use "
-    "only what the transcript says and keep the speaker's meaning: do not "
+    '"title" of at most 8 words; a "hook": one sentence of at most 15 '
+    "words that makes a viewer want to watch, to open the post's caption; and "
+    'a "screen_hook" of at most 6 words, shown on screen over the first '
+    "seconds of the clip to viewers who may have the sound off: the stakes, "
+    "or a question the clip answers, so they stay to watch; not the title "
+    "again. Use only what the transcript says and keep the speaker's meaning: do not "
     "invent names or facts, or turn a claim into its opposite. No hashtags and "
     "no emoji. No swear words of any kind, not even mild ones such as "
     '"ass", "damn" or "hell": if the speaker swears, say it another way or '
@@ -28,9 +31,10 @@ SYSTEM_PROMPT = (
     "him, her, his, hers, himself or herself for anyone. Repeat the name "
     'instead, or rephrase so no pronoun is needed, as in "Sam stunned by the '
     'bill" and "Sam cannot believe the price". The only exception is a person '
-    "whose pronouns the About line states. The title "
-    "and hook are about this clip, so do not copy the video's title. Reply "
-    'with JSON only: "title" and "hook", each one line.'
+    "whose pronouns the About line states. The title, "
+    "hook and screen hook are about this clip, so do not copy the video's "
+    'title. Reply with JSON only: "title", "hook" and "screen_hook", each one '
+    "line."
 )
 # Enough of a bad reply to see what went wrong.
 _REPLY_LIMIT = 200
@@ -39,7 +43,8 @@ _SCHEMA = ClipTitle.model_json_schema()
 
 
 class OllamaTitleWriter:
-    """Writes a title and hook per clip with a local LLM. See docs/decisions/0018.
+    """Writes a title, hook and screen hook per clip with a local LLM. See
+    docs/decisions/0018.
 
     One request per clip, through the shared `OllamaClient` (temperature 0,
     seed 0, `think: false`). Any failure raises `TitleError`; there is no

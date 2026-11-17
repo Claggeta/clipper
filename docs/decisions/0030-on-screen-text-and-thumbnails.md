@@ -154,6 +154,23 @@ cuts since 0029.
   pink, outlined, medium, faded, dragged text burned where the preview
   showed it. Manual step RV22.
 
+## Amended by the screen hook (V8 item 7a)
+
+- `render --titles`, and so `drafts`, burns the title model's screen
+  hook (ADR 0018, screen hook amendment) as each titled clip's first
+  text: from 0 to `SCREEN_HOOK_SECONDS = 3.0` (or the clip's end), at the
+  top, in the default look, on every style. It is the clip's `texts` in
+  the manifest, so the review page shows, edits or deletes it like any
+  text and a Save keeps it without a re-render.
+- Without `--captions` the clip still gets an ASS file for the text
+  alone; the manifest's `captions` stays None and the console tags a
+  clip `captions` only when it has speech in the file.
+- A screen hook the text rules refuse (over `TEXT_LIMIT`) is a note,
+  and the clip renders without it.
+- In the review page, the first text a clip gets with "Add text" starts
+  as its screen hook, else the title box, else the title. Checked in
+  headless Edge on a scratch copy of v2924392099. Manual step R19d.
+
 ## Revisit when
 
 - The ffmpeg build changes to one with an older libass (RV13 step 7).
