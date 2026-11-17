@@ -9,12 +9,16 @@
 const captionWordsBox = document.getElementById("caption-words");
 const highlightBox = document.getElementById("highlights");
 const captionNotice = document.getElementById("caption-notice");
+const captionOffer = document.getElementById("caption-offer");
 // key -> {fixes: Map(start ms -> text), keys: Set(start ms), highlight}
 const captionEdits = new Map();
 // Wait this long after a span or edit change before asking the server.
 const EDITOR_WAIT_MS = 300;
 let editorKey = ""; // what the chips were drawn for
 let editorTimer = 0;
+// The last word fixed, offered for the same word elsewhere in the span
+// (V8 item 4e): {key, at, original, text}, or null.
+let fixOffer = null;
 
 function toMs(seconds) {
   return Math.round(seconds * 1000);
@@ -136,7 +140,74 @@ async function drawCaptionEditor() {
   }
   editorKey = key;
   drawChips(clip, words, chunks);
+  drawOffer(clip, words);
   drawHighlights(clip);
+}
+
+// --- Fix every occurrence (V8 item 4e) ---
+
+const EDGE_MARKS = /^([^\p{L}\p{N}']*)(.*?)([^\p{L}\p{N}']*)$/su;
+
+// [leading marks, the word, trailing marks].
+function wordParts(text) {
+  const [, lead, core, trail] = text.match(EDGE_MARKS);
+  return [lead, core, trail];
+}
+
+function sameWord(a, b) {
+  return wordParts(a)[1].toLowerCase() === wordParts(b)[1].toLowerCase();
+}
+
+// The other unfixed words in the span that read as the one just fixed.
+function offerMatches(clip, words) {
+  if (!fixOffer || fixOffer.key !== clip.key || !wordParts(fixOffer.original)[1]) {
+    return [];
+  }
+  const edits = editsOf(clip);
+  return words.filter(
+    ([start, , original]) =>
+      start >= span.start &&
+      start < span.end &&
+      toMs(start) !== fixOffer.at &&
+      !edits.fixes.has(toMs(start)) &&
+      sameWord(original, fixOffer.original),
+  );
+}
+
+function drawOffer(clip, words) {
+  const matches = offerMatches(clip, words);
+  captionOffer.replaceChildren();
+  captionOffer.hidden = matches.length === 0;
+  if (!matches.length) {
+    return;
+  }
+  const word = wordParts(fixOffer.original)[1];
+  const button = document.createElement("button");
+  button.type = "button";
+  const others = matches.length === 1 ? "the other" : `all ${matches.length} others`;
+  button.textContent = fixOffer.text
+    ? `Fix ${others}: "${word}" to "${wordParts(fixOffer.text)[1]}"`
+    : `Hide ${others}: "${word}"`;
+  button.addEventListener("click", () => {
+    const edits = editsOf(clip);
+    const core = wordParts(fixOffer.text)[1];
+    for (const [start, , original] of matches) {
+      // Each keeps its own punctuation around the fixed word.
+      const [lead, , trail] = wordParts(original);
+      edits.fixes.set(toMs(start), fixOffer.text ? `${lead}${core}${trail}` : "");
+    }
+    fixOffer = null;
+    editorKey = "";
+    captionsChanged();
+  });
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.textContent = "No";
+  dismiss.addEventListener("click", () => {
+    fixOffer = null;
+    captionOffer.hidden = true;
+  });
+  captionOffer.append(button, dismiss);
 }
 
 function drawChips(clip, words, chunks) {
@@ -231,8 +302,10 @@ function editChip(clip, chip, at, original) {
       const text = box.value.trim().split(/\s+/).join(" ");
       if (text === original.trim()) {
         edits.fixes.delete(at);
+        fixOffer = null;
       } else {
         edits.fixes.set(at, text);
+        fixOffer = { key: clip.key, at, original, text };
       }
     }
     editorKey = "";
@@ -282,7 +355,9 @@ function resetCaptionEditor(clip, clear = false) {
     captionEdits.set(clip.key, { fixes: new Map(), keys: new Set(), highlight: "yellow" });
   }
   editorKey = "";
+  fixOffer = null;
   captionWordsBox.replaceChildren();
+  captionOffer.hidden = true;
   captionNotice.textContent = "";
   scheduleEditor();
 }
