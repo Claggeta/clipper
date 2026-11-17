@@ -1696,9 +1696,9 @@ confirmation first.
    - 4d. ~~People carried over: a clip with no verdict starts with the
      people of the last clip saved from the same video, unsaved. ADR
      0031 amendment, manual step RV35.~~ (done; #264)
-   - 4f. Texts at the playhead: a text after the first starts at the
+   - 4f. ~~Texts at the playhead: a text after the first starts at the
      playhead for 3 s in the last text's look. ADR 0031 amendment,
-     manual step RV36.
+     manual step RV36.~~ (done; #266)
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).
