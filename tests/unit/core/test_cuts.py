@@ -5,6 +5,7 @@ from clipper.core.cuts import (
     TimeMap,
     check_cuts,
     cut_crop,
+    draft_cuts,
     find_pauses,
 )
 from clipper.domain.errors import ClipRenderError
@@ -58,6 +59,19 @@ def test_a_segment_without_words_counts_as_speech_throughout() -> None:
 def test_a_pause_whose_cut_would_leave_the_clip_is_kept() -> None:
     transcript = _transcript(_words((10.0, 10.5), (12.0, 12.5)))
     assert find_pauses(transcript, 10.0, 11.0) == ()
+
+
+def test_a_draft_gets_its_pause_cuts() -> None:
+    transcript = _transcript(_words((10.0, 12.0), (14.0, 20.0)))
+    # 1.7 s of 10 s removed, under the share.
+    assert draft_cuts(transcript, 10.0, 20.0) == (((12.15, 13.85),), False)
+
+
+def test_a_draft_mostly_without_words_keeps_its_pauses() -> None:
+    transcript = _transcript(_words((10.0, 11.0), (16.0, 20.0)))
+    # 4.7 s of 10 s would go: a moment seen rather than said.
+    assert draft_cuts(transcript, 10.0, 20.0) == ((), True)
+    assert draft_cuts(_transcript(_words((10.0, 20.0))), 10.0, 20.0) == ((), False)
 
 
 def test_check_cuts_accepts_ordered_cuts_inside_the_span() -> None:

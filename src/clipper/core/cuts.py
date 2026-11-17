@@ -12,6 +12,11 @@ CUT_PADDING_SECONDS = 0.15
 
 Cut = tuple[float, float]
 
+# Drafts get their pause cuts unless these would remove more than this share
+# of the clip, a sign of a moment seen rather than said (ADR 0029, drafts
+# amendment, V8 7b-1). On 197 judged keepers a quarter would lose 45% or more.
+MAX_DRAFT_CUT_SHARE = 0.35
+
 
 def find_pauses(transcript: Transcript, start: float, end: float) -> tuple[Cut, ...]:
     """Proposed cuts for the pauses in speech inside `start`..`end`, in source
@@ -37,6 +42,18 @@ def find_pauses(transcript: Transcript, start: float, end: float) -> tuple[Cut, 
                 cuts.append((round(cut[0], 3), round(cut[1], 3)))
         reach = b if reach is None else max(reach, b)
     return tuple(cuts)
+
+
+def draft_cuts(
+    transcript: Transcript, start: float, end: float
+) -> tuple[tuple[Cut, ...], bool]:
+    """The pause cuts a draft gets, and whether they were held back because
+    they would remove more than `MAX_DRAFT_CUT_SHARE` of `start`..`end`."""
+    cuts = find_pauses(transcript, start, end)
+    removed = sum(b - a for a, b in cuts)
+    if cuts and removed > MAX_DRAFT_CUT_SHARE * (end - start):
+        return (), True
+    return cuts, False
 
 
 def check_cuts(cuts: Sequence[Cut], start: float, end: float) -> None:

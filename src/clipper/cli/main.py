@@ -47,6 +47,7 @@ from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import build_ass, clip_text
 from clipper.core.channels import ABOUT_LIMIT, channel_about
 from clipper.core.config import Settings
+from clipper.core.cuts import MAX_DRAFT_CUT_SHARE, Cut, TimeMap, cut_crop, draft_cuts
 from clipper.core.evaluation import boundary_gaps, evaluate
 from clipper.core.framing import (
     facecam_caption_margin,
@@ -612,6 +613,8 @@ class _RenderFlags(NamedTuple):
     channels: Mapping[str, str] | None = None
     # Where the facecam style puts the cam (ADR 0025).
     cam: CamPosition = "top"
+    # Cut each clip's pauses, as `drafts` does (ADR 0029, drafts amendment).
+    cut_pauses: bool = False
 
 
 def _drafts_styles(
@@ -731,7 +734,7 @@ def _cut_clips(
     cannot be written is `Error:` and exit 1.
     """
     ranks, selected, folder, paths, media = plan
-    captions, vertical, titles, about, styles, channels, cam = flags
+    captions, vertical, titles, about, styles, channels, cam, cut_pauses = flags
     renderer = build.renderer(settings)
     face_only = styles == (VerticalStyle.FACE,)
     tracker = build.face_tracker(settings) if VerticalStyle.FACE in styles else None
@@ -811,6 +814,18 @@ def _cut_clips(
                 else:
                     assert media.width is not None and media.height is not None
                     layout = plan_facecam(box, media.width, media.height, cam)
+        cuts: tuple[Cut, ...] = ()
+        if cut_pauses:
+            cuts, held = draft_cuts(
+                result.transcript, candidate.start_seconds, candidate.end_seconds
+            )
+            if held:
+                console.print(
+                    f"[yellow]Note:[/yellow] #{number} {span} pauses not cut: "
+                    f"they would remove over {MAX_DRAFT_CUT_SHARE:.0%} of it",
+                    soft_wrap=True,
+                )
+        time_map = TimeMap(candidate.start_seconds, candidate.end_seconds, cuts)
         text = clip_text(result.transcript, candidate) if writer else ""
         if writer and not text:
             console.print(
@@ -826,10 +841,10 @@ def _cut_clips(
             failures.append(f"#{number} {span}: {escape(str(exc))}")
             entries.append(ManifestClip(**entry, error=str(exc)))
             continue
-        texts = _screen_hook_texts(title, candidate, f"#{number} {span}")
+        texts = _screen_hook_texts(title, time_map.duration, f"#{number} {span}")
         spoken = result.transcript if captions else _NO_SPEECH
         built = (
-            build_ass(spoken, candidate, vertical=vertical, texts=texts)
+            build_ass(spoken, candidate, vertical=vertical, cuts=cuts, texts=texts)
             if captions or texts
             else None
         )
@@ -873,6 +888,7 @@ def _cut_clips(
                     spoken,
                     candidate,
                     vertical=vertical,
+                    cuts=cuts,
                     texts=texts,
                     caption_margin_v=margin,
                 ).text
@@ -883,7 +899,12 @@ def _cut_clips(
                     path.with_name(name),
                     captions=style_ass or None,
                     vertical=vertical,
-                    crop=crop if style is VerticalStyle.FACE else None,
+                    crop=(
+                        cut_crop(crop, time_map)
+                        if crop is not None and style is VerticalStyle.FACE
+                        else None
+                    ),
+                    cuts=cuts,
                     facecam=layout if style is VerticalStyle.FACECAM else None,
                 )
             except ClipperError as exc:
@@ -927,9 +948,17 @@ def _cut_clips(
                 hook=title.hook if title else None,
                 screen_hook=title.screen_hook if title else None,
                 variants=tuple(variants),
+                cuts=cuts,
                 texts=texts,
             )
         )
+        if cuts:
+            removed = sum(b - a for a, b in cuts)
+            console.print(
+                f"  Cut {len(cuts)} pause(s), {removed:.1f} s: "
+                f"{time_map.duration:.1f} s long",
+                soft_wrap=True,
+            )
         if title:
             console.print(f"  Title: {escape(title.title)}", soft_wrap=True)
             console.print(f"  Hook: {escape(title.hook)}", soft_wrap=True)
@@ -965,14 +994,14 @@ _NO_SPEECH = Transcript(segments=())
 
 
 def _screen_hook_texts(
-    title: ClipTitle | None, candidate: ClipCandidate, clip: str
+    title: ClipTitle | None, length: float, clip: str
 ) -> tuple[OnScreenText, ...]:
-    """The clip's first text: its screen hook over the first seconds at the
-    top (ADR 0030, screen hook amendment), or nothing without a title. A
-    screen hook the text rules refuse is a note, not a failure."""
+    """The clip's first text: its screen hook over the first seconds of the
+    finished clip, `length` long, at the top (ADR 0030, screen hook
+    amendment), or nothing without a title. A screen hook the text rules
+    refuse is a note, not a failure."""
     if title is None:
         return ()
-    length = candidate.end_seconds - candidate.start_seconds
     try:
         hook = OnScreenText(
             text=title.screen_hook,
@@ -1050,6 +1079,14 @@ def drafts(
         ),
     ] = None,
     cam: CamOption = None,
+    cut_pauses: Annotated[
+        bool,
+        typer.Option(
+            "--cut-pauses/--no-cut-pauses",
+            help="Cut the pauses in speech from each clip, unless that would "
+            f"remove over {MAX_DRAFT_CUT_SHARE:.0%} of it; toggled in review.",
+        ),
+    ] = True,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     detector: DetectorOption = DetectorName.LLM,
     top: Annotated[
@@ -1105,6 +1142,7 @@ def drafts(
         styles=styles,
         channels=channels,
         cam=cam_position,
+        cut_pauses=cut_pauses,
     )
     if len(checked) == 1:
         item = checked[0]

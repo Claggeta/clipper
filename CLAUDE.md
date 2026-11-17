@@ -446,7 +446,10 @@ and planned code:
   amendment (V7 3a): Cut in/out at the playhead (`[`, `]`), merged with
   cuts they meet, stored as ordinary cuts; Cut silence keeps manual and
   saved cuts; manual step RV16. Strip drag amendment (V7 3b): a drag
-  over 4 px on the frames cuts the range, a click still seeks.
+  over 4 px on the frames cuts the range, a click still seeks. Drafts
+  amendment (V8 7b-1): `drafts` cuts each clip's pauses (stored as
+  `cuts`, `--no-cut-pauses`), none where they would remove over 35%;
+  keepers' median 41.8 to 38.1 s; D14.
 - `0030` — on-screen text and thumbnails, made in review: text boxes per
   clip (words, start and end in the finished clip's seconds, `top` or
   `middle`), bold white on a half-dark box, extra events in the clip's ASS
@@ -1786,6 +1789,11 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
    - 7b. Shorter drafts: pauses cut by default and a target length of
      about 20 to 35 s, weighed against ends cut early (ADR 0023 and 0029
      amendments).
+   - 7b-2. Shorter candidates (added 2026-11-17, after 7c): 30 s
+     windows tried against the 45 s default, LLM `drafts` on four or
+     more judged VODs, new drafts judged by the maintainer, `eval` at
+     top 10 with ends cut early weighed. ADR 0014 and 0023 amendments.
+     May end in nothing.
    - 7c. A cold open: a spike on finding a clip's peak (the model naming
      the punchline, or the loudest second); if it works, the peak 2 to
      3 s plays first, then the clip from its start, through the

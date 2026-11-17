@@ -32,9 +32,11 @@ from clipper.domain.models import (
     RenderedClip,
     RenderManifest,
     RenderOverlay,
+    Segment,
     Transcript,
     VideoInfo,
     VideoSource,
+    Word,
     Zoom,
 )
 
@@ -55,16 +57,40 @@ class Recorder:
 
 
 class RecordingTranscriber(FakeTranscriber):
-    def __init__(self, log: Recorder, error: str | None = None) -> None:
+    def __init__(
+        self,
+        log: Recorder,
+        error: str | None = None,
+        transcript: Transcript | None = None,
+    ) -> None:
         super().__init__()
         self._log = log
         self._error = error
+        self._given = transcript
 
     def transcribe(self, media_path: Path) -> Transcript:
         self._log.stages.append(f"transcribe {media_path.name}")
         if self._error:
             raise TranscriptionError(self._error)
-        return super().transcribe(media_path)
+        return self._given or super().transcribe(media_path)
+
+
+def _spoken(*words: tuple[float, float]) -> Transcript:
+    """Words at these times, in one segment."""
+    return Transcript(
+        source="talk.mp4",
+        language="en",
+        segments=(
+            Segment(
+                start_seconds=words[0][0],
+                end_seconds=words[-1][1],
+                text="w",
+                words=tuple(
+                    Word(start_seconds=a, end_seconds=b, text="w") for a, b in words
+                ),
+            ),
+        ),
+    )
 
 
 class StubDetector:
@@ -167,6 +193,7 @@ class Env:
         self.top_ns: list[int] = []
         self.title_writers_built = 0
         self.transcribe_error: str | None = None
+        self.transcript: Transcript | None = None
         self.download_error: str | None = None
         self.download_fail_on: tuple[str, ...] = ()
         self.tracker = FakeFaceTracker()
@@ -191,7 +218,9 @@ class Env:
             return FakeTitleWriter()
 
         context = AppContext(
-            transcriber=lambda s: RecordingTranscriber(self.log, self.transcribe_error),
+            transcriber=lambda s: RecordingTranscriber(
+                self.log, self.transcribe_error, self.transcript
+            ),
             detector=detector,
             renderer=lambda s: self.renderer,
             probe=FakeProbe,
@@ -488,6 +517,31 @@ def test_a_style_without_vertical_fails_before_any_download(env: Env) -> None:
     assert result.exit_code == 1
     assert "Error: --style needs --vertical" in result.output
     assert env.log.stages == []
+
+
+# Clip 1 (0 to 4.5 s) has a 0.8 s pause; clip 2 (4.5 to 9 s) is mostly
+# silent, so its 2.7 s cut would pass the 35% guard.
+_PAUSED = _spoken((0.2, 1.5), (2.3, 4.4), (4.6, 5.0), (8.0, 8.9))
+
+
+def test_drafts_cut_pauses_unless_most_of_the_clip_would_go(env: Env) -> None:
+    env.transcript = _PAUSED
+    result = env.run(str(env.video), "--no-titles")
+    assert result.exit_code == 0, result.output
+    manifest = env.manifest("talk")
+    assert [c.cuts for c in manifest.clips] == [((1.65, 2.15),), ()]
+    # Both styles of clip 1 are cut; clip 2 renders whole.
+    assert env.renderer.cuts == [((1.65, 2.15),)] * 2 + [()] * 2
+    assert "Cut 1 pause(s), 0.5 s: 4.0 s long" in result.output
+    assert "#2 0:00:04-0:00:09 pauses not cut" in result.output
+
+
+def test_no_cut_pauses_renders_whole_clips(env: Env) -> None:
+    env.transcript = _PAUSED
+    result = env.run(str(env.video), "--no-titles", "--no-cut-pauses")
+    assert result.exit_code == 0, result.output
+    assert [c.cuts for c in env.manifest("talk").clips] == [(), ()]
+    assert "Cut " not in result.output
 
 
 class FaceFailingRenderer(FakeClipRenderer):

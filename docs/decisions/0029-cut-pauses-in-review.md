@@ -127,6 +127,30 @@ press on a handle or a cut stripe keeps its own meaning. Shift+drag only
 was not chosen: a plain drag on the frames did nothing before. Manual
 step RV16, steps 9 and 10.
 
+## Amended by cuts in drafts (V8 item 7b-1)
+
+- Studio's advice for the view ceiling is shorter Shorts with the
+  pauses cut (V8 rescope); keepers have a median span of 41.8 s.
+  `drafts` now cuts each clip's pauses as Cut silence proposes them
+  (`find_pauses`, gaps of 0.6 s less 0.15 s a side), stored as the
+  manifest clip's `cuts` so the review page shows them toggleable;
+  `--no-cut-pauses` turns it off. `render` is unchanged.
+- **A guard:** a clip whose cuts would remove more than
+  `MAX_DRAFT_CUT_SHARE = 0.35` of its span gets none, and a note. Long
+  silences mark moments seen rather than said (reactions, laughter,
+  which Whisper does not transcribe), and cutting them would leave
+  little of the moment.
+- Measured on 197 judged keepers over 25 VODs (their spans, cuts as the
+  page proposes): uncut median 41.8 s, 43 at 35 s or less; every pause
+  cut, median 33.5 s and 112, but a quarter lose 45% or more; with the
+  guard, median 38.1 s and 73. The maintainer had used Cut silence on 4
+  keepers.
+- Every style is cut alike: captions and the screen hook (ADR 0030) go
+  through the time map, the face crop's moves through `cut_crop`. The
+  span, the label and `eval` are unchanged. Judged on posted Shorts
+  (ADR 0027). Shorter candidates, the larger lever, are V8 item 7b-2.
+  Manual step D14.
+
 ## Revisit when
 
 - The maintainer keeps most proposed cuts, or turns most off: change the
