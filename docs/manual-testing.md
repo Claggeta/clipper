@@ -2528,6 +2528,30 @@ Pass: the first `ffprobe` prints the late start; `fetch` prints
 `Remuxing`. Without a late file at hand, any `fetch` passes if it prints
 no `Remuxing` for a file starting at 0.
 
+### D14. Drafts with their pauses cut
+
+Covers [ADR 0029](decisions/0029-cut-pauses-in-review.md)'s drafts
+amendment (V8 item 7b-1), on a video with a cached transcript:
+
+```powershell
+uv run clipper drafts data\videos\<id>.mp4 --detector heuristic --no-titles --top 3 --style fit
+uv run clipper drafts data\videos\<id>.mp4 --detector heuristic --no-titles --top 3 --style fit --no-cut-pauses
+```
+
+Pass: in the first run each cut clip prints `Cut <n> pause(s), <s> s:
+<length> s long`, and a mostly silent one prints `pauses not cut: they
+would remove over 35% of it`. Played, a cut clip jumps over the pauses
+with no word clipped, its captions in step with the speech to the end;
+`ffprobe` gives its length as printed. In the manifest each cut clip has
+`cuts`; `clipper review` on the folder shows them as cuts, toggleable,
+and a Save without changes does not re-render. The second run prints no
+`Cut` lines and its clips run their whole spans.
+
+Run in part 2026-11-17 by the assistant on a 3-minute excerpt of
+v2924392099 (a scratch cache, 43 s): 3 clips cut by 4 to 8 pauses (2.6 to
+8.7 s), `ffprobe` lengths 41.5, 30.5 and 36.0 s as printed; playback and
+the review steps are left to the maintainer.
+
 ### D11. Clean up
 
 ```powershell

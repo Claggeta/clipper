@@ -197,7 +197,10 @@ with `Drafts: <clips dir>/<channel>/<MM-DD-YYYY>/<video name>`: a folder with ev
 vertical, captioned clip, and a suggested title and hook for each in the
 manifest. Each titled clip also shows a screen hook, a few words from the
 model stating the stakes or a question, at the top for its first 3 seconds
-(edit or delete it in `review`). Each clip comes in two styles to pick from: `<name>.mp4` fits the
+(edit or delete it in `review`). Pauses in speech are cut from each
+clip, as `review`'s Cut silence would, unless that would remove over 35%
+of it (a moment seen rather than said); `--no-cut-pauses` keeps clips
+whole. Each clip comes in two styles to pick from: `<name>.mp4` fits the
 whole frame, and `<name>.face.mp4` crops on the largest face (a clip with no
 face gets only the first). `--style fit` or `--style face` renders one;
 `--style facecam` (repeat `--style` for several) adds the gaming stream

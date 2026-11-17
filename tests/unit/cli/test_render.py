@@ -67,6 +67,7 @@ class RaisingRenderer:
         *,
         vertical: bool = False,
         crop: object = None,
+        cuts: object = (),
         facecam: object = None,
     ):
         raise ClipRenderError("[aist#0:0/pcm_s16le] [/bogus] bad")
