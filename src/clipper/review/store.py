@@ -9,6 +9,7 @@ See docs/decisions/0024 (item 3c and 3d amendments).
 import logging
 import math
 import os
+import shutil
 import tempfile
 import threading
 from collections.abc import Sequence
@@ -49,6 +50,7 @@ from clipper.core.judging import (
     trash_judgment,
 )
 from clipper.core.naming import clip_file_name, variant_file_name
+from clipper.core.posting import upload_stem
 from clipper.core.sequence import BlockMap
 from clipper.domain.errors import ClipperError, JudgingError, ReviewError
 from clipper.domain.models import (
@@ -85,6 +87,7 @@ from clipper.domain.models import (
     Zoom,
     format_timestamp,
     is_still,
+    library_folder,
 )
 
 logger = logging.getLogger(__name__)
@@ -1580,6 +1583,60 @@ class ReviewStore:
             for start, end in spans
         ]
         return " ".join(w for w in words if w)
+
+    # --- The clip library (ADR 0035) ---
+
+    def make_library_folder(self, name: str) -> str:
+        """Make a library folder under the B-roll folder; an existing one is
+        fine. Raises `BadRequest` for a bad name, `JudgingError` without a
+        B-roll folder."""
+        try:
+            folder = library_folder(name)
+        except ValueError as exc:
+            raise BadRequest(str(exc)) from exc
+        root = self._library_root()
+        (root / folder).mkdir(parents=True, exist_ok=True)
+        return folder
+
+    def to_library(self, rank: int, folder: str) -> str:
+        """Put a copy of a clip's rendered file in a library folder, named
+        after its title, and return its B-roll name `<folder>/<file>`.
+
+        A hard link where one can be made, else a copy; `-2`, `-3` on a
+        name already there. The file is the clip as last rendered, so
+        unsaved edits are not in it.
+        """
+        try:
+            folder = library_folder(folder)
+        except ValueError as exc:
+            raise BadRequest(str(exc)) from exc
+        with self._lock:
+            clip = self._clip(rank)
+            if clip.file is None:
+                raise JudgingError(f"Clip {rank} has no rendered file to keep")
+            source = self._folder / clip.file
+            if not source.is_file():
+                raise JudgingError(f"Clip {rank}'s file {clip.file} is missing")
+            target_dir = self._library_root() / folder
+            if not target_dir.is_dir():
+                raise JudgingError(f"No library folder {folder}")
+            stem = upload_stem(clip.title, Path(clip.file).stem)
+            name, count = f"{stem}.mp4", 1
+            while (target_dir / name).exists():
+                count += 1
+                name = f"{stem}-{count}.mp4"
+            target = target_dir / name
+            try:
+                os.link(source, target)
+            except OSError:
+                shutil.copy2(source, target)
+            return f"{folder}/{name}"
+
+    def _library_root(self) -> Path:
+        root = self._render.broll_dir
+        if root is None:
+            raise JudgingError("No B-roll folder for the library")
+        return root
 
     # --- The pad (ADR 0034) ---
 

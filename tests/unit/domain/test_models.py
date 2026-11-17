@@ -934,3 +934,32 @@ def test_a_clip_has_a_sequence_or_cuts_and_pad_ids_are_unique() -> None:
             clips=(),
             pad=(piece, piece),
         )
+
+
+@pytest.mark.parametrize(
+    "name", ["drift.mp4", "Lacy best/fish.mp4", "v2.1/still.png", "a_b-c/x.mov"]
+)
+def test_a_broll_file_may_sit_in_one_library_folder(name: str) -> None:
+    from clipper.domain.models import broll_file
+
+    assert broll_file(name) == name
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["../x.mp4", "a/b/x.mp4", ".git/x.mp4", "Lacy /x.mp4", "/x.mp4", "a/", "x.txt"],
+)
+def test_other_broll_paths_are_refused(name: str) -> None:
+    from clipper.domain.models import broll_file
+
+    with pytest.raises(ValueError):
+        broll_file(name)
+
+
+def test_a_library_folder_name_is_stripped_and_checked() -> None:
+    from clipper.domain.models import library_folder
+
+    assert library_folder("  Lacy best ") == "Lacy best"
+    for bad in ("", ".x", "x.", "a/b", "x" * 41, "naïve?"):
+        with pytest.raises(ValueError):
+            library_folder(bad)
