@@ -318,6 +318,33 @@ goes next, then 9m on top of it.
 - The unsaved check compares a block's own edits to the millisecond.
 - Manual step RV30.
 
+## Amended by the cold open spike (V8 item 7c, not adopted)
+
+- The idea, from Studio's advice to start on the peak: a draft opens on
+  its 2 to 3 s peak, then plays from its start, through this ADR's
+  repeated ranges. The question was whether Clipper can find the peak.
+- The maintainer marked by hand, in the clip as it plays, the moment
+  that would stop a scrolling viewer on 15 saved clips (5 posted, 4
+  rated `good`, 2 `ok`, 4 older), 16.7 to 104 s long. Every clip got a
+  mark, all between 1 and 9 s in (6 at 1.0 s, median 4 s).
+- Two guesses per clip, a hit within 2 s of the mark: the local model
+  (`qwen3.5:9b`, `think: false`) given the clip's words with clip times
+  and asked for the punchline or peak reaction, 2 of 15; the loudest
+  2.5 s of the clip's momentary loudness (`ebur128`), 2 of 15. Opening
+  at 1 s, with no guess, 7 of 15. Median error 14.1 and 10.1 s: both
+  find a climax 10 to 40 s in, where the maintainer's moment is near
+  the start.
+- Decision: not adopted, no code. On keepers the moment that holds a
+  viewer is already in the first seconds, so replaying a later climax
+  first is not what the marks ask for, and replaying a 1 to 6 s mark
+  would barely change the clip. The screen hook (ADR 0018 and 0030
+  amendments) and shorter clips (7b) stay the levers for the first
+  seconds. Scratch script, marks and results kept outside git, on the
+  maintainer's machine.
+- Revisit if posted Shorts' figures show a drop-off in the first
+  seconds that a later moment could fix, or if drafts, unlike keepers,
+  start well before their moment (the starts item under "Later").
+
 ## Revisit when
 
 - Repeats need edits that differ in more than zooms and crops.
