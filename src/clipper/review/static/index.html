@@ -73,11 +73,11 @@
     <div id="details" class="details" hidden>
       <form class="inspector judge" onsubmit="return false">
         <div class="tabs" role="tablist" aria-label="Inspector">
-          <button type="button" role="tab" id="tab-clip" data-tab="clip" aria-selected="true" aria-controls="panel-clip">Clip</button>
-          <button type="button" role="tab" id="tab-captions" data-tab="captions" aria-selected="false" aria-controls="panel-captions">Captions</button>
-          <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Text</button>
-          <button type="button" role="tab" id="tab-frame" data-tab="frame" aria-selected="false" aria-controls="panel-frame">Frame</button>
-          <button type="button" role="tab" id="tab-audio" data-tab="audio" aria-selected="false" aria-controls="panel-audio">Audio</button>
+          <button type="button" role="tab" id="tab-clip" data-tab="clip" title="Alt+1" aria-selected="true" aria-controls="panel-clip">Clip</button>
+          <button type="button" role="tab" id="tab-captions" data-tab="captions" title="Alt+2" aria-selected="false" aria-controls="panel-captions">Captions</button>
+          <button type="button" role="tab" id="tab-text" data-tab="text" title="Alt+3" aria-selected="false" aria-controls="panel-text">Text</button>
+          <button type="button" role="tab" id="tab-frame" data-tab="frame" title="Alt+4" aria-selected="false" aria-controls="panel-frame">Frame</button>
+          <button type="button" role="tab" id="tab-audio" data-tab="audio" title="Alt+5" aria-selected="false" aria-controls="panel-audio">Audio</button>
         </div>
         <section id="panel-clip" class="panel" role="tabpanel" data-panel="clip" aria-labelledby="tab-clip">
           <h2 id="title"></h2>
@@ -356,6 +356,7 @@
         <dt><kbd>A</kbd></dt><dd>Add clip here</dd>
         <dt><kbd>T</kbd></dt><dd>Add text</dd>
         <dt><kbd>E</kbd></dt><dd>Add the last sound effect at the playhead</dd>
+        <dt><kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>5</kbd></dt><dd>Clip, Captions, Text, Frame and Audio tabs</dd>
         <dt><kbd>?</kbd></dt><dd>This list (<kbd>Esc</kbd> closes it)</dd>
       </dl>
       <p class="muted">Keys do nothing while typing in a box; <kbd>Esc</kbd> leaves the box.</p>
