@@ -1705,8 +1705,8 @@ confirmation first.
    - 4f. ~~Texts at the playhead: a text after the first starts at the
      playhead for 3 s in the last text's look. ADR 0031 amendment,
      manual step RV36.~~ (done; #266)
-   - 4g. Tab keys: `Alt+1` to `Alt+5` open the inspector's tabs. ADR
-     0031 amendment, manual step RV38.
+   - 4g. ~~Tab keys: `Alt+1` to `Alt+5` open the inspector's tabs. ADR
+     0031 amendment, manual step RV38.~~ (done; #270)
 5. Small fixes from "Parked", each its own PR:
    - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
      amendment).
