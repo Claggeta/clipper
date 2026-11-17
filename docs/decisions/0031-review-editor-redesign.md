@@ -343,6 +343,15 @@ asked for a chat box that turns a described edit into the page's edits.
   edits are ordinary word fixes (ADR 0017, caption editing amendment),
   unsaved until Save. Manual step RV37.
 
+## Amended by tab keys (V8 item 4g)
+
+- From the click audit (V8 item 4a): a clip could take five tab clicks.
+  `Alt+1` to `Alt+5` open the Clip, Captions, Text, Frame and Audio tabs,
+  by the physical digit key, not while typing; the plain digits stay
+  rating and trash reasons. Edge has no `Alt`+digit shortcut of its own
+  on Windows, but headless runs cannot show the browser's own keys, so
+  manual step RV38 checks it in a real window.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

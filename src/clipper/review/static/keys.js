@@ -200,6 +200,14 @@ document.addEventListener("keydown", (event) => {
     moveBlock(key === "arrowleft" ? -1 : 1);
     return;
   }
+  // Alt+1 to Alt+5 open the inspector's tabs in order (V8 item 4g).
+  const digit = /^Digit([1-9])$/.exec(event.code);
+  const tabs = document.querySelectorAll("[data-tab]");
+  if (event.altKey && !event.ctrlKey && !event.metaKey && digit && Number(digit[1]) <= tabs.length) {
+    event.preventDefault();
+    tabs[Number(digit[1]) - 1].click();
+    return;
+  }
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }

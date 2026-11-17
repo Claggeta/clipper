@@ -3823,6 +3823,22 @@ RV12, on a clip where a word appears three or more times.
 
 Then delete the scratch folders.
 
+### RV38. Tab keys
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s tab keys
+amendment (V8 item 4g). Same scratch copy and labels dir as RV12, in a
+normal (not headless) Edge window.
+
+1. Choose a clip and press `Alt+5`, `Alt+2`, `Alt+3`, `Alt+4`, `Alt+1`.
+   Pass: Audio, Captions, Text, Frame and Clip open in turn; the browser
+   opens no menu and does not move focus to its toolbar.
+2. Hover a tab. Pass: its tooltip names its key.
+3. Click into the title box and press `Alt+3`. Pass: the tab stays.
+4. Press Esc, then `2`. Pass: the rating is OK, as before.
+5. Press `?`. Pass: the list has the `Alt+1` to `5` line.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |
