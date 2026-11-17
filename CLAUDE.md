@@ -1788,7 +1788,8 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      draft; manual step R19d)
    - 7b. Shorter drafts: pauses cut by default and a target length of
      about 20 to 35 s, weighed against ends cut early (ADR 0023 and 0029
-     amendments).
+     amendments). 7b-1 ~~pauses cut in `drafts`~~ (done; #277; none past
+     35% of a clip, keepers' median 41.8 to 38.1 s; manual step D14).
    - 7b-2. Shorter candidates (added 2026-11-17, after 7c): 30 s
      windows tried against the 45 s default, LLM `drafts` on four or
      more judged VODs, new drafts judged by the maintainer, `eval` at
