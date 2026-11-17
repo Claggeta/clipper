@@ -612,12 +612,41 @@ MAX_OVERLAYS = 10
 MAX_STILL_SECONDS = 30.0
 
 
+# A library folder under the B-roll folder (ADR 0035): letters, digits,
+# spaces, hyphens, underscores and dots, not starting with a dot or ending
+# with a dot or space, which Windows refuses.
+_LIBRARY_FOLDER = re.compile(r"[\w-](?:[\w .-]{0,38}[\w-])?")
+
+
+def library_folder(name: str) -> str:
+    """A library folder's name, stripped; ValueError for any other."""
+    folder = name.strip()
+    if not _LIBRARY_FOLDER.fullmatch(folder):
+        raise ValueError(
+            "a library folder is 1 to 40 letters, digits, spaces, hyphens, "
+            "underscores or dots"
+        )
+    return folder
+
+
 def broll_file(name: str) -> str:
-    """A B-roll file name: plain, with a video or image suffix."""
-    if Path(name).name != name or not name.strip():
-        raise ValueError("a B-roll file must be a plain file name")
+    """A B-roll file name: plain, or `<folder>/<file>` in one library folder
+    (ADR 0035), with a video or image suffix."""
+    *folders, file = name.split("/")
+    plain = Path(file).name == file and bool(file.strip())
+    if folders:
+        try:
+            plain = (
+                plain and len(folders) == 1 and library_folder(folders[0]) == folders[0]
+            )
+        except ValueError:
+            plain = False
+    if not plain:
+        raise ValueError(
+            "a B-roll file must be a plain file name, or one in a library folder"
+        )
     suffixes = BROLL_VIDEO_SUFFIXES + BROLL_IMAGE_SUFFIXES
-    if Path(name).suffix.lower() not in suffixes:
+    if Path(file).suffix.lower() not in suffixes:
         raise ValueError(f"a B-roll file must be one of {', '.join(suffixes)}")
     return name
 

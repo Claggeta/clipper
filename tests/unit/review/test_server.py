@@ -1506,9 +1506,27 @@ def test_broll_files_are_listed_with_lengths_and_only_listed_ones_served(
         url = f"http://127.0.0.1:{server.server_address[1]}"
         listed = json.loads(_get(url + "/api/broll")[2])["broll"]
         assert listed == [
-            {"name": "broken.mp4", "still": False, "duration": None, "sound": False},
-            {"name": "drift.mp4", "still": False, "duration": 8.0, "sound": True},
-            {"name": "skull.png", "still": True, "duration": None, "sound": False},
+            {
+                "name": "broken.mp4",
+                "folder": "",
+                "still": False,
+                "duration": None,
+                "sound": False,
+            },
+            {
+                "name": "drift.mp4",
+                "folder": "",
+                "still": False,
+                "duration": 8.0,
+                "sound": True,
+            },
+            {
+                "name": "skull.png",
+                "folder": "",
+                "still": True,
+                "duration": None,
+                "sound": False,
+            },
         ]
         _get(url + "/api/broll")
         assert Probe.calls == 2
@@ -1523,3 +1541,99 @@ def test_broll_files_are_listed_with_lengths_and_only_listed_ones_served(
     finally:
         server.shutdown()
         server.server_close()
+
+
+# --- The clip library (ADR 0035) ---
+
+
+@pytest.fixture
+def library(tmp_path: Path) -> Iterator[tuple[str, Path]]:
+    """A server whose B-roll folder has a loose file and a library folder."""
+    broll = tmp_path / "broll"
+    (broll / "Lacy best").mkdir(parents=True)
+    (broll / ".hidden").mkdir()
+    (broll / "drift.mp4").write_bytes(b"loose")
+    (broll / "Lacy best" / "fish.mp4").write_bytes(b"kept clip")
+    session = dataclasses.replace(_session(tmp_path), broll_dir=broll)
+    server = make_server(session, 0)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}", broll
+    server.shutdown()
+    server.server_close()
+
+
+def test_library_folders_are_listed_and_their_files_served(
+    library: tuple[str, Path],
+) -> None:
+    url, _ = library
+    reply = json.loads(_get(url + "/api/broll")[2])
+    assert reply["folders"] == ["Lacy best"]
+    assert [(f["name"], f["folder"]) for f in reply["broll"]] == [
+        ("drift.mp4", ""),
+        ("Lacy best/fish.mp4", "Lacy best"),
+    ]
+    status, _, body = _get(url + "/broll/Lacy%20best/fish.mp4")
+    assert (status, body) == (200, b"kept clip")
+    assert _get(url + "/broll/Lacy%20best/../drift.mp4")[0] == 404
+    assert _get(url + "/broll/.hidden/x.mp4")[0] == 404
+
+
+def test_a_library_folder_is_made_by_name(library: tuple[str, Path]) -> None:
+    url, broll = library
+    status, reply = _post(url, "/api/library/folders", {"name": " Fortnite "})
+    assert status == 200, reply
+    assert reply["folders"] == ["Fortnite", "Lacy best"]
+    assert (broll / "Fortnite").is_dir()
+    assert _post(url, "/api/library/folders", {"name": "Fortnite"})[0] == 200
+    for bad in ("", "../up", ".dot", "a/b", "x" * 41):
+        status, reply = _post(url, "/api/library/folders", {"name": bad})
+        assert status == 400, bad
+    status, _ = _post(
+        url, "/api/library/folders", {"name": "x"}, {"Origin": "http://evil"}
+    )
+    assert status == 403
+
+
+def test_a_clip_is_copied_into_a_library_folder_by_its_title(
+    library: tuple[str, Path],
+) -> None:
+    url, broll = library
+    status, reply = _post(url, "/api/clips/1/library", {"folder": "Lacy best"})
+    assert status == 200, reply
+    assert reply["added"] == "Lacy best/a-title.mp4"
+    assert (broll / "Lacy best" / "a-title.mp4").read_bytes() == b"clip"
+    assert "Lacy best/a-title.mp4" in [f["name"] for f in reply["broll"]]
+    # A second copy gets a number; a clip without a title, its file's name.
+    assert _post(url, "/api/clips/1/library", {"folder": "Lacy best"})[1]["added"] == (
+        "Lacy best/a-title-2.mp4"
+    )
+    assert _post(url, "/api/clips/2/library", {"folder": "Lacy best"})[1]["added"] == (
+        "Lacy best/talk_2.mp4"
+    )
+
+
+@pytest.mark.parametrize(
+    ("rank", "folder", "status", "message"),
+    [
+        (3, "Lacy best", 409, "no rendered file"),
+        (9, "Lacy best", 404, "No clip ranked 9"),
+        (1, "Missing", 409, "No library folder Missing"),
+        (1, "../up", 400, "a library folder is"),
+    ],
+)
+def test_copying_a_clip_is_refused_when_it_cannot_be(
+    library: tuple[str, Path], rank: int, folder: str, status: int, message: str
+) -> None:
+    url, _ = library
+    got, reply = _post(url, f"/api/clips/{rank}/library", {"folder": folder})
+    assert got == status
+    assert message in reply["error"]
+
+
+def test_the_library_needs_a_broll_folder(base_url: str) -> None:
+    status, reply = _post(base_url, "/api/library/folders", {"name": "Fortnite"})
+    assert status == 409
+    assert "No B-roll folder" in reply["error"]

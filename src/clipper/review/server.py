@@ -23,7 +23,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, unquote
 
 from pydantic import ValidationError
 
@@ -61,6 +61,7 @@ from clipper.domain.models import (
     RenderManifest,
     Transcript,
     is_still,
+    library_folder,
 )
 from clipper.review.store import (
     BadRequest,
@@ -125,9 +126,13 @@ _FRAME_PATH = re.compile(r"/frames/([^/]+)/(\d{1,7}(?:\.25|\.5|\.75)?)\.jpg")
 # The maintainer's audio files, for the page to play: /music/<name> and
 # /sfx/<name>, listed names only (ADR 0007, audio amendment).
 _AUDIO_PATH = re.compile(r"/(music|sfx)/([^/\\]+)")
-# The maintainer's B-roll, for the page to show: /broll/<name>, listed
-# names only (ADR 0034, B-roll amendment).
-_BROLL_PATH = re.compile(r"/broll/([^/\\]+)")
+# The maintainer's B-roll, for the page to show: /broll/<name>, or
+# /broll/<folder>/<name> in a library folder (ADR 0035), each part
+# URL-encoded; listed names only (ADR 0034, B-roll amendment).
+_BROLL_PATH = re.compile(r"/broll/(.+)")
+# The clip library (ADR 0035): a new folder, or a clip's file copied in.
+_LIBRARY_FOLDERS_PATH = "/api/library/folders"
+_LIBRARY_CLIP_PATH = re.compile(r"/api/clips/(\d{1,4})/library")
 # The video's audio levels for the waveform: /peaks/<video key>.bin.
 _PEAKS_PATH = re.compile(r"/peaks/([^/]+)\.bin")
 # A rendered draft listed in the manifest: /clips/<file name> (ADR 0025).
@@ -533,16 +538,39 @@ def audio_files(folder: Path | None) -> list[str]:
 
 
 def broll_files(folder: Path | None) -> list[str]:
-    """The B-roll files in a folder, by name, which are all the page may
-    pick or fetch (ADR 0034, B-roll amendment)."""
+    """The B-roll files in a folder, by name, then those in its library
+    folders as `<folder>/<name>` (ADR 0035), which are all the page may pick
+    or fetch (ADR 0034, B-roll amendment)."""
     if folder is None or not folder.is_dir():
         return []
     suffixes = BROLL_VIDEO_SUFFIXES + BROLL_IMAGE_SUFFIXES
-    return sorted(
+    names = sorted(
         path.name
         for path in folder.iterdir()
         if path.is_file() and path.suffix.lower() in suffixes
     )
+    for sub in library_folders(folder):
+        names += sorted(
+            f"{sub}/{path.name}"
+            for path in (folder / sub).iterdir()
+            if path.is_file() and path.suffix.lower() in suffixes
+        )
+    return names
+
+
+def library_folders(folder: Path | None) -> list[str]:
+    """The library folders under the B-roll folder: subfolders with a name
+    `library_folder` accepts, sorted (ADR 0035)."""
+    if folder is None or not folder.is_dir():
+        return []
+    names = []
+    for path in folder.iterdir():
+        if not path.is_dir():
+            continue
+        with contextlib.suppress(ValueError):
+            if library_folder(path.name) == path.name:
+                names.append(path.name)
+    return sorted(names, key=str.casefold)
 
 
 def broll_payload(session: ReviewSession, known: dict[str, object]) -> list[object]:
@@ -554,6 +582,7 @@ def broll_payload(session: ReviewSession, known: dict[str, object]) -> list[obje
         if name not in known:
             entry: dict[str, object] = {
                 "name": name,
+                "folder": name.split("/")[0] if "/" in name else "",
                 "still": is_still(name),
                 "duration": None,
                 "sound": False,
@@ -683,11 +712,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 ):
                     pass
                 elif path == "/api/broll":
-                    self._send_json(
-                        HTTPStatus.OK, {"broll": broll_payload(session, broll_known)}
-                    )
+                    self._send_json(HTTPStatus.OK, self._broll_reply())
                 elif (shot := _BROLL_PATH.fullmatch(path)) and self._send_broll(
-                    shot.group(1)
+                    unquote(shot.group(1))
                 ):
                     pass
                 elif path == "/api/captions":
@@ -720,6 +747,10 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:
             path = self.path.split("?", 1)[0]
+            library = _LIBRARY_CLIP_PATH.fullmatch(path)
+            if library is not None or path == _LIBRARY_FOLDERS_PATH:
+                self._post_library(int(library.group(1)) if library else None)
+                return
             if (story := _STORY_PATH.fullmatch(path)) is not None:
                 self._post_story(story.group(1) or "make")
                 return
@@ -764,6 +795,40 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                         "render_error": saved.render_error,
                         "warning": saved.warning,
                     }
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except UnknownClip:
+                self._send_error(HTTPStatus.NOT_FOUND, f"No clip ranked {rank}")
+            except JudgingError as exc:
+                self._send_error(HTTPStatus.CONFLICT, str(exc))
+            except (ClipperError, OSError) as exc:
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, reply)
+
+        def _broll_reply(self) -> dict[str, object]:
+            return {
+                "broll": broll_payload(session, broll_known),
+                "folders": library_folders(session.broll_dir),
+            }
+
+        def _post_library(self, rank: int | None) -> None:
+            """Make a library folder, or copy clip `rank`'s file into one;
+            the reply is the B-roll and folders, and `added` the new file
+            (ADR 0035)."""
+            if not self._trusted():
+                self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
+                return
+            try:
+                data = self._read_json()
+                if not isinstance(data, dict):
+                    raise BadRequest("send a JSON object")
+                if rank is None:
+                    store.make_library_folder(str(data.get("name", "")))
+                    reply = self._broll_reply()
+                else:
+                    added = store.to_library(rank, str(data.get("folder", "")))
+                    reply = self._broll_reply() | {"added": added}
             except BadRequest as exc:
                 self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             except UnknownClip:

@@ -587,6 +587,12 @@ and planned code:
   Cold open spike amendment (V8 7c, not adopted): the maintainer's marks
   on 15 saved clips all 1 to 9 s in; the model's punchline and the
   loudest 2.5 s each 2 of 15 within 2 s, opening at 1 s 7; no code.
+- `0035` — a clip library as folders under `data/broll/`: B-roll may be
+  `<folder>/<file>` one level down; a saved clip's rendered file is copied
+  (hard link else copy) into a folder, named after its title; library
+  clips are inserted or overlaid as B-roll, unchanged code; `POST
+  /api/library/folders`, `POST /api/clips/<rank>/library`; listed by folder
+  in the bin. Blocks from another VOD's source not taken: a core change.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1828,7 +1834,12 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      with a blank pad; clips dragged from a folder onto the pad or the
      sequence lane and spliced with other blocks and B-roll. A sequence
      block from another VOD is a core change (ADR 0034 amendment),
-     designed first.
+     designed first. ADR 0035: library folders under `data/broll/`,
+     saved clips copied in and used as B-roll; in PRs:
+     - 9c-1. ADR 0035, folder names in B-roll paths, folders listed and
+       served, a folder made, a clip copied in.
+     - 9c-2. The Library tab in the bin: folders, To library, a new
+       folder, drag onto the lane; manual step.
 10. Release notes and tag `v0.8.0`.
 
 Later, not scheduled:
