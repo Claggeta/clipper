@@ -196,7 +196,10 @@ and planned code:
   or two fitting emoji (110 of 110; hooks got none); naming the person 68
   to 61, the maintainer's person 36 to 34 of 65. No emoji amendment (V7
   7i, the maintainer's choice): back to "no emoji", added by hand in
-  review; the 3a wording (naming 68 of 110).
+  review; the 3a wording (naming 68 of 110). Screen hook amendment (V8
+  7a): a `screen_hook` of at most 6 words in the same request, kept on
+  the manifest clip and burned as its first text; on 5 posted clips 3
+  questions, 2 with "he"; R19d.
 - `0019` — clips go to `<clips dir>/<stem>/` with a `manifest.json` replaced
   each run (since V6 4d `<clips dir>/<channel>/<MM-DD-YYYY>/<stem>/`, an
   existing folder reused). File names inside are unchanged. Amends 0008. Item 4a amendment:
@@ -461,7 +464,9 @@ and planned code:
   and a free `x`/`y` dragged on the preview; defaults burn as before.
   One box amendment (V7 7e): `BorderStyle 4`, one box behind a wrapped
   text (per-line boxes overlapped darker), outline colour clear; needs
-  libass 0.17 or newer.
+  libass 0.17 or newer. Screen hook amendment (V8 7a): `render --titles`
+  burns the screen hook as the first text, 0 to 3 s at the top, with or
+  without captions; the page's first text starts as it.
 - `0031` — the review page becomes a one-screen editor: clip list,
   a live 9:16 preview, an inspector with Clip, Captions, Text, Frame,
   Audio and Assist tabs, and a timeline of tracks (frames, waveform,

@@ -26,6 +26,7 @@ from clipper.domain.models import (
     FaceTrack,
     ManifestClip,
     MediaInfo,
+    OnScreenText,
     RenderManifest,
     Segment,
     Transcript,
@@ -88,7 +89,9 @@ class FakeTitleWriter:
         self.abouts.append(about)
         if text in self._fail_on:
             raise TitleError("Model reply is not a valid title: [bad]")
-        return ClipTitle(title=f"Title: {text}", hook=f"Hook: {text}")
+        return ClipTitle(
+            title=f"Title: {text}", hook=f"Hook: {text}", screen_hook="Watch this"
+        )
 
 
 def _no_title_writer(settings: object) -> FakeTitleWriter:
@@ -529,6 +532,54 @@ def test_titles_are_written_from_each_clips_text_to_the_manifest(env: Env) -> No
     assert "  Title: Title: hello there\n  Hook: Hook: hello there\n" in result.output
 
 
+def test_titles_burn_the_screen_hook_as_the_first_text(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.use_title_writer(FakeTitleWriter())
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    (clip,) = env.manifest().clips
+    assert clip.screen_hook == "Watch this"
+    assert clip.texts == (
+        OnScreenText(text="Watch this", start_seconds=0.0, end_seconds=3.0),
+    )
+    # Without --captions the file has the text and no spoken captions.
+    assert clip.captions is None
+    (ass,) = env.renderer.captions
+    assert ass is not None
+    assert "Watch this" in ass
+    assert "hello" not in ass
+    assert "  Screen hook: Watch this\n" in result.output
+
+
+def test_the_screen_hook_joins_the_captions(env: Env) -> None:
+    env.save(transcript=_SPEECH)
+    env.use_title_writer(FakeTitleWriter())
+    result = env.run("--titles", "--captions", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    (ass,) = env.renderer.captions
+    assert ass is not None
+    assert "Watch this" in ass
+    assert "hello" in ass
+    assert env.manifest().clips[0].captions is not None
+
+
+def test_a_screen_hook_the_text_rules_refuse_is_a_note(env: Env) -> None:
+    class Wordy:
+        def write(
+            self, text: str, video: VideoInfo | None = None, about: str | None = None
+        ) -> ClipTitle:
+            return ClipTitle(title="t", hook="h", screen_hook="word " * 40)
+
+    env.save(transcript=_SPEECH)
+    env.context = dataclasses.replace(env.context, title_writer=lambda s: Wordy())
+    result = env.run("--titles", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert "screen hook not burned" in result.output
+    (clip,) = env.manifest().clips
+    assert clip.texts == ()
+    assert env.renderer.captions == [None]
+
+
 def test_titles_with_other_flags_are_shown_together(env: Env) -> None:
     env.save(transcript=_SPEECH)
     env.use_title_writer(FakeTitleWriter())
@@ -542,7 +593,7 @@ def test_title_text_is_not_parsed_as_markup(env: Env) -> None:
         def write(
             self, text: str, video: VideoInfo | None = None, about: str | None = None
         ) -> ClipTitle:
-            return ClipTitle(title="[bold]x[/bold]", hook="[red]y")
+            return ClipTitle(title="[bold]x[/bold]", hook="[red]y", screen_hook="[b]z")
 
     env.save(transcript=_SPEECH)
     env.context = dataclasses.replace(env.context, title_writer=lambda s: Bracketed())

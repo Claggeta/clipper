@@ -344,17 +344,21 @@ class ClipInfo(BaseModel):
 
 
 class ClipTitle(BaseModel):
-    """A suggested title and hook for one clip. See docs/decisions/0018.
+    """A suggested title, hook and screen hook for one clip. See
+    docs/decisions/0018.
 
-    Both are stripped, must not be empty, and must be one line.
+    The hook opens the post's caption; the screen hook is the few words
+    shown over the clip's first seconds (screen hook amendment, V8 7a). All
+    are stripped, must not be empty, and must be one line.
     """
 
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
 
     title: str = Field(min_length=1)
     hook: str = Field(min_length=1)
+    screen_hook: str = Field(min_length=1)
 
-    @field_validator("title", "hook")
+    @field_validator("title", "hook", "screen_hook")
     @classmethod
     def _one_line(cls, value: str) -> str:
         if "\n" in value or "\r" in value:
@@ -372,6 +376,9 @@ TextColour = Literal["white", "yellow", "green", "cyan", "pink", "orange"]
 TextLook = Literal["box", "outline"]
 TextSize = Literal["small", "medium", "large"]
 TEXT_LIMIT = 120
+# A draft's screen hook shows from 0 for this long, at the top (ADR 0030,
+# screen hook amendment, V8 7a); the review page's first text too.
+SCREEN_HOOK_SECONDS = 3.0
 
 
 class OnScreenText(BaseModel):
@@ -831,7 +838,9 @@ class ManifestClip(BaseModel):
 
     `model_title` is the title `render --titles` wrote, kept by the page's
     first write to the clip (None if there was none); `title` may then be
-    the maintainer's.
+    the maintainer's. `screen_hook` is the model's few words for the
+    clip's first seconds, burned as its first text by `render --titles`
+    (ADR 0018 and 0030, screen hook amendments).
 
     `added` marks a clip the maintainer added in the review page (item 3e
     amendment), ranked after the drafts, with score 0 and the reason
@@ -866,6 +875,7 @@ class ManifestClip(BaseModel):
     captions: Literal["words", "segments"] | None = None
     title: str | None = None
     hook: str | None = None
+    screen_hook: str | None = None
     error: str | None = None
     reviewed: Literal["saved", "trashed"] | None = None
     draft_start_seconds: float | None = None

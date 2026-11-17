@@ -330,7 +330,8 @@ def clip_payload(
 
     `start` and `end` are what the file covers; `draft_start` and `draft_end`
     are the detector's span, the same until a re-render. `model_title` is
-    the model's title, kept once the page has written the clip. `variants`
+    the model's title, kept once the page has written the clip, and
+    `screen_hook` its words for the first seconds (ADR 0030). `variants`
     are the rendered styles and `style` the clip's own, its first (ADR 0025).
     `cuts` are the ranges left out of the file (ADR 0029), `texts`
     the lines burned over it (ADR 0030), and `sequence` its blocks (ADR
@@ -349,6 +350,7 @@ def clip_payload(
         "range_end": min(clip.end_seconds + RANGE_SECONDS, session.duration_seconds),
         "title": clip.title,
         "hook": clip.hook,
+        "screen_hook": clip.screen_hook,
         "file": clip.file,
         "variants": [_variant(session, v) for v in clip.variants],
         "style": clip.variants[0].style if clip.variants else None,

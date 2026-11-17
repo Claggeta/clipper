@@ -153,7 +153,9 @@ class FakeTitleWriter:
         self, text: str, video: VideoInfo | None = None, about: str | None = None
     ) -> ClipTitle:
         FakeTitleWriter.abouts.append(about)
-        return ClipTitle(title=f"T {text[:10]}", hook=f"H {text[:10]}")
+        return ClipTitle(
+            title=f"T {text[:10]}", hook=f"H {text[:10]}", screen_hook="Wait for it"
+        )
 
 
 class Env:

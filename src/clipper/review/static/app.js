@@ -579,14 +579,15 @@ thumbButton.addEventListener("click", async () => {
   }
 });
 
-// The first text is a hook: the title, over the first seconds at the top.
+// The first text is a hook: the model's screen hook, else the title, over
+// the first seconds at the top (ADR 0030, screen hook amendment).
 // Later ones start at the playhead, for HOOK_SECONDS, in the look of the
 // last text (V8 item 4e).
 document.getElementById("add-text").addEventListener("click", () => {
   const texts = textsOf(current);
   if (texts.length === 0) {
     texts.push({
-      text: titleBox.value.trim() || current.title || "",
+      text: current.screen_hook || titleBox.value.trim() || current.title || "",
       start: 0,
       end: HOOK_SECONDS,
       place: "top",

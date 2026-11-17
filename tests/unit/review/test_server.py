@@ -80,7 +80,7 @@ MANIFEST = RenderManifest(
     captions=True,
     titles=False,
     clips=(
-        _clip(1, 60.0, 105.0, title="A title", hook="A hook."),
+        _clip(1, 60.0, 105.0, title="A title", hook="A hook.", screen_hook="Why?"),
         _clip(2, 400.0, 440.0),
         _clip(3, 500.0, 530.0, file=None, error="ffmpeg failed"),
     ),
@@ -197,6 +197,7 @@ def test_payload_clamps_each_range_to_the_video(tmp_path: Path) -> None:
     assert clips[0]["model_title"] == "A title"
     assert clips[1]["model_title"] is None
     assert clips[0]["hook"] == "A hook."
+    assert (clips[0]["screen_hook"], clips[1]["screen_hook"]) == ("Why?", None)
     assert clips[2]["file"] is None
     assert clips[2]["error"] == "ffmpeg failed"
     assert [(c["reviewed"], c["judgment"]) for c in clips] == [(None, None)] * 3

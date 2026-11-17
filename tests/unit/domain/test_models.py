@@ -663,8 +663,12 @@ def test_a_saved_clip_still_needs_a_file_or_an_error() -> None:
 
 
 def test_clip_title_is_stripped() -> None:
-    title = ClipTitle(title="  A title ", hook=" A hook.  ")
-    assert (title.title, title.hook) == ("A title", "A hook.")
+    title = ClipTitle(title="  A title ", hook=" A hook.  ", screen_hook=" Why? ")
+    assert (title.title, title.hook, title.screen_hook) == (
+        "A title",
+        "A hook.",
+        "Why?",
+    )
 
 
 @pytest.mark.parametrize(
@@ -680,11 +684,13 @@ def test_clip_title_rejects_empty_or_multiline_text(
     title: str, hook: str, message: str
 ) -> None:
     with pytest.raises(ValidationError, match=message):
-        ClipTitle(title=title, hook=hook)
+        ClipTitle(title=title, hook=hook, screen_hook="s")
+    with pytest.raises(ValidationError, match=message):
+        ClipTitle(title="t", hook="h", screen_hook=hook if title == "title" else title)
 
 
 def test_clip_title_is_immutable() -> None:
-    title = ClipTitle(title="t", hook="h")
+    title = ClipTitle(title="t", hook="h", screen_hook="s")
     with pytest.raises(ValidationError):
         title.title = "u"  # type: ignore[misc]
 

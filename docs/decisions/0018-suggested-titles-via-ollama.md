@@ -415,6 +415,29 @@ prompt goes back to "No hashtags and no emoji.", the wording measured as
 of 65 the maintainer's person. Nothing else changes; titles already in
 manifests keep their emoji. Manual step R19c.
 
+## Amended by the screen hook (V8 item 7a)
+
+- Posted Shorts stall in YouTube's first test, and Studio's advice is
+  bold text in the first 2 seconds stating the stakes or asking a
+  question (V8 rescope, 2026-11-17). The hook (up to 15 words) is too
+  long to read in that time and only opens the caption.
+- The same request now also asks for a `screen_hook`: at most 6 words,
+  shown over the first seconds to viewers who may have the sound off,
+  the stakes or a question the clip answers, not the title again; the
+  prompt's other rules (no emoji, swear words or guessed pronouns, keep
+  the speaker's meaning) cover it. `ClipTitle.screen_hook` is required,
+  so a reply without one is that clip's title failure, as before.
+- `render --titles` (and so `drafts`) keeps it on the manifest clip
+  (`screen_hook`, ADR 0019) and burns it as the clip's first text (ADR
+  0030, screen hook amendment). Combined and summary titles get one
+  too, unused.
+- Tried on the 5 posted clips still in their manifests, with their
+  saved about text: 3 screen hooks are questions ("Is Adapt safe on
+  this road?"), 2 use "he" despite the pronoun rule, and 1 names the
+  wrong person (Jason for Joe), as titles do. Not handled in code; fixed
+  in review. Judged on posted Shorts: stayed to watch before and after
+  (ADR 0027). Manual step R19d.
+
 ## Revisit when
 
 - Titles need a different model from the detector.
