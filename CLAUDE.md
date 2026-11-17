@@ -579,6 +579,9 @@ and planned code:
   Block edits amendment (9n-5): "This block only" in the Frame and Audio
   tabs, bars and ticks on the block, trims keep them on the footage or
   drop them; manual step RV30.
+  Cold open spike amendment (V8 7c, not adopted): the maintainer's marks
+  on 15 saved clips all 1 to 9 s in; the model's punchline and the
+  loudest 2.5 s each 2 of 15 within 2 s, opening at 1 s 7; no code.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.
@@ -1795,10 +1798,13 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      more judged VODs, new drafts judged by the maintainer, `eval` at
      top 10 with ends cut early weighed. ADR 0014 and 0023 amendments.
      May end in nothing.
-   - 7c. A cold open: a spike on finding a clip's peak (the model naming
+   - 7c. ~~A cold open: a spike on finding a clip's peak (the model naming
      the punchline, or the loudest second); if it works, the peak 2 to
      3 s plays first, then the clip from its start, through the
-     sequence track's repeats (ADR 0034 amendment).
+     sequence track's repeats (ADR 0034 amendment).~~ (done; ended in
+     nothing: the maintainer's peaks on 15 saved clips all 1 to 9 s in,
+     the model and the loudest 2.5 s each 2 of 15 within 2 s against 7
+     for opening at 1 s; ADR 0034 amendment; no code)
 8. A hand-off to DaVinci Resolve (free edition), a spike first: whether
    it imports a timeline Clipper writes (FCPXML or OTIO) with the cut
    clips, B-roll, and captions as a transparent overlay track, and how
