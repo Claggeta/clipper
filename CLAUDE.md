@@ -1779,8 +1779,10 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
    P1)
 7. A Shorts recipe in `drafts`, in PRs, each judged on posted Shorts
    (and picking changes on judged labels too); each may end in nothing:
-   - 7a. The first on-screen text is the model's hook, not the title
-     (ADR 0018 and 0030 amendments).
+   - 7a. ~~The first on-screen text is the model's hook, not the title
+     (ADR 0018 and 0030 amendments).~~ (done; #275; a new `screen_hook`
+     of at most 6 words, burned 0 to 3 s at the top of every titled
+     draft; manual step R19d)
    - 7b. Shorter drafts: pauses cut by default and a target length of
      about 20 to 35 s, weighed against ends cut early (ADR 0023 and 0029
      amendments).
