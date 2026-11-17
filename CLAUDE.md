@@ -1820,7 +1820,9 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
    - 9a. ~~One bar for the buttons above and below the film strip, with
      "On-screen" as a dropdown.~~ (done; #280; Cuts and Block menus,
      "On screen" a checklist; manual step RV39)
-   - 9b. The pad out of the clip list column, into its own window.
+   - 9b. ~~The pad out of the clip list column, into its own window.~~
+     (done; #282; a tabbed bin left of the timeline, Clear pad; manual
+     step RV40)
    - 9c. A clip library across VODs: folders of clips kept on disk (where
      decided in the item), opened in the pad window; each edit starts
      with a blank pad; clips dragged from a folder onto the pad or the
