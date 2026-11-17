@@ -398,6 +398,11 @@ and planned code:
   to drafts by matching title, length and date, ambiguous ones confirmed by
   hand, confirmed links kept and reused. Each import a dated snapshot,
   compared by age and channel. Imported data stays out of git.
+  First export amendment (V8): a folder of `Table data.csv` (a row per
+  Short, columns from Studio's chooser, read by name; `Content` is the
+  video ID, joined to `posts.json` exactly), `Chart data.csv` (per day)
+  and `Totals.csv`; `Stayed to watch (%)` and `Average percentage viewed
+  (%)` present once chosen; a blank cell is not reported, not 0.
 - `0028` — post queue: `clipper queue` lists saved clips rated `good`, not
   yet posted, one per drafts folder in turn (newest first), with a day each
   (`--per-day`, default 2, `--start`), and writes `<clips dir>/queue.md`
@@ -702,27 +707,37 @@ assistant (9j) stays open, waiting on the maintainer's example requests.
 
 ## V8 scope
 
+Rescoped on 2026-11-17 (see "From the V8 rescope"): posted Shorts stall
+at about 1,000 to 1,500 views, and the first Studio export is in.
+
 Input: the same sources and drafts folders as V7, the maintainer's
-judgments in `review` (now with trash reasons), and a set of edit
-requests written by the maintainer. Output: picks changed only where a
-measured signal helps, a review page that takes fewer clicks per clip,
-and maybe a local-LLM assistant that turns a typed request into the
-page's edits. Interface: changes to `review`, the detector if a signal
-is adopted, and small fixes from "Parked".
+judgments in `review` (now with trash reasons), YouTube Studio exports
+of the channel's Shorts (ADR 0027), and a set of edit requests written
+by the maintainer. Output: a report of how posted Shorts do, linked to
+their drafts; drafts cut to a Shorts recipe (a hook on screen first,
+shorter, maybe a cold open), each part judged on posted Shorts; a
+clip's edit handed to DaVinci Resolve (free) if a spike finds that
+works; a simpler review page with a clip library across VODs to splice
+from; and maybe picks changed by a measured signal and the local-LLM
+assistant. Interface: a Studio import command, changes to `drafts` and
+`review`, maybe an export command, and small fixes from "Parked".
 
-Every picking change is measured as in V5 to V7: per VOD at top 10
-against the judged labels, keepers and rejects, keepers cut short and end
-gaps, unjudged drafts judged first, against the current default; and,
-once ratings are enough, `good` picks in the top few ranks.
+Recipe changes are judged on posted Shorts against those posted before
+them: stayed to watch, average percentage viewed and views at a similar
+age, per Short; indicative only at 1 to 2 posts a day. Every picking
+change is measured as in V5 to V7: per VOD at top 10 against the judged
+labels, keepers and rejects, keepers cut short and end gaps, unjudged
+drafts judged first, against the current default; and, once ratings are
+enough, `good` picks in the top few ranks.
 
-Non-goals for V8: the performance work (no Studio CSV export yet; ADRs
-0026 and 0027 still stand), posting or uploads, the YouTube or Twitch
-APIs, hosted or paid models, speaker detection, the movies/TV niche, a
-URL box in the review page, channel watching or scheduling, a database,
-user accounts, a JavaScript framework or build step for the page, and
-any dependency that fails ADR 0003's check (frame embeddings only after
-cheap signals show something, and only without PyTorch if it can be
-avoided).
+Non-goals for V8: performance as a training target and retraining (ADR
+0026's later stages), posting or uploads, the YouTube or Twitch APIs,
+OAuth or logins, hosted or paid models or tools (DaVinci Resolve's free
+edition only), speaker detection, the movies/TV niche, a URL box in the
+review page, channel watching or scheduling, a database, user accounts,
+a JavaScript framework or build step for the page, and any dependency
+that fails ADR 0003's check (frame embeddings only after cheap signals
+show something, and only without PyTorch if it can be avoided).
 
 ## Maintainer's goals
 
@@ -828,6 +843,29 @@ From the V8 questions on 2026-11-16:
 - The small Parked fixes ride along, each its own PR.
 - The judged labels then: 196 labels (13 rated `good`) and 168 rejected
   spans on 24 VODs, no trash reasons yet (V7 2a had just landed).
+
+From the V8 rescope on 2026-11-17:
+
+- The focus is posting better clips. Posted Shorts stall at about 1,000
+  to 1,500 views; YouTube Studio's assistant put it down to stayed to
+  watch (51 to 69% on the best, against the 75 to 80% it says wider
+  reach needs, unverified) and retention, and advised: start on the
+  peak, a hook on screen in the first 2 s, no dead audio, 25 to 30 s
+  with pauses cut, end on the payoff, loops, and clips that start a
+  debate.
+- The first Studio export is in (ADR 0027 amendment): 69 Shorts, 8 of
+  them recorded with `clipper posted`.
+- Drafts are not good enough to post as cut, so more editing is needed,
+  and the review page has become confusing: the rows of buttons above
+  and below the film strip most of all. "On-screen" can be a dropdown;
+  the pad should move elsewhere.
+- Wanted: grab clips from any VOD into a library of folders kept on
+  disk, opened in the pad window, starting each edit with a blank pad,
+  and drag clips from a folder onto the pad or the editing timeline to
+  splice with other edits and B-roll.
+- The maintainer has not used a video editor; every edit so far was in
+  `review`. Order chosen: the Studio import, then the Shorts recipe in
+  `drafts`, then a hand-off to DaVinci Resolve, then the simpler page.
 
 ## Current state
 
@@ -1716,7 +1754,45 @@ confirmation first.
      at the length limit (ADR 0014).
    - 5d. `eval`'s closing note worded by where the labels came from
      (ADR 0012).
-6. Release notes and tag `v0.8.0`.
+
+Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
+3 and 5 wait.
+
+6. Studio import (ADR 0027; the command name decided in the item): read
+   an export folder by column name, keep a dated snapshot under
+   `data/performance/` (out of git), link Shorts to drafts by video ID
+   through `posts.json` and the rest by matching (decision 3), ambiguous
+   ones confirmed by hand and kept, and report stayed to watch, average
+   percentage viewed and views per Short and by length, style and
+   channel. Manual step.
+7. A Shorts recipe in `drafts`, in PRs, each judged on posted Shorts
+   (and picking changes on judged labels too); each may end in nothing:
+   - 7a. The first on-screen text is the model's hook, not the title
+     (ADR 0018 and 0030 amendments).
+   - 7b. Shorter drafts: pauses cut by default and a target length of
+     about 20 to 35 s, weighed against ends cut early (ADR 0023 and 0029
+     amendments).
+   - 7c. A cold open: a spike on finding a clip's peak (the model naming
+     the punchline, or the loudest second); if it works, the peak 2 to
+     3 s plays first, then the clip from its start, through the
+     sequence track's repeats (ADR 0034 amendment).
+8. A hand-off to DaVinci Resolve (free edition), a spike first: whether
+   it imports a timeline Clipper writes (FCPXML or OTIO) with the cut
+   clips, B-roll, and captions as a transparent overlay track, and how
+   many steps that takes for someone new to an editor. Then an export
+   command if so. A new ADR; may end in nothing.
+9. A simpler review page, in PRs, each with a manual step (ADR 0031 and
+   0034 amendments):
+   - 9a. One bar for the buttons above and below the film strip, with
+     "On-screen" as a dropdown.
+   - 9b. The pad out of the clip list column, into its own window.
+   - 9c. A clip library across VODs: folders of clips kept on disk (where
+     decided in the item), opened in the pad window; each edit starts
+     with a blank pad; clips dragged from a folder onto the pad or the
+     sequence lane and spliced with other blocks and B-roll. A sequence
+     block from another VOD is a core change (ADR 0034 amendment),
+     designed first.
+10. Release notes and tag `v0.8.0`.
 
 Later, not scheduled:
 
