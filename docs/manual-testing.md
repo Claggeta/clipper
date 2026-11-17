@@ -3804,6 +3804,25 @@ RV12.
 
 Then delete the scratch folders.
 
+### RV37. Fix every occurrence of a word
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s fix every
+occurrence amendment (V8 item 4e). Same scratch copy and labels dir as
+RV12, on a clip where a word appears three or more times.
+
+1. Open `Captions`, click one of the repeated words, type a new spelling
+   and press Enter. Pass: under the note, `Fix all N others: "<word>" to
+   "<new>"` and `No`, N counting the others in the span.
+2. Press the fix button. Pass: every occurrence shows the new spelling,
+   each with its own punctuation, and the offer goes.
+3. Click another repeated word, clear it and press Enter. Pass: `Hide all
+   N others`. Press `No`. Pass: the offer goes and only the one word is
+   hidden.
+4. Fix a word that appears once. Pass: no offer.
+5. Save. Pass: the draft's captions show every fix.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

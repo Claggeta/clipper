@@ -674,6 +674,13 @@ button[aria-pressed="true"] {
 .effect-mark.selected { box-shadow: 0 0 0 2px #fff; }
 .effect-row.selected { outline: 1px solid var(--accent); }
 
+.caption-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
 /* Thumbnails (ADR 0030). */
 .thumb-row {
   display: grid;

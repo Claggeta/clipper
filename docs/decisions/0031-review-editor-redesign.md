@@ -333,6 +333,16 @@ asked for a chat box that turns a described edit into the page's edits.
   end, in the middle, with the last text's colour, look, size and fade
   (not its dragged position). Manual step RV36.
 
+## Amended by fix every occurrence (V8 item 4e)
+
+- From the click audit (V8 item 4a): a misheard name was fixed once per
+  occurrence. After a word is fixed or hidden in the Captions tab, the
+  page offers to do the same to the other unfixed words in the span that
+  read the same (ignoring case and the punctuation around them), each
+  keeping its own punctuation; "No" dismisses it. Single words only; the
+  edits are ordinary word fixes (ADR 0017, caption editing amendment),
+  unsaved until Save. Manual step RV37.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).
