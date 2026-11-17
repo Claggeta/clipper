@@ -1432,3 +1432,38 @@ class PostLog(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     posts: tuple[PostRecord, ...] = ()
+
+
+class StudioRow(BaseModel):
+    """One Short in a YouTube Studio export's table (ADR 0027, first export
+    amendment): its video ID, title, publish day and length in whole seconds,
+    and the figures used in reports. A figure is None where the export left
+    the cell blank or had no such column; a blank is not reported, not 0."""
+
+    model_config = ConfigDict(frozen=True)
+
+    video_id: str = Field(min_length=1)
+    title: str
+    published: date
+    duration_seconds: int = Field(ge=0)
+    views: int | None = None
+    engaged_views: int | None = None
+    stayed_to_watch: float | None = None
+    average_percentage_viewed: float | None = None
+    average_view_duration_seconds: int | None = None
+    likes: int | None = None
+    shares: int | None = None
+    comments: int | None = None
+    subscribers_gained: int | None = None
+
+
+class StudioExport(BaseModel):
+    """A Studio export folder's table, with the date range and channel its
+    folder name gives (`Content <from>_<to> <channel>`), None when renamed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rows: tuple[StudioRow, ...]
+    first_day: date | None = None
+    last_day: date | None = None
+    channel: str | None = None

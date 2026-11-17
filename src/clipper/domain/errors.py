@@ -84,3 +84,7 @@ class QueueError(ClipperError):
 
 class RemuxError(ClipperError):
     """Raised when a video cannot be remuxed to start at 0 (ADR 0020)."""
+
+
+class PerformanceError(ClipperError):
+    """Raised when a YouTube Studio export cannot be read or kept (ADR 0027)."""

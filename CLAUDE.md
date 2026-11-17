@@ -403,6 +403,10 @@ and planned code:
   video ID, joined to `posts.json` exactly), `Chart data.csv` (per day)
   and `Totals.csv`; `Stayed to watch (%)` and `Average percentage viewed
   (%)` present once chosen; a blank cell is not reported, not 0.
+  Import amendment (V8 6): `clipper performance <folder> [--link]`,
+  snapshot in `<performance dir>/<last day>/`, linked by the posts record
+  or by folded title, length within 2 s and day; `--link` adds matches to
+  `posts.json`; medians by length, channel and style; P1.
 - `0028` — post queue: `clipper queue` lists saved clips rated `good`, not
   yet posted, one per drafts folder in turn (newest first), with a day each
   (`--per-day`, default 2, `--start`), and writes `<clips dir>/queue.md`

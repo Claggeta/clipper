@@ -112,6 +112,41 @@ video (0008, 0019), and no record says which draft became which Short.
   to 40 s (19), 53.6% at 40 to 50 s (27), 46.4% at 50 s or more (8).
   1 share and 4 comments in all. Small samples.
 
+## Amended by the import (V8 item 6)
+
+- `clipper performance <export folder> [--link]` reads `Table data.csv`
+  by column name, copies the export's three files unchanged to
+  `<performance dir>/<last day>/` (`CLIPPER_PERFORMANCE_DIR`, default
+  `data/performance`, out of git; the day from the folder name, else
+  today; a later import of the same day replaces them), and prints a
+  report.
+- Linking (decision 3): a Short whose video ID is in the posts record is
+  linked to that clip. Otherwise its title is folded (case, accents,
+  emoji and punctuation dropped) and compared with every clip's title and
+  model title in every drafts folder, saved or not (drafts were posted
+  before `review`), and with each combined clip's and rendered summary's.
+  Its length must be within `LENGTH_TOLERANCE_SECONDS = 2.0` of the clip's
+  (the span less cuts, or its sequence's blocks) and it must be published
+  on or after the drafts folder's day. One draft fits: matched. Several
+  fit, or titles match but length or day does not: ambiguous, the drafts
+  listed. No title matches: up to 3 drafts with near titles, those whose
+  length and day fit first, as `<title> (<folder>/<file>)`.
+- `--link` adds each matched Short to `data/posts.json` as a post dated
+  the day it was published, so the posts record is the file of confirmed
+  links decision 3 names; an ambiguous or unfound Short is settled by hand
+  with `clipper posted <folder>/<file> <link> --on <day>`. The record does
+  not say which posts came from the import.
+- The report: a row per Short (published, age at the export's last day,
+  length, views, stayed to watch, average percentage viewed, likes, how it
+  is linked), then medians of views, stayed to watch and average
+  percentage viewed by length band (under 30, 30 to 40, 40 to 50, 50 s or
+  more), by the draft's channel (spaces trimmed) and by style (the clip
+  file's; none for a draft with several styles rendered).
+- On the first export: 8 Shorts by the posts record, 7 matched and 54 not
+  found. Most titles were rewritten at upload, so a near title is the
+  usual lead. `Chart data.csv` (views per day, for views at a similar
+  age) is kept but not read yet; manual step P1.
+
 ## Revisit when
 
 - The export lacks figures the report needs, or matching leaves many
