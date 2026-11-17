@@ -49,6 +49,7 @@ async function toPad(start = null, end = null) {
   }
   if (await padPost("/api/pad", { start: round(from), end: round(to) })) {
     notice("");
+    showBin("pad");
   }
 }
 
@@ -116,6 +117,63 @@ function drawPad() {
     });
     padList.append(item);
   }
+}
+
+// Clear pad (V8 item 9b): every piece off, one request each, after a second
+// press within CONFIRM_MS; clips that use them keep their blocks.
+const padClear = document.getElementById("pad-clear");
+let clearArmed = null;
+
+padClear.addEventListener("click", async () => {
+  if (!pad.length) {
+    return;
+  }
+  if (!clearArmed) {
+    padClear.textContent = "Sure?";
+    clearArmed = setTimeout(() => {
+      clearArmed = null;
+      padClear.textContent = "Clear pad";
+    }, CONFIRM_MS);
+    return;
+  }
+  clearTimeout(clearArmed);
+  clearArmed = null;
+  padClear.textContent = "Clear pad";
+  for (const piece of [...pad]) {
+    if (!(await padPost(`/api/pad/${piece.id}/delete`, {}))) {
+      break;
+    }
+  }
+});
+
+// The bin's tabs (V8 item 9b), the open one remembered in this browser.
+const BIN_KEY = "clipper-review-bin";
+
+function showBin(name) {
+  for (const tab of document.querySelectorAll("[data-bin]")) {
+    tab.setAttribute("aria-selected", String(tab.dataset.bin === name));
+  }
+  for (const panel of document.querySelectorAll("[data-bin-panel]")) {
+    panel.hidden = panel.dataset.binPanel !== name;
+  }
+  try {
+    localStorage.setItem(BIN_KEY, name);
+  } catch {
+    // Storage is blocked; the bin opens on the pad next time.
+  }
+}
+
+for (const tab of document.querySelectorAll("[data-bin]")) {
+  tab.addEventListener("click", () => showBin(tab.dataset.bin));
+}
+
+try {
+  const kept = localStorage.getItem(BIN_KEY);
+  if (kept && document.querySelector(`[data-bin="${kept}"]`)) {
+    showBin(kept);
+  }
+} catch {
+  // Storage is blocked; the pad shows.
 }
 
 function removePiece(piece, button) {

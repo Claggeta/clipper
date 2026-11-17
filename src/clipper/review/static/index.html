@@ -29,15 +29,6 @@
         <span class="rank">+</span><span class="name">Combined clip</span><span class="badge" data-state="combined">Combined</span><span class="span"></span>
       </button>
       <ol id="clips" class="clips"></ol>
-      <section class="pad" aria-label="Pad">
-        <h2>Pad <span class="muted">this video</span></h2>
-        <p id="pad-empty" class="muted pad-empty">Mark a range with Cut in, then Shift+P (or To pad); or Shift-drag on the strip. Drag a piece onto the Sequence lane.</p>
-        <ol id="pad-list" class="pad-list"></ol>
-        <p id="pad-notice" class="error pad-notice" role="status"></p>
-        <h2>B-roll <span class="muted">data/broll</span></h2>
-        <p id="broll-empty" class="muted pad-empty">Put your own videos and stills in data/broll, then reload.</p>
-        <ol id="broll-list" class="pad-list"></ol>
-      </section>
     </nav>
     <main class="stage">
       <div class="screen-switch" role="group" aria-label="Show">
@@ -164,6 +155,29 @@
         </div>
       </form>
       <section class="timeline" aria-label="Timeline">
+        <!-- The bin (V8 item 9b): the pad and B-roll beside the lanes they
+             are dragged onto, one tab at a time. -->
+        <aside class="bin" aria-label="Bin">
+          <div class="bin-tabs" role="tablist" aria-label="Bin">
+            <button type="button" role="tab" id="bin-tab-pad" data-bin="pad" aria-selected="true" aria-controls="bin-pad">Pad</button>
+            <button type="button" role="tab" id="bin-tab-broll" data-bin="broll" aria-selected="false" aria-controls="bin-broll">B-roll</button>
+          </div>
+          <div id="bin-pad" class="bin-panel" role="tabpanel" data-bin-panel="pad" aria-labelledby="bin-tab-pad">
+            <div class="bin-head">
+              <span class="muted">This video</span>
+              <button type="button" id="pad-clear" title="Take every piece off the pad (twice to confirm); clips that use them keep them">Clear pad</button>
+            </div>
+            <p id="pad-empty" class="muted pad-empty">Mark a range with Cut in, then Shift+P (or To pad); or Shift-drag on the strip. Drag a piece onto the Sequence lane.</p>
+            <ol id="pad-list" class="pad-list"></ol>
+            <p id="pad-notice" class="error pad-notice" role="status"></p>
+          </div>
+          <div id="bin-broll" class="bin-panel" role="tabpanel" data-bin-panel="broll" aria-labelledby="bin-tab-broll" hidden>
+            <div class="bin-head"><span class="muted">data/broll</span></div>
+            <p id="broll-empty" class="muted pad-empty">Put your own videos and stills in data/broll, then reload.</p>
+            <ol id="broll-list" class="pad-list"></ol>
+          </div>
+        </aside>
+        <div class="timeline-main">
         <!-- One bar (V8 item 9a): view, trim, then the cut and block actions
              in menus; the keys press the same buttons inside them. -->
         <div class="strip-bar">
@@ -240,11 +254,12 @@
           <div class="lane-row">
             <span class="lane-name">B-roll</span>
             <div class="lane-cell">
-              <div id="broll-lane" class="broll-lane no-overlays" data-placeholder="Drop a B-roll file here, or press Overlay on it in the pad"></div>
+              <div id="broll-lane" class="broll-lane no-overlays" data-placeholder="Drop a B-roll file here, or press Overlay on it in the B-roll tab"></div>
               <span id="broll-note" class="muted lane-note"></span>
             </div>
           </div>
           <div id="broll-row" class="sequence-bar broll-row" hidden></div>
+        </div>
         </div>
       </section>
     </div>

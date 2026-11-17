@@ -3592,8 +3592,8 @@ Covers the pad ([ADR 0034](decisions/0034-sequence-track-and-pad.md),
 V7 item 9n-4). Use a scratch copy of a drafts folder with captions and a
 scratch `CLIPPER_LABELS_DIR`, as in RV7.
 
-1. Choose a clip. Pass: below the clip list, "Pad" with a hint and no
-   pieces.
+1. Choose a clip. Pass: in the bin left of the timeline (below the clip
+   list before V8 item 9b), the Pad tab with a hint and no pieces.
 2. Move the playhead outside the span, press `[`, move on 4 s and press
    `Shift+P`. Pass: the notice says the mark is for the pad; a piece
    appears, named by its first words, with its first frame, times and
@@ -3937,6 +3937,23 @@ normal Edge window.
    plays and no name changes. Save, choose the next unjudged clip. Pass:
    the summary names the same two, "(from the last clip saved)".
 5. Press Esc with a menu open. Pass: it closes.
+
+Then delete the scratch folders.
+
+### RV40. The bin
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s bin
+amendment (V8 item 9b). Same scratch copy and labels dir as RV12.
+
+1. Open the page. Pass: the clip list fills the left column with no pad
+   under it; the bin, left of the timeline, has Pad and B-roll tabs.
+2. Press B-roll, reload. Pass: the B-roll tab is still open. Press To
+   pad on a clip. Pass: the Pad tab opens with the new piece.
+3. Drag a piece onto the Sequence lane. Pass: a block is inserted, as
+   in RV28.
+4. Press Clear pad. Pass: it reads "Sure?"; wait 3 s and it goes back.
+   Press it twice. Pass: the pad is empty and the clip keeps its block.
+5. Narrow the window under 1200 px. Pass: the bin sits under the lanes.
 
 Then delete the scratch folders.
 
