@@ -2911,9 +2911,9 @@ labelled with its time, covering the clip plus about 2 minutes either side;
 the scale reads `<n> s per frame`. The clip's span is outlined in yellow and
 the rest dimmed; a white line follows the playhead. The first strip of a clip
 fills in within a few seconds (record the time); choosing the clip again, or
-reloading the page, shows it at once. Zoom in and Zoom out change the scale
+reloading the page, shows it at once. `+` and `−` (zoom) change the scale
 (1, 2, 5, 10, 15, 30, 60 s per frame) around the same centre; ‹ and › move by
-half a strip; Fit clip returns to the first view. Clicking a frame seeks the
+half a strip; Fit returns to the first view. Clicking a frame seeks the
 player there. Stop the server, start `review` on another VOD's folder in
 the same browser, and choose a clip: every frame in the strip is from that
 VOD, matching the player when you click it (frames are cached by URL, and
@@ -2925,7 +2925,7 @@ browser): one frame takes about 220 ms with ffmpeg; 20 frames fetched 6 at a
 time from the server took 1.34 s cold and 0.02 s cached; a second past the
 end is `404`.
 
-### RV6. Handles, Set start/end, Preview and Reset
+### RV6. Handles, Start/End, Preview and Reset
 
 With RV5's page open, on one clip:
 
@@ -2934,10 +2934,10 @@ With RV5's page open, on one clip:
    edge: the strip moves with it.
 2. Drag the end handle right past the clip's end by a few seconds. It cannot
    cross the start handle.
-3. Seek with the step buttons, press Set end, then Set start somewhere
+3. Seek with the step buttons, press End, then Start somewhere
    earlier. The handles move there; a time off the strip recentres it. Set
    start after the end shows `The start must be before the end.`
-4. Press Preview span. It plays from the start handle and pauses at the end
+4. Press Preview. It plays from the start handle and pauses at the end
    handle, within a frame. Press it again and seek during playback: it plays
    on past the end (seeking cancels the preview).
 5. A length under 15 s or over 90 s shows in red.
@@ -3108,7 +3108,7 @@ it copies into the current folder.
    a clip with no gaps of 0.6 s: "No pauses of 0.6 s or more in the span."
 3. Click one stripe. Pass: it becomes a dashed outline (kept) and the
    after-length grows; click again to cut it.
-4. Press `Preview span`. Pass: playback jumps over each striped stretch
+4. Press `Preview`. Pass: playback jumps over each striped stretch
    and stops at the end handle; outlined stretches play.
 5. Save. Pass: "Re-rendering"; then the draft player shows the cut clip:
    shorter, the pauses gone, **lips in sync with the audio to the end**,
@@ -3239,7 +3239,7 @@ amendment (V7 item 3a). Same scratch copy and labels dir as RV12.
    and press `[`. Pass: `[` is typed; no red line.
 6. Press `Cut silence`. Pass: red-striped pauses appear, the yellow
    stretch stays, and no pause stripe overlaps it.
-7. Press `Preview span`. Pass: playback jumps over the yellow stretch.
+7. Press `Preview`. Pass: playback jumps over the yellow stretch.
    Save. Pass: the re-rendered draft leaves that stretch out, lips in
    sync, captions on the right words.
 8. Reload and choose the clip. Pass: its cuts are all striped yellow
@@ -3337,10 +3337,10 @@ VOD whose waveform is not cached yet (delete its file under
    "Waveform loading…"; within a few minutes (about 2 on a 4.5-hour VOD)
    a waveform appears, louder where people talk or shout. Reload. Pass:
    the waveform is there at once.
-2. Press `Zoom in` until `0.25 s per frame`. Pass: frames four to a
+2. Press `+` (zoom in) until `0.25 s per frame`. Pass: frames four to a
    second, each a little later than the last (labels with tenths), and a
    lane of words under the waveform lined up with the speech.
-3. With `Snap to words` pressed, drag the start handle slowly near a
+3. With `Snap` pressed, drag the start handle slowly near a
    word. Pass: it jumps to the word's start within about 0.3 s and moves
    freely between words. Hold Alt and drag. Pass: it moves freely.
 4. Put the playhead just after a word starts and press `I`. Pass: the
@@ -3350,7 +3350,7 @@ VOD whose waveform is not cached yet (delete its file under
    starts. Pass: the cut runs from the first word's end to the later
    word's start. Drag across the waveform lane. Pass: a cut, snapped the
    same way.
-6. Press `Snap to words` to turn it off and repeat step 4. Pass: the
+6. Press `Snap` to turn it off and repeat step 4. Pass: the
    start is the playhead's time. Reload. Pass: still off.
 7. Click on the waveform lane. Pass: the playhead moves there.
 8. Save a clip whose start or end snapped. Pass: the draft starts on the
@@ -3570,7 +3570,7 @@ captions and a scratch `CLIPPER_LABELS_DIR`, as in RV7.
 5. Drag the last block onto the first. Pass: it moves to the front.
    Drag a block's right edge with the mouse. Pass: it grows, the length
    follows, and its end snaps to a word edge (Alt frees it).
-6. Press `Preview span` on the Preview view. Pass: the blocks play in
+6. Press `Preview` on the Preview view. Pass: the blocks play in
    order, jumping at each join (a brief hitch is expected); the time
    under the preview counts on across joins; captions and texts follow;
    it stops after the last block.
@@ -3636,7 +3636,7 @@ set to a folder with a video that has sound, one without, and a still
    that point; a still is not split (a notice says so).
 4. Drag an insert's right edge. Pass: it grows, but no further than the
    file's end (a still: 30 s); a still has no left edge to drag.
-5. On the Preview view, press `Preview span`. Pass: the source plays,
+5. On the Preview view, press `Preview`. Pass: the source plays,
    then the insert, with its sound if on and no captions, then the
    still, silent, then the next block; the time under the preview
    counts on across every join; texts and music carry on; it stops after
@@ -3679,7 +3679,7 @@ drafts folder with captions, a scratch `CLIPPER_LABELS_DIR`, and
    picture-in-picture: a box of 30% of the width over the clip, under
    the captions. Drag the box on the preview. Pass: it follows the
    pointer and does not start playing.
-5. Press `Preview span` over the cutaway. Pass: the B-roll plays in step
+5. Press `Preview` over the cutaway. Pass: the B-roll plays in step
    with the clip, silent, the clip's sound going on; pausing pauses both.
 6. Edit the sequence so the clip is shorter than an overlay's end.
    Pass: that bar's border turns red, and Save says the overlay ends past
@@ -3913,6 +3913,30 @@ normal (not headless) Edge window.
 3. Click into the title box and press `Alt+3`. Pass: the tab stays.
 4. Press Esc, then `2`. Pass: the rating is OK, as before.
 5. Press `?`. Pass: the list has the `Alt+1` to `5` line.
+
+Then delete the scratch folders.
+
+### RV39. One bar, menus and the people dropdown
+
+Covers [ADR 0031](decisions/0031-review-editor-redesign.md)'s one bar
+amendment (V8 item 9a). Same scratch copy and labels dir as RV12, in a
+normal Edge window.
+
+1. Choose a clip. Pass: one row of controls above the strip (`‹ − + Fit
+   ›`, Start, End, Preview, Reset, Cuts, To pad, Block, Snap); under the
+   strip only the Sequence and B-roll lanes, named on the left, the
+   B-roll lane reading "Drop a B-roll file here...".
+2. Open Cuts and press Cut silence. Pass: the menu closes and the pause
+   cuts appear. Press `[`, move the playhead, press `]`. Pass: a manual
+   cut, as before.
+3. Open Block. Pass: its first line says what the sequence is; Back to
+   span is greyed for a clip without its own sequence. Click the strip.
+   Pass: the menu closes. Press `B`. Pass: the block splits.
+4. Open "On screen" and tick two names. Pass: the list stays open and
+   the summary names both; Unsaved shows. Press Space. Pass: the video
+   plays and no name changes. Save, choose the next unjudged clip. Pass:
+   the summary names the same two, "(from the last clip saved)".
+5. Press Esc with a menu open. Pass: it closes.
 
 Then delete the scratch folders.
 

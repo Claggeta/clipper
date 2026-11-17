@@ -101,7 +101,10 @@
           </div>
           <div id="people-field" class="judge-field" hidden>
             <span class="field-label" id="people-label">On screen <span id="people-carried" class="muted" hidden>(from the last clip saved)</span></span>
-            <div id="people" class="toggle-row" role="group" aria-labelledby="people-label"></div>
+            <details class="menu people-menu" id="people-menu">
+              <summary id="people-summary" aria-describedby="people-label">Nobody marked</summary>
+              <div id="people" class="menu-items people-list" role="group" aria-labelledby="people-label"></div>
+            </details>
           </div>
         </section>
         <section id="panel-captions" class="panel" role="tabpanel" data-panel="captions" aria-labelledby="tab-captions" hidden>
@@ -161,25 +164,49 @@
         </div>
       </form>
       <section class="timeline" aria-label="Timeline">
+        <!-- One bar (V8 item 9a): view, trim, then the cut and block actions
+             in menus; the keys press the same buttons inside them. -->
         <div class="strip-bar">
-          <button type="button" id="pan-back" title="Earlier">‹</button>
-          <button type="button" id="zoom-out">Zoom out</button>
-          <button type="button" id="zoom-in">Zoom in</button>
-          <button type="button" id="fit">Fit clip</button>
-          <button type="button" id="pan-on" title="Later">›</button>
+          <div class="bar-group" role="group" aria-label="View">
+            <button type="button" id="pan-back" class="compact" title="Earlier">‹</button>
+            <button type="button" id="zoom-out" class="compact" title="Zoom out">−</button>
+            <button type="button" id="zoom-in" class="compact" title="Zoom in">+</button>
+            <button type="button" id="fit" title="Fit the clip in the strip">Fit</button>
+            <button type="button" id="pan-on" class="compact" title="Later">›</button>
+          </div>
           <span class="sep" aria-hidden="true"></span>
-          <button type="button" id="set-start">Set start</button>
-          <button type="button" id="set-end">Set end</button>
-          <button type="button" id="preview" class="primary">Preview span</button>
-          <button type="button" id="reset">Reset</button>
+          <div class="bar-group" role="group" aria-label="Trim">
+            <button type="button" id="set-start" title="The span starts at the playhead ( I )">Start</button>
+            <button type="button" id="set-end" title="The span ends at the playhead ( O )">End</button>
+            <button type="button" id="preview" class="primary" title="Play the span through its cuts ( P )">Preview</button>
+            <button type="button" id="reset" title="Back to the draft's span">Reset</button>
+          </div>
           <span class="sep" aria-hidden="true"></span>
-          <button type="button" id="cut-silence" title="Cut the pauses in speech inside the span">Cut silence</button>
-          <button type="button" id="cut-in-button" title="Start a cut at the playhead ( [ )">Cut in</button>
-          <button type="button" id="cut-out-button" title="End the cut at the playhead ( ] ); Esc drops it">Cut out</button>
-          <button type="button" id="clear-cuts">Clear cuts</button>
+          <details class="menu" id="cuts-menu">
+            <summary title="Cut silence, cut in and out, clear">Cuts</summary>
+            <div class="menu-items">
+              <button type="button" id="cut-silence" title="Cut the pauses in speech inside the span">Cut silence</button>
+              <button type="button" id="cut-in-button" title="Start a cut at the playhead ( [ )">Cut in <kbd>[</kbd></button>
+              <button type="button" id="cut-out-button" title="End the cut at the playhead ( ] ); Esc drops it">Cut out <kbd>]</kbd></button>
+              <button type="button" id="clear-cuts">Clear cuts</button>
+            </div>
+          </details>
           <button type="button" id="to-pad" title="Keep the range from Cut in to the playhead, or the span, on the pad (Shift+P)">To pad</button>
+          <details class="menu" id="block-menu">
+            <summary title="The selected block on the Sequence lane">Block</summary>
+            <div class="menu-items">
+              <p id="sequence-state" class="muted menu-note"></p>
+              <button type="button" id="seq-split" title="Split the block at the playhead (B)">Split <kbd>B</kbd></button>
+              <button type="button" id="seq-duplicate" title="Duplicate the selected block after it (Shift+D)">Duplicate <kbd>Shift+D</kbd></button>
+              <button type="button" id="seq-remove" title="Remove the selected block (Backspace)">Remove <kbd>Backspace</kbd></button>
+              <button type="button" id="seq-left" title="Move the selected block earlier (Alt+Left)">Move earlier <kbd>Alt+←</kbd></button>
+              <button type="button" id="seq-right" title="Move the selected block later (Alt+Right)">Move later <kbd>Alt+→</kbd></button>
+              <button type="button" id="seq-sound" aria-pressed="false" title="The selected B-roll insert's own sound, or silence" disabled>Sound off</button>
+              <button type="button" id="seq-back" title="Drop the clip's own sequence: the span less its cuts">Back to span</button>
+            </div>
+          </details>
           <span class="sep" aria-hidden="true"></span>
-          <button type="button" id="snap" aria-pressed="true" title="Handles and cuts move to the nearest word edge within 0.3 s; hold Alt while dragging to place them freely">Snap to words</button>
+          <button type="button" id="snap" aria-pressed="true" title="Handles and cuts move to the nearest word edge within 0.3 s; hold Alt while dragging to place them freely">Snap</button>
           <span id="trim-notice" class="error"></span>
           <span id="scale" class="muted scale"></span>
         </div>
@@ -201,26 +228,22 @@
           <div id="handle-start" class="handle" title="Start"></div>
           <div id="handle-end" class="handle" title="End"></div>
         </div>
+        <!-- The lanes under the strip, each named on the left; their actions
+             are in the bar's Block menu and the pad (V8 item 9a). -->
         <div id="sequence" class="sequence">
-          <div class="sequence-bar">
-            <span class="sequence-name">Sequence</span>
-            <button type="button" id="seq-split" title="Split the block at the playhead (B)">Split</button>
-            <button type="button" id="seq-duplicate" title="Duplicate the selected block after it (Shift+D)">Duplicate</button>
-            <button type="button" id="seq-remove" title="Remove the selected block (Backspace)">Remove</button>
-            <button type="button" id="seq-left" title="Move the selected block earlier (Alt+Left)">‹ Move</button>
-            <button type="button" id="seq-right" title="Move the selected block later (Alt+Right)">Move ›</button>
-            <button type="button" id="seq-sound" aria-pressed="false" title="The selected B-roll insert's own sound, or silence" disabled>Sound off</button>
-            <button type="button" id="seq-back" title="Drop the clip's own sequence: the span less its cuts">Back to span</button>
-            <span id="sequence-state" class="muted"></span>
+          <div class="lane-row">
+            <span class="lane-name">Sequence</span>
+            <div id="sequence-lane" class="sequence-lane">
+              <div id="seq-playhead" class="seq-playhead" hidden></div>
+            </div>
           </div>
-          <div id="sequence-lane" class="sequence-lane">
-            <div id="seq-playhead" class="seq-playhead" hidden></div>
+          <div class="lane-row">
+            <span class="lane-name">B-roll</span>
+            <div class="lane-cell">
+              <div id="broll-lane" class="broll-lane no-overlays" data-placeholder="Drop a B-roll file here, or press Overlay on it in the pad"></div>
+              <span id="broll-note" class="muted lane-note"></span>
+            </div>
           </div>
-          <div class="sequence-bar overlay-head">
-            <span class="sequence-name">B-roll over</span>
-            <span id="broll-note" class="muted">Drop a B-roll file here, or press Overlay on it in the pad.</span>
-          </div>
-          <div id="broll-lane" class="broll-lane empty"></div>
           <div id="broll-row" class="sequence-bar broll-row" hidden></div>
         </div>
       </section>

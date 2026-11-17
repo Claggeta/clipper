@@ -169,6 +169,8 @@ function drawSequence() {
   sequenceState.textContent = own
     ? `${blocks.length} blocks · ${total.toFixed(1)} s · its own sequence; the handles set only the span`
     : `the span less its cuts · ${total.toFixed(1)} s · edit a block to change the order`;
+  // The state is the Block menu's first line and the lane's tooltip.
+  sequenceLane.title = sequenceState.textContent;
   document.getElementById("seq-back").disabled = !own;
   for (const element of [...sequenceLane.querySelectorAll(".block")]) {
     element.remove();

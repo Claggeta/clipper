@@ -523,6 +523,9 @@ and planned code:
   Fix all amendment (V8 4e): after a word fix or hide, an offer for the
   span's other words that read the same, punctuation kept; RV37.
   Tab keys amendment (V8 4g): `Alt+1` to `Alt+5` open the tabs; RV38.
+  One bar amendment (V8 9a): view, trim, Cuts and Block menus, To pad
+  and Snap in one bar above the strip; lanes alone below it; "On
+  screen" a dropdown checklist; keys work with a checkbox focused; RV39.
 - `0032` — Combine (first called Summarize, renamed 2026-11-13): a VOD's
   saved clips joined in VOD order into `<stem>_combined.mp4` by
   `ClipRenderer.join` (`concat`, label cards as on-screen texts, music as

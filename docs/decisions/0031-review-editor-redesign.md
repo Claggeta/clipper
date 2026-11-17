@@ -352,6 +352,31 @@ asked for a chat box that turns a described edit into the page's edits.
   on Windows, but headless runs cannot show the browser's own keys, so
   manual step RV38 checks it in a real window.
 
+## Amended by one bar (V8 item 9a)
+
+- The maintainer found the rows of buttons above and below the film
+  strip confusing (V8 rescope, 2026-11-17): 18 above it, 7 for the
+  Sequence lane below it, and a "B-roll over" row.
+- One bar above the strip: view (pan, zoom as `−` and `+`, Fit), trim
+  (Start, End, Preview, Reset), a **Cuts** menu (Cut silence, Cut in,
+  Cut out, Clear cuts), To pad, a **Block** menu (the sequence state,
+  Split, Duplicate, Remove, Move earlier and later, Sound, Back to span)
+  and Snap. The menus are `<details>` elements; an action, a press
+  elsewhere or Esc closes them. Their buttons keep their ids, so the
+  keys press them as before.
+- Below the strip only the lanes, each named on the left; the B-roll
+  lane's note is its placeholder, and its controls for a selected
+  overlay stay under it. The lane's empty class was renamed: the page's
+  `.empty` placeholder rule had been padding it to 42 px.
+- "On screen" is a dropdown: its summary names who is marked, and it
+  opens a two-column checklist that stays open while names are ticked.
+- A focused checkbox no longer counts as typing, so the keys work after
+  ticking a name or Move on (Space plays rather than ticks).
+- Checked in headless Edge on a scratch copy of v2924392099: 13
+  controls in the bar, Cut silence from its menu (5 cuts), `B` from the
+  keys inside a closed menu (6 to 7 blocks), the checklist, Space with
+  a checkbox focused. Manual step RV39.
+
 ## Revisit when
 
 - The plain scripts become hard to change (a framework, by amendment).

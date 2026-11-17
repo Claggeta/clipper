@@ -9,9 +9,11 @@ const MOVE_ON_KEY = "clipper-review-move-on";
 const moveOnBox = document.getElementById("move-on");
 const keysHelp = document.getElementById("keys-help");
 
+// A ticked checkbox keeps focus but takes no typing, so keys still work
+// after one (the people checklist, Move on; V8 item 9a).
 function typingIn(target) {
   return (
-    target instanceof HTMLInputElement ||
+    (target instanceof HTMLInputElement && target.type !== "checkbox") ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     (target instanceof HTMLElement && target.isContentEditable)
