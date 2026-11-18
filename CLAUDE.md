@@ -1838,10 +1838,14 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      block from another VOD is a core change (ADR 0034 amendment),
      designed first. ADR 0035: library folders under `data/broll/`,
      saved clips copied in and used as B-roll; in PRs:
-     - 9c-1. ADR 0035, folder names in B-roll paths, folders listed and
-       served, a folder made, a clip copied in.
-     - 9c-2. The Library tab in the bin: folders, To library, a new
-       folder, drag onto the lane; manual step.
+     - 9c-1. ~~ADR 0035, folder names in B-roll paths, folders listed and
+       served, a folder made, a clip copied in.~~ (done; #284)
+     - 9c-2. ~~The Library tab in the bin: folders, To library, a new
+       folder, drag onto the lane; manual step.~~ (done; #285; a library
+       clip inserted whole; manual step RV41)
+
+   Item 9 is done: one bar #280, the bin #282, the library #284 and
+   #285.
 10. Release notes and tag `v0.8.0`.
 
 Later, not scheduled:
