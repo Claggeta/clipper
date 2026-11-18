@@ -271,60 +271,204 @@ sequenceLane.addEventListener("drop", (event) => {
 
 document.getElementById("to-pad").addEventListener("click", () => toPad());
 
-// B-roll files (ADR 0034, B-roll amendment): listed under the pieces,
-// inserted after the selected block or dropped onto the Sequence lane, or
-// laid over the clip (overlays.js).
+// B-roll files (ADR 0034, B-roll amendment) and library clips (ADR 0035):
+// listed in the bin's Library tab, inserted after the selected block or
+// dropped onto the Sequence lane, or laid over the clip (overlays.js).
 const BROLL_TYPE = "application/x-clipper-broll";
 const brollList = document.getElementById("broll-list");
 
+// The Library tab (ADR 0035): loose B-roll, then each library folder with
+// its clips, all inserted or laid over as B-roll.
 function drawBrollFiles() {
   brollList.replaceChildren();
-  document.getElementById("broll-empty").hidden = brollFiles.length > 0;
-  for (const file of brollFiles) {
-    const item = document.createElement("li");
-    item.className = "piece broll-file";
-    item.draggable = true;
-    const src = `/broll/${encodeURIComponent(file.name)}`;
-    let thumb;
-    if (file.still) {
-      thumb = document.createElement("img");
-      thumb.src = src;
-      thumb.alt = "";
-    } else {
-      thumb = document.createElement("video");
-      thumb.src = `${src}#t=0.1`;
-      thumb.muted = true;
-      thumb.preload = "metadata";
-    }
-    thumb.className = "piece-thumb";
-    const name = document.createElement("span");
-    name.className = "piece-title";
-    name.textContent = file.name;
-    const meta = document.createElement("span");
-    meta.className = "piece-meta";
-    const length = file.still ? "still" : file.duration ? `${file.duration.toFixed(1)} s` : "length unknown";
-    meta.textContent = `${length}${file.sound ? " · 🔊" : ""}`;
-    const actions = document.createElement("span");
-    actions.className = "piece-actions";
-    const add = document.createElement("button");
-    add.type = "button";
-    add.textContent = "Insert";
-    add.title = "Put it in the clip's sequence after the selected block";
-    add.addEventListener("click", () => insertBroll(file, selectedBlock + 1));
-    const over = document.createElement("button");
-    over.type = "button";
-    over.textContent = "Overlay";
-    over.title = "Lay it over the clip at the playhead, its sound off";
-    over.addEventListener("click", () => addOverlay(file));
-    actions.append(add, over);
-    item.append(thumb, name, meta, actions);
-    item.addEventListener("dragstart", (event) => {
-      event.dataTransfer.setData(BROLL_TYPE, file.name);
-      event.dataTransfer.effectAllowed = "copy";
-    });
-    brollList.append(item);
+  document.getElementById("broll-empty").hidden = brollFiles.length > 0 || libraryFolders.length > 0;
+  const loose = brollFiles.filter((file) => !file.folder);
+  if (loose.length) {
+    brollList.append(librarySection("B-roll", loose, null));
+  }
+  for (const folder of libraryFolders) {
+    brollList.append(
+      librarySection(folder, brollFiles.filter((file) => file.folder === folder), folder),
+    );
+  }
+  drawFolderChoice();
+}
+
+// A folder's clips under its name, folded open; `folder` is null for the
+// loose B-roll.
+function librarySection(title, list, folder) {
+  const section = document.createElement("details");
+  section.className = "library-folder";
+  section.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = `${title} (${list.length})`;
+  section.append(summary);
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted pad-empty";
+    empty.textContent = "Empty: press To library on a saved clip.";
+    section.append(empty);
+  }
+  const items = document.createElement("ol");
+  items.className = "pad-list";
+  for (const file of list) {
+    items.append(brollItem(file, folder));
+  }
+  section.append(items);
+  return section;
+}
+
+function brollItem(file, folder) {
+  const item = document.createElement("li");
+  item.className = "piece broll-file";
+  item.draggable = true;
+  const src = `/broll/${encodeURIComponent(file.name)}`;
+  let thumb;
+  if (file.still) {
+    thumb = document.createElement("img");
+    thumb.src = src;
+    thumb.alt = "";
+  } else {
+    thumb = document.createElement("video");
+    thumb.src = `${src}#t=0.1`;
+    thumb.muted = true;
+    thumb.preload = "metadata";
+  }
+  thumb.className = "piece-thumb";
+  const name = document.createElement("span");
+  name.className = "piece-title";
+  name.textContent = folder ? file.name.slice(folder.length + 1) : file.name;
+  name.title = file.name;
+  const meta = document.createElement("span");
+  meta.className = "piece-meta";
+  const length = file.still ? "still" : file.duration ? `${file.duration.toFixed(1)} s` : "length unknown";
+  meta.textContent = `${length}${file.sound ? " · 🔊" : ""}`;
+  const actions = document.createElement("span");
+  actions.className = "piece-actions";
+  const add = document.createElement("button");
+  add.type = "button";
+  add.textContent = "Insert";
+  add.title = "Put it in the clip's sequence after the selected block";
+  add.addEventListener("click", () => insertBroll(file, selectedBlock + 1));
+  const over = document.createElement("button");
+  over.type = "button";
+  over.textContent = "Overlay";
+  over.title = "Lay it over the clip at the playhead, its sound off";
+  over.addEventListener("click", () => addOverlay(file));
+  actions.append(add, over);
+  item.append(thumb, name, meta, actions);
+  item.addEventListener("dragstart", (event) => {
+    event.dataTransfer.setData(BROLL_TYPE, file.name);
+    event.dataTransfer.effectAllowed = "copy";
+  });
+  return item;
+}
+
+// --- Into the library (ADR 0035) ---
+
+const FOLDER_KEY = "clipper-review-library-folder";
+const folderChoice = document.getElementById("library-folder");
+const libraryNotice = document.getElementById("library-notice");
+
+function librarySay(message, error = false) {
+  libraryNotice.textContent = message;
+  libraryNotice.classList.toggle("error", error);
+}
+
+// The folder To library uses: the one picked last, else the first.
+function drawFolderChoice() {
+  let kept = null;
+  try {
+    kept = localStorage.getItem(FOLDER_KEY);
+  } catch {
+    // Storage is blocked; the first folder is picked.
+  }
+  const picked = folderChoice.value || kept;
+  folderChoice.replaceChildren();
+  for (const folder of libraryFolders) {
+    const option = document.createElement("option");
+    option.value = folder;
+    option.textContent = folder;
+    folderChoice.append(option);
+  }
+  if (libraryFolders.includes(picked)) {
+    folderChoice.value = picked;
+  }
+  folderChoice.disabled = libraryFolders.length === 0;
+  document.getElementById("to-library").disabled = libraryFolders.length === 0;
+}
+
+folderChoice.addEventListener("change", () => {
+  try {
+    localStorage.setItem(FOLDER_KEY, folderChoice.value);
+  } catch {
+    // Storage is blocked; the choice lasts until reload.
+  }
+});
+
+// The reply to a library write carries the B-roll and folders afresh.
+function takeLibrary(reply) {
+  brollFiles = reply.broll || brollFiles;
+  libraryFolders = reply.folders || libraryFolders;
+  drawBrollFiles();
+}
+
+document.getElementById("to-library").addEventListener("click", async () => {
+  if (!current) {
+    librarySay("Choose a clip first.", true);
+    return;
+  }
+  if (!current.file || current.isNew) {
+    librarySay("This clip has no rendered file yet: Save it first.", true);
+    return;
+  }
+  if (!document.getElementById("unsaved").hidden) {
+    librarySay("Save first: the library gets the clip as last saved.", true);
+    return;
+  }
+  try {
+    const reply = await post(`/api/clips/${current.rank}/library`, { folder: folderChoice.value });
+    takeLibrary(reply);
+    librarySay(`Added ${reply.added}.`);
+  } catch (error) {
+    librarySay(error.message, true);
+  }
+});
+
+const makeRow = document.getElementById("library-make");
+const nameBox = document.getElementById("library-name");
+
+document.getElementById("library-new").addEventListener("click", () => {
+  makeRow.hidden = !makeRow.hidden;
+  if (!makeRow.hidden) {
+    nameBox.focus();
+  }
+});
+
+async function makeFolder() {
+  const name = nameBox.value.trim();
+  if (!name) {
+    return;
+  }
+  try {
+    takeLibrary(await post("/api/library/folders", { name }));
+    folderChoice.value = name;
+    folderChoice.dispatchEvent(new Event("change"));
+    nameBox.value = "";
+    makeRow.hidden = true;
+    librarySay(`Folder ${name} is ready.`);
+  } catch (error) {
+    librarySay(error.message, true);
   }
 }
+
+document.getElementById("library-make-button").addEventListener("click", makeFolder);
+nameBox.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    makeFolder();
+  }
+});
 
 loaded.then(() => {
   pad = padAtLoad || [];

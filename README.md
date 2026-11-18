@@ -246,7 +246,11 @@ effects from `data/sfx/`) tabs, and the film strip across the bottom.
 Mark cuts by hand with `[` and `]` or by dragging on the strip. A Sequence
 lane plays a clip as blocks in any order, a pad keeps ranges marked
 anywhere in the VOD (`Shift+P`), and B-roll from `data/broll/` goes in as
-a block or over the clip. A `facecam` draft gets a cam toggle (top or
+a block or over the clip. The bin left of the timeline holds the pad and
+the Library: folders under `data/broll/` of saved clips from any video
+(To library copies the current clip in), spliced into another clip whole
+by Insert or a drag onto the Sequence lane
+([ADR 0035](docs/decisions/0035-clip-library.md)). A `facecam` draft gets a cam toggle (top or
 bottom). While Trash is armed, keys `1` to `5` record why. Most actions have a key (`?` lists
 them), and after Save or Trash the page moves on to the next clip without a
 verdict. `Combine` joins the saved clips into one longer Short with

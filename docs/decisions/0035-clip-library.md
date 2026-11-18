@@ -75,6 +75,23 @@ lands in, which is right for a clip with its own.
 - Library copies are under `data/`, out of git, and a copy costs disk space
   only where a hard link cannot be made (across drives).
 
+## Amended by the page (V8 item 9c-2)
+
+- The bin's B-roll tab is now **Library**: the loose B-roll under
+  "B-roll", then each library folder folded open with its count, each
+  clip with Insert and Overlay and draggable onto the Sequence lane as
+  before. "New folder" opens a name box; "To library" copies the chosen
+  clip into the folder picked in a list (remembered in local storage).
+- To library refuses a new clip, one without a file, or one with
+  unsaved edits ("Save first"), since the copy is the file as last
+  rendered.
+- A library clip is inserted whole (its length to the hundredth below);
+  other B-roll still goes in for 3 s.
+- Checked in headless Edge on a scratch copy of v2924392099 with a
+  scratch B-roll folder: a folder made, a saved clip hard-linked in,
+  inserted whole (37.75 s) into another clip, Save re-rendered it to
+  76.75 s at 1080x1920. Manual step RV41.
+
 ## Revisit when
 
 - The maintainer often wants to re-trim or re-caption a borrowed clip in

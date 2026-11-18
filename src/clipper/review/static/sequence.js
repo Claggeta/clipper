@@ -29,7 +29,8 @@ const brollPlayer = document.getElementById("broll-player");
 const brollStill = new Image();
 const STILL_SUFFIXES = [".png", ".jpg", ".jpeg"];
 const MAX_STILL = 30;
-let brollFiles = []; // [{name, still, duration, sound}] from /api/broll
+let brollFiles = []; // [{name, folder, still, duration, sound}] from /api/broll
+let libraryFolders = []; // the library folders under data/broll (ADR 0035)
 // {index, still, from, playing, startedAt, timer}: the insert on show.
 let insert = null;
 let lastWatch = 0; // when the frame loop last stepped the blocks
@@ -705,7 +706,9 @@ function insertBroll(file, index) {
   if (!current) {
     return;
   }
-  const length = file.still ? 2 : Math.min(3, file.duration || 3);
+  // A library clip (ADR 0035) goes in whole; other B-roll for 3 s.
+  const whole = file.folder && !file.still && file.duration ? Math.floor(file.duration * 100) / 100 : 0;
+  const length = file.still ? 2 : whole || Math.min(3, file.duration || 3);
   const blocks = makeOwn(current);
   const at = clamp(index, 0, blocks.length);
   blocks.splice(at, 0, copyBlock({ start: 0, end: length, broll: file.name, sound: file.sound }));
@@ -797,8 +800,10 @@ async function loadBroll() {
     const response = await fetch("/api/broll");
     const data = await response.json();
     brollFiles = data.broll || [];
+    libraryFolders = data.folders || [];
   } catch {
     brollFiles = [];
+    libraryFolders = [];
   }
   if (typeof drawBrollFiles === "function") {
     drawBrollFiles();
