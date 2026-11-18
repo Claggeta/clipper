@@ -593,6 +593,8 @@ and planned code:
   clips are inserted or overlaid as B-roll, unchanged code; `POST
   /api/library/folders`, `POST /api/clips/<rank>/library`; listed by folder
   in the bin. Blocks from another VOD's source not taken: a core change.
+  Page amendment (V8 9c-2): the bin's Library tab, New folder, To library
+  (saved clips only), a library clip inserted whole; RV41.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

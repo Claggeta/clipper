@@ -3957,6 +3957,30 @@ amendment (V8 item 9b). Same scratch copy and labels dir as RV12.
 
 Then delete the scratch folders.
 
+### RV41. The clip library
+
+Covers [ADR 0035](decisions/0035-clip-library.md) (V8 item 9c). Same
+scratch copy and labels dir as RV12, and a scratch
+`CLIPPER_BROLL_DIR` with one loose video in it.
+
+1. Open the bin's Library tab. Pass: the loose video under "B-roll";
+   To library is greyed while there is no folder.
+2. Press New folder, type `Test picks`, press Enter. Pass: "Folder Test
+   picks is ready", the folder shows "(0)" and is picked in the list,
+   and it exists under the B-roll folder.
+3. Choose a saved clip with nothing unsaved and press To library. Pass:
+   "Added Test picks/<its title>.mp4"; the file is there and plays in
+   the bin's thumbnail. Change its title without saving and press To
+   library. Pass: "Save first".
+4. Choose a clip from another drafts folder (run `clipper review` on it
+   with the same B-roll folder) and drag the library clip onto its
+   Sequence lane. Pass: a green block as long as the whole clip; Preview
+   plays it in the second player with its own captions and sound.
+5. Save. Pass: the re-rendered draft plays this clip, then the library
+   clip, with no gap; its length is the two together.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

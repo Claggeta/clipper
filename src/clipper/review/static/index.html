@@ -160,7 +160,7 @@
         <aside class="bin" aria-label="Bin">
           <div class="bin-tabs" role="tablist" aria-label="Bin">
             <button type="button" role="tab" id="bin-tab-pad" data-bin="pad" aria-selected="true" aria-controls="bin-pad">Pad</button>
-            <button type="button" role="tab" id="bin-tab-broll" data-bin="broll" aria-selected="false" aria-controls="bin-broll">B-roll</button>
+            <button type="button" role="tab" id="bin-tab-broll" data-bin="broll" aria-selected="false" aria-controls="bin-broll" title="B-roll and the clip library (data/broll)">Library</button>
           </div>
           <div id="bin-pad" class="bin-panel" role="tabpanel" data-bin-panel="pad" aria-labelledby="bin-tab-pad">
             <div class="bin-head">
@@ -172,9 +172,23 @@
             <p id="pad-notice" class="error pad-notice" role="status"></p>
           </div>
           <div id="bin-broll" class="bin-panel" role="tabpanel" data-bin-panel="broll" aria-labelledby="bin-tab-broll" hidden>
-            <div class="bin-head"><span class="muted">data/broll</span></div>
-            <p id="broll-empty" class="muted pad-empty">Put your own videos and stills in data/broll, then reload.</p>
-            <ol id="broll-list" class="pad-list"></ol>
+            <!-- The clip library (ADR 0035): saved clips copied into folders
+                 under data/broll, used as B-roll in any video's clips. -->
+            <div class="bin-head">
+              <span class="muted">data/broll</span>
+              <button type="button" id="library-new" title="A new library folder">New folder</button>
+            </div>
+            <div id="library-make" class="library-row" hidden>
+              <input id="library-name" type="text" maxlength="40" autocomplete="off" placeholder="Folder name" aria-label="New folder name">
+              <button type="button" id="library-make-button">Make</button>
+            </div>
+            <div class="library-row">
+              <select id="library-folder" aria-label="Library folder"></select>
+              <button type="button" id="to-library" title="Copy this clip, as last saved, into the folder">To library</button>
+            </div>
+            <p id="library-notice" class="judge-notice pad-notice" role="status"></p>
+            <p id="broll-empty" class="muted pad-empty">Make a folder and press To library on a saved clip, or put your own videos and stills in data/broll and reload.</p>
+            <div id="broll-list" class="library-list"></div>
           </div>
         </aside>
         <div class="timeline-main">

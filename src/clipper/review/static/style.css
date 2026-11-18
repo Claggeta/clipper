@@ -1294,6 +1294,32 @@ kbd {
 
 .timeline-main { grid-area: main; min-width: 0; }
 
+/* The clip library (ADR 0035): folders folded open in the Library tab. */
+.library-row { display: flex; gap: 4px; margin: 0 2px 6px; }
+
+.library-row select,
+.library-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.library-row button { padding: 2px 8px; font-size: 12px; }
+
+.library-folder > summary {
+  margin: 4px 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .pad-empty { margin: 0 4px; font-size: 12px; }
 
 .pad-notice { margin: 4px; font-size: 12px; }
