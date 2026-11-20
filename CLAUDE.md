@@ -600,6 +600,15 @@ and planned code:
   in the bin. Blocks from another VOD's source not taken: a core change.
   Page amendment (V8 9c-2): the bin's Library tab, New folder, To library
   (saved clips only), a library clip inserted whole; RV41.
+- `0036` — `clipper resolve <clip> ...`: clips named as `posted` takes
+  them, from any drafts folders, as one FCPXML 1.9 timeline for DaVinci
+  Resolve (free) in `<clips dir>/resolve/<name>/`: 1080x1920 at 60 fps,
+  each clip's kept stretches of its source (span less cuts, or its
+  sequence) filled to the height, B-roll inserts fitted, media in place;
+  `captions.srt` from `caption_chunks` (`--no-captions`) and the steps.
+  Texts, zooms, crops, overlays, music and effects not carried. Spike:
+  finished pieces, the source and subtitles all imported; the source
+  chosen (no render, cuts re-openable); manual step H1.
 
 A design decision that isn't in an ADR is a decision that will be undone by
 accident.

@@ -44,7 +44,7 @@ from clipper.adapters.results.video_info_json import (
     video_info_beside,
 )
 from clipper.cli.context import AppContext, DetectorName
-from clipper.core.captions import build_ass, clip_text
+from clipper.core.captions import CaptionWord, build_ass, caption_chunks, clip_text
 from clipper.core.channels import ABOUT_LIMIT, channel_about
 from clipper.core.config import Settings
 from clipper.core.cuts import MAX_DRAFT_CUT_SHARE, Cut, TimeMap, cut_crop, draft_cuts
@@ -53,6 +53,17 @@ from clipper.core.framing import (
     facecam_caption_margin,
     plan_face_crop,
     plan_facecam,
+)
+from clipper.core.handoff import (
+    HANDOFF_FOLDER,
+    Media,
+    Shot,
+    build_fcpxml,
+    build_srt,
+    clip_shots,
+    import_steps,
+    subtitle_cues,
+    timeline_seconds,
 )
 from clipper.core.interfaces import StoryWriter, TitleWriter
 from clipper.core.judging import check_judged_labels, judged_labels_path
@@ -81,6 +92,7 @@ from clipper.core.posting import (
     record_post,
     schedule,
     titled_clips,
+    upload_stem,
 )
 from clipper.core.sources import (
     parse_source_list,
@@ -92,6 +104,7 @@ from clipper.domain.errors import (
     ClipperError,
     ClipRenderError,
     DetectionError,
+    HandoffError,
     LabelsError,
     QueueError,
     ReviewError,
@@ -119,6 +132,7 @@ from clipper.domain.models import (
     Transcript,
     VideoInfo,
     VideoSource,
+    is_still,
 )
 from clipper.review.server import (
     DEFAULT_PORT,
@@ -1634,6 +1648,139 @@ def posted(
         f"{action} {escape(key)}: {source.video_id} on {day.isoformat()}",
         soft_wrap=True,
     )
+
+
+@app.command()
+def resolve(
+    ctx: typer.Context,
+    clips: Annotated[
+        list[str],
+        typer.Argument(
+            help="The clips, in play order: each a title as the queue shows "
+            "it, a path, or <folder>/<file>, as `clipper posted` takes them.",
+            show_default=False,
+        ),
+    ],
+    name: Annotated[
+        str | None,
+        typer.Option(
+            "--name",
+            help="The hand-off's name. Default: the first clip's title.",
+            show_default=False,
+        ),
+    ] = None,
+    captions: Annotated[
+        bool,
+        typer.Option(
+            "--captions/--no-captions",
+            help="Write the captions as subtitles (captions.srt).",
+        ),
+    ] = True,
+) -> None:
+    """Hand clips to DaVinci Resolve as one vertical timeline (ADR 0036).
+
+    Writes <clips dir>/resolve/<name>/ with timeline.fcpxml (each clip's
+    kept stretches of its source video, filled to the frame's height, and
+    its B-roll inserts), captions.srt and the import steps. Clips from
+    several videos may be spliced in one timeline.
+    """
+    settings = Settings()
+    build = _context(ctx)
+    try:
+        shots: list[Shot] = []
+        chunks: dict[int, list[list[CaptionWord]]] = {}
+        media: dict[str, Media] = {}
+        titles: list[str | None] = []
+        probe = build.probe()
+        for index, clip in enumerate(clips):
+            folder, entry, manifest = _handoff_clip(settings.clips_dir, clip)
+            titles.append(entry.title)
+            video = settings.videos_dir / manifest.source
+            if not video.is_file():
+                raise HandoffError(f"{clip}: no source video {video}")
+            mine = clip_shots(index, entry, manifest.source)
+            for shot in mine:
+                if shot.media in media:
+                    continue
+                path = (settings.broll_dir / shot.media) if shot.broll else video
+                if shot.broll and is_still(shot.media):
+                    if not path.is_file():
+                        raise HandoffError(f"{clip}: no B-roll file {path}")
+                    media[shot.media] = Media(path.resolve(), None, None, None, False)
+                    continue
+                info = probe.probe(path)
+                media[shot.media] = Media(
+                    path.resolve(),
+                    info.duration_seconds,
+                    info.width,
+                    info.height,
+                    info.has_audio,
+                )
+            shots += mine
+            spoken = [s for s in mine if not s.broll]
+            if captions and spoken:
+                transcript = load_analysis_result(Path(manifest.analysis)).transcript
+                cover = ClipCandidate(
+                    start_seconds=min(s.start for s in spoken),
+                    end_seconds=max(s.end for s in spoken),
+                    score=0,
+                    reasons=("hand-off",),
+                )
+                chunks[index] = caption_chunks(
+                    transcript, cover, edits=entry.caption_edits
+                )
+            del folder
+        title = name or titles[0] or "Clipper hand-off"
+        out = settings.clips_dir / HANDOFF_FOLDER / upload_stem(title, "clipper")
+        files = {"timeline.fcpxml": build_fcpxml(title, shots, media)}
+        if captions:
+            files["captions.srt"] = build_srt(subtitle_cues(shots, chunks))
+        files["steps.txt"] = import_steps(title, captions)
+        try:
+            out.mkdir(parents=True, exist_ok=True)
+            for file, text in files.items():
+                (out / file).write_text(text, encoding="utf-8", newline="\n")
+            if not captions:
+                (out / "captions.srt").unlink(missing_ok=True)
+        except OSError as exc:
+            raise HandoffError(f"Cannot write {out}: {exc}") from exc
+    except ClipperError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(code=1) from exc
+    seconds = timeline_seconds(shots)
+    console.print(
+        f"Timeline: {len(clips)} clip(s), {len(shots)} shot(s), {seconds:.1f} s",
+        soft_wrap=True,
+    )
+    console.print(f"Resolve: {escape(str(out))}", soft_wrap=True)
+    console.print(import_steps(title, captions), soft_wrap=True, markup=False)
+
+
+def _handoff_clip(
+    clips_dir: Path, clip: str
+) -> tuple[Path, ManifestClip, RenderManifest]:
+    """The drafts folder, manifest entry and manifest of a clip named as
+    `posted` takes it; joined clips (Combine, Summarize) are refused."""
+    try:
+        key = _clip_key(clips_dir, clip)
+    except QueueError as path_error:
+        key = _titled_key(clips_dir, clip, path_error)
+    stem, file = key.split("/", 1)
+    path = Path(clip)
+    folder = (
+        path.parent
+        if path.is_absolute() and path.is_file()
+        else find_drafts_folder(clips_dir, stem)
+    )
+    if folder is None:
+        raise HandoffError(f"{clip}: no drafts folder {stem} under {clips_dir}")
+    manifest = load_manifest(folder)
+    entry = next((c for c in manifest.clips if c.file == file), None)
+    if entry is None:
+        raise HandoffError(
+            f"{clip} is a combined clip or summary; hand off its clips instead"
+        )
+    return folder, entry, manifest
 
 
 @app.command()
