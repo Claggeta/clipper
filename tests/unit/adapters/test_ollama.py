@@ -193,3 +193,24 @@ def test_without_a_context_size_the_tokens_read_are_not_checked(
         monkeypatch, json.dumps({"response": "{}", "prompt_eval_count": 4096}).encode()
     )
     assert _generate() == "{}"
+
+
+@pytest.mark.parametrize(
+    ("extra", "after"), [({"eval_count": 512}, " after 512 tokens"), ({}, "")]
+)
+def test_a_reply_cut_off_at_the_length_limit_says_so(
+    monkeypatch: pytest.MonkeyPatch, extra: dict[str, object], after: str
+) -> None:
+    body = {"response": '{"score": 0.', "done_reason": "length", **extra}
+    _patch(monkeypatch, json.dumps(body).encode())
+    with pytest.raises(LlmError) as caught:
+        _generate()
+    assert str(caught.value) == (
+        "Ollama's reply from model 'some-model:tag' was cut off at the length "
+        f"limit{after}, before it was complete"
+    )
+
+
+def test_a_finished_reply_is_returned(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch(monkeypatch, json.dumps({"response": "{}", "done_reason": "stop"}).encode())
+    assert _generate() == "{}"

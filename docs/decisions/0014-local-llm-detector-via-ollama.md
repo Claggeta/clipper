@@ -387,6 +387,15 @@ committed. Results under ADR 0023's amendment of the same item.
 **Decision.** Not adopted; `WINDOW_SECONDS` and `STEP_SECONDS` stand. The
 new judged labels stay.
 
+## Amended by the length limit message (V8 item 5c)
+
+- `OllamaClient` reads `done_reason`: a reply cut off at the length limit
+  (`length`) is an `LlmError` saying so, with the tokens written when
+  Ollama gives `eval_count`, instead of reaching the caller as unfinished
+  JSON (`not a valid score ... (got '')`). The detector and title writer
+  keep the message, as for every client error. Not seen since `think:
+  false`; checked on constructed replies only, no manual step.
+
 ## Related
 
 - 0012: evaluation
