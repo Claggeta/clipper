@@ -127,6 +127,8 @@ and planned code:
   rubric's probabilities tied the current prompt (keepers 70, rejects
   30, 3 VODs ahead, 3 behind), the current prompt's were behind (66,
   34), the rubric alone clustered; probabilities end ties at no cost.
+  Shorter windows amendment (V8 7b-2, not adopted): 30 s windows, step
+  10 s, on four VODs; results in ADR 0023.
   Shared client amendment (V7 4): `OllamaClient` and `TextGenerator` in
   `adapters/llm/ollama.py`, raising `LlmError`, which the detector and
   title writer turn into their own errors with the message kept.
@@ -270,7 +272,10 @@ and planned code:
   `MIN_CANDIDATE_SECONDS = 15.0` for both detectors; the heuristic is
   unchanged, the LLM keeps 18 keepers and 12 rejects with no draft under
   15 s, losing one mostly silent keeper. Item 7 amendment: decision 4
-  (merging) withdrawn; neighbours stay separate clips.
+  (merging) withdrawn; neighbours stay separate clips. 30 s windows
+  amendment (V8 7b-2, not adopted): LLM at top 10 on four VODs, keepers
+  10 to 12, rejects 27 to 28, `good` 5 to 1, cut short 3 to 4 (one end
+  +55 s); windows stay 45 s.
 - `0024` — `clipper review <drafts folder>`: a local browser page on the
   loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
   a player on the source video, a film strip of the clip plus 120 s either
@@ -1806,11 +1811,13 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      about 20 to 35 s, weighed against ends cut early (ADR 0023 and 0029
      amendments). 7b-1 ~~pauses cut in `drafts`~~ (done; #277; none past
      35% of a clip, keepers' median 41.8 to 38.1 s; manual step D14).
-   - 7b-2. Shorter candidates (added 2026-11-17, after 7c): 30 s
+   - 7b-2. ~~Shorter candidates (added 2026-11-17, after 7c): 30 s
      windows tried against the 45 s default, LLM `drafts` on four or
      more judged VODs, new drafts judged by the maintainer, `eval` at
      top 10 with ends cut early weighed. ADR 0014 and 0023 amendments.
-     May end in nothing.
+     May end in nothing.~~ (done; ended in nothing: keepers 10 to 12 but
+     `good` 5 to 1 and one end +55 s; 25 new drafts judged; ADR 0014
+     and 0023 amendments; no code)
    - 7c. ~~A cold open: a spike on finding a clip's peak (the model naming
      the punchline, or the loudest second); if it works, the peak 2 to
      3 s plays first, then the clip from its start, through the

@@ -374,6 +374,19 @@ the earlier-start tie rule stand. The new judged labels stay. Revisit if
 ratings build up enough to compare `good` picks in the top few ranks,
 where B-p's ordering might differ from A's.
 
+## Amended by shorter windows (V8 item 7b-2, ADR 0023): measured, not adopted
+
+**Tried.** The LLM detector (`qwen3.5:9b`, current prompt) over 30 s
+windows with a 10 s step, against the 45 s default, on the saved
+transcripts of v2927846652, v2924392099, hrWCftyrXIA and BAN4ynLSknc, top
+10 each. The 25 windows of the 30 s top 10s that no judged label covered
+were rendered (fit, captions, no pause cuts) and judged by the maintainer
+in `review`. Scratch script in `D:\Clippett\spikes\window30`, not
+committed. Results under ADR 0023's amendment of the same item.
+
+**Decision.** Not adopted; `WINDOW_SECONDS` and `STEP_SECONDS` stand. The
+new judged labels stay.
+
 ## Related
 
 - 0012: evaluation
