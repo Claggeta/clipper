@@ -129,6 +129,29 @@ The two signals differ:
   nothing to retrain yet. The script and embeddings are kept outside
   git, on the maintainer's machine.
 
+## Amended by the ranker rerun (V8 items 3a and 3c, not adopted)
+
+- 3a, trash reasons (V7 2a): 16 of 200 rejected spans carry a reason,
+  on 4 VODs: `nothing_happening` 12, `other` 3, `needs_context` 1,
+  `seen_not_said` and `bad_cut` none. Too few to settle much; they point
+  at dull talk picked by the text score, not at visual moments (3b) or
+  cuts.
+- 3c, the same script and measure as V6 item 5 on 25 VODs (27 judged,
+  the same two left out), with 542 keeper and 481 reject windows (377
+  and 204 before; rejects more than doubled).
+- Keeper over reject on the held-out VOD (AUC): 0.59 with embeddings,
+  0.60 with embeddings and signals (0.60 and 0.61 before); per VOD 0.21
+  to 0.90.
+- Its own top 10: 238 of 250 picks unjudged (9 keepers, 3 rejects),
+  against 97 keepers, 101 rejects and 22 unjudged for the LLM's drafts
+  on 22 VODs.
+- Inside the LLM's judged top 10 (167 drafts, 17 VODs): the ranker 0.60,
+  the LLM's own order 0.55 (0.61 and 0.56 before).
+- Decision: not adopted, nothing merged. Nearly double the judged windows
+  moved nothing, so more labels of the same kind are not the lever;
+  revisit with a new kind of input (frames or audio, 3b), or after a
+  ranker's own top 10 is judged on a few VODs.
+
 ## Revisit when
 
 - Labels pass a few thousand judged spans (fine-tuning becomes plausible).
