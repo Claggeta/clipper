@@ -137,6 +137,8 @@ and planned code:
   Shared client amendment (V7 4): `OllamaClient` and `TextGenerator` in
   `adapters/llm/ollama.py`, raising `LlmError`, which the detector and
   title writer turn into their own errors with the message kept.
+  Length limit amendment (V8 5c): `done_reason: length` is an error
+  saying the reply was cut off.
   Drafts defaults amendment (V5 11): `drafts` uses the LLM and `--top N`
   (default 10, `CLIPPER_TOP_N` not used); `analyze` and `eval` keep the
   heuristic and top 5. Judged keepers at top 10 on three VODs: LLM 18,
@@ -1945,9 +1947,6 @@ Later, not scheduled:
   labels name visual moments ("Biz Hits a Long Putt"), which a
   transcript-only detector cannot see. Unverified as the cause of the LLM's
   top-5 misses. Audio and visual features are a V3 non-goal.
-- `OllamaClient` ignores `done_reason`. A reply cut off at the length limit
-  shows as `not a valid score ... (got '')` instead of saying it was cut off.
-  Not hit since `think: false` (ADR 0014).
 - Letterboxed sources keep their bars under `--vertical` (ADR 0016, manual
   step R15): `test_input.mp4` has black bars in its 1280x720 frame, and they
   show inside the fitted picture and blurred in the fill. Spiked as V7 item

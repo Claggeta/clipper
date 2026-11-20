@@ -136,6 +136,15 @@ class OllamaClient:
                 f"Unexpected response from Ollama at {self._url}: "
                 f"{text.strip()[:_BODY_LIMIT]!r}"
             )
+        # A reply cut off at the length limit is unfinished JSON, which the
+        # caller would otherwise report as unreadable (ADR 0014, V8 5c).
+        if isinstance(data, dict) and data.get("done_reason") == "length":
+            written = data.get("eval_count")
+            after = f" after {written} tokens" if isinstance(written, int) else ""
+            raise LlmError(
+                f"Ollama's reply from model {self._model!r} was cut off at the "
+                f"length limit{after}, before it was complete"
+            )
         read = data.get("prompt_eval_count") if isinstance(data, dict) else None
         if (
             num_ctx is not None
