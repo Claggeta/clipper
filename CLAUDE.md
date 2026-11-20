@@ -1834,11 +1834,14 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      nothing: the maintainer's peaks on 15 saved clips all 1 to 9 s in,
      the model and the loudest 2.5 s each 2 of 15 within 2 s against 7
      for opening at 1 s; ADR 0034 amendment; no code)
-8. A hand-off to DaVinci Resolve (free edition), a spike first: whether
+8. ~~A hand-off to DaVinci Resolve (free edition), a spike first: whether
    it imports a timeline Clipper writes (FCPXML or OTIO) with the cut
    clips, B-roll, and captions as a transparent overlay track, and how
    many steps that takes for someone new to an editor. Then an export
-   command if so. A new ADR; may end in nothing.
+   command if so. A new ADR; may end in nothing.~~ (done; spike: finished
+   pieces, the source timeline and subtitles all imported; ADR 0036 and
+   `clipper resolve` #288, the source timeline filled to the height with
+   subtitles; manual step H1)
 9. A simpler review page, in PRs, each with a manual step (ADR 0031 and
    0034 amendments):
    - 9a. ~~One bar for the buttons above and below the film strip, with
