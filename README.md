@@ -498,7 +498,7 @@ Detector: heuristic (top 5)
 1 video, 4 labels, 5 candidates
 Recall: 3 of 4 labels (75%)
 Precision: 3 of 5 candidates (60%); 2 more repeat a matched label
-Indicative only: one labeler, 1 video, 4 labels (ADR 0012).
+Indicative only: 1 video, 4 labels (ADR 0012).
 ```
 
 These four labels cover the whole speech, so every candidate lands inside one,

@@ -110,9 +110,7 @@ def test_reports_counts_and_ratios(env: Env) -> None:
     assert "1 video, 3 labels, 3 candidates" in result.output
     assert "Recall: 1 of 3 labels (33%)" in result.output
     assert "Precision: 1 of 3 candidates (33%)" in result.output
-    assert "Indicative only: one labeler, 1 video, 3 labels (ADR 0012)." in (
-        result.output
-    )
+    assert "Indicative only: 1 video, 3 labels (ADR 0012)." in (result.output)
 
 
 def test_tables_show_labels_and_notes(env: Env) -> None:

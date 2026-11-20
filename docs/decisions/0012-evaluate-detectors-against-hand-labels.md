@@ -64,6 +64,13 @@ maintainer's own judgment of which moments in a video are worth cutting.
   anything about real media. No real labels exist yet.
 - (-) Overlap thresholds are guesses until there is something to tune them on.
 
+## Amended by the closing note (V8 item 5d)
+
+- `eval`'s closing note drops "one labeler": `Indicative only: 1 video,
+  <n> labels (ADR 0012).` Twitch clip labels come from many viewers, and
+  judged labels from the maintainer; the note no longer claims either.
+  Recording each file's source was not needed for a note.
+
 ## Revisit when
 
 - Posted clips have metrics. Platform data becomes a second reference and may
