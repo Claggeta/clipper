@@ -398,7 +398,10 @@ and planned code:
   reject 0.59 to 0.61, per VOD 0.24 to 0.80; its top 10 141 to 145 of 150
   unjudged, so not scored; inside the LLM's top 10, 0.61 against the
   LLM's 0.56. Embedding 15 VODs about 1.5 min. Rerun when the labels
-  about double.
+  about double. Rerun amendment (V8 3a and 3c, not adopted): 16 trash
+  reasons (12 `nothing_happening`); 25 VODs, 542 keeper and 481 reject
+  windows, held-out 0.59 to 0.60, inside the LLM's top 10 0.60 against
+  0.55; more labels moved nothing.
 - `0027` — performance data: a YouTube Studio CSV exported by hand and
   imported offline; no YouTube API, key, OAuth or login. The parser follows
   a real export, recorded in an amendment first (columns unverified);
@@ -1750,16 +1753,21 @@ confirmation first.
    answers; then an Assist tab if it is right often enough. ADR 0014
    and 0031 amendments. May end in nothing. Waits on the requests.
 3. Better picks, in steps, each may end in nothing:
-   - 3a. Not code: after a week or two of judging, the trash reasons
+   - 3a. ~~Not code: after a week or two of judging, the trash reasons
      counted per VOD (`nothing_happening`, `needs_context`,
      `seen_not_said`, `bad_cut`, `other`); the counts choose 3b or 3c
-     first, or a boundary change for bad cuts.
+     first, or a boundary change for bad cuts.~~ (done 2026-11-20: 16
+     reasons on 4 VODs, 12 `nothing_happening`, no `seen_not_said` or
+     `bad_cut`; 3c first; ADR 0026 amendment)
    - 3b. Visual spike: cheap per-second signals from ffmpeg (scene
      changes, motion) against keepers, rejected spans and random spans,
      as the loudness spike; frame embeddings only if those show
      something, after ADR 0003's check. Ends in an ADR or in nothing.
-   - 3c. Rerun the ranker spike (ADR 0026): rejected spans have nearly
-     doubled since V6 item 5 (90 to 168), labels 144 to 196.
+   - 3c. ~~Rerun the ranker spike (ADR 0026): rejected spans have nearly
+     doubled since V6 item 5 (90 to 168), labels 144 to 196.~~ (done;
+     ended in nothing: 542 keeper and 481 reject windows on 25 VODs,
+     held-out 0.59 to 0.60 as before, its top 10 238 of 250 unjudged;
+     ADR 0026 amendment; no code)
 4. Fewer clicks in `review`, in PRs, each with a manual step:
    - 4a. ~~Not code: a click audit in headless Edge of a typical clip
      (trim, a caption fix, a title text, a rating, Save), counting clicks,
