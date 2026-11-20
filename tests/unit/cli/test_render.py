@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 from datetime import date
 from pathlib import Path
 
@@ -185,6 +186,20 @@ def test_renders_all_candidates(env: Env) -> None:
     ]
     assert "Rendered 3 of 3 clips" in result.output
     assert "Rendered #1 0:00:10-0:00:20" in result.output
+
+
+@pytest.mark.parametrize(("flag", "level"), [("-v", "INFO"), (None, "WARNING")])
+def test_verbose_logs_each_tools_full_output(
+    env: Env, monkeypatch: pytest.MonkeyPatch, flag: str | None, level: str
+) -> None:
+    levels: list[int] = []
+    monkeypatch.setattr(
+        "clipper.cli.main.logging.basicConfig",
+        lambda **kwargs: levels.append(kwargs["level"]),
+    )
+    result = env.run(*([flag] if flag else []))
+    assert result.exit_code == 0, result.output
+    assert levels == [logging.getLevelName(level)]
 
 
 def test_rank_selects_sorted_and_deduped(env: Env) -> None:

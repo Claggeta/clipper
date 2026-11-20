@@ -93,6 +93,13 @@ one can fail while others succeed.
   first, so a failure leaves the clip's old file in place; the judged label
   is written regardless, and the page shows the error.
 
+## Amended by `render --verbose` (V8 item 5a)
+
+- **`render --verbose` (`-v`)**, as on `analyze` and `drafts`: logging at
+  INFO, so ffmpeg's full stderr, which ADR 0004 logs for every run, is
+  shown for a failed clip beside the 10-line `Failed:` message. Off by
+  default; the failure policy is unchanged. Manual step R14.
+
 ## Revisit when
 
 - A third command or a third injected dependency appears. Move to the context

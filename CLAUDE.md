@@ -74,7 +74,8 @@ and planned code:
 - `0011` — `render` is a separate command (`--rank`, `--captions`). If one clip
   fails, the rest still render, then it exits 1. Review amendment (V5 3d):
   the review page's Save is a second caller of the same render path; a
-  failure leaves the old file in place.
+  failure leaves the old file in place. Verbose amendment (V8 5a):
+  `render --verbose` (`-v`) shows ffmpeg's full stderr log; R14.
 - `0012` — detectors are evaluated against hand-written label files (one JSON
   per video, `CLIPPER_LABELS_DIR`). `clipper eval` reruns a detector on the
   saved transcript. Results are indicative, not statistical. A candidate hits
@@ -1924,9 +1925,6 @@ Later, not scheduled:
   before cutting, that ffmpeg has the `subtitles` filter, and exit 1 with
   nothing written. How to ask ffmpeg is unverified. Amends ADR 0011's check
   order and ADR 0010.
-- `render` has no `-v`, so the full ffmpeg stderr INFO log (ADR 0004) is not
-  reachable, only the 10-line failure message. Fix: a `--verbose` flag like
-  `analyze`'s, and an amendment to ADR 0011.
 - Minimum overlap for caption cues: a segment that crosses a clip's edge shows
   its whole sentence for the part inside the clip (ADR 0010). Since V4 item 4
   this applies only to segments without words (v0.3 analyses); word captions
