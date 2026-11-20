@@ -393,9 +393,9 @@ def _report_evaluation(
     )
     if evaluation.judged:
         _report_judged(evaluation)
+    # Not "one labeler": Twitch clip labels come from many viewers (V8 5d).
     console.print(
-        f"Indicative only: one labeler, 1 video, {_count(n_labels, 'label')} "
-        "(ADR 0012).",
+        f"Indicative only: 1 video, {_count(n_labels, 'label')} (ADR 0012).",
         soft_wrap=True,
     )
 

@@ -104,7 +104,8 @@ and planned code:
   labels may overlap, ordered by start; clip labels may not. Trash reason
   amendment (V7 2a): a rejected span may carry `reason`
   (`nothing_happening`, `needs_context`, `seen_not_said`, `bad_cut`,
-  `other`), optional; `eval` unchanged.
+  `other`), optional; `eval` unchanged. Closing note amendment (V8
+  5d): "Indicative only: 1 video, <n> labels", no "one labeler".
 - `0013` — `--detector heuristic|llm` on `analyze` and `eval`, composed by
   `build_detector(settings, name)`. No test double is selectable by name.
   `AnalysisResult.detector` records the name (`llm:<model>` for the LLM),
@@ -1965,10 +1966,6 @@ Later, not scheduled:
   Again on v2922589775: "Adapt learns about the Pirate Token".
   A lever: give the prompt the channel or known names. Needs an ADR 0018
   amendment. Scheduled as V5 item 8 (video metadata).
-- `eval` ends with "Indicative only: one labeler, ..." even when the labels
-  come from Twitch clips, which many viewers made. Fix: word it by source, or
-  drop "one labeler"; how `eval` would know the source is undecided (a field
-  in the labels file, or the note prefix). Seen in manual step T5.
 - `fetch` makes two yt-dlp requests for a new video: the download, then a
   `--skip-download` request for `<id>.info.json` (ADR 0020, video info
   amendment; skipped once the info file exists). yt-dlp's
