@@ -2760,6 +2760,12 @@ steps; the folder holds `timeline.fcpxml`, `captions.srt` and
 Run `uv run clipper resolve "<title>" --no-captions`: no `captions.srt`
 is left in the folder, and the steps leave out the subtitles.
 
+Run in part 2026-11-20 by the maintainer on the hand-off of "Jason owns
+the Maybach!" and "Jason on fighting for attention" (v2927846652): the
+footage filled the tall frame, and a GIF B-roll file imported (in the
+spike); checks 1, 3 and the B-roll import passed. The spike's tests
+covered 2, 5 and 6.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`

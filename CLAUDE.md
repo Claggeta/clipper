@@ -1804,14 +1804,16 @@ confirmation first.
    - 4g. ~~Tab keys: `Alt+1` to `Alt+5` open the inspector's tabs. ADR
      0031 amendment, manual step RV38.~~ (done; #270)
 5. Small fixes from "Parked", each its own PR:
-   - 5a. `render --verbose` for the full ffmpeg stderr log (ADR 0011
-     amendment).
-   - 5b. A check, before cutting, that ffmpeg has the `subtitles` filter
-     when captions are on (ADR 0010 and 0011 amendments).
-   - 5c. `OllamaClient` reads `done_reason` and says a reply was cut off
-     at the length limit (ADR 0014).
-   - 5d. `eval`'s closing note worded by where the labels came from
-     (ADR 0012).
+   - 5a. ~~`render --verbose` for the full ffmpeg stderr log (ADR 0011
+     amendment).~~ (done; #291; manual step R14)
+   - 5b. ~~A check, before cutting, that ffmpeg has the `subtitles` filter
+     when captions are on (ADR 0010 and 0011 amendments).~~ (done; #292;
+     titles too, for the screen hook, and `drafts` before any download;
+     manual step C9)
+   - 5c. ~~`OllamaClient` reads `done_reason` and says a reply was cut off
+     at the length limit (ADR 0014).~~ (done; #293)
+   - 5d. ~~`eval`'s closing note worded by where the labels came from
+     (ADR 0012).~~ (done; #294; "one labeler" dropped, no source field)
 
 Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
 3 and 5 wait.
