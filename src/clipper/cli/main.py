@@ -560,6 +560,7 @@ def render(
     build = _context(ctx)
     try:
         about = _check_about(about, titles)
+        _check_burn_in(settings, build, captions or titles)
         if style is not VerticalStyle.FIT and not vertical:
             raise ClipRenderError(f"--style {style.value} needs --vertical")
         cam_position = _check_cam(cam, (style,))
@@ -678,6 +679,14 @@ def _check_cam(cam: CamPlace | None, styles: Sequence[VerticalStyle]) -> CamPosi
     if cam is not None and VerticalStyle.FACECAM not in styles:
         raise ClipRenderError("--cam is for --style facecam")
     return "bottom" if cam is CamPlace.BOTTOM else "top"
+
+
+def _check_burn_in(settings: Settings, build: AppContext, needed: bool) -> None:
+    """Fail before anything is cut when captions or on-screen texts (the
+    screen hook, with titles) are wanted and ffmpeg cannot burn them in, so
+    a build without libass fails once, not on every clip (V8 5b)."""
+    if needed:
+        build.renderer(settings).check_captions()
 
 
 def _check_about(about: str | None, titles: bool) -> str | None:
@@ -1153,6 +1162,7 @@ def drafts(
         styles = _drafts_styles(style, vertical)
         cam_position = _check_cam(cam, styles)
         about = _check_about(about, titles)
+        _check_burn_in(settings, build, captions or titles)
         queue = _queue(sources or [], list_file, about)
         checked = _check_queue(queue, titles)
         channels = load_channel_abouts(settings.channels_file) if titles else {}

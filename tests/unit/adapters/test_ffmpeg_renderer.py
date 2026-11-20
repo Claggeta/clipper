@@ -978,3 +978,50 @@ def test_facecam_refuses_a_face_crop_or_zooms(video: Path, tmp_path: Path) -> No
                 facecam=_FACECAM,
                 **extra,
             )
+
+
+def _patch_filters(
+    monkeypatch: pytest.MonkeyPatch, stdout: str, code: int = 0
+) -> list[list[str]]:
+    calls: list[list[str]] = []
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, code, stdout, "bad build")
+
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    return calls
+
+
+_FILTERS = """Filters:
+ .. ass               V->V       Render ASS subtitles onto input video.
+ .. subtitles         V->V       Render text subtitles onto input video.
+ .. scale             V->V       Scale the input video size.
+"""
+
+
+def test_check_captions_asks_ffmpeg_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _patch_filters(monkeypatch, _FILTERS)
+    renderer = FfmpegClipRenderer()
+    renderer.check_captions()
+    renderer.check_captions()
+    assert calls == [["ffmpeg", "-hide_banner", "-filters"]]
+
+
+def test_check_captions_refuses_a_build_without_libass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_filters(monkeypatch, _FILTERS.replace("subtitles ", "drawtext  "))
+    with pytest.raises(ClipRenderError, match="no subtitles filter.*--no-captions"):
+        FfmpegClipRenderer().check_captions()
+
+
+def test_check_captions_reports_a_failed_listing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_filters(monkeypatch, "", code=1)
+    with pytest.raises(ClipRenderError, match=r"ffmpeg failed \(exit 1\): bad build"):
+        FfmpegClipRenderer().check_captions()

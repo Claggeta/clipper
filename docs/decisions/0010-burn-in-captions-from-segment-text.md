@@ -131,6 +131,15 @@ three.
   keep the glyph but depends on the font not drawing a box for it, and
   replacing `\` with a lookalike, which changes the text.
 
+## Amended by the subtitles check (V8 item 5b)
+
+- Before anything is cut, a run that burns captions or on-screen texts
+  asks ffmpeg for its filters once (`ffmpeg -hide_banner -filters`) and
+  stops with one message if `subtitles` (libass) is not listed, instead of
+  every clip failing with the same ffmpeg error. The listing is read
+  structurally (a filter's name in its column), not from an error.
+  `ClipRenderer.check_captions`; manual step C9.
+
 ## Revisit when
 
 - Segment-level captions look bad on real clips. That is the case for

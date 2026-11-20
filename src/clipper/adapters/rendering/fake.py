@@ -46,6 +46,14 @@ class FakeClipRenderer:
             tuple[tuple[Path, ...], Path, str | None, AudioMix | None, float]
         ] = []
         self.fail_joins = False
+        # Set to make check_captions fail, as for an ffmpeg without libass.
+        self.no_captions = False
+        self.caption_checks = 0
+
+    def check_captions(self) -> None:
+        self.caption_checks += 1
+        if self.no_captions:
+            raise ClipRenderError("no subtitles filter")
 
     def render(
         self,

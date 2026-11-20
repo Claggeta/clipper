@@ -1,4 +1,5 @@
 import logging
+import re
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -296,11 +297,37 @@ def _seconds(value: float) -> str:
     return f"{value:.3f}"
 
 
+# A filter's line in `ffmpeg -filters`: flags, its name, its pads, its help.
+_SUBTITLES_LISTED = re.compile(r"^\s*\S+\s+subtitles\s", re.MULTILINE)
+
+
 class FfmpegClipRenderer:
     """Renders a clip by re-encoding with ffmpeg. See docs/decisions/0007."""
 
     def __init__(self, executable: str = "ffmpeg") -> None:
         self._executable = executable
+        self._has_subtitles: bool | None = None
+
+    def check_captions(self) -> None:
+        """Ask ffmpeg once for its filters (`-filters`) and raise if the
+        `subtitles` filter, which needs libass, is not among them."""
+        if self._has_subtitles is None:
+            result = run_tool(
+                self._executable,
+                ["-hide_banner", "-filters"],
+                error_type=ClipRenderError,
+                log=logger,
+            )
+            if result.returncode != 0:
+                raise ClipRenderError(format_failure(self._executable, result))
+            self._has_subtitles = _SUBTITLES_LISTED.search(result.stdout) is not None
+        if not self._has_subtitles:
+            raise ClipRenderError(
+                f"{self._executable} has no subtitles filter (it needs libass), so "
+                "captions and on-screen text cannot be burned in. Install an "
+                "ffmpeg build with libass, or run with --no-captions and "
+                "--no-titles."
+            )
 
     def render(
         self,
