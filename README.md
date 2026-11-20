@@ -301,6 +301,21 @@ Short in `data/posts.json`; settle the rest with `clipper posted`. No
 YouTube login or API. See
 [ADR 0027](docs/decisions/0027-performance-data-from-studio-csv-exports.md).
 
+### Editing in DaVinci Resolve
+
+```powershell
+uv run clipper resolve "<clip title>" ["<another clip title>" ...]
+```
+
+Writes `data/clips/resolve/<title>/` with a vertical timeline of the clips
+in the order given, from any videos: each clip's kept stretches of its
+source video (filled to the frame's height) and its B-roll inserts, the
+captions as subtitles (`captions.srt`, or `--no-captions`) and the import
+steps for DaVinci Resolve's free edition (File > Import > Timeline).
+Clips are named by title, path or `<folder>/<file>`, as for `clipper
+posted`. Texts, zooms, music and effects stay in review. See
+[ADR 0036](docs/decisions/0036-resolve-handoff.md).
+
 ### Evaluating detectors
 
 `eval` measures the detector against moments you labeled by hand. It reruns the

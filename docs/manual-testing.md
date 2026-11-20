@@ -2691,6 +2691,38 @@ Run 2026-11-17 by the assistant on the maintainer's first export, against
 a temp posts file: 69 Shorts, 8 by the posts record, 7 matched, 54 not
 found; bands, channels and snapshot as above.
 
+## Resolve hand-off
+
+### H1. `clipper resolve` into DaVinci Resolve
+
+Covers [ADR 0036](decisions/0036-resolve-handoff.md) (V8 item 8). Needs
+DaVinci Resolve (the free edition) and two saved clips, one with cuts,
+from different drafts folders if you have them. A clip with a B-roll
+insert in its sequence covers the inserts too.
+
+```powershell
+uv run clipper resolve "<first clip's title>" "<second clip's title>"
+```
+
+Pass: it prints `Timeline: 2 clip(s), <n> shot(s), <s> s`, the folder
+`Resolve: <clips dir>\resolve\<first title as a file name>` and the
+steps; the folder holds `timeline.fcpxml`, `captions.srt` and
+`steps.txt`. Then in Resolve, following the steps:
+
+1. The timeline imports at 1080x1920 and opens on the Edit page.
+2. Track V1 holds each clip's kept stretches in turn (a cut is a join
+   between two of them), then the second clip's.
+3. The VOD footage fills the frame's height, centred, its sides cropped;
+   B-roll is fitted, whole.
+4. Sound plays through; a B-roll insert saved without sound is silent.
+5. The subtitles, dragged on at 0:00, keep time with the speech in both
+   clips, with no word from a cut stretch.
+6. With Trim mode (`T`), dragging a stretch's right edge brings back
+   the footage that was cut, pushing the rest later.
+
+Run `uv run clipper resolve "<title>" --no-captions`: no `captions.srt`
+is left in the folder, and the steps leave out the subtitles.
+
 ## Labels from Twitch clips
 
 Covers `clipper labels`
