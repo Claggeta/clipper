@@ -1944,6 +1944,31 @@ round or squashed. Fail the step only if text is cut off by the frame. Size,
 placement and stretching are a judgement for the maintainer, and a change to
 them is a code change, not part of a release.
 
+### C9. A build without the subtitles filter fails once, before cutting
+
+Covers ADR 0010 and 0011's subtitles check amendments (V8 item 5b). First
+see what this ffmpeg lists:
+
+```powershell
+ffmpeg -hide_banner -filters | Select-String " subtitles "
+```
+
+Pass: one line, ` .. subtitles  V->V  Render text subtitles ...`. Then, if
+an ffmpeg build without libass is at hand (an "essentials" or minimal
+build), put its folder first on `PATH` for this window and run C1's render
+with `--captions`:
+
+```powershell
+$env:PATH = "C:\path\to\ffmpeg-without-libass\bin;" + $env:PATH
+Reset-Clips
+uv run clipper render "$S\testsrc.mp4" "$S\testsrc-two.json" --captions
+```
+
+Pass: one `Error: ffmpeg has no subtitles filter (it needs libass), ...`
+line, exit 1, and nothing in the clips folder; the same command with
+`--no-captions` renders. Open a new window afterwards to restore `PATH`.
+Not run yet: no such build was at hand when the check was added.
+
 ## LLM detector
 
 Covers `--detector llm` ([ADR 0014](decisions/0014-local-llm-detector-via-ollama.md),

@@ -183,6 +183,12 @@ class ClipRenderer(Protocol):
         `length` (ADR 0032)."""
         ...
 
+    def check_captions(self) -> None:
+        """Raise `ClipRenderError` if captions and on-screen texts cannot be
+        burned in (ffmpeg without its `subtitles` filter), so a run stops
+        before cutting anything (ADR 0010 and 0011, V8 5b)."""
+        ...
+
     def still(
         self,
         video_path: Path,

@@ -100,6 +100,14 @@ one can fail while others succeed.
   shown for a failed clip beside the 10-line `Failed:` message. Off by
   default; the failure policy is unchanged. Manual step R14.
 
+## Amended by the subtitles check (V8 item 5b)
+
+- **Check order**: `render --captions` or `--titles` (the screen hook is
+  an on-screen text) checks the `subtitles` filter (ADR 0010 amendment)
+  with the other input checks, so a build without libass exits 1 with
+  nothing written. `drafts` makes the same check before any download or
+  transcription (ADR 0022). Plain renders skip it. Manual step C9.
+
 ## Revisit when
 
 - A third command or a third injected dependency appears. Move to the context

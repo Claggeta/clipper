@@ -59,6 +59,9 @@ class FakeProbe:
 
 
 class RaisingRenderer:
+    def check_captions(self) -> None:
+        pass
+
     def render(  # type: ignore[no-untyped-def]
         self,
         video_path: Path,
@@ -200,6 +203,14 @@ def test_verbose_logs_each_tools_full_output(
     result = env.run(*([flag] if flag else []))
     assert result.exit_code == 0, result.output
     assert levels == [logging.getLevelName(level)]
+
+
+def test_captions_need_the_subtitles_filter_before_cutting(env: Env) -> None:
+    env.renderer.no_captions = True
+    env.assert_failed_before_cutting(env.run("--captions"), "no subtitles filter")
+    result = env.run()
+    assert result.exit_code == 0, result.output
+    assert env.renderer.caption_checks == 1
 
 
 def test_rank_selects_sorted_and_deduped(env: Env) -> None:

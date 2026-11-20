@@ -378,6 +378,21 @@ def test_an_empty_model_fails_before_downloading_without_titles(env: Env) -> Non
     assert not (env.tmp / "output").exists()
 
 
+def test_an_ffmpeg_without_libass_fails_before_downloading(env: Env) -> None:
+    env.renderer.no_captions = True
+    result = env.run(_URL)
+    assert result.exit_code == 1
+    assert "Error: no subtitles filter" in result.output
+    assert env.log.stages == []
+
+
+def test_no_captions_or_titles_needs_no_subtitles_filter(env: Env) -> None:
+    env.renderer.no_captions = True
+    result = env.run(str(env.video), "--no-captions", "--no-titles")
+    assert result.exit_code == 0, result.output
+    assert env.renderer.caption_checks == 0
+
+
 def test_the_heuristic_needs_no_model(env: Env) -> None:
     env.monkeypatch.setenv("CLIPPER_LLM_MODEL", "")
     result = env.run(str(env.video), "--no-titles", "--detector", "heuristic")
