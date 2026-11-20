@@ -2,14 +2,16 @@
 
 AI-assisted tool that finds clip-worthy moments in long-form video.
 
-**Status:** V1 to V7 work locally as a command-line tool (v0.7.0).
+**Status:** V1 to V8 work locally as a command-line tool (v0.8.0).
 `clipper drafts` takes a YouTube or Twitch URL, or a local file, to a folder of
 vertical clips with word-by-word captions and a suggested title and hook for
 each. `clipper review` opens a local page to judge, trim, cut, add text to and
 make thumbnails for those drafts, and `clipper queue` lists the kept clips to
 post. `fetch`, `analyze`, `render` and `eval` are also separate commands, and
 `labels` turns a Twitch VOD's community clips into a labels file for `eval`.
-Posting, uploads and analytics are not built.
+`clipper performance` reads a YouTube Studio export to show how posted
+Shorts do, and `clipper resolve` hands clips to DaVinci Resolve as an
+editable timeline. Posting and uploads are not built.
 
 ## What it does
 
@@ -526,15 +528,14 @@ maintainer would not post.
 - **The video check is by name only.** `render` checks that the video's file
   name matches the one in the JSON. A different video with the same name is cut
   without a warning.
-- **Captions need libass.** An ffmpeg build without it fails every clip with
-  ffmpeg's own message. Only one build (gyan.dev 9.0.2, with libass) has been
+- **Captions need libass.** With captions or titles on, `render` and
+  `drafts` check once that ffmpeg has its `subtitles` filter and stop before
+  cutting if not. Only one build (gyan.dev 9.0.2, with libass) has been
   tried.
 - **Captions have one style.** It was chosen by eye on one video and is not
   tuned. A word that starts before a clip's first frame is not shown. The
   characters `{ } < > \` are removed from caption text because the renderer
   reads them as markup, so `5 > 3` shows as `5 3`.
-- **`render` has no `-v`.** Only the 10-line ffmpeg failure message is
-  available.
 
 ## Documentation
 
