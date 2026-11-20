@@ -844,6 +844,18 @@ On Windows the exit reads `-13, permission denied`, not the unsigned
 `4294967283` (V7 item 7a). If ffmpeg unexpectedly succeeds here, record that
 and the contents of the folder.
 
+Then the same failure with `--verbose` (V8 item 5a), the folder still in
+place:
+
+```powershell
+uv run clipper render "$S	estsrc.mp4" "$S	estsrc-two.json" --rank 2 -v
+```
+
+Pass: an `INFO clipper.adapters.rendering.ffmpeg: ffmpeg stderr:` line
+followed by ffmpeg's whole error output (more than the 10 lines the
+`Failed:` line keeps), then the same `Failed: #2` line. Without `-v`
+there is no `INFO` line.
+
 ### R15. `--vertical` fits the frame into 9:16 at 1080x1920
 
 Covers [ADR 0016](decisions/0016-vertical-centre-crop.md). `Invoke-Render` in R0

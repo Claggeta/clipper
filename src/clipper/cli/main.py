@@ -541,8 +541,21 @@ def render(
         ),
     ] = False,
     about: AboutOption = None,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Log each tool's full output, such as ffmpeg's whole error "
+            "log for a clip that fails (ADR 0004).",
+        ),
+    ] = False,
 ) -> None:
     """Render the clip candidates in RESULT_JSON from VIDEO to video files."""
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
     settings = Settings()
     build = _context(ctx)
     try:
