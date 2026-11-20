@@ -219,6 +219,37 @@ would have helped none of them:
 Five pairs is a small sample. Where two halves are one moment, the review
 page joins them: drag one clip's end over the other, Save, Trash the other.
 
+## Amended by V8 item 7b-2: 30 s windows, not adopted
+
+YouTube Studio's assistant advised Shorts of 25 to 30 s (V8 rescope), and
+pause cuts (ADR 0029, V8 7b-1) brought keepers only from 41.8 to 38.1 s.
+So the LLM detector was tried with 30 s windows (10 s step) against the 45
+s default (ADR 0014 amendment), at top 10 on four streamer VODs, every
+draft judged except three 45 s drafts on hrWCftyrXIA.
+
+| VOD | 45 s keepers / rejected / cut short | 30 s keepers / rejected / cut short |
+|---|---|---|
+| v2927846652 (jasontheween) | 5 / 5 / 2 | 5 / 5 / 2 |
+| v2924392099 (adapt) | 2 / 8 / 0 | 3 / 7 / 1 |
+| hrWCftyrXIA | 1 / 6 / 1 (3 unjudged) | 1 / 9 / 1 |
+| BAN4ynLSknc (lacy) | 2 / 8 / 0 | 3 / 7 / 0 |
+| All | 10 / 27 / 3 | 12 / 28 / 4 |
+
+- Candidates' median length 38.5 s to 21.1 s; keepers' saved spans 35.3 s
+  to 25.7 s (median).
+- Rated `good`: 5 of the 45 s keepers, 1 of the 30 s keepers. Only 3
+  keepers are the same moment in both.
+- Cut short: the 30 s keepers' ends moved by up to +55.1 s (one moment
+  ran a minute past its window), the 45 s keepers' by up to +6.0 s.
+- Two keepers more and level or ahead on every VOD, but the moments the
+  maintainer would post now are mostly in the 45 s top 10, and a short
+  window more often stops before the moment does. Small samples.
+
+**Decision.** Not adopted: windows stay 45 s. Shorter Shorts come from
+cutting pauses (ADR 0029) and trimming in `review`. Revisit when `good`
+ratings are enough to count `good` picks in the top few ranks per VOD,
+or with a way to end a short window where its moment ends.
+
 ## Revisit when
 
 - Judged drafts often join two neighbouring clips in the review page:
