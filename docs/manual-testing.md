@@ -4056,6 +4056,41 @@ scratch copy and labels dir as RV12, and a scratch
 
 Then delete the scratch folders.
 
+### RV42. The cam box set by hand
+
+Covers [ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md)
+(V8 item 12b). A scratch copy of a vertical drafts folder from a stream
+with a cam the finder missed (a borderless corner cam), the same labels
+dir as RV12, and a scratch `CLIPPER_CAMS_FILE`.
+
+1. Open the Frame tab on a clip drafted in fit only. Pass: "None. Draw
+   one over the cam…", Clear greyed, and "Keep for <channel>'s next
+   videos" when the video has an info file.
+2. Untick Keep and press Draw cam box. Pass: the Source view, paused,
+   with a dashed outline over the picture alone (not the black bars).
+   Drag from one corner of the cam to the other. Pass: a yellow box,
+   the rest dimmed; drag inside it to move it, and it stops at the
+   picture's edges. Esc. Pass: drawing ends and nothing is saved.
+3. Draw it again and press Save cam box. Pass: "Cam box saved", the
+   Preview view with Facecam picked and "Cam on top" and "Cam at the
+   bottom" shown; the preview has the whole cam on top and gameplay
+   with no edge of the cam in it. The manifest has `cam_box`; the cams
+   file is untouched.
+4. Choose another clip drafted in fit only. Pass: Fit and Facecam both
+   offered; the Draft view still plays the fit file.
+5. Save the first clip in Facecam. Pass: "Facecam kept" and, after
+   about 12 s, a `<name>.facecam.mp4` framed as the preview was; the
+   label has `"style": "facecam"`.
+6. Tick Keep, Redraw cam box and save. Pass: the cams file has one
+   `<channel> | x y w h` line and the status reads "Set for this
+   folder; saved for <channel>". Run `drafts --style fit --style
+   facecam` on another of the channel's videos. Pass: "Cam box (saved
+   for <channel>)" and every clip has a facecam draft.
+7. Clear with Keep ticked. Pass: "None…", the channel's line gone, and
+   Facecam no longer offered on fit-only clips.
+
+Then delete the scratch folders.
+
 ## Record your run
 
 | Field | Value |

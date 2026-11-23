@@ -401,6 +401,30 @@ committed.
   on a folder writes a new manifest, without the folder's box; the
   channel's stays. The page's drawing tool is 12b-2.
 
+## Amended by the cam box in the review page (V8 item 12b-2)
+
+- The Frame tab's "Cam box" says whether one is set (for the folder,
+  saved for the channel, or none), with Draw (or Redraw) cam box, Clear,
+  and "Keep for <channel>'s next videos" (ticked at first; shown only
+  when the video has a channel).
+- Draw switches to the Source view, pauses, and lays a layer over the
+  picture alone (the player's letterbox left out): a drag draws the box,
+  a drag inside it moves it, kept inside the picture; Esc or Cancel ends
+  it unsaved. Save cam box sends it, rounded to four places as the cams
+  file keeps it, below 5% either way not allowed; then the current clip
+  is set to Facecam and shown in the Preview view, unsaved.
+- With a box, every clip of a vertical folder drafted with styles offers
+  Facecam; one without a facecam draft keeps playing the file it has in
+  the Draft view, and the preview and cam buttons use the box's frame
+  from the server. Clear sends no box (and takes the channel's line out
+  with Keep ticked, or when only the channel had one), and drops an
+  unsaved Facecam pick on clips without a facecam draft.
+- `static/cambox.js`; `facecamLayouts` in `app.js` serves the preview
+  and the cam buttons alike. Checked in headless Edge on a copy of the
+  Lacy folder: drawn, moved, clamped, Esc, saved for the folder only,
+  Facecam offered on a fit-only clip and saved in it (11 s, the whole cam
+  over gameplay clear of it), no page errors. Manual step RV42.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

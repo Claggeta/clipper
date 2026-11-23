@@ -239,6 +239,40 @@ button[aria-pressed="true"] {
   pointer-events: none;
 }
 
+/* The cam box drawn over the source picture (ADR 0025, 12b amendment). */
+.cambox-layer {
+  position: absolute;
+  z-index: 3;
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+  outline: 1px dashed var(--muted);
+}
+
+.cambox-rect {
+  position: absolute;
+  border: 2px solid var(--accent);
+  background: rgb(245 197 24 / 12%);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 35%);
+  cursor: move;
+}
+
+.cambox-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  white-space: nowrap;
+  cursor: default;
+}
+
 .preview-view {
   position: relative;
   display: flex;

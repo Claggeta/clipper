@@ -389,6 +389,8 @@ and planned code:
   amendment (12b-1): `RenderManifest.cam_box` per folder and
   `data/cams.txt` (`CLIPPER_CAMS_FILE`) per channel, before the finder;
   `POST /api/cam-box`; facecam on any clip once a hand box is set.
+  Page amendment (12b-2): Draw cam box in the Frame tab over the source
+  picture, Keep for the channel, `static/cambox.js`; RV42.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -1926,8 +1928,10 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
       the source frame, applied to the folder's clips, maybe kept per
       channel. ADR 0024 amendment, manual step. In PRs: 12b-1 ~~the
       manifest's `cam_box`, `data/cams.txt` per channel, the box order,
-      `drafts`/`render` and `POST /api/cam-box`~~ (done); 12b-2 the
-      page's drawing tool and Facecam for every clip, manual step RV42.
+      `drafts`/`render` and `POST /api/cam-box`~~ (done; #302); 12b-2
+      ~~the page's drawing tool and Facecam for every clip, manual step
+      RV42~~ (done; checked in headless Edge on a copy of the Lacy
+      folder).
     - 12c. Only if 12b is too many clicks: a spike on corner cams (two
       real borders where the box meets a frame corner, interior edges
       not winning), against boxes marked by hand on VODs with and

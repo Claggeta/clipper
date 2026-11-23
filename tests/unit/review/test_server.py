@@ -252,6 +252,7 @@ def _get(
         ("/preview.js", "text/javascript", b"/api/captions"),
         ("/captions.js", "text/javascript", b"caption_edits"),
         ("/frame.js", "text/javascript", b"hand_crops"),
+        ("/cambox.js", "text/javascript", b"/api/cam-box"),
         ("/audio.js", "text/javascript", b"/api/audio"),
         ("/overlays.js", "text/javascript", b"broll-lane"),
         ("/combine.js", "text/javascript", b"/api/combined"),

@@ -43,6 +43,14 @@
           <span id="preview-time" class="preview-time"></span>
           <span id="preview-note" class="preview-note" hidden></span>
         </div>
+        <div id="cambox-layer" class="cambox-layer" hidden>
+          <div id="cambox-rect" class="cambox-rect" hidden></div>
+          <div class="cambox-bar">
+            <span>Drag over the cam; drag inside the box to move it.</span>
+            <button type="button" id="cambox-save" class="primary" disabled>Save cam box</button>
+            <button type="button" id="cambox-cancel" title="Esc">Cancel</button>
+          </div>
+        </div>
         <div id="draft-view" class="draft-view" hidden>
           <div class="draft-frame">
             <video id="draft" controls preload="metadata" playsinline></video>
@@ -131,6 +139,13 @@
           <div id="styles" class="toggle-row" role="group" aria-label="Style"></div>
           <div id="cams" class="toggle-row" role="group" aria-label="Cam" hidden></div>
           <p id="styles-none" class="muted">This clip has one style.</p>
+          <span class="field-label">Cam box <span class="muted">(for the facecam style, every clip)</span></span>
+          <p id="cambox-status" class="muted"></p>
+          <div class="toggle-row">
+            <button type="button" id="cambox-draw" title="Drag a box over the cam on the source">Draw cam box</button>
+            <button type="button" id="cambox-clear">Clear</button>
+          </div>
+          <label id="cambox-keep-row" class="fade" hidden><input type="checkbox" id="cambox-keep" checked> Keep for <span id="cambox-channel"></span>'s next videos</label>
           <label class="fade block-only" title="Zooms and hand crops for the selected block alone; they replace the clip's there"><input type="checkbox" id="frame-block-only"> This block only <span id="frame-block-name" class="muted"></span></label>
           <span class="field-label">Zooms <span id="zooms-unit" class="muted">(seconds into the span)</span></span>
           <div id="zooms" class="ranges"></div>
@@ -422,6 +437,7 @@
   <script src="/pad.js"></script>
   <script src="/captions.js"></script>
   <script src="/frame.js"></script>
+  <script src="/cambox.js"></script>
   <script src="/audio.js"></script>
   <script src="/overlays.js"></script>
   <script src="/combine.js"></script>
