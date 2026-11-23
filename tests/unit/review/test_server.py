@@ -906,7 +906,7 @@ def test_a_facecam_style_carries_its_frame_for_either_cam(tmp_path: Path) -> Non
     top, bottom = shown["layouts"]["top"], shown["layouts"]["bottom"]
     assert top == {
         "cam": [1402, 616, 498, 312],
-        "game": [492, 0, 936, 1080],
+        "game": [466, 0, 936, 1080],
         "cam_height": 676,
         "caption_margin_v": None,
     }

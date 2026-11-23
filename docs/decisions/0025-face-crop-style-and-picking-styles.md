@@ -300,7 +300,8 @@ committed.
   high; the gameplay a centre crop of the whole source at the shape of the
   rest; stacked by `vstack` in the one encode (ADR 0007), before captions.
   A cam near the frame's edge mostly falls outside the centre crop; a
-  sliver of it can show at the gameplay's side.
+  sliver of it can show at the gameplay's side. (12a amendment: the crop
+  slides clear of it now.)
 - No box: a note, and the clip renders in `fit` (or only in `fit` when
   `fit` is also chosen). A finder failure is a failure, as the face
   tracker's: the clip fails if facecam is its only style, else the other
@@ -344,6 +345,27 @@ committed.
   the bottom (label `"cam": "bottom"`, captions above the cam in the
   re-rendered file), and a moved span re-rendered in facecam. Manual step
   RV32.
+
+## Amended by the gameplay crop clearing the cam (V8 item 12a)
+
+- Found on a Lacy VOD (`v2937465519`), a borderless cam in the top-left
+  corner: the centred gameplay crop (353 to 1567 of 1920) took in the
+  cam's right side (to 494) and the chat under it.
+- `plan_facecam` still starts from the centred crop. If that shows any of
+  the box, the crop slides away from the cam (away from the side of the
+  frame the cam's centre is on) until clear of it, stopping at the
+  frame's edge, with an even offset. It moves only if that shows less of
+  the cam, so a cam in the middle that no slide can clear leaves the crop
+  centred. A crop the frame's full width (a narrow source) slides up or
+  down the same way.
+- One place: `render`, `drafts`, `review`'s re-render and the preview's
+  layouts all come from `plan_facecam`, so nothing else changes. Drafts
+  rendered before keep their crop until re-rendered.
+- The gameplay is no longer centred when the cam is near it, which is the
+  point; what was at the far side of the frame may now show instead.
+- Not settled here: the box itself. On that VOD it stopped at an edge
+  inside the cam, and 9 of 10 drafts found none (a corner cam has two
+  real borders, the finder wants three); 12b and 12c.
 
 ## Revisit when
 

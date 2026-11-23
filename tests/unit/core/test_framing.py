@@ -171,13 +171,15 @@ def test_hand_crop_plan_moves_one_window_at_each_stretch() -> None:
 
 # The facecam style's frame (ADR 0025, facecam style amendment), on a
 # constructed box like a streamer's at the bottom right of a 1920x1080 frame.
-def test_plan_facecam_stacks_the_cam_over_a_centre_crop() -> None:
+def test_plan_facecam_stacks_the_cam_over_the_gameplay() -> None:
     box = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
     layout = plan_facecam(box, W, H)
     assert layout.cam == (1402, 616, 498, 312)
     # 1080 * 312 / 498 = 676.6, down to even; the game fills the other 1244.
     assert layout.cam_height == 676
-    assert layout.game == (492, 0, 936, 1080)
+    # Centred at 492 the crop would reach 1428, past the cam's 1402; it
+    # slides left to end there.
+    assert layout.game == (466, 0, 936, 1080)
     assert layout.position == "top"
 
 
@@ -189,7 +191,7 @@ def test_plan_facecam_keeps_the_position() -> None:
 def test_a_tall_cam_takes_at_most_half_the_frame() -> None:
     layout = plan_facecam(FacecamBox(x=0.0, y=0.0, w=0.2, h=1.0), W, H)
     assert layout.cam_height == 960
-    assert layout.game == (353, 0, 1214, 1080)
+    assert layout.game == (384, 0, 1214, 1080)
 
 
 def test_a_narrow_source_crops_the_game_by_height() -> None:
@@ -197,6 +199,39 @@ def test_a_narrow_source_crops_the_game_by_height() -> None:
     _, gy, gw, gh = layout.game
     assert gw == 600
     assert gh < 1080 and gh % 2 == 0
-    assert gy == (1080 - gh) // 2
+    # Centred, the crop would show the cam (rows 108 to 432); it slides down
+    # as far as the frame allows.
+    assert gy == 1080 - gh
     # The crop has the game area's shape, 1080 wide by the rest of 1920.
     assert abs(gw / gh - 1080 / (1920 - layout.cam_height)) < 0.01
+
+
+# ADR 0025, 12a amendment: the gameplay crop slides clear of the cam.
+def test_a_corner_cam_is_left_out_of_the_gameplay() -> None:
+    # The box found on a Lacy VOD (v2937465519), top left; the cam ends at
+    # 494 and a centred crop would start at 353.
+    box = FacecamBox(x=0.10078125, y=0.0, w=0.15625, h=0.2569444444444444)
+    gx, _, gw, _ = plan_facecam(box, W, H).game
+    assert (gx, gw) == (494, 1214)
+    assert gx + gw <= W
+
+
+def test_a_cam_clear_of_the_centre_crop_leaves_it_centred() -> None:
+    box = FacecamBox(x=0.0, y=0.0, w=0.15, h=0.2)
+    gx, _, gw, _ = plan_facecam(box, W, H).game
+    assert gx == (W - gw) // 2
+    assert gx >= 0.15 * W
+
+
+def test_a_cam_no_slide_can_clear_keeps_the_crop_centred() -> None:
+    box = FacecamBox(x=0.45, y=0.0, w=0.1, h=0.3)
+    gx, _, gw, _ = plan_facecam(box, W, H).game
+    assert gx == (W - gw) // 2
+
+
+def test_the_crop_slides_only_as_far_as_the_frame_allows() -> None:
+    # Cam from 576 to 960: clearing it would need the crop to start at 960,
+    # past the frame's 1920 - 1214 = 706, so it stops at the edge.
+    box = FacecamBox(x=0.3, y=0.0, w=0.2, h=0.5)
+    gx, _, gw, _ = plan_facecam(box, W, H).game
+    assert (gx, gx + gw) == (706, 1920)
