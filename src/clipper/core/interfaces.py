@@ -93,6 +93,12 @@ class ReviewFiles(Protocol):
 
     def save_manifest(self, manifest: RenderManifest, folder: Path) -> None: ...
 
+    # The channel's cam box in the cams file, or out of it for None (ADR
+    # 0025, 12b amendment); raises `FaceError`.
+    def save_channel_cam(
+        self, path: Path, channel: str, box: FacecamBox | None
+    ) -> None: ...
+
 
 @runtime_checkable
 class ClipDetector(Protocol):

@@ -47,3 +47,39 @@ def test_a_bad_people_line_names_the_file(tmp_path: Path) -> None:
     path.write_text("Ron\nRon\n", encoding="utf-8")
     with pytest.raises(ReviewError, match=r"people\.txt: Line 2: 'Ron' is given twice"):
         load_people(path)
+
+
+# Saved cam boxes per channel (ADR 0025, 12b amendment).
+
+
+def test_no_cams_file_means_no_saved_boxes(tmp_path: Path) -> None:
+    from clipper.adapters.results.channels_txt import load_channel_cams
+
+    assert load_channel_cams(tmp_path / "cams.txt") == {}
+
+
+def test_a_cam_box_is_saved_and_read_back(tmp_path: Path) -> None:
+    from clipper.adapters.results.channels_txt import (
+        load_channel_cams,
+        save_channel_cam,
+    )
+    from clipper.domain.models import FacecamBox
+
+    path = tmp_path / "data" / "cams.txt"
+    box = FacecamBox(x=0.0, y=0.0, w=0.25, h=0.25)
+    save_channel_cam(path, "Lacy", box)
+    assert load_channel_cams(path) == {"lacy": box}
+    save_channel_cam(path, "Lacy", None)
+    assert load_channel_cams(path) == {}
+
+
+def test_a_bad_cams_file_names_the_file_and_is_not_overwritten(tmp_path: Path) -> None:
+    from clipper.adapters.results.channels_txt import save_channel_cam
+    from clipper.domain.errors import FaceError
+    from clipper.domain.models import FacecamBox
+
+    path = tmp_path / "cams.txt"
+    path.write_text("Lacy | nope\n", encoding="utf-8")
+    with pytest.raises(FaceError, match=r"cams\.txt: Line 1: write it as"):
+        save_channel_cam(path, "Ron", FacecamBox(x=0.0, y=0.0, w=0.2, h=0.2))
+    assert path.read_text(encoding="utf-8") == "Lacy | nope\n"

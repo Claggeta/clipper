@@ -16,7 +16,11 @@ from clipper.adapters.results.analysis_json import (
     check_source_matches,
     load_analysis_result,
 )
-from clipper.adapters.results.channels_txt import load_channel_abouts, load_people
+from clipper.adapters.results.channels_txt import (
+    load_channel_abouts,
+    load_channel_cams,
+    load_people,
+)
 from clipper.adapters.results.labels_json import (
     check_labels_match,
     load_labels,
@@ -45,7 +49,7 @@ from clipper.adapters.results.video_info_json import (
 )
 from clipper.cli.context import AppContext, DetectorName
 from clipper.core.captions import CaptionWord, build_ass, caption_chunks, clip_text
-from clipper.core.channels import ABOUT_LIMIT, channel_about
+from clipper.core.channels import ABOUT_LIMIT, channel_about, channel_cam
 from clipper.core.config import Settings
 from clipper.core.cuts import MAX_DRAFT_CUT_SHARE, Cut, TimeMap, cut_crop, draft_cuts
 from clipper.core.evaluation import boundary_gaps, evaluate
@@ -569,6 +573,11 @@ def render(
         plan = _plan_render(settings, build, video, result, rank)
         _check_frame_size((style,) if vertical else (), plan.media, video)
         channels = load_channel_abouts(settings.channels_file) if titles else {}
+        cams = (
+            load_channel_cams(settings.cams_file)
+            if vertical and style is VerticalStyle.FACECAM
+            else {}
+        )
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         console.print(f"[red]Error:[/red] {escape(str(exc))}")
@@ -582,6 +591,7 @@ def render(
         styles=(style,) if vertical else (),
         channels=channels,
         cam=cam_position,
+        cams=cams,
     )
     if _cut_clips(
         settings, build, video, result, result_json, plan, writer, flags
@@ -643,6 +653,9 @@ class _RenderFlags(NamedTuple):
     cam: CamPosition = "top"
     # Cut each clip's pauses, as `drafts` does (ADR 0029, drafts amendment).
     cut_pauses: bool = False
+    # Cam boxes set by hand, by channel, used before the finder (ADR 0025,
+    # 12b amendment).
+    cams: Mapping[str, FacecamBox] | None = None
 
 
 def _drafts_styles(
@@ -770,11 +783,19 @@ def _cut_clips(
     cannot be written is `Error:` and exit 1.
     """
     ranks, selected, folder, paths, media = plan
-    captions, vertical, titles, about, styles, channels, cam, cut_pauses = flags
+    captions, vertical, titles, about, styles, channels, cam, cut_pauses, cams = flags
     renderer = build.renderer(settings)
     face_only = styles == (VerticalStyle.FACE,)
     tracker = build.face_tracker(settings) if VerticalStyle.FACE in styles else None
     finder = build.facecam_finder(settings) if VerticalStyle.FACECAM in styles else None
+    saved_box: FacecamBox | None = None
+    if finder is not None:
+        channel = _channel_of(video)
+        saved_box = channel_cam(cams or {}, channel)
+        if saved_box is not None and channel is not None:
+            console.print(
+                f"Cam box (saved for {escape(channel.strip())})", soft_wrap=True
+            )
     video_info = _title_context(video) if writer else None
     if writer and about is None and video_info is not None:
         about = channel_about(channels or {}, video_info)
@@ -826,9 +847,12 @@ def _cut_clips(
         box: FacecamBox | None = None
         layout: FacecamLayout | None = None
         if finder is not None:
-            # No box renders in `fit` instead (ADR 0025, facecam style).
+            # No box renders in `fit` instead (ADR 0025, facecam style); a box
+            # saved for the channel is used without looking (12b amendment).
             try:
-                box = finder.find(video, candidate.start_seconds, candidate.end_seconds)
+                box = saved_box or finder.find(
+                    video, candidate.start_seconds, candidate.end_seconds
+                )
             except ClipperError as exc:
                 if styles == (VerticalStyle.FACECAM,):
                     failures.append(f"#{number} {span}: {escape(str(exc))}")
@@ -1166,6 +1190,11 @@ def drafts(
         queue = _queue(sources or [], list_file, about)
         checked = _check_queue(queue, titles)
         channels = load_channel_abouts(settings.channels_file) if titles else {}
+        cams = (
+            load_channel_cams(settings.cams_file)
+            if VerticalStyle.FACECAM in styles
+            else {}
+        )
         writer = build.title_writer(settings) if titles else None
     except ClipperError as exc:
         for line in str(exc).splitlines():
@@ -1180,6 +1209,7 @@ def drafts(
         channels=channels,
         cam=cam_position,
         cut_pauses=cut_pauses,
+        cams=cams,
     )
     if len(checked) == 1:
         item = checked[0]
@@ -1480,6 +1510,7 @@ def review(
             result = load_analysis_result(analysis)
             check_source_matches(result, video)
             transcript = result.transcript
+        channel = _channel_of(video)
         session = ReviewSession(
             folder=folder,
             manifest=manifest,
@@ -1506,6 +1537,9 @@ def review(
             probe=build.probe(),
             title_writer=_review_title_writer(build, settings),
             story_writer=_review_story_writer(build, settings),
+            channel=channel,
+            channel_cam=channel_cam(load_channel_cams(settings.cams_file), channel),
+            cams_file=settings.cams_file,
         )
         build.serve(
             session,

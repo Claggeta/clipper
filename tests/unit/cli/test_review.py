@@ -89,6 +89,8 @@ class Env:
         monkeypatch.setenv("CLIPPER_CACHE_DIR", str(self.cache))
         self.labels_dir = tmp_path / "labels"
         monkeypatch.setenv("CLIPPER_LABELS_DIR", str(self.labels_dir))
+        self.cams = tmp_path / "cams.txt"
+        monkeypatch.setenv("CLIPPER_CAMS_FILE", str(self.cams))
         self.picks = self.labels_dir / "picks" / "talk.json"
         self.files = JsonReviewFiles()
         self.probe = FakeProbe()

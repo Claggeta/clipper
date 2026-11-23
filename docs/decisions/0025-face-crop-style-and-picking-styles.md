@@ -367,6 +367,40 @@ committed.
   inside the cam, and 9 of 10 drafts found none (a corner cam has two
   real borders, the finder wants three); 12b and 12c.
 
+## Amended by the cam box set by hand (V8 item 12b-1)
+
+- A borderless or corner cam is set by hand instead of found: a streamer
+  rarely moves the cam within a stream, so one box serves a whole VOD,
+  and often every VOD of a channel.
+- Kept in two places. Per drafts folder, `RenderManifest.cam_box`
+  (fractions of the frame, a `FacecamBox`; ADR 0019), for every clip of
+  the folder. Per channel, a committed `data/cams.txt`
+  (`CLIPPER_CAMS_FILE`), `<channel> | <x> <y> <w> <h>` per line, `#`
+  comments, a channel once, compared as the channels file's are (ADR
+  0018); `core/channels.py` parses it and rewrites one channel's line,
+  leaving the rest.
+- Which box: the folder's, else the channel's, else the finder's, else
+  the draft's. `drafts` and `render` with the facecam style read the
+  cams file with the other input checks (a bad file fails before any
+  download) and, with a box for the video's channel, use it for every
+  clip without running the finder, printing `Cam box (saved for
+  <channel>)`.
+- In `review`: `POST /api/cam-box` with `box` (or null to clear) and
+  `channel` (true also writes or removes the channel's line; 409 when
+  the video has no channel), the same JSON, Origin and Host checks as
+  other writes, a box under 5% of the frame either way refused; the
+  reply is the clips payload. With a hand box, Save may keep the facecam
+  style on any clip of a vertical folder, and a facecam Save re-renders
+  when the clip has no facecam draft or its draft is framed on another
+  box. The payload's `cam_box` gives the box in use, whether the folder
+  or the channel keeps it, the channel it may be kept for, and its frame
+  for either cam; facecam drafts' preview frames follow the hand box, as
+  Save would render them.
+- A saved channel box goes stale when the streamer changes the overlay;
+  it shows in the preview and is redrawn or cleared. `drafts` run again
+  on a folder writes a new manifest, without the folder's box; the
+  channel's stays. The page's drawing tool is 12b-2.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

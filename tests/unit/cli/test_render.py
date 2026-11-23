@@ -115,6 +115,8 @@ class Env:
         monkeypatch.setenv("CLIPPER_CLIPS_DIR", str(self.clips))
         self.channels = tmp_path / "channels.txt"
         monkeypatch.setenv("CLIPPER_CHANNELS_FILE", str(self.channels))
+        self.cams = tmp_path / "cams.txt"
+        monkeypatch.setenv("CLIPPER_CAMS_FILE", str(self.cams))
         self.save()
         self.use_probe(FakeProbe())
         self.use_renderer(self.renderer)

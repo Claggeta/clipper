@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     videos_dir: Path = Path("data/videos")
     # Saved about text per channel for titles (ADR 0018, saved about).
     channels_file: Path = Path("data/channels.txt")
+    # Facecam boxes set by hand per channel (ADR 0025, 12b amendment).
+    cams_file: Path = Path("data/cams.txt")
     # Names the review page offers as on screen (ADR 0024, rating amendment).
     people_file: Path = Path("data/people.txt")
     # Music and sound effect files the maintainer adds for clips; nothing

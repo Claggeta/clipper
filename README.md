@@ -130,7 +130,10 @@ This renders every candidate. Options:
   cuts people out. `--style facecam` is for gaming streams with a cam box:
   the box is found from the footage (a still face inside a bordered box)
   and stacked over a centre crop of the gameplay, or under it with `--cam
-  bottom`. A clip with no box found renders in `fit`, with a note.
+  bottom`. A clip with no box found renders in `fit`, with a note. A box
+  saved for the channel in `data/cams.txt` (`<channel> | <x> <y> <w>
+  <h>`, fractions of the frame) is used for every clip instead of
+  looking, for borderless or corner cams.
 - `--titles` suggests a title and a hook line per clip with a local model
   through [Ollama](https://ollama.com), the same server and model as
   `--detector llm` (`CLIPPER_LLM_MODEL`, default `qwen3.5:9b`). They are
@@ -418,6 +421,7 @@ repo root or set absolute paths.
 | `CLIPPER_LABELS_DIR`   | `data/labels` | Where `eval` looks for labels files, and `labels` writes them |
 | `CLIPPER_VIDEOS_DIR`   | `data/videos` | Where `fetch` saves downloaded videos  |
 | `CLIPPER_CHANNELS_FILE`| `data/channels.txt` | Saved `<channel> \| <about text>` lines for titles |
+| `CLIPPER_CAMS_FILE`    | `data/cams.txt`     | Saved `<channel> \| <x> <y> <w> <h>` facecam boxes |
 | `CLIPPER_PEOPLE_FILE`  | `data/people.txt` | Names offered in `review` |
 | `CLIPPER_CAMPAIGNS_FILE`| `data/campaigns.txt` | Campaigns `queue` checks clips against |
 | `CLIPPER_POSTS_FILE`   | `data/posts.json` | Where `posted` records posts |

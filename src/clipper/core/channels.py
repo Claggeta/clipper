@@ -1,15 +1,19 @@
-"""Saved about text per channel, and the people the review page offers.
+"""Saved about text and cam boxes per channel, and the people the review
+page offers.
 
-Pure functions: parsing the channels file and finding a video's line, and
-parsing the people file. Reading the files is the caller's. See
-docs/decisions/0018 (saved about amendment) and 0024 (rating amendment).
+Pure functions: parsing the channels and cams files and finding a video's
+line, writing a cams line, and parsing the people file. Reading and writing
+the files is the caller's. See docs/decisions/0018 (saved about amendment),
+0024 (rating amendment) and 0025 (12b amendment).
 """
 
 from collections.abc import Mapping
 
+from pydantic import ValidationError
+
 from clipper.core.sources import ABOUT_SEPARATOR
-from clipper.domain.errors import ReviewError, TitleError
-from clipper.domain.models import VideoInfo
+from clipper.domain.errors import FaceError, ReviewError, TitleError
+from clipper.domain.models import FacecamBox, VideoInfo
 
 # The longest about text, saved or given with --about (ADR 0018, 8c).
 ABOUT_LIMIT = 300
@@ -54,6 +58,67 @@ def channel_about(abouts: Mapping[str, str], video: VideoInfo | None) -> str | N
     if video is None:
         return None
     return abouts.get(video.channel.strip().casefold())
+
+
+_CAMS_HINT = "write it as <channel> | <x> <y> <w> <h>, fractions of the frame"
+
+
+def parse_channel_cams(text: str) -> dict[str, FacecamBox]:
+    """`<channel> | <x> <y> <w> <h>` per line, keyed by channel ignoring
+    case; the box as fractions of the frame, `x` and `y` its top-left.
+
+    Blank lines and `#` comments are skipped. Raises `FaceError` for a line
+    without four numbers, a box outside the frame, or a channel given twice.
+    """
+    cams: dict[str, FacecamBox] = {}
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        channel, _, numbers = line.partition(ABOUT_SEPARATOR)
+        channel = channel.strip()
+        try:
+            x, y, w, h = (float(v) for v in numbers.split())
+            box = FacecamBox(x=x, y=y, w=w, h=h)
+        except (ValueError, ValidationError) as exc:
+            raise FaceError(f"Line {number}: {_CAMS_HINT}") from exc
+        if not channel:
+            raise FaceError(f"Line {number}: {_CAMS_HINT}")
+        key = channel.casefold()
+        if key in cams:
+            raise FaceError(f"Line {number}: {channel!r} is given twice")
+        cams[key] = box
+    return cams
+
+
+def channel_cam(
+    cams: Mapping[str, FacecamBox], channel: str | None
+) -> FacecamBox | None:
+    """The saved cam box for the channel, compared as `channel_about` does."""
+    if channel is None:
+        return None
+    return cams.get(channel.strip().casefold())
+
+
+def set_channel_cam(text: str, channel: str, box: FacecamBox | None) -> str:
+    """The cams file's text with the channel's line replaced, added at the
+    end, or removed for no box; other lines and comments stay as they are."""
+    key = channel.strip().casefold()
+    lines = [
+        raw
+        for raw in text.splitlines()
+        if raw.strip().startswith("#")
+        or raw.partition(ABOUT_SEPARATOR)[0].strip().casefold() != key
+        or not raw.strip()
+    ]
+    if box is not None:
+        # Rounded, and kept inside the frame after rounding.
+        x, y = round(box.x, 4), round(box.y, 4)
+        w, h = min(round(box.w, 4), 1 - x), min(round(box.h, 4), 1 - y)
+        lines.append(
+            f"{channel.strip()} {ABOUT_SEPARATOR} {x:.4f} {y:.4f} {w:.4f} {h:.4f}"
+        )
+    return "".join(f"{line}\n" for line in lines)
 
 
 # The longest name in the people file.

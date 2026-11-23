@@ -384,7 +384,11 @@ and planned code:
   preview from server-sent layouts, `cam` on label and variant, re-render
   finds the box again else keeps the draft's, captions 60 px above a
   bottom cam everywhere (ADR 0017 `caption_margin_v`); no zooms, crops,
-  sequence or B-roll in facecam.
+  sequence or B-roll in facecam. Crop amendment (V8 12a): the gameplay
+  crop slides clear of the cam as far as the frame allows. Hand box
+  amendment (12b-1): `RenderManifest.cam_box` per folder and
+  `data/cams.txt` (`CLIPPER_CAMS_FILE`) per channel, before the finder;
+  `POST /api/cam-box`; facecam on any clip once a hand box is set.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -1916,11 +1920,14 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
     1 of 10 drafts got a facecam variant, its box stopped at an edge
     inside the cam, and the centre-cropped gameplay showed the cam's
     right side and the chat), in PRs, ADR 0025 amendments:
-    - 12a. The gameplay crop slides away from the cam until clear of it,
-      as far as the frame allows; unit tests.
+    - 12a. ~~The gameplay crop slides away from the cam until clear of
+      it, as far as the frame allows; unit tests.~~ (done; #301)
     - 12b. The cam box set by hand in `review`: a rectangle dragged over
       the source frame, applied to the folder's clips, maybe kept per
-      channel. ADR 0024 amendment, manual step.
+      channel. ADR 0024 amendment, manual step. In PRs: 12b-1 ~~the
+      manifest's `cam_box`, `data/cams.txt` per channel, the box order,
+      `drafts`/`render` and `POST /api/cam-box`~~ (done); 12b-2 the
+      page's drawing tool and Facecam for every clip, manual step RV42.
     - 12c. Only if 12b is too many clicks: a spike on corner cams (two
       real borders where the box meets a frame corner, interior edges
       not winning), against boxes marked by hand on VODs with and
