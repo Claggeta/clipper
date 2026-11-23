@@ -795,8 +795,8 @@ can be avoided).
 
 `v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
 V8 is not closed: the assistant (item 2), the visual spike (3b) and
-7b's target length are still open. Item 11 (a speaker detection spike)
-was added on 2026-11-23, after 3b.
+7b's target length are still open. Items 11 (a speaker detection spike,
+after 3b) and 12 (facecam fixes) were added on 2026-11-23.
 
 ## Maintainer's goals
 
@@ -1911,6 +1911,20 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
     stretches with the right face. New dependencies through ADR 0003's
     check. Ends in an ADR 0025 amendment or in nothing; code, if any, is
     later items, each designed first.
+12. Facecam fixes (added 2026-11-23, found by the maintainer on a Lacy
+    VOD, v2937465519: a borderless cam in the frame's top-left corner;
+    1 of 10 drafts got a facecam variant, its box stopped at an edge
+    inside the cam, and the centre-cropped gameplay showed the cam's
+    right side and the chat), in PRs, ADR 0025 amendments:
+    - 12a. The gameplay crop slides away from the cam until clear of it,
+      as far as the frame allows; unit tests.
+    - 12b. The cam box set by hand in `review`: a rectangle dragged over
+      the source frame, applied to the folder's clips, maybe kept per
+      channel. ADR 0024 amendment, manual step.
+    - 12c. Only if 12b is too many clicks: a spike on corner cams (two
+      real borders where the box meets a frame corner, interior edges
+      not winning), against boxes marked by hand on VODs with and
+      without a cam. May end in nothing.
 
 Later, not scheduled:
 
