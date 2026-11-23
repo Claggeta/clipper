@@ -1,0 +1,187 @@
+{
+  "source": "hrWCftyrXIA.mp4",
+  "labels": [
+    {
+      "start": "1:45:09.75",
+      "end": "1:45:42.59",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:45:13.89",
+        "end": "1:45:55.22"
+      },
+      "style": "fit",
+      "rating": "good",
+      "people": [
+        "Lacy"
+      ],
+      "texts": [
+        {
+          "text": "*Calls Lacy Trash*",
+          "start_seconds": 0.0,
+          "end_seconds": 6.0,
+          "place": "top",
+          "colour": "pink",
+          "look": "outline"
+        },
+        {
+          "text": "*Misses Every Shot*",
+          "start_seconds": 7.0,
+          "end_seconds": 18.0,
+          "place": "top",
+          "colour": "pink",
+          "look": "outline"
+        },
+        {
+          "text": "*Huh?*",
+          "start_seconds": 19.0,
+          "end_seconds": 26.0,
+          "place": "top",
+          "colour": "pink",
+          "look": "outline"
+        },
+        {
+          "text": "*She Starts Stimming*",
+          "start_seconds": 29.0,
+          "end_seconds": 33.0,
+          "place": "middle",
+          "colour": "pink",
+          "look": "outline"
+        }
+      ],
+      "caption_edits": {
+        "fixes": [
+          {
+            "start_seconds": 6310.85,
+            "text": "You're"
+          },
+          {
+            "start_seconds": 6329.49,
+            "text": "r*cist,"
+          },
+          {
+            "start_seconds": 6330.49,
+            "text": "Lacy"
+          },
+          {
+            "start_seconds": 6334.17,
+            "text": "r*cist"
+          },
+          {
+            "start_seconds": 6335.05,
+            "text": "Ok"
+          },
+          {
+            "start_seconds": 6339.38,
+            "text": "Ok"
+          }
+        ],
+        "keys": [],
+        "highlight": "pink"
+      },
+      "audio": {
+        "gain_db": 0.0,
+        "music": null,
+        "effects": [
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6317.96,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6318.95,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6320.45,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6321.39,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6322.74,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6323.8,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6325.07,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6327.11,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6328.18,
+            "level_db": -8.0
+          },
+          {
+            "file": "buzzer.mp3",
+            "at_seconds": 6335.96,
+            "level_db": -8.0
+          }
+        ]
+      },
+      "note": "Funny clip. She misses every shot and because of her accent it sounds like she is calling Lacy Racy or Racist"
+    }
+  ],
+  "rejected": [
+    {
+      "start": "2:23:44.79",
+      "end": "2:24:23.03"
+    },
+    {
+      "start": "2:25:14.35",
+      "end": "2:25:43.25",
+      "reason": "other"
+    },
+    {
+      "start": "2:48:44.82",
+      "end": "2:49:13.51",
+      "reason": "nothing_happening"
+    },
+    {
+      "start": "3:44:16.67",
+      "end": "3:44:35.57"
+    },
+    {
+      "start": "4:05:56.59",
+      "end": "4:06:12.84"
+    },
+    {
+      "start": "4:06:15.55",
+      "end": "4:06:56.51"
+    },
+    {
+      "start": "4:23:28.89",
+      "end": "4:24:07.03"
+    },
+    {
+      "start": "4:30:54.21",
+      "end": "4:31:14.01",
+      "reason": "nothing_happening"
+    },
+    {
+      "start": "5:22:25.25",
+      "end": "5:22:42.77",
+      "reason": "needs_context"
+    },
+    {
+      "start": "7:59:47.06",
+      "end": "8:00:12.71",
+      "reason": "nothing_happening"
+    }
+  ]
+}

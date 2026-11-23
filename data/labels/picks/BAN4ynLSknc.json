@@ -34,6 +34,22 @@
       "note": "Good clip. Big global news."
     },
     {
+      "start": "0:32:22.54",
+      "end": "0:32:43.18",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "Not super entertaining but talk about global news is always OK"
+    },
+    {
+      "start": "2:21:22.44",
+      "end": "2:21:41.12",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "Funny, needs a better hook and more context"
+    },
+    {
       "start": "2:26:44.63",
       "end": "2:27:04.79",
       "verdict": "fix",
@@ -73,6 +89,31 @@
     {
       "start": "2:55:39.59",
       "end": "2:56:22.84"
+    },
+    {
+      "start": "3:02:57.71",
+      "end": "3:03:18.46",
+      "reason": "nothing_happening"
+    },
+    {
+      "start": "3:35:31.21",
+      "end": "3:35:51.76",
+      "reason": "nothing_happening"
+    },
+    {
+      "start": "3:45:35.49",
+      "end": "3:46:02.05",
+      "reason": "nothing_happening"
+    },
+    {
+      "start": "4:21:48.6",
+      "end": "4:22:09.89",
+      "reason": "nothing_happening"
+    },
+    {
+      "start": "4:38:33.69",
+      "end": "4:39:00",
+      "reason": "nothing_happening"
     },
     {
       "start": "5:35:52.15",
