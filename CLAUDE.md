@@ -786,15 +786,17 @@ enough, `good` picks in the top few ranks.
 Non-goals for V8: performance as a training target and retraining (ADR
 0026's later stages), posting or uploads, the YouTube or Twitch APIs,
 OAuth or logins, hosted or paid models or tools (DaVinci Resolve's free
-edition only), speaker detection, the movies/TV niche, a URL box in the
-review page, channel watching or scheduling, a database, user accounts,
-a JavaScript framework or build step for the page, and any dependency
-that fails ADR 0003's check (frame embeddings only after cheap signals
-show something, and only without PyTorch if it can be avoided).
+edition only), speaker detection beyond item 11's spike, the movies/TV
+niche, a URL box in the review page, channel watching or scheduling, a
+database, user accounts, a JavaScript framework or build step for the
+page, and any dependency that fails ADR 0003's check (frame embeddings
+only after cheap signals show something, and only without PyTorch if it
+can be avoided).
 
 `v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
 V8 is not closed: the assistant (item 2), the visual spike (3b) and
-7b's target length are still open.
+7b's target length are still open. Item 11 (a speaker detection spike)
+was added on 2026-11-23, after 3b.
 
 ## Maintainer's goals
 
@@ -1897,6 +1899,18 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
 10. ~~Release notes and tag `v0.8.0`.~~ (done; notes #296, F1 run
     2026-11-20 and again 2026-11-23 on ffmpeg 9.0.2 before tagging, tag
     `v0.8.0` on 217d3c6 and pre-release by the maintainer)
+11. Speaker detection spike (added 2026-11-23, the maintainer's choice;
+    after 3b): which face on screen is talking, for the `face` style's
+    listener-framed two-shot (ADR 0025) and a possible podcast split.
+    The speaker marked by hand on stretches of 3 to 5 podcast or IRL
+    clips where `face` framed the wrong person; tried first, lip opening
+    from dense face landmarks at 15 to 25 frames a second correlated
+    with the audio's loudness, then that joined with audio diarization
+    (ONNX, no PyTorch) if needed; a trained audio-visual model (TalkNet,
+    Light-ASD) only if both fall short. Measured as the share of
+    stretches with the right face. New dependencies through ADR 0003's
+    check. Ends in an ADR 0025 amendment or in nothing; code, if any, is
+    later items, each designed first.
 
 Later, not scheduled:
 
@@ -1917,7 +1931,8 @@ Later, not scheduled:
   amendment): the largest face is sometimes the listener (a podcast
   two-shot with the speaker side-on); mouth movement at 5 samples a
   second did not tell them apart. Needs an audio-visual model; after
-  13e's picks show how often `face` loses to `fit` for it.
+  13e's picks show how often `face` loses to `fit` for it. Scheduled as
+  a V8 item 11 spike.
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
   first, and stack it above or below the gameplay. After V5 item 13e's
   picks show how often facecam clips are posted. Scheduled as V7 item 6;
