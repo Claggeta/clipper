@@ -208,7 +208,8 @@ def hand_crop_plan(
 
 # ADR 0025, facecam style amendment: the cam fills the frame's width at its
 # own shape, up to half the frame's height, and the gameplay fills the rest as
-# a centre crop of the whole source.
+# a crop of the whole source, centred unless that shows the cam (12a
+# amendment).
 FACECAM_WIDTH = 1080
 FACECAM_HEIGHT = 1920
 MAX_CAM_HEIGHT = FACECAM_HEIGHT // 2
@@ -233,8 +234,12 @@ def plan_facecam(
     game_h = frame_height // 2 * 2
     if game_w >= frame_width:
         game_h = _even(frame_width * game_height / FACECAM_WIDTH, frame_height)
-    game_x = (frame_width - game_w) // 2
-    game_y = (frame_height - game_h) // 2
+    game_x = _clear_of_cam(
+        (frame_width - game_w) // 2, game_w, frame_width, cam_x, cam_w
+    )
+    game_y = _clear_of_cam(
+        (frame_height - game_h) // 2, game_h, frame_height, cam_y, cam_h
+    )
     return FacecamLayout(
         cam=(cam_x, cam_y, cam_w, cam_h),
         game=(game_x, game_y, game_w, game_h),
@@ -253,6 +258,24 @@ def facecam_caption_margin(layout: FacecamLayout) -> int | None:
     if layout.position == "bottom":
         return layout.cam_height + CAPTION_GAP
     return None
+
+
+def _clear_of_cam(start: int, size: int, frame: int, cam: int, cam_size: int) -> int:
+    """Where the gameplay crop starts along one side of the frame: `start`
+    (centred), slid away from the cam until clear of it, as far as the frame
+    allows, and kept even; centred still if sliding shows no less of it."""
+
+    def shown(at: int) -> int:
+        return max(0, min(at + size, cam + cam_size) - max(at, cam))
+
+    if shown(start) == 0:
+        return start
+    if cam + cam_size / 2 < frame / 2:
+        after = cam + cam_size + (cam + cam_size) % 2
+        slid = max(start, min(after, (frame - size) // 2 * 2))
+    else:
+        slid = min(start, max((cam - size) // 2 * 2, 0))
+    return slid if shown(slid) < shown(start) else start
 
 
 def _even(value: float, limit: int) -> int:
