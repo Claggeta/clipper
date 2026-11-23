@@ -152,6 +152,30 @@ The two signals differ:
   revisit with a new kind of input (frames or audio, 3b), or after a
   ranker's own top 10 is judged on a few VODs.
 
+## Visual spike amendment (V8 item 3b, 2026-11-23, not adopted)
+
+Cheap frame signals before any frame encoder, as decision 3 orders:
+ffmpeg's scene score and motion (mean difference between neighbouring
+frames) at 4 frames a second on a 160x90 grey picture, on 27 judged
+VODs: 206 keeper spans, 200 rejected spans and 200 random 45 s spans
+per VOD. Bar set before the run: keepers over rejected outside the
+chance band pooled, and the same direction on at least 2 of 3 VODs with
+3 or more of each.
+
+- Pooled keeper over reject (AUC): mean motion 0.59, 90th percentile
+  motion 0.61, scene cuts a minute 0.58, against a chance band of 0.45
+  to 0.56.
+- Per VOD: at most 9 of 15 VODs lean the same way (10 needed), single
+  VODs 0.29 to 0.92.
+- Keepers against random spans: 0.48 to 0.54. Rejected spans are calmer
+  on some VODs; keepers are not busier, so motion cannot rank a VOD's
+  windows.
+- Decision: no frame signal as a detector or ranker input, and no frame
+  embeddings (their condition, cheap signals showing something, is
+  unmet), so no ADR 0003 check for a frame encoder. Revisit if
+  `seen_not_said` becomes a common trash reason, with a signal about
+  what is on screen rather than how much it moves.
+
 ## Revisit when
 
 - Labels pass a few thousand judged spans (fine-tuning becomes plausible).

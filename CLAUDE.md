@@ -415,7 +415,11 @@ and planned code:
   about double. Rerun amendment (V8 3a and 3c, not adopted): 16 trash
   reasons (12 `nothing_happening`); 25 VODs, 542 keeper and 481 reject
   windows, held-out 0.59 to 0.60, inside the LLM's top 10 0.60 against
-  0.55; more labels moved nothing.
+  0.55; more labels moved nothing. Visual spike amendment (V8 3b, not
+  adopted): ffmpeg motion and scene cuts on 27 VODs, 206 keepers and
+  200 rejects; pooled 0.59 to 0.61 but the same way on at most 9 of 15
+  VODs, keepers ordinary against random spans; frame embeddings not
+  tried.
 - `0027` — performance data: a YouTube Studio CSV exported by hand and
   imported offline; no YouTube API, key, OAuth or login. The parser follows
   a real export, recorded in an amendment first (columns unverified);
@@ -800,8 +804,8 @@ only after cheap signals show something, and only without PyTorch if it
 can be avoided).
 
 `v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
-V8 is not closed: the assistant (item 2), the visual spike (3b) and
-7b's target length are still open. Items 11 (a speaker detection spike,
+V8 is not closed: the assistant (item 2) and 7b's target length are
+still open; the visual spike (3b) ended in nothing on 2026-11-23. Items 11 (a speaker detection spike,
 after 3b) and 12 (facecam fixes) were added on 2026-11-23.
 
 ## Maintainer's goals
@@ -978,8 +982,8 @@ All merged to `main` with green CI:
   one bar, a bin and a clip library in `review`, six click fixes, the
   Parked fixes in item 5; shorter windows, a cold open and the ranker
   rerun measured and not adopted. Released as `v0.8.0` (pre-release, tag
-  on 217d3c6). Notes are in `docs/releases/v0.8.0.md`. Items 2, 3b and
-  7b's target length stay open.
+  on 217d3c6). Notes are in `docs/releases/v0.8.0.md`. Items 2 and 7b's
+  target length stay open; the visual spike (3b) ended in nothing.
 
 In progress:
 
@@ -1172,6 +1176,43 @@ the rise against the 60 s before, and the share of seconds above the VOD's
 - Decision: loudness is not a detector input (10b dropped). Revisit if
   silent or visual keepers become common in judged labels, or the facecam
   or speaker work (ADR 0025) needs an audio signal.
+
+Visual spike (V8 item 3b, 2026-11-23), ended in nothing. Per-frame scene
+score and motion (the mean difference between neighbouring frames,
+`tblend` and `signalstats`) from ffmpeg at 4 frames a second on a 160x90
+grey picture, CPU decode (the GPU was slower), about 14x realtime: 3 to
+30 min per VOD, 27 judged VODs. 206 keepers (`post`, `fix`, `added`),
+200 rejected spans (12 `nothing_happening`) and 200 random 45 s spans
+per VOD. Per span: mean and 90th percentile motion, the rise against the
+60 s before, the share of busy (over the VOD's 90th percentile) and
+still (under its 10th) frames, and scene cuts (score over 0.3) a minute.
+The bar, set before the run: keepers over rejected outside the chance
+band pooled, and the same direction on at least 2 of 3 VODs with 3 or
+more of each. Scratch scripts in `D:\Clippett\spikes\visual\`, not
+committed.
+
+| Feature | Keepers over rejected (AUC) | Keepers over random | VODs above 0.5 (range) |
+|---|---|---|---|
+| Mean motion | 0.59 | 0.50 | 9 of 15 (0.39 to 0.88) |
+| 90th percentile motion | 0.61 | 0.51 | 8 of 15 (0.38 to 0.88) |
+| Rise against the 60 s before | 0.48 | 0.52 | 6 of 15 (0.13 to 0.75) |
+| Share of busy frames | 0.59 | 0.48 | 7 of 15 (0.33 to 0.83) |
+| Share of still frames | 0.49 | 0.54 | 5 of 15 (0.04 to 0.65) |
+| Scene cuts a minute | 0.58 | 0.51 | 9 of 15 (0.29 to 0.92) |
+
+- Pooled, motion clears the chance band (0.45 to 0.56 by permutation),
+  but per VOD it does not hold: at most 9 of 15 VODs lean the same way,
+  under the 10 the bar needs, and single VODs run 0.39 to 0.88.
+- Keepers are ordinary against random spans (0.48 to 0.54): the pooled
+  gap is rejected spans being calmer than usual on some VODs, not
+  keepers being busier, so motion would not pick keepers from a VOD.
+- Against the 12 `nothing_happening` spans: 0.43 to 0.63, too few to read.
+- The 26 streamer VODs alone (the podcast left out) give the same table
+  within 0.01.
+- Decision: no visual signal as a detector or ranker input, and frame
+  embeddings not tried (3b's condition for them unmet; ADR 0026
+  amendment). Revisit if `seen_not_said` trash reasons become common,
+  with a signal about what is on screen rather than how much it moves.
 
 V3 results, for reference:
 
@@ -1786,10 +1827,14 @@ confirmation first.
      first, or a boundary change for bad cuts.~~ (done 2026-11-20: 16
      reasons on 4 VODs, 12 `nothing_happening`, no `seen_not_said` or
      `bad_cut`; 3c first; ADR 0026 amendment)
-   - 3b. Visual spike: cheap per-second signals from ffmpeg (scene
+   - 3b. ~~Visual spike: cheap per-second signals from ffmpeg (scene
      changes, motion) against keepers, rejected spans and random spans,
      as the loudness spike; frame embeddings only if those show
-     something, after ADR 0003's check. Ends in an ADR or in nothing.
+     something, after ADR 0003's check. Ends in an ADR or in nothing.~~
+     (done 2026-11-23; ended in nothing: on 27 VODs motion 0.59 to 0.61
+     pooled but the same way on at most 9 of 15 VODs, keepers ordinary
+     against random spans; frame embeddings not tried; results under
+     "Visual spike" in "Current state", ADR 0026 amendment; no code)
    - 3c. ~~Rerun the ranker spike (ADR 0026): rejected spans have nearly
      doubled since V6 item 5 (90 to 168), labels 144 to 196.~~ (done;
      ended in nothing: 542 keeper and 481 reject windows on 25 VODs,
