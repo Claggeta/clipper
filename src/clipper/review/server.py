@@ -55,6 +55,7 @@ from clipper.domain.models import (
     BROLL_VIDEO_SUFFIXES,
     ClipCandidate,
     ClipVariant,
+    FacecamBox,
     LabeledVideo,
     ManifestClip,
     MusicBed,
@@ -76,6 +77,7 @@ from clipper.review.store import (
     hand_payload,
     overlay_payload,
     pad_payload,
+    parse_cam_box,
     parse_caption_edits,
     parse_combine,
     parse_pad_name,
@@ -153,6 +155,8 @@ _STORY_PATH = re.compile(r"/api/story(?:/(plan|beats|save|trash|thumbnail|sugges
 _COMBINED_PATH = re.compile(r"/api/combined(?:/(save|trash|thumbnail|suggest))?")
 # The folder's pad (ADR 0034): add a piece, or rename or delete one.
 _PAD_PATH = re.compile(r"/api/pad(?:/(p\d{1,4})(?:/(delete))?)?")
+# The folder's cam box set by hand, or the channel's (ADR 0025, 12b).
+_CAM_BOX_PATH = "/api/cam-box"
 _MAX_BODY = 64 * 1024
 # A refused body is read and dropped up to this size before the reply.
 _MAX_DRAIN = 1024 * 1024
@@ -199,6 +203,11 @@ class ReviewSession:
     probe: MediaProbe | None = None
     title_writer: TitleWriter | None = None
     story_writer: StoryWriter | None = None
+    # The video's channel, its cam box saved by hand in `cams_file`, if any
+    # (ADR 0025, 12b amendment).
+    channel: str | None = None
+    channel_cam: FacecamBox | None = None
+    cams_file: Path | None = None
 
 
 def frames_folder(cache_dir: Path, video: Path) -> Path:
@@ -324,6 +333,9 @@ def make_store(session: ReviewSession) -> ReviewStore:
             broll_dir=session.broll_dir,
             probe=session.probe,
             facecam_finder=session.facecam_finder,
+            channel=session.channel,
+            channel_cam=session.channel_cam,
+            cams_file=session.cams_file,
         ),
     )
 
@@ -357,7 +369,7 @@ def clip_payload(
         "hook": clip.hook,
         "screen_hook": clip.screen_hook,
         "file": clip.file,
-        "variants": [_variant(session, v) for v in clip.variants],
+        "variants": [_variant(session, v, store.hand_box) for v in clip.variants],
         "style": clip.variants[0].style if clip.variants else None,
         "error": clip.error,
         "reviewed": clip.reviewed,
@@ -390,7 +402,42 @@ def clips_payload(session: ReviewSession, store: ReviewStore) -> dict[str, objec
         "combined": combined_payload(manifest.combined),
         "story": story_payload(manifest.story),
         "pad": pad_payload(manifest.pad),
+        "cam_box": cam_box_payload(session, store),
     }
+
+
+def cam_box_payload(session: ReviewSession, store: ReviewStore) -> dict[str, object]:
+    """The cam box set by hand (ADR 0025, 12b amendment): `box` the one in
+    use, the folder's else the channel's, with its frame for either cam;
+    `folder` and `saved` say where it is kept, and `channel` names the
+    channel it may be kept for (None: it cannot be)."""
+    box = store.hand_box
+    shown: dict[str, object] = {
+        "box": None if box is None else box.model_dump(),
+        "folder": store.manifest.cam_box is not None,
+        "saved": store.channel_cam is not None,
+        "channel": session.channel if session.cams_file is not None else None,
+    }
+    if box is not None and session.frame_size is not None:
+        shown["layouts"] = _layouts(session.frame_size, box)
+        shown["frame"] = list(session.frame_size)
+    return shown
+
+
+def _layouts(
+    frame_size: tuple[int, int], box: FacecamBox
+) -> dict[str, dict[str, object]]:
+    """The facecam frame for either cam, in the frame's pixels (ADR 0025)."""
+    layouts: dict[str, dict[str, object]] = {}
+    for cam in ("top", "bottom"):
+        layout = plan_facecam(box, *frame_size, cam)
+        layouts[cam] = {
+            "cam": list(layout.cam),
+            "game": list(layout.game),
+            "cam_height": layout.cam_height,
+            "caption_margin_v": facecam_caption_margin(layout),
+        }
+    return layouts
 
 
 def _span_query(session: ReviewSession, query: str) -> tuple[float, float]:
@@ -461,25 +508,19 @@ def captions_payload(session: ReviewSession, query: str) -> dict[str, object]:
     return {"chunks": [[list(word) for word in chunk] for chunk in chunks]}
 
 
-def _variant(session: ReviewSession, variant: ClipVariant) -> dict[str, object]:
+def _variant(
+    session: ReviewSession, variant: ClipVariant, hand_box: FacecamBox | None
+) -> dict[str, object]:
     """A rendered style as the page sees it; a facecam one with its cam and
     its frame for either cam, in the probed frame's pixels, for the preview
-    (ADR 0025, facecam style amendment)."""
+    (ADR 0025, facecam style amendment): from the box set by hand when there
+    is one, as Save would re-render it (12b amendment)."""
     shown: dict[str, object] = {"style": variant.style, "file": variant.file}
     if variant.style != "facecam" or variant.box is None:
         return shown
     shown["cam"] = variant.cam or "top"
     if session.frame_size is not None:
-        layouts = {}
-        for cam in ("top", "bottom"):
-            layout = plan_facecam(variant.box, *session.frame_size, cam)
-            layouts[cam] = {
-                "cam": list(layout.cam),
-                "game": list(layout.game),
-                "cam_height": layout.cam_height,
-                "caption_margin_v": facecam_caption_margin(layout),
-            }
-        shown["layouts"] = layouts
+        shown["layouts"] = _layouts(session.frame_size, hand_box or variant.box)
         shown["frame"] = list(session.frame_size)
     return shown
 
@@ -760,6 +801,9 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
             if (pad := _PAD_PATH.fullmatch(path)) is not None:
                 self._post_pad(pad.group(1), pad.group(2))
                 return
+            if path == _CAM_BOX_PATH:
+                self._post_cam_box()
+                return
             action = _ACTION_PATH.fullmatch(path)
             if path == _ADD_PATH:
                 rank, verb = 0, "add"
@@ -864,6 +908,24 @@ def _handler(session: ReviewSession) -> type[BaseHTTPRequestHandler]:
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
             else:
                 self._send_json(HTTPStatus.OK, {"pad": pad_payload(store.manifest.pad)})
+
+        def _post_cam_box(self) -> None:
+            """Set or clear the cam box by hand, for the folder and maybe the
+            channel; the reply is the whole clips payload, since every
+            facecam frame follows it (ADR 0025, 12b amendment)."""
+            if not self._trusted():
+                self._send_error(HTTPStatus.FORBIDDEN, "Only the review page may write")
+                return
+            try:
+                store.set_cam_box(*parse_cam_box(self._read_json()))
+            except BadRequest as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except JudgingError as exc:
+                self._send_error(HTTPStatus.CONFLICT, str(exc))
+            except (ClipperError, OSError) as exc:
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            else:
+                self._send_json(HTTPStatus.OK, clips_payload(session, store))
 
         def _post_combined(self, verb: str) -> None:
             if not self._trusted():

@@ -4,6 +4,7 @@ import pytest
 
 from clipper.adapters.rendering.fake import FakeClipRenderer
 from clipper.adapters.results.labels_json import load_labels
+from clipper.adapters.results.manifest_json import load_manifest
 from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.core.framing import plan_facecam
 from clipper.domain.errors import JudgingError, ReviewError
@@ -665,6 +666,118 @@ def test_a_bad_cam_in_the_body_is_refused() -> None:
 
     with pytest.raises(BadRequest, match="the cam must be one of top, bottom"):
         parse_save({"start": 1.0, "end": 20.0, "cam": "left"}, 100.0)
+
+
+# The cam box set by hand (ADR 0025, 12b amendment): a corner cam like the
+# one on a Lacy VOD, which the finder missed.
+_HAND = FacecamBox(x=0.0, y=0.0, w=0.255, h=0.255)
+
+
+def _hand_env(
+    tmp_path: Path,
+    clip: ManifestClip | None = None,
+    channel_cam: FacecamBox | None = None,
+) -> Env:
+    env = Env(tmp_path, *((clip,) if clip else ()))
+    finder = FakeFacecamFinder(_FOUND)
+    env.store = ReviewStore(
+        env.folder,
+        env.store.manifest,
+        None,
+        env.labels_path,
+        JsonReviewFiles(),
+        RenderInputs(
+            tmp_path / "talk.mp4",
+            env.renderer,
+            TRANSCRIPT,
+            frame_size=(1920, 1080),
+            facecam_finder=finder,
+            channel="Lacy",
+            channel_cam=channel_cam,
+            cams_file=tmp_path / "cams.txt",
+        ),
+    )
+    return env
+
+
+def test_a_hand_box_makes_facecam_a_style_for_a_clip_drafted_in_fit(
+    tmp_path: Path,
+) -> None:
+    env = _hand_env(tmp_path)
+    env.store.set_cam_box(_HAND, for_channel=False)
+
+    result = env.store.save(1, SaveRequest(10.0, 40.0, None, None, "facecam"))
+
+    assert result.render_error is None
+    assert env.renderer.facecams == [plan_facecam(_HAND, 1920, 1080, "top")]
+    [variant] = result.clip.variants
+    assert (variant.style, variant.box) == ("facecam", _HAND)
+    assert load_manifest(env.folder).cam_box == _HAND
+    assert not (tmp_path / "cams.txt").exists()
+
+
+def test_without_a_hand_box_a_fit_clip_has_no_facecam_to_keep(tmp_path: Path) -> None:
+    env = _hand_env(tmp_path)
+    with pytest.raises(JudgingError, match="no facecam draft"):
+        env.store.save(1, SaveRequest(10.0, 40.0, None, None, "facecam"))
+
+
+def test_a_hand_box_re_renders_a_facecam_draft_framed_on_another_box(
+    tmp_path: Path,
+) -> None:
+    env = _hand_env(tmp_path, _facecam_env(tmp_path / "a").store.manifest.clips[0])
+    (env.folder / "talk_1.facecam.mp4").write_bytes(b"facecam")
+    env.store.set_cam_box(_HAND, for_channel=False)
+
+    result = env.store.save(1, SaveRequest(10.0, 40.0, None, None, "facecam"))
+
+    assert env.renderer.facecams == [plan_facecam(_HAND, 1920, 1080, "top")]
+    assert result.clip.variants[0].box == _HAND
+
+
+def test_a_box_kept_for_the_channel_is_written_to_the_cams_file(
+    tmp_path: Path,
+) -> None:
+    env = _hand_env(tmp_path)
+
+    env.store.set_cam_box(_HAND, for_channel=True)
+
+    assert (tmp_path / "cams.txt").read_text() == "Lacy | 0.0000 0.0000 0.2550 0.2550\n"
+    assert env.store.channel_cam == _HAND
+    env.store.set_cam_box(None, for_channel=True)
+    assert (tmp_path / "cams.txt").read_text() == ""
+    assert env.store.hand_box is None
+
+
+def test_the_channels_box_stands_in_until_the_folder_has_its_own(
+    tmp_path: Path,
+) -> None:
+    env = _hand_env(tmp_path, channel_cam=_HAND)
+    assert env.store.hand_box == _HAND
+    folder_box = FacecamBox(x=0.0, y=0.7, w=0.3, h=0.3)
+    env.store.set_cam_box(folder_box, for_channel=False)
+    assert env.store.hand_box == folder_box
+
+
+def test_a_channel_box_needs_a_channel(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    with pytest.raises(JudgingError, match="no channel"):
+        env.store.set_cam_box(_HAND, for_channel=True)
+    assert env.store.manifest.cam_box is None
+
+
+def test_a_cam_box_body_is_checked() -> None:
+    from clipper.review.store import parse_cam_box
+
+    box = {"x": 0.0, "y": 0.0, "w": 0.255, "h": 0.255}
+    assert parse_cam_box({"box": box, "channel": True}) == (_HAND, True)
+    assert parse_cam_box({"box": None}) == (None, False)
+    with pytest.raises(BadRequest, match="inside the frame"):
+        parse_cam_box({"box": {"x": 0.9, "y": 0.0, "w": 0.2, "h": 0.2}})
+    with pytest.raises(BadRequest, match="at least 5%"):
+        parse_cam_box({"box": {"x": 0.0, "y": 0.0, "w": 0.01, "h": 0.2}})
+    with pytest.raises(BadRequest, match="channel must be"):
+        parse_cam_box({"box": None, "channel": "yes"})
 
 
 def test_a_style_the_clip_lacks_is_refused(tmp_path: Path) -> None:

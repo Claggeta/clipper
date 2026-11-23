@@ -1082,7 +1082,9 @@ class RenderManifest(BaseModel):
     a landscape run or an older manifest. `combined` is the clips joined in
     the review page, if made (ADR 0032), and `story` the VOD's summary in
     beats, planned and perhaps rendered (ADR 0033). `pad` is the ranges
-    kept to drop into clips' sequences (ADR 0034).
+    kept to drop into clips' sequences (ADR 0034). `cam_box` is the facecam
+    box set by hand in the review page, for every clip of the folder (ADR
+    0025, 12b amendment).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -1101,6 +1103,7 @@ class RenderManifest(BaseModel):
     )
     story: Story | None = None
     pad: tuple[PadPiece, ...] = Field(default=(), max_length=MAX_PAD_PIECES)
+    cam_box: FacecamBox | None = None
 
     @model_validator(mode="after")
     def _pad_ids_unique(self) -> "RenderManifest":

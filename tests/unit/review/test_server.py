@@ -1472,6 +1472,62 @@ def test_the_pad_is_listed_added_to_renamed_and_deleted(base_url: str) -> None:
     assert status == 403
 
 
+def test_the_cam_box_is_set_and_cleared_for_the_folder(
+    base_url: str, tmp_path: Path
+) -> None:
+    box = {"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25}
+    shown = json.loads(_get(base_url + "/api/clips")[2])["cam_box"]
+    assert shown == {"box": None, "folder": False, "saved": False, "channel": None}
+
+    status, reply = _post(base_url, "/api/cam-box", {"box": box})
+    assert status == 200
+    assert reply["cam_box"]["box"] == box and reply["cam_box"]["folder"]
+    manifest = json.loads((_folder(tmp_path) / "manifest.json").read_text())
+    assert manifest["cam_box"] == box
+    # This run has no channel to keep it for.
+    status, reply = _post(base_url, "/api/cam-box", {"box": box, "channel": True})
+    assert status == 409 and "no channel" in reply["error"]
+    status, reply = _post(base_url, "/api/cam-box", {"box": None})
+    assert (status, reply["cam_box"]["box"]) == (200, None)
+    assert _post(base_url, "/api/cam-box", {"box": {"x": 2}})[0] == 400
+    status, _ = _post(base_url, "/api/cam-box", {"box": box}, {"Origin": "http://evil"})
+    assert status == 403
+
+
+def test_a_hand_box_frames_the_preview_and_every_facecam_draft(
+    tmp_path: Path,
+) -> None:
+    import dataclasses
+
+    from clipper.domain.models import ClipVariant, FacecamBox
+    from clipper.review.server import clip_payload
+
+    hand = FacecamBox(x=0.0, y=0.0, w=0.25, h=0.25)
+    session = dataclasses.replace(
+        _session(tmp_path),
+        frame_size=(1920, 1080),
+        channel="Lacy",
+        channel_cam=hand,
+        cams_file=tmp_path / "cams.txt",
+    )
+    store = make_store(session)
+    shown = clips_payload(session, store)["cam_box"]
+    assert isinstance(shown, dict)
+    assert (shown["folder"], shown["saved"], shown["channel"]) == (False, True, "Lacy")
+    layouts = shown["layouts"]
+    assert isinstance(layouts, dict)
+    # The gameplay crop starts clear of the cam (12a).
+    assert layouts["top"]["game"][0] >= 0.25 * 1920
+
+    drafted = FacecamBox(x=0.73, y=0.57, w=0.26, h=0.29)
+    variant = ClipVariant(style="facecam", file="talk_1.facecam.mp4", box=drafted)
+    clip = MANIFEST.clips[0].model_copy(update={"variants": (variant,)})
+    variants = clip_payload(session, store, clip)["variants"]
+    assert isinstance(variants, list)
+    [payload] = variants
+    assert payload["layouts"] == layouts
+
+
 def test_broll_files_are_listed_with_lengths_and_only_listed_ones_served(
     tmp_path: Path,
 ) -> None:

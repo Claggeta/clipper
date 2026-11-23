@@ -671,6 +671,35 @@ def parse_pad_name(data: object) -> str:
     return _piece_name(name)
 
 
+def parse_cam_box(data: object) -> tuple[FacecamBox | None, bool]:
+    """Check a cam box body (ADR 0025, 12b amendment): `box` as fractions
+    of the frame (`x`, `y`, `w`, `h`) or null to clear it, and `channel`,
+    true to keep it for the video's channel too."""
+    if not isinstance(data, dict):
+        raise BadRequest("the body must be a JSON object")
+    for_channel = data.get("channel", False)
+    if not isinstance(for_channel, bool):
+        raise BadRequest("channel must be true or false")
+    raw = data.get("box")
+    if raw is None:
+        return None, for_channel
+    if not isinstance(raw, dict):
+        raise BadRequest("box must be an object of x, y, w and h, or null")
+    try:
+        box = FacecamBox.model_validate(raw)
+    except ValidationError as exc:
+        raise BadRequest("box must be x, y, w and h inside the frame") from exc
+    if box.w < MIN_CAM_SIDE or box.h < MIN_CAM_SIDE:
+        raise BadRequest(
+            f"the box must be at least {MIN_CAM_SIDE:.0%} of the frame each way"
+        )
+    return box, for_channel
+
+
+# A hand cam box is at least this share of the frame each way.
+MIN_CAM_SIDE = 0.05
+
+
 def _piece_name(name: str) -> str:
     if "\n" in name or "\r" in name:
         raise BadRequest("a piece's name must be one line")
@@ -740,6 +769,11 @@ class RenderInputs:
     probe: MediaProbe | None = None
     # Finds the cam box for a facecam re-render (ADR 0025).
     facecam_finder: FacecamFinder | None = None
+    # The video's channel, its cam box saved by hand, and the file that
+    # keeps such boxes (ADR 0025, 12b amendment).
+    channel: str | None = None
+    channel_cam: FacecamBox | None = None
+    cams_file: Path | None = None
 
 
 class ReviewStore:
@@ -762,6 +796,33 @@ class ReviewStore:
         self.manifest = manifest
         self.labels = labels
         self._broll_infos: dict[Path, MediaInfo] = {}
+        self.channel_cam = render.channel_cam
+
+    @property
+    def hand_box(self) -> FacecamBox | None:
+        """The cam box set by hand: the folder's, else the channel's (ADR
+        0025, 12b amendment)."""
+        return self.manifest.cam_box or self.channel_cam
+
+    def set_cam_box(self, box: FacecamBox | None, for_channel: bool) -> None:
+        """Set the folder's cam box, or clear it for none; `for_channel`
+        also keeps it (or takes it out) in the cams file for the video's
+        channel. Raises `JudgingError` for a channel run that has none."""
+        with self._lock:
+            if for_channel and (
+                self._render.channel is None or not self._render.cams_file
+            ):
+                raise JudgingError("This video has no channel to keep the cam box for")
+            manifest = self.manifest.model_copy(update={"cam_box": box})
+            self._files.save_manifest(manifest, self._folder)
+            self.manifest = manifest
+            if for_channel:
+                assert self._render.channel is not None
+                assert self._render.cams_file is not None
+                self._files.save_channel_cam(
+                    self._render.cams_file, self._render.channel, box
+                )
+                self.channel_cam = box
 
     def _clip(self, rank: int) -> ManifestClip:
         for clip in self.manifest.clips:
@@ -883,7 +944,14 @@ class ReviewStore:
                 raise JudgingError("The facecam style has no B-roll overlays")
             drafted = _facecam_variant(clip)
             cam = request.cam or (drafted.cam if drafted else None) or "top"
-            needs_render = needs_render or (drafted is not None and drafted.cam != cam)
+            # No facecam draft, or one framed on another box than the hand
+            # box, renders anew (12b amendment).
+            needs_render = (
+                needs_render
+                or drafted is None
+                or drafted.cam != cam
+                or (self.hand_box is not None and drafted.box != self.hand_box)
+            )
         name = clip_file_name(self._render.video, candidate)
         if style is not None:
             name = variant_file_name(name, style)
@@ -1032,6 +1100,9 @@ class ReviewStore:
         styles = [v.style for v in clip.variants]
         if wanted is None:
             return styles[0] if styles else None
+        if wanted == "facecam" and self.hand_box is not None and self.manifest.vertical:
+            # A hand box makes facecam a style for every clip (12b amendment).
+            return wanted
         if wanted not in styles:
             raise JudgingError(f"This clip has no {wanted} draft to keep")
         return wanted
@@ -1183,7 +1254,10 @@ class ReviewStore:
         }
 
     def _facecam_box(self, clip: ManifestClip, candidate: ClipCandidate) -> FacecamBox:
-        """The cam box over the span: found again, else the draft's (ADR 0025)."""
+        """The cam box over the span: the one set by hand, else found again,
+        else the draft's (ADR 0025, facecam style and 12b amendments)."""
+        if self.hand_box is not None:
+            return self.hand_box
         finder, size = self._render.facecam_finder, self._render.frame_size
         if finder is None or size is None:
             raise ReviewError("A facecam re-render needs the finder and frame size")

@@ -202,6 +202,8 @@ class Env:
             monkeypatch.setenv(f"CLIPPER_{name.upper()}_DIR", str(tmp_path / name))
         self.channels = tmp_path / "channels.txt"
         monkeypatch.setenv("CLIPPER_CHANNELS_FILE", str(self.channels))
+        self.cams = tmp_path / "cams.txt"
+        monkeypatch.setenv("CLIPPER_CAMS_FILE", str(self.cams))
         self.monkeypatch = monkeypatch
         self.video = tmp_path / "talk.mp4"
         self.video.write_bytes(b"not a real video")
@@ -509,6 +511,27 @@ def test_no_facecam_box_leaves_only_fit(env: Env) -> None:
     assert "has no facecam box; not rendered in the facecam style" in result.output
     manifest = env.manifest("talk")
     assert [[v.style for v in c.variants] for c in manifest.clips] == [["fit"]] * 2
+
+
+def test_a_cam_box_saved_for_the_channel_is_used_without_looking(env: Env) -> None:
+    # ADR 0025, 12b amendment: every clip gets the facecam style.
+    env.cams.write_text("a channel | 0 0 0.25 0.25\n", encoding="utf-8")
+    env.finder = FakeFacecamFinder(box=False)
+    result = env.run(_URL, "--style", "fit", "--style", "facecam")
+    assert result.exit_code == 0, result.output
+    assert "Cam box (saved for A channel)" in result.output
+    assert env.finder.spans == []
+    manifest = env.manifest("abcDEF123_-")
+    boxes = [c.variants[1].box for c in manifest.clips]
+    assert boxes == [FacecamBox(x=0.0, y=0.0, w=0.25, h=0.25)] * 2
+
+
+def test_a_bad_cams_file_fails_before_any_download(env: Env) -> None:
+    env.cams.write_text("a channel | 0 0\n", encoding="utf-8")
+    result = env.run(_URL, "--style", "fit", "--style", "facecam")
+    assert result.exit_code == 1
+    assert "cams.txt: Line 1: write it as" in result.output.replace("\n", "")
+    assert env.log.stages == []
 
 
 def test_cam_without_the_facecam_style_fails_before_any_download(env: Env) -> None:
