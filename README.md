@@ -256,7 +256,10 @@ the Library: folders under `data/broll/` of saved clips from any video
 (To library copies the current clip in), spliced into another clip whole
 by Insert or a drag onto the Sequence lane
 ([ADR 0035](docs/decisions/0035-clip-library.md)). A `facecam` draft gets a cam toggle (top or
-bottom). While Trash is armed, keys `1` to `5` record why. Most actions have a key (`?` lists
+bottom). For a cam the finder misses, "Draw cam box" in the Frame tab:
+drag a box over the cam on the source, save it for the folder (and, with
+Keep ticked, in `data/cams.txt` for the channel's next videos), and every
+clip offers Facecam. While Trash is armed, keys `1` to `5` record why. Most actions have a key (`?` lists
 them), and after Save or Trash the page moves on to the next clip without a
 verdict. `Combine` joins the saved clips into one longer Short with
 optional "Hour N" cards and music, and `Summarize video` has the local model

@@ -212,14 +212,15 @@ function drawFit(context, width, height, media = player, size = null) {
 }
 
 // The facecam frame for the cam picked, in the probed frame's pixels, or
-// null when the style is not facecam (ADR 0025, facecam style amendment).
+// null when the style is not facecam (ADR 0025, facecam style amendment);
+// from the cam box set by hand when there is one (12b amendment).
 function facecamFrame(clip) {
-  const drafted = isVertical && chosenStyle(clip) === "facecam" ? facecamDraft(clip) : null;
-  if (!drafted || !drafted.layouts) {
+  const found = isVertical && chosenStyle(clip) === "facecam" ? facecamLayouts(clip) : null;
+  if (!found) {
     return null;
   }
   const cam = camOf(clip);
-  return { ...drafted.layouts[cam], frame: drafted.frame, position: cam };
+  return { ...found.layouts[cam], frame: found.frame, position: cam };
 }
 
 // The cam box across the width at its own shape, over (or under) a centre

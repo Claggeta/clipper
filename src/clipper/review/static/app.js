@@ -61,6 +61,9 @@ let folderCombined = null;
 let folderStoryAtLoad = null;
 // The folder's pad as loaded, for pad.js (ADR 0034).
 let padAtLoad = null;
+// The cam box set by hand, as the server last sent it (ADR 0025, 12b):
+// {box, folder, saved, channel, layouts, frame}; cambox.js keeps it.
+let folderCamBox = null;
 // Names this video in frame URLs, so the browser's cache of frames never
 // mixes VODs (every run is served from the same address).
 let framesKey = "";
@@ -903,6 +906,17 @@ function facecamDraft(clip) {
   return (clip.variants || []).find((variant) => variant.style === "facecam") || null;
 }
 
+// The facecam frame for either cam and the frame's size: from the cam box
+// set by hand when there is one, as Save renders it (12b amendment), else
+// from the clip's facecam draft; null with neither.
+function facecamLayouts(clip) {
+  if (isVertical && folderCamBox && folderCamBox.box && folderCamBox.layouts) {
+    return { layouts: folderCamBox.layouts, frame: folderCamBox.frame };
+  }
+  const drafted = facecamDraft(clip);
+  return drafted && drafted.layouts ? { layouts: drafted.layouts, frame: drafted.frame } : null;
+}
+
 // Where the facecam style puts the cam: the one picked, else the draft's.
 function camOf(clip) {
   const drafted = facecamDraft(clip);
@@ -918,7 +932,7 @@ function camChanged(clip) {
 // Top or bottom, while the facecam style is picked.
 function drawCams(clip) {
   camBox.replaceChildren();
-  camBox.hidden = chosenStyle(clip) !== "facecam" || !facecamDraft(clip);
+  camBox.hidden = chosenStyle(clip) !== "facecam" || !facecamLayouts(clip);
   if (camBox.hidden) {
     return;
   }
@@ -939,6 +953,18 @@ function drawCams(clip) {
 function drawDraft(clip) {
   const options = draftsOf(clip);
   hasDraft = options.length > 0;
+  // A cam box set by hand offers facecam on a clip drafted without it; the
+  // Draft view keeps showing the file there is, and Save renders it (12b).
+  if (
+    hasDraft &&
+    isVertical &&
+    folderCamBox &&
+    folderCamBox.box &&
+    options[0].style &&
+    !facecamDraft(clip)
+  ) {
+    options.push({ style: "facecam", file: null });
+  }
   drawScreen();
   styleBox.replaceChildren();
   const none = document.getElementById("styles-none");
@@ -967,7 +993,8 @@ function drawDraft(clip) {
     }
   }
   drawCams(clip);
-  const src = `/clips/${encodeURIComponent(shown.file)}?v=${versions.get(clip.key) || 0}`;
+  const file = shown.file || options.find((option) => option.file).file;
+  const src = `/clips/${encodeURIComponent(file)}?v=${versions.get(clip.key) || 0}`;
   if (draft.getAttribute("src") !== src) {
     draft.setAttribute("src", src);
   }
@@ -1853,6 +1880,7 @@ async function load() {
   folderCombined = data.combined || null;
   folderStoryAtLoad = data.story || null;
   padAtLoad = data.pad || [];
+  folderCamBox = data.cam_box || null;
   const flags = document.getElementById("flags");
   for (const name of ["vertical", "captions", "titles"]) {
     if (data[name]) {
