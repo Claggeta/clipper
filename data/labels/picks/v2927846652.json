@@ -37,7 +37,38 @@
       "rating": "good",
       "people": [
         "Jason"
-      ]
+      ],
+      "cuts": [
+        {
+          "start": "0:50:35.89",
+          "end": "0:50:36.35"
+        },
+        {
+          "start": "0:50:43.25",
+          "end": "0:50:44.59"
+        },
+        {
+          "start": "0:50:50.83",
+          "end": "0:50:51.37"
+        },
+        {
+          "start": "0:51:00.93",
+          "end": "0:51:01.65"
+        },
+        {
+          "start": "0:51:03.75",
+          "end": "0:51:04.17"
+        },
+        {
+          "start": "0:51:09.33",
+          "end": "0:51:09.65"
+        }
+      ],
+      "caption_edits": {
+        "fixes": [],
+        "keys": [],
+        "highlight": "orange"
+      }
     },
     {
       "start": "1:03:00.89",
@@ -89,9 +120,50 @@
       "note": "Interesting Story. A big collab with another large streamer"
     },
     {
+      "start": "1:13:01.77",
+      "end": "1:14:19.77",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:13:01.77",
+        "end": "1:13:24.65"
+      },
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Jason"
+      ],
+      "note": "Not exciting but an interesting story. I would cut some parts in the middle"
+    },
+    {
       "start": "1:20:16.56",
       "end": "1:20:58.1",
       "verdict": "post"
+    },
+    {
+      "start": "1:23:42.6",
+      "end": "1:24:27.34",
+      "verdict": "fix",
+      "draft": {
+        "start": "1:23:42.6",
+        "end": "1:24:10.2"
+      },
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Jason"
+      ],
+      "note": "Need to be cut longer. Not super exciting but interesting conversation"
+    },
+    {
+      "start": "1:25:33.52",
+      "end": "1:26:00.52",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "people": [
+        "Jason"
+      ],
+      "note": "I would combine with clip 8 and then edit those combined clips down to one good clip"
     },
     {
       "start": "1:53:33.06",
@@ -100,9 +172,19 @@
       "style": "fit",
       "rating": "ok",
       "note": "Funny short clip. Not much else besides the comedic fall."
+    },
+    {
+      "start": "2:20:21.02",
+      "end": "2:20:37.5",
+      "verdict": "post"
     }
   ],
   "rejected": [
+    {
+      "start": "0:06:42.22",
+      "end": "0:07:09.99",
+      "reason": "nothing_happening"
+    },
     {
       "start": "0:07:50.27",
       "end": "0:08:15.56"
@@ -120,8 +202,18 @@
       "end": "1:02:14.57"
     },
     {
+      "start": "1:40:29.5",
+      "end": "1:40:48.53",
+      "reason": "other"
+    },
+    {
       "start": "2:59:15.93",
       "end": "2:59:56.12"
+    },
+    {
+      "start": "4:19:43.42",
+      "end": "4:20:00.86",
+      "reason": "nothing_happening"
     }
   ]
 }

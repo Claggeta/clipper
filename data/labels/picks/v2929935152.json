@@ -1,0 +1,42 @@
+{
+  "source": "v2929935152.mp4",
+  "labels": [
+    {
+      "start": "2:06:48.43",
+      "end": "2:07:06.35",
+      "verdict": "added",
+      "rating": "good",
+      "cuts": [
+        {
+          "start": "2:06:53.14",
+          "end": "2:06:53.46"
+        },
+        {
+          "start": "2:06:58.42",
+          "end": "2:06:58.78"
+        },
+        {
+          "start": "2:07:02.06",
+          "end": "2:07:02.62"
+        }
+      ],
+      "audio": {
+        "gain_db": 0.0,
+        "music": null,
+        "effects": [
+          {
+            "file": "fahhh-pump-sound.mp3",
+            "at_seconds": 7613.85,
+            "level_db": -4.0
+          },
+          {
+            "file": "vine-boom.mp3",
+            "at_seconds": 7622.86,
+            "level_db": 0.0
+          }
+        ]
+      },
+      "note": "interesting new game. Intense speed and \"death\" make it more entertaining"
+    }
+  ]
+}

@@ -14,6 +14,14 @@
       "note": "Ok clip. Not super funny and not a lot of context"
     },
     {
+      "start": "2:01:15.07",
+      "end": "2:01:40.09",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "Funny conversation"
+    },
+    {
       "start": "2:04:13.44",
       "end": "2:04:55.36",
       "verdict": "post",
@@ -24,6 +32,26 @@
         "Adapt"
       ],
       "note": "Not a lot of context. little humor."
+    },
+    {
+      "start": "2:21:57.43",
+      "end": "2:22:14.19",
+      "verdict": "post",
+      "style": "fit",
+      "rating": "ok",
+      "note": "On its own I wouldn't post but I would take this clip and then combine it with another clip later of someone eating the food."
+    },
+    {
+      "start": "3:08:53.73",
+      "end": "3:09:22.57",
+      "verdict": "fix",
+      "draft": {
+        "start": "3:08:56.01",
+        "end": "3:09:22.57"
+      },
+      "style": "fit",
+      "rating": "ok",
+      "note": "The clip needed to start earlier."
     }
   ],
   "rejected": [
@@ -44,6 +72,11 @@
       "end": "0:51:11.95"
     },
     {
+      "start": "0:58:07.68",
+      "end": "0:58:30.19",
+      "reason": "other"
+    },
+    {
       "start": "1:08:33.49",
       "end": "1:09:11.75"
     },
@@ -56,8 +89,18 @@
       "end": "2:11:06.1"
     },
     {
+      "start": "4:01:15.01",
+      "end": "4:01:33.65",
+      "reason": "nothing_happening"
+    },
+    {
       "start": "4:16:59.11",
       "end": "4:17:38.69"
+    },
+    {
+      "start": "4:24:05.02",
+      "end": "4:24:24.79",
+      "reason": "nothing_happening"
     }
   ]
 }
