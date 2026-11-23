@@ -792,6 +792,10 @@ a JavaScript framework or build step for the page, and any dependency
 that fails ADR 0003's check (frame embeddings only after cheap signals
 show something, and only without PyTorch if it can be avoided).
 
+`v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
+V8 is not closed: the assistant (item 2), the visual spike (3b) and
+7b's target length are still open.
+
 ## Maintainer's goals
 
 As stated: a personal tool, used daily and eventually mostly unattended, that
@@ -961,6 +965,13 @@ All merged to `main` with green CI:
   after titles, no emoji in titles; the finer LLM score and the letterbox
   fix measured and not adopted. Released as `v0.7.0` (pre-release, tag on
   b5d8f2a). Notes are in `docs/releases/v0.7.0.md`.
+- V8 so far: `clipper performance` (Studio import), a screen hook and
+  pauses cut in `drafts`, `clipper resolve` (DaVinci Resolve hand-off),
+  one bar, a bin and a clip library in `review`, six click fixes, the
+  Parked fixes in item 5; shorter windows, a cold open and the ranker
+  rerun measured and not adopted. Released as `v0.8.0` (pre-release, tag
+  on 217d3c6). Notes are in `docs/releases/v0.8.0.md`. Items 2, 3b and
+  7b's target length stay open.
 
 In progress:
 
@@ -1883,7 +1894,9 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
 
    Item 9 is done: one bar #280, the bin #282, the library #284 and
    #285.
-10. Release notes and tag `v0.8.0`.
+10. ~~Release notes and tag `v0.8.0`.~~ (done; notes #296, F1 run
+    2026-11-20 and again 2026-11-23 on ffmpeg 9.0.2 before tagging, tag
+    `v0.8.0` on 217d3c6 and pre-release by the maintainer)
 
 Later, not scheduled:
 
