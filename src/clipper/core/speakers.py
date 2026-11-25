@@ -54,7 +54,10 @@ def link_faces(track: FaceTrack) -> list[list[tuple[float, FaceBox]]]:
 # sample, each face's scores are averaged over SCORE_WINDOW seconds around
 # it, and the face with the highest average is the speaker when that average
 # is above 0 and at least MIN_LEAD above the next face's. Otherwise no one
-# clearly is, and `face` frames as it did without speakers.
+# clearly is: the last clear speaker stays the speaker while that face is
+# still seen, and before anyone or after it leaves, `face` frames as it did
+# without speakers. Falling back on every unclear sample made a moment's
+# near-tie jump to the largest face, which split the shot like a cut.
 SCORE_WINDOW = 0.5
 MIN_LEAD = 0.5
 
@@ -63,9 +66,10 @@ def speaker_boxes(track: FaceTrack, speakers: SpeakerTrack) -> list[FaceBox | No
     """The talking face's box at each of `track`'s samples, or None."""
     half_sample = 0.5 / track.samples_per_second
     found: list[FaceBox | None] = []
+    last: int | None = None  # the last clear speaker, by index in `faces`
     for sample in track.samples:
-        heard: list[tuple[float, FaceBox]] = []
-        for face in speakers.faces:
+        heard: list[tuple[float, int, FaceBox]] = []
+        for index, face in enumerate(speakers.faces):
             near = min(
                 zip(face.seconds, face.boxes, strict=True),
                 key=lambda pair: abs(pair[0] - sample.seconds),
@@ -81,12 +85,17 @@ def speaker_boxes(track: FaceTrack, speakers: SpeakerTrack) -> list[FaceBox | No
             )
             scores = face.scores[max(low, 0) : max(high + 1, 0)]
             if scores:
-                heard.append((sum(scores) / len(scores), near[1]))
-        heard.sort(key=lambda pair: pair[0], reverse=True)
+                heard.append((sum(scores) / len(scores), index, near[1]))
+        heard.sort(key=lambda entry: entry[0], reverse=True)
         clear = heard and heard[0][0] > 0
         if clear and len(heard) > 1:
             clear = heard[0][0] - heard[1][0] >= MIN_LEAD
-        found.append(heard[0][1] if clear else None)
+        if clear:
+            last = heard[0][1]
+            found.append(heard[0][2])
+            continue
+        held = [box for _, index, box in heard if index == last]
+        found.append(held[0] if held else None)
     return found
 
 

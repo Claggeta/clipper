@@ -561,6 +561,24 @@ had to guess (its listener-framed two-shot).
   middle person talks 0 to 0% (1); 44 to 69% over all. About 20 s more per
   `face` clip, cached. Manual step R20a.
 
+## Amended by holding the last speaker (after V8 item 13b-2)
+
+Found by the maintainer in R20a on 5pk8HLcAAT0 rank 8: about 7 s in, the
+window framed half the speaker, between the two hosts. One sample (0.2 s)
+had no clear speaker, a near-tie; falling back to the largest face jumped
+to the other host, which split the shot like a camera cut, and the new
+shot's one position mixed the speaker with the next shot's face, a second
+before the video's own cut.
+
+- When no one is clearly talking, the last clear speaker stays the
+  subject while that face is still seen (it has scores at the sample);
+  only before anyone has clearly talked, or once that face is gone, does
+  `face` fall back to the largest face.
+- Rank 8 now moves only at the video's cut (8.7 s). On item 11's 14
+  single-speaker stretches the speaker is on screen 73% of the time (69%
+  before the fix, 44% without speakers): podcast 99%, seated IRL 84%,
+  handheld Lacy 46 to 58%.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

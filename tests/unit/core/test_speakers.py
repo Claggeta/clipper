@@ -124,28 +124,34 @@ def test_scores_are_averaged_around_each_sample() -> None:
 
     # 0.5 s around 10.4 s is frames 4 to 16, and around 10.6 s frames 9 to
     # 21: each holds all 5 frames at 3.0, a mean above 0; 10.2 s holds 2.
-    assert found == [None, None, face, face, None]
+    # At 10.8 s it is held as the last speaker.
+    assert found == [None, None, face, face, face]
 
 
-def test_a_face_not_seen_at_a_sample_or_past_its_scores_is_left_out() -> None:
-    face = box(0.3)
-    late = talking(face, 10.4, [1.0] * 15, samples=3)
-    short = talking(face, 10.0, [1.0] * 3)
+def test_the_last_speaker_is_held_through_a_moment_without_a_clear_one() -> None:
+    left, right = box(0.1), box(0.6)
+    # Left talks, nearly ties with the right at 10.4 s, then talks again.
+    left_scores = [1.0] * 8 + [0.3] * 9 + [1.0] * 8
+    right_scores = [-1.0] * 8 + [0.2] * 9 + [-1.0] * 8
 
-    assert speaker_boxes(track(*[(face,)] * 5), speakers(late)) == [
-        None,
-        None,
-        face,
-        face,
-        face,
-    ]
-    assert speaker_boxes(track(*[(face,)] * 5), speakers(short)) == [
-        face,
-        face,
-        None,
-        None,
-        None,
-    ]
+    found = speaker_boxes(
+        track(*[(left, right)] * 5),
+        speakers(talking(left, 10.0, left_scores), talking(right, 10.0, right_scores)),
+    )
+
+    assert found == [left] * 5
+
+
+def test_a_held_speaker_is_let_go_once_out_of_sight() -> None:
+    left, right = box(0.1), box(0.6)
+    # Left talks, then leaves the shot; the right face never talks.
+    gone = talking(left, 10.0, [1.0] * 10, samples=2)
+    there = talking(right, 10.0, [-1.0] * 25)
+    faces = track(*[(left, right)] * 2, *[(right,)] * 3)
+
+    found = speaker_boxes(faces, speakers(gone, there))
+
+    assert found == [left, left, None, None, None]
 
 
 class FailingScorer:
