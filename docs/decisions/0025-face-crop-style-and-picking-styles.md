@@ -425,11 +425,60 @@ committed.
   Facecam offered on a fit-only clip and saved in it (11 s, the whole cam
   over gameplay clear of it), no page errors. Manual step RV42.
 
+## Amended by the speaker detection spike (V8 item 11)
+
+The `face` style frames the largest face, which is sometimes the listener
+(the locked framing amendment). Spiked on 35 stretches of 3 to 10 s with
+two faces at least 10% of the frame tall, from cached face tracks of four
+VODs: a podcast (5pk8HLcAAT0), two CORE IRL videos and a handheld Lacy
+IRL stream. The maintainer marked who talks in each (left, right, both or
+neither): 14 single-speaker stretches, 20 both, 1 neither. Bar set before
+the run: the marked speaker on 80% of single-speaker stretches and better
+than the largest face on 3 of 4 VODs.
+
+| Method | Right of 14 | Podcast | 3Sbj_BZORr4 | ANoZNWQXYZ4 | Lacy |
+|---|---|---|---|---|---|
+| Light-ASD | 11 | 4 of 4 | 4 of 4 | 0 of 1 | 3 of 5 |
+| Lip opening against loudness | 10 | 3 of 4 | 2 of 4 | 1 of 1 | 4 of 5 |
+| Largest face (current) | 6 | 2 of 4 | 2 of 4 | 0 of 1 | 2 of 5 |
+| Face nearer the centre | 6 | | | | |
+
+- Lip opening: MediaPipe Face Landmarker's inner lips at 15 fps, the
+  best correlation with loudness within 0.2 s, the higher of the two
+  faces. Built by hand first, as the item ordered.
+- Light-ASD (Liao et al., CVPR 2023; MIT; 1.02M parameters, weights in
+  its repository, 94.1% mAP on AVA-ActiveSpeaker): its demo pipeline
+  with YuNet in place of S3FD, every face in the frame found at 25 fps,
+  IoU tracks, 112 px grey crops and MFCC, scores per frame. PyTorch on
+  the CPU (about 120 MB), a few minutes for all 35 stretches.
+- Light-ASD is sure on seated footage: 8 of 8 on the podcast and seated
+  IRL, the speaker about +1.2 and the listener about -1.6 on the
+  podcast. It is weak on the handheld crowd stream: scores near 0, a face
+  broken into 13 to 27 tracks by the moving camera; two of its misses
+  are stretches the maintainer called hard to judge. Its third miss
+  (ANoZNWQXYZ4 16) scored an unmarked middle person highest, who the
+  maintainer noted does most of the talking.
+- Scoring every face mattered: several stretches' speaker was a third
+  face outside the two compared, which Light-ASD scored and lip opening
+  could not.
+- On "both" stretches, both faces usually score as talking for part of
+  the time: the per-frame scores follow turns.
+
+Decision (the maintainer's, 2026-11-25): adopted for seated setups
+(podcasts, seated IRL), the bar missed by one stretch on a small sample;
+the maintainer uses `face` mostly for podcasts, not handheld streams.
+Light-ASD becomes the speaker signal for `face`, in later items, each
+designed first: first whether it runs through ONNX (`onnxruntime`, ADR
+0003's check), so Clipper does not take PyTorch; then `face` framing the
+speaker. Handheld crowd footage keeps the largest face. Scratch scripts
+in `D:\Clippett\spikes\speaker\`, not committed.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it
   there.
-- `face` frames the wrong person often: try speaker detection.
+- `face` frames the wrong person often: try speaker detection (spiked
+  in V8 item 11, adopted for seated setups).
 - Facecam clips are a large share of the posts: build the split.
 
 ## Related

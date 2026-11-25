@@ -391,6 +391,12 @@ and planned code:
   `POST /api/cam-box`; facecam on any clip once a hand box is set.
   Page amendment (12b-2): Draw cam box in the Frame tab over the source
   picture, Keep for the channel, `static/cambox.js`; RV42.
+  Speaker spike amendment (V8 11, adopted for seated setups): 35
+  stretches marked by the maintainer on four VODs, 14 single-speaker;
+  Light-ASD (MIT, CPU) 11, lip opening against loudness 10, the largest
+  face 6; 8 of 8 on the podcast and seated IRL, weak on a handheld crowd
+  stream; every face scored. Next: Light-ASD through ONNX, then `face`
+  framing the speaker.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -796,7 +802,7 @@ enough, `good` picks in the top few ranks.
 Non-goals for V8: performance as a training target and retraining (ADR
 0026's later stages), posting or uploads, the YouTube or Twitch APIs,
 OAuth or logins, hosted or paid models or tools (DaVinci Resolve's free
-edition only), speaker detection beyond item 11's spike, the movies/TV
+edition only), speaker detection beyond items 11 and 13, the movies/TV
 niche, a URL box in the review page, channel watching or scheduling, a
 database, user accounts, a JavaScript framework or build step for the
 page, and any dependency that fails ADR 0003's check (frame embeddings
@@ -804,8 +810,9 @@ only after cheap signals show something, and only without PyTorch if it
 can be avoided).
 
 `v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
-V8 is not closed: the assistant (item 2) and 7b's target length are
-still open; the visual spike (3b) ended in nothing on 2026-11-23. Items 11 (a speaker detection spike,
+V8 is not closed: the assistant (item 2), 7b's target length and item
+13 are still open; the visual spike (3b) ended in nothing on 2026-11-23,
+and the speaker spike (11) was adopted for seated setups on 2026-11-25. Items 11 (a speaker detection spike,
 after 3b) and 12 (facecam fixes) were added on 2026-11-23.
 
 ## Maintainer's goals
@@ -1950,7 +1957,7 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
 10. ~~Release notes and tag `v0.8.0`.~~ (done; notes #296, F1 run
     2026-11-20 and again 2026-11-23 on ffmpeg 9.0.2 before tagging, tag
     `v0.8.0` on 217d3c6 and pre-release by the maintainer)
-11. Speaker detection spike (added 2026-11-23, the maintainer's choice;
+11. ~~Speaker detection spike (added 2026-11-23, the maintainer's choice;
     after 3b): which face on screen is talking, for the `face` style's
     listener-framed two-shot (ADR 0025) and a possible podcast split.
     The speaker marked by hand on stretches of 3 to 5 podcast or IRL
@@ -1961,7 +1968,12 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
     Light-ASD) only if both fall short. Measured as the share of
     stretches with the right face. New dependencies through ADR 0003's
     check. Ends in an ADR 0025 amendment or in nothing; code, if any, is
-    later items, each designed first.
+    later items, each designed first.~~ (done 2026-11-25; adopted for
+    seated setups: on 14 single-speaker stretches marked by the
+    maintainer, Light-ASD 11, lip opening 10, the largest face 6; 8 of 8
+    on the podcast and seated IRL, weak on a handheld crowd stream; the
+    trained model was tried after lip opening, skipping diarization;
+    ADR 0025 amendment; no code)
 12. Facecam fixes (added 2026-11-23, found by the maintainer on a Lacy
     VOD, v2937465519: a borderless cam in the frame's top-left corner;
     1 of 10 drafts got a facecam variant, its box stopped at an edge
@@ -1981,6 +1993,17 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
       real borders where the box meets a frame corner, interior edges
       not winning), against boxes marked by hand on VODs with and
       without a cam. May end in nothing.
+
+13. Speaker framing for `face` (added 2026-11-25, after item 11; the
+    maintainer uses `face` mostly for podcasts), in PRs, each designed
+    first, ADR 0025 amendments:
+    - 13a. Light-ASD through ONNX: export its audio and visual parts,
+      check scores match PyTorch's on item 11's stretches, and ADR
+      0003's check for `onnxruntime`; may end in needing PyTorch, which
+      goes back to the maintainer.
+    - 13b. Faces tracked and scored per clip (cached like face tracks),
+      and `face` framing the speaker in seated footage, holding through
+      short turns; handheld footage keeps the largest face. Manual step.
 
 Later, not scheduled:
 
@@ -2002,7 +2025,7 @@ Later, not scheduled:
   two-shot with the speaker side-on); mouth movement at 5 samples a
   second did not tell them apart. Needs an audio-visual model; after
   13e's picks show how often `face` loses to `fit` for it. Scheduled as
-  a V8 item 11 spike.
+  a V8 item 11 spike; adopted for seated setups, built as V8 item 13.
 - The facecam split (ADR 0025): find a fixed facecam box per clip, measured
   first, and stack it above or below the gameplay. After V5 item 13e's
   picks show how often facecam clips are posted. Scheduled as V7 item 6;
