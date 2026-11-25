@@ -1,7 +1,23 @@
+from pathlib import Path
+
 import pytest
 
-from clipper.core.speakers import link_faces, overlap
-from clipper.domain.models import FaceBox, FaceSample, FaceTrack
+from clipper.core.speakers import (
+    MIN_LEAD,
+    SCORE_WINDOW,
+    link_faces,
+    overlap,
+    score_speakers,
+    speaker_boxes,
+)
+from clipper.domain.errors import FaceError
+from clipper.domain.models import (
+    FaceBox,
+    FaceSample,
+    FaceTrack,
+    SpeakerTrack,
+    TalkingFace,
+)
 
 
 def box(x: float, y: float = 0.2, side: float = 0.2) -> FaceBox:
@@ -57,3 +73,101 @@ def test_a_short_gap_is_bridged_and_a_long_one_ends_the_track() -> None:
 def test_tracks_of_two_detections_or_fewer_are_dropped() -> None:
     assert link_faces(track((box(0.3),), (box(0.3),))) == []
     assert link_faces(track((), (), ())) == []
+
+
+def talking(
+    face: FaceBox, start: float, scores: list[float], samples: int = 5
+) -> TalkingFace:
+    return TalkingFace(
+        seconds=tuple(start + i / 5 for i in range(samples)),
+        boxes=(face,) * samples,
+        frames_per_second=25,
+        scores=tuple(scores),
+    )
+
+
+def speakers(*faces: TalkingFace) -> SpeakerTrack:
+    return SpeakerTrack(
+        source="talk.mp4", start_seconds=10.0, end_seconds=11.0, faces=faces
+    )
+
+
+def test_settings_match_adr_0025() -> None:
+    assert (SCORE_WINDOW, MIN_LEAD) == (0.5, 0.5)
+
+
+def test_the_speaker_is_the_face_clearly_ahead() -> None:
+    left, right = box(0.1), box(0.6)
+    faces = track(*[(left, right)] * 5)
+
+    ahead = speaker_boxes(
+        faces,
+        speakers(talking(left, 10.0, [1.0] * 25), talking(right, 10.0, [0.0] * 25)),
+    )
+    close = speaker_boxes(
+        faces,
+        speakers(talking(left, 10.0, [0.6] * 25), talking(right, 10.0, [0.3] * 25)),
+    )
+    silent = speaker_boxes(faces, speakers(talking(left, 10.0, [-0.5] * 25)))
+
+    assert ahead == [left] * 5
+    assert close == [None] * 5
+    assert silent == [None] * 5
+
+
+def test_scores_are_averaged_around_each_sample() -> None:
+    face = box(0.3)
+    # Talking only in frames 10 to 14, around the sample at 10.4 s.
+    scores = [-1.0] * 10 + [3.0] * 5 + [-1.0] * 10
+
+    found = speaker_boxes(track(*[(face,)] * 5), speakers(talking(face, 10.0, scores)))
+
+    # 0.5 s around 10.4 s is frames 4 to 16, and around 10.6 s frames 9 to
+    # 21: each holds all 5 frames at 3.0, a mean above 0; 10.2 s holds 2.
+    assert found == [None, None, face, face, None]
+
+
+def test_a_face_not_seen_at_a_sample_or_past_its_scores_is_left_out() -> None:
+    face = box(0.3)
+    late = talking(face, 10.4, [1.0] * 15, samples=3)
+    short = talking(face, 10.0, [1.0] * 3)
+
+    assert speaker_boxes(track(*[(face,)] * 5), speakers(late)) == [
+        None,
+        None,
+        face,
+        face,
+        face,
+    ]
+    assert speaker_boxes(track(*[(face,)] * 5), speakers(short)) == [
+        face,
+        face,
+        None,
+        None,
+        None,
+    ]
+
+
+class FailingScorer:
+    def score(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> SpeakerTrack:
+        raise FaceError("no audio")
+
+
+class EmptyScorer:
+    def score(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> SpeakerTrack:
+        return speakers()
+
+
+def test_score_speakers_says_why_when_it_cannot() -> None:
+    assert score_speakers(FailingScorer(), Path("talk.mp4"), 0.0, 1.0) == (
+        None,
+        "no audio",
+    )
+    assert score_speakers(EmptyScorer(), Path("talk.mp4"), 0.0, 1.0) == (
+        speakers(),
+        None,
+    )

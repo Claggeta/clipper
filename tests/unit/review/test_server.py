@@ -34,7 +34,9 @@ from clipper.domain.models import (
     ManifestClip,
     RenderManifest,
     Segment,
+    SpeakerTrack,
     StoryNote,
+    TalkingFace,
     Transcript,
     Word,
 )
@@ -1226,6 +1228,75 @@ def test_crop_payload_frames_the_span_as_a_re_render_would(tmp_path: Path) -> No
         "frame": [1920, 1080],
     }
     assert tracker.spans == [(60.0, 90.0)]
+
+
+class TwoShotTracker:
+    """Two faces of a size, too far apart to share the window."""
+
+    faces = (
+        FaceBox(x=0.1, y=0.2, w=0.05, h=0.3, score=0.9),
+        FaceBox(x=0.8, y=0.2, w=0.05, h=0.3, score=0.9),
+    )
+
+    def track(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> FaceTrack:
+        return FaceTrack(
+            source=video_path.name,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            samples_per_second=5.0,
+            samples=tuple(
+                FaceSample(seconds=start_seconds + i / 5, faces=self.faces)
+                for i in range(15)
+            ),
+        )
+
+
+class RightTalks:
+    """The right face of the two-shot talks; `fail` raises."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+
+    def score(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> SpeakerTrack:
+        if self.fail:
+            raise FaceError("no audio")
+        seconds = tuple(start_seconds + i / 5 for i in range(15))
+        return SpeakerTrack(
+            source=video_path.name,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            faces=tuple(
+                TalkingFace(
+                    seconds=seconds,
+                    boxes=(box,) * 15,
+                    frames_per_second=25,
+                    scores=(score,) * 75,
+                )
+                for box, score in zip(TwoShotTracker.faces, (-1.5, 1.2), strict=True)
+            ),
+        )
+
+
+def test_crop_payload_frames_the_speaker(tmp_path: Path) -> None:
+    session = dataclasses.replace(
+        _session(tmp_path),
+        face_tracker=TwoShotTracker(),
+        frame_size=(1920, 1080),
+        speaker_scorer=RightTalks(),
+    )
+    failing = dataclasses.replace(session, speaker_scorer=RightTalks(fail=True))
+
+    talking = crop_payload(session, "start=60&end=90")
+    unscored = crop_payload(failing, "start=60&end=90")
+
+    # The right face's centre is 1584; without speakers, the left one's.
+    assert talking["crop"] == {"width": 608, "height": 1080, "points": [[0.0, 1280]]}
+    assert unscored["crop"] == {"width": 608, "height": 1080, "points": [[0.0, 0]]}
+    assert make_store(session)._render.speaker_scorer is session.speaker_scorer
 
 
 def test_crop_payload_without_a_face_says_so(tmp_path: Path) -> None:

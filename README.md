@@ -124,10 +124,11 @@ This renders every candidate. Options:
   whole frame, scaled to fit the width, centred on a blurred copy of itself.
   Nothing is cut off. Black bars built into the source stay in the picture.
   Captions are drawn on the vertical frame. `--style face` crops a
-  full-height 9:16 window that follows the largest face instead (faces
-  found with OpenCV, cached under the cache dir); a clip with no face is
-  skipped with a note. It suits podcasts and webcam streams; on groups it
-  cuts people out. `--style facecam` is for gaming streams with a cam box:
+  full-height 9:16 window on a face instead (faces found with OpenCV,
+  cached under the cache dir): the person talking, found with the bundled
+  Light-ASD model, when two people are too far apart to frame together,
+  else the largest face; a clip with no face is skipped with a note. It
+  suits podcasts and webcam streams; on groups it cuts people out. `--style facecam` is for gaming streams with a cam box:
   the box is found from the footage (a still face inside a bordered box)
   and stacked over a centre crop of the gameplay, or under it with `--cam
   bottom`. A clip with no box found renders in `fit`, with a note. A box
@@ -206,8 +207,8 @@ model stating the stakes or a question, at the top for its first 3 seconds
 clip, as `review`'s Cut silence would, unless that would remove over 35%
 of it (a moment seen rather than said); `--no-cut-pauses` keeps clips
 whole. Each clip comes in two styles to pick from: `<name>.mp4` fits the
-whole frame, and `<name>.face.mp4` crops on the largest face (a clip with no
-face gets only the first). `--style fit` or `--style face` renders one;
+whole frame, and `<name>.face.mp4` crops on the person talking (a clip with
+no face gets only the first). `--style fit` or `--style face` renders one;
 `--style facecam` (repeat `--style` for several) adds the gaming stream
 layout above.
 Give several sources, or `--list sources.txt` (one per line, `#` for

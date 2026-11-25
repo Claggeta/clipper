@@ -26,6 +26,11 @@ from clipper.adapters.media.ffprobe import FfprobeMediaProbe
 from clipper.adapters.media.frames import FfmpegFrameExtractor
 from clipper.adapters.media.peaks import FfmpegPeaksExtractor
 from clipper.adapters.media.remux import FfmpegRemuxer
+from clipper.adapters.media.speakers import (
+    SCORER_NAME,
+    CachingSpeakerScorer,
+    OpenCvSpeakerScorer,
+)
 from clipper.adapters.rendering.ffmpeg import FfmpegClipRenderer
 from clipper.adapters.results.review_files import JsonReviewFiles
 from clipper.adapters.titles.ollama import OllamaTitleWriter
@@ -45,6 +50,7 @@ from clipper.core.interfaces import (
     PeaksExtractor,
     Remuxer,
     ReviewFiles,
+    SpeakerScorer,
     StoryWriter,
     TitleWriter,
     Transcriber,
@@ -101,6 +107,16 @@ def build_face_tracker(settings: Settings) -> FaceTracker:
     """Compose the face tracker, cached per span under the cache dir (ADR 0025)."""
     return CachingFaceTracker(
         OpenCvFaceTracker(), settings.cache_dir / "faces", TRACKER_NAME
+    )
+
+
+def build_speaker_scorer(settings: Settings) -> SpeakerScorer:
+    """Compose the speaker scorer over the cached face tracker, cached per span
+    under the cache dir (ADR 0025, speaker scorer amendment)."""
+    return CachingSpeakerScorer(
+        OpenCvSpeakerScorer(build_face_tracker(settings)),
+        settings.cache_dir / "speakers",
+        SCORER_NAME,
     )
 
 
@@ -180,6 +196,7 @@ class AppContext:
     frames: Callable[[], FrameExtractor] = build_frames
     peaks: Callable[[], PeaksExtractor] = build_peaks
     face_tracker: Callable[[Settings], FaceTracker] = build_face_tracker
+    speaker_scorer: Callable[[Settings], SpeakerScorer] = build_speaker_scorer
     facecam_finder: Callable[[Settings], FacecamFinder] = build_facecam_finder
     review_files: Callable[[], ReviewFiles] = build_review_files
     title_writer: Callable[[Settings], TitleWriter] = build_title_writer

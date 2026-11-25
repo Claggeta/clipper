@@ -404,7 +404,12 @@ and planned code:
   `TalkingFace`; faces from the cached 5 fps tracks (`link_faces` in
   `core/speakers.py`), `OpenCvSpeakerScorer` and a cache under
   `<cache dir>/speakers/`; 12 of 14 on item 11's stretches, 8 of 8
-  seated.
+  seated. Speaker framing amendment (13b-2): the face clearly talking
+  (scores over 0.5 s, above 0, 0.5 ahead) is the subject when a close
+  pair does not fit, else the largest face; switches move as cuts,
+  `MIN_HOLD` holds through replies; `render`, `drafts` and `review`; a
+  scorer failure is a note; the speaker on screen 44 to 69% of item 11's
+  stretches (podcast 50 to 99%); R20a.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -818,8 +823,8 @@ only after cheap signals show something, and only without PyTorch if it
 can be avoided).
 
 `v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
-V8 is not closed: the assistant (item 2), 7b's target length and item
-13 are still open; the visual spike (3b) ended in nothing on 2026-11-23,
+V8 is not closed: the assistant (item 2) and 7b's target length are
+still open, and item 13 (speaker framing) landed on 2026-11-25; the visual spike (3b) ended in nothing on 2026-11-23,
 and the speaker spike (11) was adopted for seated setups on 2026-11-25. Items 11 (a speaker detection spike,
 after 3b) and 12 (facecam fixes) were added on 2026-11-23.
 
@@ -2017,10 +2022,13 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
       cached 5 fps face tracks can replace detection on every frame,
       measured; unit tests.~~ (done; cached tracks kept every seated
       pick, 12 of 14 on item 11's stretches; ADR 0025 amendment)
-    - 13b-2. `face` framing the speaker in seated footage, holding
+    - 13b-2. ~~`face` framing the speaker in seated footage, holding
       through short turns (minimum turn set from item 11's stretches),
       the largest face when no one talks; handheld footage (many short
-      tracks) keeps the largest face. Manual step.
+      tracks) keeps the largest face. Manual step.~~ (done; no new turn
+      length, the 2 s hold does it; handheld footage falls back by its
+      own near-0 scores, no separate check; the speaker on screen 44 to
+      69% of item 11's stretches, podcast 50 to 99%; manual step R20a)
 
 Later, not scheduled:
 

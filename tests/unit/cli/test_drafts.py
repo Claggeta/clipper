@@ -33,6 +33,7 @@ from clipper.domain.models import (
     RenderManifest,
     RenderOverlay,
     Segment,
+    SpeakerTrack,
     Transcript,
     VideoInfo,
     VideoSource,
@@ -172,6 +173,24 @@ class FakeFaceTracker:
         )
 
 
+class FakeSpeakerScorer:
+    """No one scored as talking, so `face` frames as before; `fail` raises."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.spans: list[tuple[float, float]] = []
+        self._fail = fail
+
+    def score(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> SpeakerTrack:
+        self.spans.append((start_seconds, end_seconds))
+        if self._fail:
+            raise FaceError("ffmpeg failed (exit 1): no audio")
+        return SpeakerTrack(
+            source=video_path.name, start_seconds=start_seconds, end_seconds=end_seconds
+        )
+
+
 class FakeTitleWriter:
     abouts: list[str | None] = []
 
@@ -232,6 +251,7 @@ class Env:
             ),
             video_info=lambda s: FakeVideoInfo(),
             face_tracker=lambda s: self.tracker,
+            speaker_scorer=lambda s: FakeSpeakerScorer(),
             facecam_finder=lambda s: self.finder,
         )
         if real_title_writer:
@@ -243,6 +263,7 @@ class Env:
                 downloader=context.downloader,
                 video_info=context.video_info,
                 face_tracker=context.face_tracker,
+                speaker_scorer=context.speaker_scorer,
                 facecam_finder=context.facecam_finder,
             )
         return context

@@ -104,6 +104,7 @@ from clipper.core.sources import (
     video_info_path,
     video_path,
 )
+from clipper.core.speakers import score_speakers
 from clipper.domain.errors import (
     ClipperError,
     ClipRenderError,
@@ -787,6 +788,7 @@ def _cut_clips(
     renderer = build.renderer(settings)
     face_only = styles == (VerticalStyle.FACE,)
     tracker = build.face_tracker(settings) if VerticalStyle.FACE in styles else None
+    scorer = build.speaker_scorer(settings) if tracker is not None else None
     finder = build.facecam_finder(settings) if VerticalStyle.FACECAM in styles else None
     saved_box: FacecamBox | None = None
     if finder is not None:
@@ -834,7 +836,20 @@ def _cut_clips(
                 failures.append(f"#{number} {span} (face): {escape(str(exc))}")
             else:
                 assert media.width is not None and media.height is not None
-                crop = plan_face_crop(track, media.width, media.height)
+                assert scorer is not None
+                # Without speakers the largest face is framed, as before
+                # (ADR 0025, speaker framing amendment).
+                speakers, why = score_speakers(
+                    scorer, video, candidate.start_seconds, candidate.end_seconds
+                )
+                if why is not None:
+                    console.print(
+                        f"[yellow]Note:[/yellow] #{number} {span}: speakers not "
+                        f"found ({escape(why)}); the face style frames the "
+                        "largest face",
+                        soft_wrap=True,
+                    )
+                crop = plan_face_crop(track, media.width, media.height, speakers)
                 if crop is None:
                     console.print(
                         f"[yellow]Note:[/yellow] #{number} {span} has no face in "
@@ -1524,6 +1539,7 @@ def review(
             renderer=build.renderer(settings),
             transcript=transcript,
             face_tracker=build.face_tracker(settings),
+            speaker_scorer=build.speaker_scorer(settings),
             facecam_finder=build.facecam_finder(settings),
             frame_size=(info.width, info.height)
             if info.width is not None and info.height is not None
