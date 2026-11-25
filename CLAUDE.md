@@ -409,7 +409,9 @@ and planned code:
   pair does not fit, else the largest face; switches move as cuts,
   `MIN_HOLD` holds through replies; `render`, `drafts` and `review`; a
   scorer failure is a note; the speaker on screen 44 to 69% of item 11's
-  stretches (podcast 50 to 99%); R20a.
+  stretches (podcast 50 to 99%); R20a. Hold amendment (R20a): an unclear
+  moment keeps the last speaker while that face is seen, as a near-tie
+  sample had jumped to the largest face and split the shot; 73%.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged

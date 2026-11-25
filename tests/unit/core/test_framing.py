@@ -180,6 +180,15 @@ def test_a_reply_shorter_than_the_minimum_hold_does_not_move_it() -> None:
     assert _spoken(track, left, right) == [(0.0, 0)]
 
 
+def test_a_moment_without_a_clear_speaker_does_not_split_the_shot() -> None:
+    # Found on a podcast: a fifth of a second's near-tie jumped to the other
+    # face, which split the shot and framed half the speaker.
+    track = _track(*[_TWO_SHOT] * 25)
+    left = [1.0] * 12 + [0.3] + [1.0] * 12
+    right = [-1.0] * 12 + [0.2] + [-1.0] * 12
+    assert _spoken(track, left, right) == [(0.0, 0)]
+
+
 def test_no_clear_speaker_frames_the_largest_face() -> None:
     track = _track(*[_TWO_SHOT] * 15)
     # Close scores (crosstalk, a handheld crowd) and silence.
