@@ -400,6 +400,11 @@ and planned code:
   `MaxPool3d` swapped for an equal `MaxPool2d`) runs in OpenCV's DNN,
   same picks and scores within 3e-6 of PyTorch on item 11's stretches;
   no PyTorch, no new package; MFCC and median filter in numpy.
+  Speaker scorer amendment (13b-1): `SpeakerScorer`, `SpeakerTrack` and
+  `TalkingFace`; faces from the cached 5 fps tracks (`link_faces` in
+  `core/speakers.py`), `OpenCvSpeakerScorer` and a cache under
+  `<cache dir>/speakers/`; 12 of 14 on item 11's stretches, 8 of 8
+  seated.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -2005,12 +2010,13 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
       0003's check for `onnxruntime`; may end in needing PyTorch, which
       goes back to the maintainer.~~ (done; OpenCV's DNN runs the
       export, same picks, no new package; ADR 0025 amendment)
-    - 13b-1. The scorer: `light_asd.onnx` in the package with its MIT
+    - 13b-1. ~~The scorer: `light_asd.onnx` in the package with its MIT
       licence, a `SpeakerScorer` Protocol in `core/` and an OpenCV
       adapter tracking and scoring every face in a span, cached under
       `<cache dir>/speakers/`; MFCC and median filter in numpy; whether
       cached 5 fps face tracks can replace detection on every frame,
-      measured; unit tests.
+      measured; unit tests.~~ (done; cached tracks kept every seated
+      pick, 12 of 14 on item 11's stretches; ADR 0025 amendment)
     - 13b-2. `face` framing the speaker in seated footage, holding
       through short turns (minimum turn set from item 11's stretches),
       the largest face when no one talks; handheld footage (many short
