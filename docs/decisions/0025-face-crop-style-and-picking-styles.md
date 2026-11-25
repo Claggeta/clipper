@@ -473,6 +473,33 @@ designed first: first whether it runs through ONNX (`onnxruntime`, ADR
 speaker. Handheld crowd footage keeps the largest face. Scratch scripts
 in `D:\Clippett\spikes\speaker\`, not committed.
 
+## Amended by Light-ASD through ONNX (V8 item 13a)
+
+Light-ASD runs in Clipper without PyTorch and without a new dependency:
+its ONNX export runs in OpenCV's DNN module, which already runs YuNet.
+
+- The export: one 4.1 MB file, `audio` (1, 4T, 13) MFCC at 100 a second
+  and `video` (1, T, 112, 112) grey face crops at 25 fps in, `score`
+  (T,) out (the audio-visual head's speaking logit), time dynamic, opset
+  17, PyTorch's TorchScript exporter. The audio encoder applies
+  `MaxPool3d` (kernel (1, 1, 3)) to a 4D tensor, which ONNX refuses;
+  `MaxPool2d((1, 3), (1, 2), (0, 1))` over the last two axes computes the
+  same and is swapped in before export. The recipe needs PyTorch and
+  stays out of the repository (scratch `export_onnx.py`).
+- Checked against the PyTorch model: random inputs within 4e-6;
+  item 11's 35 stretches through `onnxruntime` gave the same 331 face
+  tracks and every pick, mean scores within 2e-6; OpenCV 5.0's DNN
+  matched `onnxruntime` within 3e-6 on 1, 2 and 6 s inputs.
+- Time: 360 s on the CPU for item 11's 274 s of stretches, most of it
+  YuNet on every frame at 25 fps; whether the cached 5 fps face tracks
+  can stand in is measured in 13b-1.
+- Light-ASD's demo also uses `python_speech_features` (MFCC) and
+  `scipy` (a median filter); both are written in numpy instead, the MFCC
+  pinned by a unit test against values the library produces.
+- So no ADR 0003 check: no new package. The model is kept in the package
+  beside YuNet with its MIT licence (13b-1), as the face tracking
+  amendment did.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it
