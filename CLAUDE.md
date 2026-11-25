@@ -396,7 +396,10 @@ and planned code:
   Light-ASD (MIT, CPU) 11, lip opening against loudness 10, the largest
   face 6; 8 of 8 on the podcast and seated IRL, weak on a handheld crowd
   stream; every face scored. Next: Light-ASD through ONNX, then `face`
-  framing the speaker.
+  framing the speaker. ONNX amendment (13a): a 4.1 MB export (one
+  `MaxPool3d` swapped for an equal `MaxPool2d`) runs in OpenCV's DNN,
+  same picks and scores within 3e-6 of PyTorch on item 11's stretches;
+  no PyTorch, no new package; MFCC and median filter in numpy.
 - `0026` — learning: judged labels are the first training signal, YouTube
   performance only after a report on linked posts shows it adds something.
   In stages, each may end in nothing: the maintainer's titles and judged
@@ -1997,13 +2000,21 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
 13. Speaker framing for `face` (added 2026-11-25, after item 11; the
     maintainer uses `face` mostly for podcasts), in PRs, each designed
     first, ADR 0025 amendments:
-    - 13a. Light-ASD through ONNX: export its audio and visual parts,
+    - 13a. ~~Light-ASD through ONNX: export its audio and visual parts,
       check scores match PyTorch's on item 11's stretches, and ADR
       0003's check for `onnxruntime`; may end in needing PyTorch, which
-      goes back to the maintainer.
-    - 13b. Faces tracked and scored per clip (cached like face tracks),
-      and `face` framing the speaker in seated footage, holding through
-      short turns; handheld footage keeps the largest face. Manual step.
+      goes back to the maintainer.~~ (done; OpenCV's DNN runs the
+      export, same picks, no new package; ADR 0025 amendment)
+    - 13b-1. The scorer: `light_asd.onnx` in the package with its MIT
+      licence, a `SpeakerScorer` Protocol in `core/` and an OpenCV
+      adapter tracking and scoring every face in a span, cached under
+      `<cache dir>/speakers/`; MFCC and median filter in numpy; whether
+      cached 5 fps face tracks can replace detection on every frame,
+      measured; unit tests.
+    - 13b-2. `face` framing the speaker in seated footage, holding
+      through short turns (minimum turn set from item 11's stretches),
+      the largest face when no one talks; handheld footage (many short
+      tracks) keeps the largest face. Manual step.
 
 Later, not scheduled:
 
