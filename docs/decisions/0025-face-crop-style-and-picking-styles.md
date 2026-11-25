@@ -500,6 +500,38 @@ its ONNX export runs in OpenCV's DNN module, which already runs YuNet.
   beside YuNet with its MIT licence (13b-1), as the face tracking
   amendment did.
 
+## Amended by the speaker scorer (V8 item 13b-1)
+
+- `SpeakerScorer` in `core/interfaces.py`: `score(video, start, end)`
+  gives a `SpeakerTrack` of `TalkingFace`s, each a face's detections
+  (`seconds`, `boxes`) and Light-ASD's `scores` at 25 a second from its
+  first detection, above 0 talking. Raises `FaceError`.
+- Faces come from the `FaceTracker` (its cached 5 fps samples), not a
+  second detection on every frame: on item 11's stretches, detecting
+  every fifth frame kept every seated pick and took 206 s against 360 s.
+  `link_faces` in `core/speakers.py` follows them as Light-ASD's demo
+  does: more than half overlap (IoU) with the last box, gaps up to 0.4 s,
+  tracks of more than 0.4 s of detections.
+- `OpenCvSpeakerScorer` in `adapters/media/speakers.py`: boxes filled in
+  at 25 fps and median-smoothed over 13 frames, ffmpeg's frames at
+  1280x720 cropped as the demo (0.40 crop scale, 224 then the middle 112,
+  grey) while they decode, the span's audio at 16 kHz, MFCC in numpy
+  (`python_speech_features`' defaults, pinned by a test), scores averaged
+  over windows of 1 to 6 s, in OpenCV's DNN; the last frame or so of a
+  face has no score, as in the demo. `light_asd.onnx` (4.1 MB) beside
+  YuNet with `LICENSE-light-asd` (MIT); an integration test pins its
+  scores on fixed inputs.
+- `CachingSpeakerScorer`: one JSON file per span under
+  `<cache dir>/speakers/<stem>-<size>/`, named for the model and the face
+  tracker, as the face cache.
+- On item 11's 35 stretches through Clipper's tracker: 12 of 14
+  single-speaker stretches right (the spike 11), 8 of 8 seated; 228 s for
+  274 s of footage, face tracking included. Picks that differ from the
+  spike are handheld or "both" stretches; Clipper's face threshold is 0.8
+  where the spike's was 0.7.
+- Not yet used by any command: `face` framing the speaker is 13b-2, which
+  adds the builder to `AppContext`.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

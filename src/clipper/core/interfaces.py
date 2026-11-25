@@ -19,6 +19,7 @@ from clipper.domain.models import (
     RenderedClip,
     RenderManifest,
     RenderOverlay,
+    SpeakerTrack,
     StoryNote,
     Transcript,
     VideoInfo,
@@ -280,6 +281,20 @@ class FaceTracker(Protocol):
     def track(
         self, video_path: Path, start_seconds: float, end_seconds: float
     ) -> FaceTrack: ...
+
+
+@runtime_checkable
+class SpeakerScorer(Protocol):
+    """Follows every face across one span of a video and scores, frame by
+    frame, whether each is talking.
+
+    Raises `FaceError` on failure (see docs/decisions/0025, speaker scorer
+    amendment).
+    """
+
+    def score(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> SpeakerTrack: ...
 
 
 @runtime_checkable

@@ -180,6 +180,48 @@ class FaceTrack(BaseModel):
         return self
 
 
+class TalkingFace(BaseModel):
+    """One face followed through part of a span, and whether it is talking.
+
+    `seconds` and `boxes` are the face's detections, in time order. `scores`
+    are Light-ASD's speaking scores, `frames_per_second` of them from
+    `seconds[0]`: above 0 talking, below 0 not. See docs/decisions/0025.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    seconds: tuple[float, ...] = Field(min_length=1)
+    boxes: tuple[FaceBox, ...] = Field(min_length=1)
+    frames_per_second: float = Field(gt=0)
+    scores: tuple[float, ...]
+
+    @model_validator(mode="after")
+    def _a_box_per_detection(self) -> "TalkingFace":
+        if len(self.seconds) != len(self.boxes):
+            raise ValueError("seconds and boxes must be the same length")
+        return self
+
+
+class SpeakerTrack(BaseModel):
+    """The faces in one span of a video, each with its speaking scores.
+
+    `source` is the video's file name. See docs/decisions/0025.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str = Field(min_length=1)
+    start_seconds: float = Field(ge=0)
+    end_seconds: float
+    faces: tuple[TalkingFace, ...] = ()
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> "SpeakerTrack":
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("end_seconds must be greater than start_seconds")
+        return self
+
+
 class MediaInfo(BaseModel):
     """Facts about a media file, as reported by a probe.
 
