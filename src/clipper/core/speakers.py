@@ -1,4 +1,8 @@
-from clipper.domain.models import FaceBox, FaceTrack
+from pathlib import Path
+
+from clipper.core.interfaces import SpeakerScorer
+from clipper.domain.errors import FaceError
+from clipper.domain.models import FaceBox, FaceTrack, SpeakerTrack
 
 # Light-ASD's demo tracker (ADR 0025, speaker scorer amendment): a face
 # continues a track when it overlaps the track's last box by more than half
@@ -44,3 +48,54 @@ def link_faces(track: FaceTrack) -> list[list[tuple[float, FaceBox]]]:
             return sorted(found, key=lambda faces: faces[0][0])
         if len(current) > min_detections:
             found.append(current)
+
+
+# Who `face` frames (ADR 0025, speaker framing amendment): at each face
+# sample, each face's scores are averaged over SCORE_WINDOW seconds around
+# it, and the face with the highest average is the speaker when that average
+# is above 0 and at least MIN_LEAD above the next face's. Otherwise no one
+# clearly is, and `face` frames as it did without speakers.
+SCORE_WINDOW = 0.5
+MIN_LEAD = 0.5
+
+
+def speaker_boxes(track: FaceTrack, speakers: SpeakerTrack) -> list[FaceBox | None]:
+    """The talking face's box at each of `track`'s samples, or None."""
+    half_sample = 0.5 / track.samples_per_second
+    found: list[FaceBox | None] = []
+    for sample in track.samples:
+        heard: list[tuple[float, FaceBox]] = []
+        for face in speakers.faces:
+            near = min(
+                zip(face.seconds, face.boxes, strict=True),
+                key=lambda pair: abs(pair[0] - sample.seconds),
+            )
+            if abs(near[0] - sample.seconds) > half_sample + 1e-6:
+                continue
+            first = face.seconds[0]
+            low = round(
+                (sample.seconds - SCORE_WINDOW / 2 - first) * face.frames_per_second
+            )
+            high = round(
+                (sample.seconds + SCORE_WINDOW / 2 - first) * face.frames_per_second
+            )
+            scores = face.scores[max(low, 0) : max(high + 1, 0)]
+            if scores:
+                heard.append((sum(scores) / len(scores), near[1]))
+        heard.sort(key=lambda pair: pair[0], reverse=True)
+        clear = heard and heard[0][0] > 0
+        if clear and len(heard) > 1:
+            clear = heard[0][0] - heard[1][0] >= MIN_LEAD
+        found.append(heard[0][1] if clear else None)
+    return found
+
+
+def score_speakers(
+    scorer: SpeakerScorer, video_path: Path, start_seconds: float, end_seconds: float
+) -> tuple[SpeakerTrack | None, str | None]:
+    """The span's speakers, or None and why not: `face` then frames the
+    largest face, as before speakers (ADR 0025)."""
+    try:
+        return scorer.score(video_path, start_seconds, end_seconds), None
+    except FaceError as exc:
+        return None, str(exc)

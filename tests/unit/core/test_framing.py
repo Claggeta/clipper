@@ -17,6 +17,8 @@ from clipper.domain.models import (
     FacecamBox,
     FaceSample,
     FaceTrack,
+    SpeakerTrack,
+    TalkingFace,
 )
 
 # Constructed tracks on a 1920x1080 frame, 5 samples a second: the window is
@@ -124,6 +126,71 @@ def test_a_much_smaller_or_distant_second_face_is_not_paired() -> None:
     assert _points(_track(*[small] * 15)) == [(0.0, 496)]
     # Too far apart to share the window: the largest (here the first) is kept.
     assert _points(_track(*[distant] * 15)) == [(0.0, 0)]
+
+
+def _speakers(track: FaceTrack, *talk: list[float]) -> SpeakerTrack:
+    """Each sample's i-th face scored `talk[i][sample]` for its 5 frames."""
+    faces = []
+    for i, scores in enumerate(talk):
+        faces.append(
+            TalkingFace(
+                seconds=tuple(sample.seconds for sample in track.samples),
+                boxes=tuple(sample.faces[i] for sample in track.samples),
+                frames_per_second=25,
+                scores=tuple(score for score in scores for _ in range(5)),
+            )
+        )
+    return SpeakerTrack(
+        source="talk.mp4",
+        start_seconds=track.start_seconds,
+        end_seconds=track.end_seconds,
+        faces=tuple(faces),
+    )
+
+
+def _spoken(track: FaceTrack, *talk: list[float]) -> list[tuple[float, int]]:
+    crop = plan_face_crop(track, W, H, _speakers(track, *talk))
+    assert crop is not None
+    return list(crop.points)
+
+
+# Two faces of a size, too far apart to share the window: a podcast two-shot.
+_TWO_SHOT = (_face(300), _face(1600))
+
+
+def test_the_face_talking_is_framed_when_the_pair_does_not_fit() -> None:
+    track = _track(*[_TWO_SHOT] * 15)
+    assert _spoken(track, [-1.5] * 15, [1.2] * 15) == [(0.0, 1296)]
+
+
+def test_a_speaker_switch_moves_the_window_like_a_cut() -> None:
+    track = _track(*[_TWO_SHOT] * 40)
+    left = [1.0] * 20 + [-1.0] * 20
+    right = [-1.0] * 20 + [1.0] * 20
+    # At 4.0 s the averaged scores nearly tie; from 4.2 s the right face is
+    # clearly talking, and the move comes half a sample early, as a cut.
+    assert _spoken(track, left, right) == [(0.0, 0), (4.1, 1296)]
+
+
+def test_a_reply_shorter_than_the_minimum_hold_does_not_move_it() -> None:
+    track = _track(*[_TWO_SHOT] * 40)
+    reply = [False] * 15 + [True] * 5 + [False] * 20
+    left = [-1.0 if r else 1.0 for r in reply]
+    right = [1.0 if r else -1.0 for r in reply]
+    assert _spoken(track, left, right) == [(0.0, 0)]
+
+
+def test_no_clear_speaker_frames_the_largest_face() -> None:
+    track = _track(*[_TWO_SHOT] * 15)
+    # Close scores (crosstalk, a handheld crowd) and silence.
+    assert _spoken(track, [0.2] * 15, [0.4] * 15) == [(0.0, 0)]
+    assert _spoken(track, [-1.0] * 15, [-0.8] * 15) == [(0.0, 0)]
+
+
+def test_a_pair_that_fits_is_still_framed_together() -> None:
+    pair = (_face(800, height=0.3), _face(1200, height=0.25))
+    track = _track(*[pair] * 15)
+    assert _spoken(track, [-1.5] * 15, [1.2] * 15) == [(0.0, 696)]
 
 
 def test_the_window_never_leaves_the_frame() -> None:

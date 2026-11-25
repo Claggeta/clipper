@@ -29,7 +29,7 @@ from pydantic import ValidationError
 
 from clipper.core.captions import caption_chunks, preview_layout
 from clipper.core.cuts import find_pauses
-from clipper.core.framing import facecam_caption_margin, plan_face_crop, plan_facecam
+from clipper.core.framing import facecam_caption_margin, plan_facecam
 from clipper.core.interfaces import (
     ClipRenderer,
     FacecamFinder,
@@ -38,6 +38,7 @@ from clipper.core.interfaces import (
     MediaProbe,
     PeaksExtractor,
     ReviewFiles,
+    SpeakerScorer,
     StoryWriter,
     TitleWriter,
 )
@@ -74,6 +75,7 @@ from clipper.review.store import (
     block_payload,
     combined_payload,
     edits_payload,
+    frame_faces,
     hand_payload,
     overlay_payload,
     pad_payload,
@@ -193,6 +195,8 @@ class ReviewSession:
     transcript: Transcript | None
     face_tracker: FaceTracker | None = None
     frame_size: tuple[int, int] | None = None
+    # Who is talking, for the face style (ADR 0025, speaker framing).
+    speaker_scorer: SpeakerScorer | None = None
     people: tuple[str, ...] = ()
     # Finds the cam box for a facecam re-render (ADR 0025, facecam style).
     facecam_finder: FacecamFinder | None = None
@@ -337,6 +341,7 @@ def make_store(session: ReviewSession) -> ReviewStore:
             channel=session.channel,
             channel_cam=session.channel_cam,
             cams_file=session.cams_file,
+            speaker_scorer=session.speaker_scorer,
         ),
     )
 
@@ -535,8 +540,14 @@ def crop_payload(session: ReviewSession, query: str) -> dict[str, object]:
     start, end = _span_query(session, query)
     if session.face_tracker is None or session.frame_size is None:
         raise ReviewError("This run cannot find faces to frame")
-    track = session.face_tracker.track(session.video, start, end)
-    crop = plan_face_crop(track, *session.frame_size)
+    crop = frame_faces(
+        session.face_tracker,
+        session.speaker_scorer,
+        session.video,
+        start,
+        end,
+        session.frame_size,
+    )
     if crop is None:
         return {"crop": None, "note": "No face in this span; it is framed as fit."}
     return {

@@ -532,6 +532,35 @@ its ONNX export runs in OpenCV's DNN module, which already runs YuNet.
 - Not yet used by any command: `face` framing the speaker is 13b-2, which
   adds the builder to `AppContext`.
 
+## Amended by speaker framing (V8 item 13b-2)
+
+`face` frames the face that is talking where the locked framing amendment
+had to guess (its listener-framed two-shot).
+
+- The subject at each 5 fps sample: a close pair of similar faces that
+  fits the window, as before; else the face clearly talking; else the
+  largest face, as before. "Clearly talking" (`speaker_boxes` in
+  `core/speakers.py`): each face's Light-ASD scores averaged over 0.5 s
+  around the sample (`SCORE_WINDOW`), the highest above 0 and at least
+  0.5 (`MIN_LEAD`) above the next face's. Silence, crosstalk and the
+  near-0 scores of handheld crowd footage fall back to the largest face,
+  so no separate seated or handheld check.
+- No new timing: a switch between speakers is a jump like a camera cut,
+  and `MIN_HOLD` (2 s) keeps short replies from moving the window. The
+  averaging moves a switch about a sample after the turn.
+- `plan_face_crop(track, width, height, speakers=None)`; with no speakers
+  it frames as before. `render` and `drafts` score each `face` clip's span
+  (`AppContext.speaker_scorer`, cached under `<cache dir>/speakers/`); a
+  scorer failure, such as no audio stream, is a note and frames the
+  largest face, never a clip failure. `review` passes the scorer to Save's
+  face re-render and `/api/crop` (`frame_faces` in `review/store.py`),
+  logging a failure.
+- On item 11's 14 single-speaker stretches, the marked speaker inside the
+  window: podcast 50 to 99% of the time (4), seated IRL 48 to 84% (4),
+  handheld Lacy 46 to 46% (5, falling back), the ANoZNWQXYZ4 stretch whose
+  middle person talks 0 to 0% (1); 44 to 69% over all. About 20 s more per
+  `face` clip, cached. Manual step R20a.
+
 ## Revisit when
 
 - Picks show `face` rarely chosen on a kind of video: skip rendering it

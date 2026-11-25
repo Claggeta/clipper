@@ -1233,6 +1233,30 @@ cropped frame. The third run is faster, its faces read from the cache. The
 fourth exits 1 with `Error: --style face needs --vertical`. Record the
 times and anything framed badly.
 
+### R20a. `--style face` frames whoever is talking
+
+Covers speaker framing ([ADR 0025](decisions/0025-face-crop-style-and-picking-styles.md),
+speaker scorer and speaker framing amendments). The tests fake the speaker
+scorer, so nothing in CI runs Light-ASD on real footage. Use the podcast
+5pk8HLcAAT0 (two hosts, a two-shot too wide for one window), with R19's
+`Invoke-Titles` helper.
+
+```powershell
+$Pod = "data\videos\5pk8HLcAAT0.mp4"; $PodJson = "data\output\5pk8HLcAAT0.json"
+Measure-Command { Invoke-Titles $Pod $PodJson "--rank 8 --vertical --style face --captions" @{ CLIPPER_CLIPS_DIR = "$S\clips-r20a" } }
+Measure-Command { Invoke-Titles $Pod $PodJson "--rank 8 --vertical --style face --captions" @{ CLIPPER_CLIPS_DIR = "$S\clips-r20a" } }
+Get-ChildItem "data\cache\speakers" -Recurse -Filter *.json | Select-Object -Last 2 Name, Length
+```
+
+Pass: both runs exit 0 with `(vertical, face, captions)` and no
+`speakers not found` note. Watch the clip with sound: when one host talks
+for a few seconds, the window shows that host, cutting to the other
+when the turn passes; a "yeah" or a laugh under 2 s does not move it.
+Where both talk over each other, it stays put. The second run is faster,
+its faces and speakers read from the cache; the speaker cache gains a
+file for the span. Record the times, and any stretch where the window
+shows the listener while the other host talks.
+
 ### R21. A sequence: blocks reordered and repeated, in one encode
 
 Covers the sequence core ([ADR 0034](decisions/0034-sequence-track-and-pad.md),

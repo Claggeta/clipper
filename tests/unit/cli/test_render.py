@@ -30,6 +30,7 @@ from clipper.domain.models import (
     OnScreenText,
     RenderManifest,
     Segment,
+    SpeakerTrack,
     Transcript,
     VideoInfo,
     Word,
@@ -874,12 +875,57 @@ class FakeFaceTracker:
         )
 
 
+class FakeSpeakerScorer:
+    """No one scored as talking, so `face` frames as before; `fail` raises."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.spans: list[tuple[float, float]] = []
+        self._fail = fail
+
+    def score(
+        self, video_path: Path, start_seconds: float, end_seconds: float
+    ) -> SpeakerTrack:
+        self.spans.append((start_seconds, end_seconds))
+        if self._fail:
+            raise FaceError("ffmpeg failed (exit 1): no audio")
+        return SpeakerTrack(
+            source=video_path.name, start_seconds=start_seconds, end_seconds=end_seconds
+        )
+
+
 _SIZED = MediaInfo(duration_seconds=100.0, has_video=True, width=1920, height=1080)
 
 
-def _use_faces(env: Env, tracker: FakeFaceTracker, info: MediaInfo = _SIZED) -> None:
+def _use_faces(
+    env: Env,
+    tracker: FakeFaceTracker,
+    info: MediaInfo = _SIZED,
+    scorer: FakeSpeakerScorer | None = None,
+) -> None:
     env.use_probe(FakeProbe(info))
-    env.context = dataclasses.replace(env.context, face_tracker=lambda s: tracker)
+    speakers = scorer or FakeSpeakerScorer()
+    env.context = dataclasses.replace(
+        env.context, face_tracker=lambda s: tracker, speaker_scorer=lambda s: speakers
+    )
+
+
+def test_the_face_style_scores_speakers_over_the_same_span(env: Env) -> None:
+    scorer = FakeSpeakerScorer()
+    _use_faces(env, FakeFaceTracker(), scorer=scorer)
+    result = env.run("--vertical", "--style", "face", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert scorer.spans == [(10.0, 20.0)]
+    assert "speakers not found" not in result.output
+
+
+def test_speakers_not_found_is_a_note_and_frames_the_largest_face(env: Env) -> None:
+    _use_faces(env, FakeFaceTracker(), scorer=FakeSpeakerScorer(fail=True))
+    result = env.run("--vertical", "--style", "face", "--rank", "1")
+    assert result.exit_code == 0, result.output
+    assert "speakers not found (ffmpeg failed (exit 1): no audio)" in result.output
+    assert env.renderer.crops == [
+        CropPath(width=608, height=1080, points=((0.0, 656),))
+    ]
 
 
 def test_the_face_style_renders_a_crop_on_the_face(env: Env) -> None:

@@ -1,13 +1,16 @@
 import statistics
 from collections.abc import Sequence
 
+from clipper.core.speakers import speaker_boxes
 from clipper.domain.models import (
     CamPosition,
     CropPath,
+    FaceBox,
     FacecamBox,
     FacecamLayout,
     FaceTrack,
     HandCropPlan,
+    SpeakerTrack,
 )
 
 # A hand crop in the cut clip's seconds: start, end, and its centre as a
@@ -20,8 +23,11 @@ HandWindow = tuple[float, float, float]
 # where the subject stays outside the window for MIN_HOLD seconds. Every
 # position lasts at least MIN_HOLD seconds. Two faces whose heights are within
 # PAIR_SIZE of each other, close enough to fit PAIR_FIT windows, are framed as
-# a pair rather than guessing which one is speaking. A new position less than
-# MIN_MOVE of the window's width from the current one is not worth a cut.
+# a pair. With speakers (speaker framing amendment), a face that clearly talks
+# is the subject when the pair does not fit; a switch between speakers is a
+# jump like a camera cut, and MIN_HOLD keeps short replies from moving it. A
+# new position less than MIN_MOVE of the window's width from the current one
+# is not worth a cut.
 CUT_JUMP = 0.30
 MIN_HOLD = 2.0
 MIN_MOVE = 0.05
@@ -44,17 +50,27 @@ def window_width(frame_width: int, frame_height: int) -> int:
 
 
 def plan_face_crop(
-    track: FaceTrack, frame_width: int, frame_height: int
+    track: FaceTrack,
+    frame_width: int,
+    frame_height: int,
+    speakers: SpeakerTrack | None = None,
 ) -> CropPath | None:
     """Where a full-height 9:16 window sits over time: locked on the subject.
 
     None if no sample has a face. Within a shot the window does not move;
     brief movement is ignored. Points are kept only where the window moves.
+    The subject is the largest face, a close pair, or with `speakers` the
+    face talking when the pair does not fit.
     """
     window = window_width(frame_width, frame_height)
+    talkers = (
+        speaker_boxes(track, speakers)
+        if speakers is not None
+        else [None] * len(track.samples)
+    )
     points = [
-        _subject(track, sample_index, frame_width, window)
-        for sample_index in range(len(track.samples))
+        _subject(track, sample_index, frame_width, window, talker)
+        for sample_index, talker in enumerate(talkers)
     ]
     if all(p.centre is None for p in points):
         return None
@@ -82,19 +98,26 @@ def plan_face_crop(
     return CropPath(width=window, height=frame_height // 2 * 2, points=tuple(lefts))
 
 
-def _subject(track: FaceTrack, index: int, frame_width: int, window: int) -> _Point:
-    """The largest face, or a close pair of similar faces, in one sample."""
+def _subject(
+    track: FaceTrack,
+    index: int,
+    frame_width: int,
+    window: int,
+    talker: FaceBox | None = None,
+) -> _Point:
+    """The largest face, a close pair of similar faces, or else the face
+    talking, in one sample."""
     sample = track.samples[index]
     seconds = sample.seconds - track.start_seconds
     if not sample.faces:
         return _Point(seconds, None, 0.0)
     ranked = sorted(sample.faces, key=lambda f: f.h, reverse=True)
-    face = ranked[0]
+    face = talker or ranked[0]
     left, right = face.x * frame_width, (face.x + face.w) * frame_width
-    if len(ranked) > 1 and ranked[1].h >= PAIR_SIZE * face.h:
-        other = ranked[1]
-        pair_left = min(face.x, other.x) * frame_width
-        pair_right = max(face.x + face.w, other.x + other.w) * frame_width
+    if len(ranked) > 1 and ranked[1].h >= PAIR_SIZE * ranked[0].h:
+        first, other = ranked[0], ranked[1]
+        pair_left = min(first.x, other.x) * frame_width
+        pair_right = max(first.x + first.w, other.x + other.w) * frame_width
         if pair_right - pair_left <= PAIR_FIT * window:
             left, right = pair_left, pair_right
     return _Point(seconds, (left + right) / 2, min((right - left) / 2, window / 2))

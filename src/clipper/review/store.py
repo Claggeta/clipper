@@ -36,6 +36,7 @@ from clipper.core.interfaces import (
     FaceTracker,
     MediaProbe,
     ReviewFiles,
+    SpeakerScorer,
     TitleWriter,
 )
 from clipper.core.judging import (
@@ -52,6 +53,7 @@ from clipper.core.judging import (
 from clipper.core.naming import clip_file_name, variant_file_name
 from clipper.core.posting import upload_stem
 from clipper.core.sequence import BlockMap
+from clipper.core.speakers import score_speakers
 from clipper.domain.errors import ClipperError, JudgingError, ReviewError
 from clipper.domain.models import (
     AudioMix,
@@ -774,6 +776,28 @@ class RenderInputs:
     channel: str | None = None
     channel_cam: FacecamBox | None = None
     cams_file: Path | None = None
+    # Who is talking, so a face re-render frames the speaker (ADR 0025,
+    # speaker framing amendment).
+    speaker_scorer: SpeakerScorer | None = None
+
+
+def frame_faces(
+    tracker: FaceTracker,
+    scorer: SpeakerScorer | None,
+    video: Path,
+    start_seconds: float,
+    end_seconds: float,
+    size: tuple[int, int],
+) -> CropPath | None:
+    """The face style's crop for a span, as `drafts` frames it: on the
+    speaker where one is found, else as before speakers (ADR 0025)."""
+    track = tracker.track(video, start_seconds, end_seconds)
+    speakers = None
+    if scorer is not None:
+        speakers, why = score_speakers(scorer, video, start_seconds, end_seconds)
+        if why is not None:
+            logger.warning("Speakers not found, framing the largest face: %s", why)
+    return plan_face_crop(track, *size, speakers)
 
 
 class ReviewStore:
@@ -1112,10 +1136,14 @@ class ReviewStore:
         tracker, size = self._render.face_tracker, self._render.frame_size
         if tracker is None or size is None:
             raise ReviewError("A face re-render needs the face tracker and frame size")
-        track = tracker.track(
-            self._render.video, candidate.start_seconds, candidate.end_seconds
+        crop = frame_faces(
+            tracker,
+            self._render.speaker_scorer,
+            self._render.video,
+            candidate.start_seconds,
+            candidate.end_seconds,
+            size,
         )
-        crop = plan_face_crop(track, *size)
         if crop is None:
             raise ReviewError("No face in the new span to frame in the face style")
         return crop
@@ -1292,11 +1320,13 @@ class ReviewStore:
             crops = [
                 None
                 if block.broll is not None
-                else plan_face_crop(
-                    tracker.track(
-                        self._render.video, block.start_seconds, block.end_seconds
-                    ),
-                    *size,
+                else frame_faces(
+                    tracker,
+                    self._render.speaker_scorer,
+                    self._render.video,
+                    block.start_seconds,
+                    block.end_seconds,
+                    size,
                 )
                 for block, _ in blocks.placed
             ]
