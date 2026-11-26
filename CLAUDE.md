@@ -283,7 +283,11 @@ and planned code:
   (merging) withdrawn; neighbours stay separate clips. 30 s windows
   amendment (V8 7b-2, not adopted): LLM at top 10 on four VODs, keepers
   10 to 12, rejects 27 to 28, `good` 5 to 1, cut short 3 to 4 (one end
-  +55 s); windows stay 45 s.
+  +55 s); windows stay 45 s. Target length amendment (V8 7b, not
+  adopted): keepers' median 41.7 s on 25 VODs, `good` 39.7 s, fixes
+  lengthened 57 of 73 spans; no target length; revisit on a Studio
+  export where linked Shorts of 35 s or under lead on stayed to
+  watch.
 - `0024` — `clipper review <drafts folder>`: a local browser page on the
   loopback address, plain HTML/CSS/JS, no build step, dark theme. Clip list,
   a player on the source video, a film strip of the clip plus 120 s either
@@ -825,8 +829,8 @@ only after cheap signals show something, and only without PyTorch if it
 can be avoided).
 
 `v0.8.0` was released on 2026-11-23 with items 1, 3a, 3c and 4 to 9.
-V8 is not closed: the assistant (item 2) and 7b's target length are
-still open, and item 13 (speaker framing) landed on 2026-11-25; the visual spike (3b) ended in nothing on 2026-11-23,
+V8 is not closed: the assistant (item 2) is still open; 7b's target
+length was not adopted on 2026-11-26, and item 13 (speaker framing) landed on 2026-11-25; the visual spike (3b) ended in nothing on 2026-11-23,
 and the speaker spike (11) was adopted for seated setups on 2026-11-25. Items 11 (a speaker detection spike,
 after 3b) and 12 (facecam fixes) were added on 2026-11-23.
 
@@ -1004,8 +1008,8 @@ All merged to `main` with green CI:
   one bar, a bin and a clip library in `review`, six click fixes, the
   Parked fixes in item 5; shorter windows, a cold open and the ranker
   rerun measured and not adopted. Released as `v0.8.0` (pre-release, tag
-  on 217d3c6). Notes are in `docs/releases/v0.8.0.md`. Items 2 and 7b's
-  target length stay open; the visual spike (3b) ended in nothing.
+  on 217d3c6). Notes are in `docs/releases/v0.8.0.md`. Item 2 stays
+  open; the visual spike (3b) and 7b's target length ended in nothing.
 
 In progress:
 
@@ -1920,10 +1924,14 @@ Items 6 to 9 were added on 2026-11-17 and go first, in order; items 2,
      (ADR 0018 and 0030 amendments).~~ (done; #275; a new `screen_hook`
      of at most 6 words, burned 0 to 3 s at the top of every titled
      draft; manual step R19d)
-   - 7b. Shorter drafts: pauses cut by default and a target length of
+   - 7b. ~~Shorter drafts: pauses cut by default and a target length of
      about 20 to 35 s, weighed against ends cut early (ADR 0023 and 0029
-     amendments). 7b-1 ~~pauses cut in `drafts`~~ (done; #277; none past
-     35% of a clip, keepers' median 41.8 to 38.1 s; manual step D14).
+     amendments).~~ 7b-1 ~~pauses cut in `drafts`~~ (done; #277; none
+     past 35% of a clip, keepers' median 41.8 to 38.1 s; manual step
+     D14). Target length (done 2026-11-26; not adopted: keepers' median
+     41.7 s, `good` 39.7 s, the maintainer's fixes lengthened 57 of 73
+     spans and shortened 7; no Studio snapshot to split by length; ADR
+     0023 amendment; no code).
    - 7b-2. ~~Shorter candidates (added 2026-11-17, after 7c): 30 s
      windows tried against the 45 s default, LLM `drafts` on four or
      more judged VODs, new drafts judged by the maintainer, `eval` at

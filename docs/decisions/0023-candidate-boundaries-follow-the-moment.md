@@ -250,6 +250,27 @@ cutting pauses (ADR 0029) and trimming in `review`. Revisit when `good`
 ratings are enough to count `good` picks in the top few ranks per VOD,
 or with a way to end a short window where its moment ends.
 
+## Amended by V8 item 7b: no target length, not adopted
+
+V8 item 7b proposed drafts of about 20 to 35 s, the length YouTube
+Studio's assistant advised (unverified). Checked against the judged
+labels on 2026-11-26, with no code:
+
+- 206 keepers on 25 VODs: median 41.7 s (quartiles 35.4 and 44.6 s).
+  Rated `good`: median 39.7 s, 6 of 14 at 35 s or under.
+- Where the maintainer fixed a draft's span, 57 of 73 fixes made it
+  longer and 7 shorter (median 42.7 s as drafted, 50.9 s as saved).
+- Clips ending too early are one of the two costliest failures (the V5
+  interview), and 30 s windows (7b-2) lost `good` picks, 5 to 1.
+- No Studio snapshot was on disk, and the first export linked only 15
+  Shorts to drafts, too few to split by length.
+
+**Decision.** Not adopted: no target length or trim in `drafts`.
+Pauses are already cut by default (7b-1, ADR 0029); the rest of the
+length is the maintainer's trim in `review`. Revisit when a Studio
+export shows linked Shorts of 35 s or under clearly ahead of longer
+ones on stayed to watch at a similar age.
+
 ## Revisit when
 
 - Judged drafts often join two neighbouring clips in the review page:
